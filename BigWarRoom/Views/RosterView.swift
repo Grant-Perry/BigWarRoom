@@ -12,6 +12,9 @@ struct RosterView: View {
     @ObservedObject var viewModel: DraftRoomViewModel
     @Environment(\.dismiss) private var dismiss
     
+    // State for collapsible teams - changed to single team instead of Set
+    @State private var expandedTeam: Int? = nil
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -37,6 +40,26 @@ struct RosterView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Back") {
                         dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button("Expand All Teams") {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                // For expand all, we'll just expand the first team
+                                let allTeamSlots = Set(viewModel.allDraftPicks.map { $0.draftSlot })
+                                expandedTeam = allTeamSlots.sorted().first
+                            }
+                        }
+                        
+                        Button("Collapse All Teams") {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                expandedTeam = nil
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
                     }
                 }
             }
@@ -99,73 +122,119 @@ struct RosterView: View {
     
     private var teamRostersSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Team Rosters")
-                .font(.title2)
-                .fontWeight(.bold)
+            HStack {
+                Text("Team Rosters")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Text(expandedTeam != nil ? "1 team expanded" : "All teams collapsed")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
             
             // Group picks by draft slot (team)
             let picksByTeam = Dictionary(grouping: viewModel.allDraftPicks) { $0.draftSlot }
             let sortedTeamSlots = picksByTeam.keys.sorted()
             
-            LazyVStack(spacing: 20) {
+            LazyVStack(spacing: 16) {
                 ForEach(sortedTeamSlots, id: \.self) { teamSlot in
                     let teamPicks = picksByTeam[teamSlot] ?? []
-                    teamRosterCard(teamSlot: teamSlot, picks: teamPicks)
+                    collapsibleTeamRosterCard(teamSlot: teamSlot, picks: teamPicks)
                 }
             }
         }
     }
     
-    private func teamRosterCard(teamSlot: Int, picks: [EnhancedPick]) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Team header with name and pick count
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(teamDisplayName(for: teamSlot, from: picks))
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Draft Slot \(teamSlot)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("\(picks.count)")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
-                    
-                    Text("picks")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            // Team roster organized by position
-            let rosterByPosition = organizeRosterByPosition(picks)
-            
-            if !picks.isEmpty {
-                VStack(spacing: 20) {
-                    ForEach(rosterPositionOrder, id: \.self) { position in
-                        if let playersAtPosition = rosterByPosition[position], !playersAtPosition.isEmpty {
-                            positionGroupCard(position: position, players: playersAtPosition)
-                        }
+    private var uniqueTeamCount: Int {
+        Set(viewModel.allDraftPicks.map { $0.draftSlot }).count
+    }
+    
+    private func collapsibleTeamRosterCard(teamSlot: Int, picks: [EnhancedPick]) -> some View {
+        let isExpanded = expandedTeam == teamSlot
+        
+        return VStack(alignment: .leading, spacing: 0) {
+            // Collapsible Team Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    if isExpanded {
+                        // If this team is already expanded, collapse it
+                        expandedTeam = nil
+                    } else {
+                        // Expand this team (automatically collapses any other)
+                        expandedTeam = teamSlot
                     }
                 }
-            } else {
-                Text("No picks yet")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(teamDisplayName(for: teamSlot, from: picks))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text("Draft Slot \(teamSlot)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 12) {
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("\(picks.count)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            
+                            Text("picks")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+                    }
+                }
+                .padding(16)
+                .background(Color(.systemGray6).opacity(0.2))
+            }
+            
+            // Collapsible Content
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Team roster organized by position
+                    let rosterByPosition = organizeRosterByPosition(picks)
+                    
+                    if !picks.isEmpty {
+                        VStack(spacing: 20) {
+                            ForEach(rosterPositionOrder, id: \.self) { position in
+                                if let playersAtPosition = rosterByPosition[position], !playersAtPosition.isEmpty {
+                                    positionGroupCard(position: position, players: playersAtPosition)
+                                }
+                            }
+                        }
+                    } else {
+                        Text("No picks yet")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 20)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .background(Color(.systemGray6).opacity(0.05))
             }
         }
-        .padding(16)
         .background(Color(.systemGray6).opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(isExpanded ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
+        )
     }
     
     private func positionGroupCard(position: String, players: [EnhancedPick]) -> some View {
@@ -173,13 +242,12 @@ struct RosterView: View {
             // Position header
             HStack {
                 Text(position)
-                    .font(.title3)
-                    .fontWeight(.bold)
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
                     .background(positionColor(position))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 
                 Spacer()
                 
@@ -289,7 +357,7 @@ struct CompactTeamRosterPlayerCard: View {
                     .minimumScaleFactor(0.7)
                 
                 HStack(spacing: 6) {
-                    // Position badge
+                    // Position badge - ORIGINAL SIZE
                     Text(pick.position)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
@@ -298,7 +366,7 @@ struct CompactTeamRosterPlayerCard: View {
                         .background(positionColor(pick.position))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                     
-                    // Positional rank badge (RB1, WR2, etc.) - NEW
+                    // Positional rank badge (RB1, WR2, etc.) - ORIGINAL SIZE
                     if let positionRank = pick.player.positionalRank {
                         Text(positionRank)
                             .font(.system(size: 9, weight: .bold))
@@ -357,30 +425,4 @@ struct CompactTeamRosterPlayerCard: View {
         default: return .gray
         }
     }
-}
-
-// MARK: -> Team Roster Player Card
-
-struct TeamRosterPlayerCard: View {
-    let pick: EnhancedPick
-    
-    var body: some View {
-        CompactTeamRosterPlayerCard(pick: pick)
-    }
-    
-    private func positionColor(_ position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return .purple
-        case "RB": return .green
-        case "WR": return .blue
-        case "TE": return .orange
-        case "K": return .gray
-        case "DEF", "DST": return .red
-        default: return .gray
-        }
-    }
-}
-
-#Preview {
-    RosterView(viewModel: DraftRoomViewModel())
 }

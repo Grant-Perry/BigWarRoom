@@ -13,6 +13,7 @@ protocol DraftAPIClient {
     func fetchUser(username: String) async throws -> SleeperUser
     func fetchUserByID(userID: String) async throws -> SleeperUser
     func fetchLeagues(userID: String, season: String) async throws -> [SleeperLeague]
+    func fetchLeague(leagueID: String) async throws -> SleeperLeague  // Added this
     func fetchDraft(draftID: String) async throws -> SleeperDraft
     func fetchDraftPicks(draftID: String) async throws -> [SleeperPick]
     func fetchRosters(leagueID: String) async throws -> [SleeperRoster]
@@ -53,8 +54,10 @@ final class SleeperAPIClient: DraftAPIClient {
         return try JSONDecoder().decode(SleeperUser.self, from: data)
     }
     
-    // MARK: -> Leagues
-    func fetchLeagues(userID: String, season: String = "2024") async throws -> [SleeperLeague] {
+    // MARK: -> League Endpoints
+    
+    /// Fetch leagues for a specific user (season parameter for protocol compliance)
+    func fetchLeagues(userID: String, season: String) async throws -> [SleeperLeague] {
         let url = URL(string: "\(baseURL)/user/\(userID)/leagues/nfl/\(season)")!
         let (data, response) = try await session.data(from: url)
         
@@ -63,7 +66,44 @@ final class SleeperAPIClient: DraftAPIClient {
             throw SleeperAPIError.invalidResponse
         }
         
-        return try JSONDecoder().decode([SleeperLeague].self, from: data)
+        let leagues = try JSONDecoder().decode([SleeperLeague].self, from: data)
+        print("✅ Fetched \(leagues.count) leagues for user \(userID)")
+        return leagues
+    }
+    
+    /// Fetch leagues for a specific user (convenience method with default season)
+    func fetchLeagues(userID: String) async throws -> [SleeperLeague] {
+        return try await fetchLeagues(userID: userID, season: "2024")
+    }
+    
+    /// Fetch a specific league by ID
+    func fetchLeague(leagueID: String) async throws -> SleeperLeague {
+        let url = URL(string: "\(baseURL)/league/\(leagueID)")!
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SleeperAPIError.invalidResponse
+        }
+        
+        let league = try JSONDecoder().decode(SleeperLeague.self, from: data)
+        print("✅ Fetched league: \(league.name)")
+        return league
+    }
+    
+    /// Fetch rosters for a league
+    func fetchRosters(leagueID: String) async throws -> [SleeperRoster] {
+        let url = URL(string: "\(baseURL)/league/\(leagueID)/rosters")!
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SleeperAPIError.invalidResponse
+        }
+        
+        let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+        print("✅ Fetched \(rosters.count) rosters for league \(leagueID)")
+        return rosters
     }
     
     // MARK: -> Draft
@@ -90,19 +130,6 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         return try JSONDecoder().decode([SleeperPick].self, from: data)
-    }
-    
-    // MARK: -> Rosters
-    func fetchRosters(leagueID: String) async throws -> [SleeperRoster] {
-        let url = URL(string: "\(baseURL)/league/\(leagueID)/rosters")!
-        let (data, response) = try await session.data(from: url)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw SleeperAPIError.invalidResponse
-        }
-        
-        return try JSONDecoder().decode([SleeperRoster].self, from: data)
     }
     
     // MARK: -> Players (5MB JSON - Cache This!)

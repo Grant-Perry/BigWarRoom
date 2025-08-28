@@ -8,6 +8,11 @@
 import Foundation
 import Combine
 
+#if os(iOS)
+import AudioToolbox
+import UIKit
+#endif
+
 @MainActor
 final class DraftRoomViewModel: ObservableObject {
     // MARK: - Published UI State
@@ -34,6 +39,30 @@ final class DraftRoomViewModel: ObservableObject {
     
     @Published var roster: Roster = .init()
     
+    // MARK: - Pick Notifications
+    
+    @Published var showingPickAlert = false
+    @Published var showingConfirmationAlert = false
+    @Published var pickAlertMessage = ""
+    @Published var confirmationAlertMessage = ""
+    @Published var isMyTurn = false
+    
+    // MARK: - Manual Draft Position Selection
+    
+    @Published var isConnectedToManualDraft = false
+    @Published var manualDraftNeedsPosition = false
+    @Published var selectedManualPosition: Int = 1
+    @Published var manualDraftInfo: SleeperDraft?
+    @Published var showManualDraftEntry = false
+    
+    /// Computed property for max teams in current draft
+    var maxTeamsInDraft: Int {
+        return manualDraftInfo?.settings?.teams ??
+               selectedDraft?.settings?.teams ??
+               selectedDraft?.totalRosters ??
+               16
+    }
+
     // MARK: - Services
     
     private let sleeperClient = SleeperAPIClient.shared
@@ -41,9 +70,15 @@ final class DraftRoomViewModel: ObservableObject {
     private let polling = DraftPollingService.shared
     private let suggestionEngine = SuggestionEngine()
     
-    // MARK: - Draft Context
+    // MARK: - Draft Context & User Tracking
     
     private var draftRosters: [Int: DraftRosterInfo] = [:]
+    private var currentUserID: String?
+    private var myRosterID: Int?
+    private var myDraftSlot: Int?
+    private var allLeagueRosters: [SleeperRoster] = []
+    private var lastPickCount = 0
+    private var lastMyPickCount = 0
     
     // MARK: - Combine
     
@@ -77,7 +112,26 @@ final class DraftRoomViewModel: ObservableObject {
                 guard let self else { return }
                 self.recentLivePicks = Array(self.polling.recentPicks)
                 self.allDraftPicks = self.buildEnhancedPicks(from: picks)
-                Task { await self.refreshSuggestions() }
+                
+                // Debug logging for mock draft tracking
+                if self.myDraftSlot != nil && self.myRosterID == nil {
+                    let mySlotPicks = picks.filter { $0.draftSlot == self.myDraftSlot }
+                    print("🔍 Mock Draft Tracking - Slot \(self.myDraftSlot!): \(mySlotPicks.count) picks")
+                    for pick in mySlotPicks {
+                        if let playerID = pick.playerID,
+                           let player = self.playerDirectory.player(for: playerID) {
+                            print("   • Pick \(pick.pickNo): \(player.shortName)")
+                        }
+                    }
+                }
+                
+                // Check for turn changes and new picks
+                Task { 
+                    await self.checkForTurnChange()
+                    await self.checkForMyNewPicks(picks)
+                    await self.updateMyRosterFromPicks(picks)
+                    await self.refreshSuggestions() 
+                }
             }
             .store(in: &cancellables)
         
@@ -100,6 +154,7 @@ final class DraftRoomViewModel: ObservableObject {
     
     func connectWithUserID(_ userID: String) async {
         connectionStatus = .connecting
+        currentUserID = userID  // Store the user ID
         do {
             let user = try await sleeperClient.fetchUserByID(userID: userID)
             sleeperDisplayName = user.displayName ?? user.username
@@ -121,6 +176,17 @@ final class DraftRoomViewModel: ObservableObject {
         allDraftPicks = []
         recentLivePicks = []
         connectionStatus = .disconnected
+        currentUserID = nil
+        myRosterID = nil
+        myDraftSlot = nil
+        allLeagueRosters = []
+        
+        // Reset manual draft state
+        isConnectedToManualDraft = false
+        manualDraftNeedsPosition = false
+        manualDraftInfo = nil
+        
+        // Don't clear roster here - let user keep their manual roster if they want
     }
     
     // MARK: - Selecting a Draft
@@ -128,10 +194,21 @@ final class DraftRoomViewModel: ObservableObject {
     func selectDraft(_ league: SleeperLeague) async {
         selectedDraft = league
         
-        // Fetch roster metadata for nicer team display
+        // Fetch roster metadata and find MY roster
         if let leagueID = selectedDraft?.leagueID {
             do {
                 let rosters = try await sleeperClient.fetchRosters(leagueID: leagueID)
+                allLeagueRosters = rosters
+                
+                // Find MY roster by matching owner ID with current user ID
+                if let userID = currentUserID {
+                    if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
+                        myRosterID = myRoster.rosterID
+                        myDraftSlot = myRoster.draftSlot
+                    }
+                }
+                
+                // Build roster info for display
                 var info: [Int: DraftRosterInfo] = [:]
                 for roster in rosters {
                     let displayName = roster.ownerDisplayName ?? "Team \(roster.rosterID)"
@@ -142,8 +219,18 @@ final class DraftRoomViewModel: ObservableObject {
                     )
                 }
                 draftRosters = info
+                
+                // Load MY actual roster from the league
+                await loadMyActualRoster()
+                
+                // Initialize pick tracking
+                lastPickCount = polling.allPicks.count
+                lastMyPickCount = polling.allPicks.filter { $0.rosterID == myRosterID }.count
+                
             } catch {
                 draftRosters = [:]
+                myRosterID = nil
+                myDraftSlot = nil
             }
         }
         
@@ -155,12 +242,216 @@ final class DraftRoomViewModel: ObservableObject {
         await refreshSuggestions()
     }
     
+    /// Load the user's actual roster from the selected league
+    private func loadMyActualRoster() async {
+        guard let myRosterID = myRosterID,
+              let myRoster = allLeagueRosters.first(where: { $0.rosterID == myRosterID }),
+              let playerIDs = myRoster.playerIDs else {
+            return
+        }
+        
+        // Convert Sleeper player IDs to our internal Player objects
+        var newRoster = Roster()
+        
+        for playerID in playerIDs {
+            if let sleeperPlayer = playerDirectory.player(for: playerID),
+               let internalPlayer = playerDirectory.convertToInternalPlayer(sleeperPlayer) {
+                newRoster.add(internalPlayer)
+            }
+        }
+        
+        // Update the roster
+        roster = newRoster
+    }
+    
     // MARK: - Manual Draft ID
     
     func connectToManualDraft(draftID: String) async {
+        // Start polling immediately to show picks
         polling.startPolling(draftID: draftID)
         connectionStatus = .connected
+        isConnectedToManualDraft = true
+        
+        // DON'T auto-close the manual draft entry yet - user still needs to select position
+        // showManualDraftEntry = false
+        
+        // Try to fetch draft info for basic display
+        do {
+            let draft = try await sleeperClient.fetchDraft(draftID: draftID)
+            manualDraftInfo = draft
+            
+            // Create a minimal league object for UI consistency
+            let draftLeague = SleeperLeague(
+                leagueID: draft.leagueID ?? "manual_\(draftID)",
+                name: draft.metadata?.name ?? "Manual Draft",
+                status: .drafting,
+                sport: "nfl",
+                season: "2024",
+                seasonType: "regular", 
+                totalRosters: draft.settings?.teams ?? 12,
+                draftID: draftID,
+                avatar: nil,
+                settings: SleeperLeagueSettings(
+                    teams: draft.settings?.teams,
+                    playoffTeams: nil,
+                    playoffWeekStart: nil,
+                    leagueAverageMatch: nil,
+                    maxKeepers: nil,
+                    tradeDeadline: nil,
+                    reserveSlots: nil,
+                    taxiSlots: nil
+                ),
+                scoringSettings: nil,
+                rosterPositions: nil
+            )
+            selectedDraft = draftLeague
+            
+        } catch {
+            print("❌ Could not fetch draft info: \(error)")
+            // Create fallback league for display
+            selectedDraft = SleeperLeague(
+                leagueID: "manual_\(draftID)",
+                name: "Manual Draft",
+                status: .drafting,
+                sport: "nfl",
+                season: "2024", 
+                seasonType: "regular",
+                totalRosters: 12,
+                draftID: draftID,
+                avatar: nil,
+                settings: nil,
+                scoringSettings: nil,
+                rosterPositions: nil
+            )
+        }
+        
+        // If we have a connected user, try to enhance with roster correlation
+        if let userID = currentUserID {
+            let foundRoster = await enhanceManualDraftWithRosterCorrelation(draftID: draftID, userID: userID)
+            
+            // If we couldn't auto-detect, ask for manual position
+            if !foundRoster {
+                manualDraftNeedsPosition = true
+                // Ensure selectedManualPosition is valid for this draft
+                let teamCount = manualDraftInfo?.settings?.teams ?? selectedDraft?.totalRosters ?? 16
+                if selectedManualPosition > teamCount {
+                    selectedManualPosition = 1 // Reset to valid position
+                }
+            } else {
+                // Only close if we successfully auto-detected the roster
+                showManualDraftEntry = false
+            }
+        } else {
+            // Not connected to Sleeper - ask for manual position
+            manualDraftNeedsPosition = true
+            // Ensure selectedManualPosition is valid for this draft
+            let teamCount = manualDraftInfo?.settings?.teams ?? selectedDraft?.totalRosters ?? 16
+            if selectedManualPosition > teamCount {
+                selectedManualPosition = 1 // Reset to valid position
+            }
+        }
+        
         await refreshSuggestions()
+    }
+
+    /// Enhanced manual draft connection with full roster correlation
+    /// Returns true if roster was found, false if manual position needed
+    private func enhanceManualDraftWithRosterCorrelation(draftID: String, userID: String) async -> Bool {
+        do {
+            // Step 1: Fetch draft info to get league ID
+            print("🔍 Fetching draft info for manual draft: \(draftID)")
+            let draft = try await sleeperClient.fetchDraft(draftID: draftID)
+            
+            guard let leagueID = draft.leagueID else {
+                print("⚠️ Draft \(draftID) has no league ID - likely a mock draft")
+                return false
+            }
+            
+            print("✅ Found league ID: \(leagueID)")
+            
+            // Step 2: Fetch league info to create a SleeperLeague object
+            let league = try await sleeperClient.fetchLeague(leagueID: leagueID)
+            print("✅ Fetched league: \(league.name)")
+            
+            // Step 3: Fetch league rosters
+            let rosters = try await sleeperClient.fetchRosters(leagueID: leagueID)
+            allLeagueRosters = rosters
+            
+            // Step 4: Find MY roster by matching owner ID with current user ID
+            if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
+                myRosterID = myRoster.rosterID
+                myDraftSlot = myRoster.draftSlot
+                
+                print("🎯 Found your roster! ID: \(myRoster.rosterID), Draft Slot: \(myRoster.draftSlot ?? -1)")
+                
+                // Step 5: Set up draft roster info for display
+                var info: [Int: DraftRosterInfo] = [:]
+                for roster in rosters {
+                    let displayName = roster.ownerDisplayName ?? "Team \(roster.rosterID)"
+                    info[roster.rosterID] = DraftRosterInfo(
+                        rosterID: roster.rosterID,
+                        ownerID: roster.ownerID,
+                        displayName: displayName
+                    )
+                }
+                draftRosters = info
+                
+                // Step 6: Update selectedDraft with real league info
+                selectedDraft = league
+                
+                // Step 7: Load your actual roster from the league
+                await loadMyActualRoster()
+                
+                // Step 8: Initialize pick tracking for alerts
+                lastPickCount = polling.allPicks.count
+                lastMyPickCount = polling.allPicks.filter { $0.rosterID == myRosterID }.count
+                
+                print("🚨 Manual draft enhanced! Pick alerts and roster correlation enabled.")
+                return true
+                
+            } else {
+                print("⚠️ Could not find your roster in league \(leagueID)")
+                print("Available rosters: \(rosters.map { "\($0.rosterID): \($0.ownerID ?? "no owner")" })")
+                return false
+            }
+            
+        } catch {
+            print("❌ Failed to enhance manual draft: \(error)")
+            print("Manual draft will work but without roster correlation")
+            return false
+        }
+    }
+
+    /// Set manual draft position when auto-detection fails
+    func setManualDraftPosition(_ position: Int) {
+        myDraftSlot = position
+        manualDraftNeedsPosition = false
+        
+        // Now that position is set, we can close the manual draft entry
+        showManualDraftEntry = false
+        
+        // Initialize pick tracking with manual position - count existing picks for this slot
+        lastPickCount = polling.allPicks.count
+        
+        // Count picks already made for this draft slot
+        let existingMyPicks = polling.allPicks.filter { $0.draftSlot == position }
+        lastMyPickCount = existingMyPicks.count
+        
+        print("🎯 Manual draft position set to: \(position)")
+        print("📊 Found \(existingMyPicks.count) existing picks for slot \(position)")
+        
+        // Update roster immediately with any existing picks for this position
+        Task {
+            await updateMyRosterFromPicks(polling.allPicks)
+            await checkForTurnChange()
+        }
+    }
+
+    func dismissManualPositionPrompt() {
+        manualDraftNeedsPosition = false
+        
+        // Close the manual draft entry when they skip position selection
+        showManualDraftEntry = false
     }
     
     func forceRefresh() async {
@@ -473,6 +764,171 @@ final class DraftRoomViewModel: ObservableObject {
             )
         }
         .sorted { $0.pickNumber < $1.pickNumber }
+    }
+    
+    /// Update my roster based on draft picks
+    private func updateMyRosterFromPicks(_ picks: [SleeperPick]) async {
+        var newRoster = Roster()
+        
+        // Strategy 1: Use roster ID correlation (for real leagues)
+        if let myRosterID = myRosterID {
+            let myPicks = picks.filter { $0.rosterID == myRosterID }
+            
+            for pick in myPicks {
+                if let playerID = pick.playerID,
+                   let sleeperPlayer = playerDirectory.player(for: playerID),
+                   let internalPlayer = playerDirectory.convertToInternalPlayer(sleeperPlayer) {
+                    newRoster.add(internalPlayer)
+                }
+            }
+        }
+        // Strategy 2: Use draft slot correlation (for mock drafts/manual position)
+        else if let myDraftSlot = myDraftSlot {
+            let myPicks = picks.filter { $0.draftSlot == myDraftSlot }
+            
+            for pick in myPicks {
+                if let playerID = pick.playerID,
+                   let sleeperPlayer = playerDirectory.player(for: playerID),
+                   let internalPlayer = playerDirectory.convertToInternalPlayer(sleeperPlayer) {
+                    newRoster.add(internalPlayer)
+                }
+            }
+            
+            print("🎯 Updated roster from draft slot \(myDraftSlot): \(myPicks.count) picks")
+        }
+        
+        // Update roster if it's different
+        if !rostersAreEqual(newRoster, roster) {
+            roster = newRoster
+            print("✅ MyRoster updated with \(totalPlayersInRoster(newRoster)) players")
+        }
+    }
+    
+    /// Helper to count total players in roster
+    private func totalPlayersInRoster(_ roster: Roster) -> Int {
+        let starters = [roster.qb, roster.rb1, roster.rb2, roster.wr1, roster.wr2, roster.wr3,
+                       roster.te, roster.flex, roster.k, roster.dst].compactMap { $0 }.count
+        return starters + roster.bench.count
+    }
+    
+    // MARK: - Turn Detection & Alerts
+    
+    /// Check if it's the user's turn to pick
+    private func checkForTurnChange() async {
+        guard let draft = polling.currentDraft,
+              let myDraftSlot = myDraftSlot,
+              let teams = draft.settings?.teams else {
+            isMyTurn = false
+            return
+        }
+        
+        let currentPickNumber = polling.allPicks.count + 1
+        let wasMyTurn = isMyTurn
+        let newIsMyTurn = isMyTurnToPick(pickNumber: currentPickNumber, mySlot: myDraftSlot, totalTeams: teams)
+        
+        isMyTurn = newIsMyTurn
+        
+        // Show alert if it just became my turn
+        if newIsMyTurn && !wasMyTurn {
+            let round = ((currentPickNumber - 1) / teams) + 1
+            let pickInRound = ((currentPickNumber - 1) % teams) + 1
+            
+            pickAlertMessage = "🚨 IT'S YOUR PICK! 🚨\n\nRound \(round), Pick \(pickInRound)\n(\(currentPickNumber) overall)\n\nTime to make your selection!"
+            showingPickAlert = true
+            
+            // Haptic feedback
+            await triggerPickAlert()
+        }
+    }
+    
+    /// Calculate if it's my turn based on snake draft logic
+    private func isMyTurnToPick(pickNumber: Int, mySlot: Int, totalTeams: Int) -> Bool {
+        let round = ((pickNumber - 1) / totalTeams) + 1
+        let pickInRound = ((pickNumber - 1) % totalTeams) + 1
+        
+        if round % 2 == 1 {
+            // Odd rounds: normal order (1, 2, 3, ..., totalTeams)
+            return pickInRound == mySlot
+        } else {
+            // Even rounds: snake/reverse order (totalTeams, ..., 3, 2, 1)
+            return pickInRound == (totalTeams - mySlot + 1)
+        }
+    }
+    
+    /// Check for new picks I made and show confirmation
+    private func checkForMyNewPicks(_ picks: [SleeperPick]) async {
+        var myPicks: [SleeperPick] = []
+        var newMyPickCount = 0
+        
+        // Strategy 1: Use roster ID (for real leagues)
+        if let myRosterID = myRosterID {
+            myPicks = picks.filter { $0.rosterID == myRosterID }
+            newMyPickCount = myPicks.count
+        }
+        // Strategy 2: Use draft slot (for mock drafts)
+        else if let myDraftSlot = myDraftSlot {
+            myPicks = picks.filter { $0.draftSlot == myDraftSlot }
+            newMyPickCount = myPicks.count
+        } else {
+            return // No way to identify my picks
+        }
+        
+        // Did I just make a pick?
+        if newMyPickCount > lastMyPickCount {
+            let newPicks = myPicks.suffix(newMyPickCount - lastMyPickCount)
+            
+            for pick in newPicks {
+                if let playerID = pick.playerID,
+                   let player = playerDirectory.player(for: playerID) {
+                    confirmationAlertMessage = "✅ PICK CONFIRMED!\n\n\(player.fullName)\n\(player.position ?? "") • \(player.team ?? "")\n\nRound \(pick.round), Pick \(pick.pickNo)"
+                    showingConfirmationAlert = true
+                    
+                    print("🚨 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
+                }
+            }
+        }
+        
+        lastMyPickCount = newMyPickCount
+    }
+    
+    /// Trigger haptic and audio feedback for pick alerts
+    private func triggerPickAlert() async {
+        #if os(iOS)
+        // Strong haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+        
+        // System sound for notification
+        AudioServicesPlaySystemSound(1007) // SMS received sound
+        #endif
+    }
+    
+    /// Dismiss pick alert
+    func dismissPickAlert() {
+        showingPickAlert = false
+        pickAlertMessage = ""
+    }
+    
+    /// Dismiss confirmation alert
+    func dismissConfirmationAlert() {
+        showingConfirmationAlert = false
+        confirmationAlertMessage = ""
+    }
+    
+    /// Helper to compare rosters to avoid unnecessary updates
+    private func rostersAreEqual(_ r1: Roster, _ r2: Roster) -> Bool {
+        // Get all player IDs from both rosters
+        let r1IDs = Set([
+            r1.qb?.id, r1.rb1?.id, r1.rb2?.id, r1.wr1?.id, r1.wr2?.id, r1.wr3?.id,
+            r1.te?.id, r1.flex?.id, r1.k?.id, r1.dst?.id
+        ].compactMap { $0 } + r1.bench.map { $0.id })
+        
+        let r2IDs = Set([
+            r2.qb?.id, r2.rb1?.id, r2.rb2?.id, r2.wr1?.id, r2.wr2?.id, r2.wr3?.id,
+            r2.te?.id, r2.flex?.id, r2.k?.id, r2.dst?.id
+        ].compactMap { $0 } + r2.bench.map { $0.id })
+        
+        return r1IDs == r2IDs
     }
 }
 
