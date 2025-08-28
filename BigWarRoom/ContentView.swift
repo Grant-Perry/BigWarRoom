@@ -1,23 +1,43 @@
-// BigWarRoom --> ContentView.swift
-//  
-//   Created by: Gp. on 8/25/25 at 1:30 PM
-//     Modified: 
-//  Copyright © 2025 Cre8vPlanet Studios, LLC. - Grant Perry - all rights reserved.
-
-import SwiftUI
-
+//
+//  ContentView.swift
+//  DraftWarRoom
+//
+//  MARK: -> Main App Content View
 
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var viewModel = DraftRoomViewModel()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView {
+            // Draft War Room Tab
+            NavigationView {
+                DraftRoomView(viewModel: viewModel)
+            }
+            .tabItem {
+                Image(systemName: "brain.head.profile")
+                Text("War Room")
+            }
+            
+            // League Draft Board Tab
+            NavigationView {
+                LeagueDraftView(viewModel: viewModel)
+            }
+            .tabItem {
+                Image(systemName: "sportscourt")
+                Text("Draft Board")
+            }
+            
+            NavigationView {
+                MyRosterView(viewModel: viewModel)
+            }
+            .tabItem {
+                Image(systemName: "person.fill")
+                Text("My Roster")
+            }
         }
-        .padding()
+        .preferredColorScheme(.dark)
     }
 }
 
