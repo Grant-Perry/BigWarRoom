@@ -46,7 +46,8 @@ enum PositionFilter: String, Codable, CaseIterable, Identifiable, Hashable {
 // MARK: -> Sort Method
 enum SortMethod: String, Codable, CaseIterable, Identifiable, Hashable {
     case wizard = "WIZARD"
-    case rankings = "RANKINGS"
+    case rankings = "RANKINGS" 
+    case all = "ALL"
     
     var id: String { rawValue }
     
@@ -54,6 +55,7 @@ enum SortMethod: String, Codable, CaseIterable, Identifiable, Hashable {
         switch self {
         case .wizard: return "AI Wizard"
         case .rankings: return "Pure Ranks"
+        case .all: return "All"
         }
     }
 }

@@ -43,19 +43,35 @@ struct DraftRoomView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // List with swipe actions instead of ScrollView
-                List {
-                    ForEach(viewModel.suggestions) { suggestion in
-                        enhancedSuggestionCard(suggestion)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                // Choose display method based on sort method
+                if viewModel.selectedSortMethod == .all {
+                    // LazyVStack for "All" - can handle thousands of players
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(viewModel.suggestions) { suggestion in
+                                enhancedSuggestionCardForAll(suggestion)
+                            }
+                        }
+                        .padding(.horizontal)
                     }
+                    .frame(height: 600)
+                    .background(Color(.systemGray6).opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    // List with swipe actions for Wizard and Rankings
+                    List {
+                        ForEach(viewModel.suggestions) { suggestion in
+                            enhancedSuggestionCard(suggestion)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        }
+                    }
+                    .listStyle(.plain)
+                    .frame(height: 600) // Reduced since we removed the picks section
+                    .background(Color(.systemGray6).opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .listStyle(.plain)
-                .frame(height: 600) // Reduced since we removed the picks section
-                .background(Color(.systemGray6).opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -141,7 +157,7 @@ struct DraftRoomView: View {
                 Spacer()
                 
                 // Show current method description
-                Text(viewModel.selectedSortMethod == .wizard ? "AI Strategy" : "Pure Rankings")
+                Text(viewModel.selectedSortMethod == .wizard ? "AI Strategy" : viewModel.selectedSortMethod == .rankings ? "Pure Rankings" : "All Players")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -182,19 +198,103 @@ struct DraftRoomView: View {
             // Tap to show player stats
             showPlayerStats(for: suggestion.player)
         }
-        .swipeActions(edge: .trailing) {
+        // Only add swipe actions for non-"All" modes (List view)
+        .conditionalSwipeActions(condition: viewModel.selectedSortMethod != .all) {
             // Swipe left (from right edge) to Add to Feed
             Button("Add") {
                 addPlayerToFeed(suggestion)
             }
             .tint(.blue)
-        }
-        .swipeActions(edge: .leading) {
+        } leading: {
             // Swipe right (from left edge) to Lock as My Pick
             Button("Lock") {
                 lockPlayerAsPick(suggestion)
             }
             .tint(.green)
+        }
+    }
+    
+    // MARK: -> Enhanced Suggestion Card for "All" view (LazyVStack - no swipe actions)
+    
+    private func enhancedSuggestionCardForAll(_ suggestion: Suggestion) -> some View {
+        HStack(spacing: 16) {  
+            // Player headshot with position number badge overlay
+            ZStack(alignment: .topTrailing) {
+                // Player headshot - improved lookup logic
+                playerImageForSuggestion(suggestion.player)
+                
+                // Sequential position number in blue gradient circle
+                if let index = viewModel.suggestions.firstIndex(where: { $0.id == suggestion.id }) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.blue, .blue.opacity(0.7)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        )
+                        .offset(x: 4, y: -4)
+                }
+            }
+            
+            // Player info - expanded to fill more space
+            VStack(alignment: .leading, spacing: 6) {  
+                // Player name and position on TOP row with team logo/tier on trailing edge
+                HStack(spacing: 8) {
+                    // Custom player name and position display
+                    playerNameAndPositionView(for: suggestion)
+                    
+                    Spacer()
+                    
+                    // Team logo and tier badge all the way to trailing edge
+                    HStack(spacing: 8) {
+                        // Tier badge
+                        tierBadge(suggestion.player.tier)
+                        
+                        // Team logo
+                        TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+                            .frame(width: 42, height: 42)
+                    }
+                }
+                
+                // Player details: jersey, years, injury status (second row)
+                playerDetailsRowForAll(for: suggestion.player)
+            }
+        }
+        .padding(.horizontal, 16)  
+        .padding(.vertical, 14)    
+        .background(
+            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            // Tap to show player stats
+            showPlayerStats(for: suggestion.player)
+        }
+        // Add gesture recognizers for add/lock actions since no swipe actions in LazyVStack
+        .onLongPressGesture(minimumDuration: 0.5) {
+            // Long press to lock as my pick
+            lockPlayerAsPick(suggestion)
+            
+            // Haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+        }
+        // Add contextual menu for additional actions
+        .contextMenu {
+            Button("Lock as My Pick") {
+                lockPlayerAsPick(suggestion)
+            }
+            
+            Button("Add to Feed") {
+                addPlayerToFeed(suggestion)
+            }
         }
     }
     
@@ -272,10 +372,12 @@ struct DraftRoomView: View {
         }
         .padding()
         .background(viewModel.isLiveMode ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 12));
     }
     
     // MARK: -> Connection Section
+    
+    @State private var customSleeperInput: String = AppConstants.GpSleeperID
     
     private var connectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -288,7 +390,7 @@ struct DraftRoomView: View {
                 // Manual refresh button
                 Button("Refresh") {
                     Task {
-                        await viewModel.connectWithUserID(AppConstants.GpSleeperID)
+                        await viewModel.connectWithUsernameOrID(customSleeperInput)
                     }
                 }
                 .font(.caption)
@@ -332,18 +434,68 @@ struct DraftRoomView: View {
                 .background(Color.green.opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
-                // Not connected - show connect option
-                VStack(spacing: 8) {
-                    Text("Connect to see your league drafts")
+                // Not connected - show connect option with username/ID input
+                VStack(spacing: 12) {
+                    Text("Enter your Sleeper username or User ID to see your league drafts")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                     
-                    Button("Connect to Sleeper") {
-                        Task {
-                            await viewModel.connectWithUserID(AppConstants.GpSleeperID)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Username or User ID")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        HStack {
+                            TextField("e.g. 'gpick' or '1117588009542615040'", text: $customSleeperInput)
+                                .textFieldStyle(.roundedBorder)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled(true)
+                            
+                            Button("Connect") {
+                                Task {
+                                    await viewModel.connectWithUsernameOrID(customSleeperInput)
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(customSleeperInput.isEmpty)
                         }
                     }
-                    .buttonStyle(.borderedProminent)
+                    
+                    HStack(spacing: 8) {
+                        Button("Use Default (Gp)") {
+                            customSleeperInput = AppConstants.GpSleeperID
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        
+                        Button("Paste") {
+                            if let clipboardText = UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                                customSleeperInput = clipboardText
+                            }
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gray.opacity(0.1))
+                        .foregroundColor(.gray)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Username: gpick")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text("User ID: ...\(String(AppConstants.GpSleeperID.suffix(8)))")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .fontDesign(.monospaced)
+                        }
+                    }
                 }
                 .padding()
                 .background(Color.blue.opacity(0.1))
@@ -352,7 +504,7 @@ struct DraftRoomView: View {
         }
     }
     
-    // MARK: -> Available Drafts Section (Now Collapsible)
+    // MARK: -> Available Drafts (Now Collapsible)
     
     @State private var showAvailableDrafts = false
     
@@ -698,7 +850,7 @@ struct DraftRoomView: View {
                         .padding(.vertical, 4)
                         .background(Color.gray.opacity(0.1))
                         .foregroundColor(.gray)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: 6));
                         
                         Button("Paste") {
                             if let clipboardText = UIPasteboard.general.string {
@@ -780,6 +932,7 @@ struct DraftRoomView: View {
                         HStack {
                             TextField("E.g. J Jefferson, L Jackson, J Allen", text: $viewModel.picksFeed)
                                 .textFieldStyle(.roundedBorder)
+                                .fontDesign(.monospaced)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled(true)
                                 .submitLabel(.done)
@@ -1028,6 +1181,53 @@ struct DraftRoomView: View {
         }
     }
     
+    // MARK: -> Player Details Row for "All" view (with FantRnk restored)
+    private func playerDetailsRowForAll(for player: Player) -> some View {
+        HStack(spacing: 8) {
+            // Try to get Sleeper player data for detailed info
+            if let sleeperPlayer = findSleeperPlayerForSuggestion(player) {
+                // Fantasy Rank (restored)
+                if let searchRank = sleeperPlayer.searchRank {
+                    Text("FantRnk: \(searchRank)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                
+                // Jersey number  
+                if let number = sleeperPlayer.number {
+                    Text("#: \(number)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                
+                // Years of experience
+                if let yearsExp = sleeperPlayer.yearsExp {
+                    Text("Yrs: \(yearsExp)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                
+                // Injury status (red text if present)
+                if let injuryStatus = sleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
+                   Text(String(injuryStatus.prefix(5)))
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .fontWeight(.medium)
+                }
+            } else {
+                // Fallback when no Sleeper data
+                Text("Tier \(player.tier) • \(player.team)")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+    }
+    
     // MARK: -> Player Name and Position View
     
     private func playerNameAndPositionView(for suggestion: Suggestion) -> some View {
@@ -1153,6 +1353,24 @@ struct DraftRoomView: View {
                     team: NFLTeam.team(for: player.team)
                 )
             }
+        }
+    }
+}
+
+// MARK: -> Conditional Swipe Actions Extension
+
+extension View {
+    @ViewBuilder
+    func conditionalSwipeActions<T: View, L: View>(
+        condition: Bool,
+        @ViewBuilder trailing: () -> T,
+        @ViewBuilder leading: () -> L
+    ) -> some View {
+        if condition {
+            self.swipeActions(edge: .trailing, content: trailing)
+                .swipeActions(edge: .leading, content: leading)
+        } else {
+            self
         }
     }
 }
