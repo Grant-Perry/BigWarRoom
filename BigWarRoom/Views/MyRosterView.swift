@@ -13,55 +13,74 @@ struct MyRosterView: View {
     @State private var selectedPlayer: SleeperPlayer?
     @State private var showStats = false
     
+    // Collapsible section states
+    @State private var showStartingLineup = true
+    @State private var showBench = true
+    
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                // Header
+                // Header with draft context
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Starting Lineup")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Tap a player for stats and details")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(rosterTitle)
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            
+                            Text(rosterSubtitle)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        // Show draft connection status and turn indicator
+                        VStack(spacing: 4) {
+                            if viewModel.isLiveMode && viewModel.selectedDraft != nil {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(.green)
+                                        .frame(width: 8, height: 8)
+                                    Text("Live Draft")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            
+                            // "Your Turn" indicator
+                            if viewModel.isMyTurn {
+                                HStack(spacing: 4) {
+                                    Circle()
+                                        .fill(.orange)
+                                        .frame(width: 8, height: 8)
+                                    Text("YOUR TURN")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.orange.opacity(0.2))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding()
                 .background(Color(.systemGray6).opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 
-                // Lineup
-                VStack(spacing: 14) {
-                    rosterSlotRow(label: "QB", player: viewModel.roster.qb)
-                    rosterSlotRow(label: "RB1", player: viewModel.roster.rb1)
-                    rosterSlotRow(label: "RB2", player: viewModel.roster.rb2)
-                    rosterSlotRow(label: "WR1", player: viewModel.roster.wr1)
-                    rosterSlotRow(label: "WR2", player: viewModel.roster.wr2)
-                    rosterSlotRow(label: "WR3", player: viewModel.roster.wr3)
-                    rosterSlotRow(label: "TE", player: viewModel.roster.te)
-                    rosterSlotRow(label: "FLEX", player: viewModel.roster.flex)
-                    rosterSlotRow(label: "K", player: viewModel.roster.k)
-                    rosterSlotRow(label: "DST", player: viewModel.roster.dst)
-                }
+                // Roster stats summary
+                rosterSummaryCard
                 
-                // Bench
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Bench")
-                        .font(.title3)
-                        .fontWeight(.bold)
-                    
-                    if viewModel.roster.bench.isEmpty {
-                        emptyBenchCard
-                    } else {
-                        VStack(spacing: 12) {
-                            ForEach(Array(viewModel.roster.bench.enumerated()), id: \.offset) { _, player in
-                                enhancedPlayerCard(player)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Starting Lineup (Collapsible)
+                startingLineupSection
+                
+                // Bench (Collapsible)  
+                benchSection
             }
             .padding()
         }
@@ -75,6 +94,180 @@ struct MyRosterView: View {
                 )
             }
         }
+    }
+    
+    // MARK: - Starting Lineup Section (Collapsible)
+    
+    private var startingLineupSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showStartingLineup.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Starting Lineup")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("\(filledSlots)/10 filled")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Image(systemName: showStartingLineup ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .foregroundColor(.primary)
+            
+            // Collapsible Content
+            if showStartingLineup {
+                VStack(spacing: 14) {
+                    rosterSlotRow(label: "QB", player: viewModel.roster.qb)
+                    rosterSlotRow(label: "RB1", player: viewModel.roster.rb1)
+                    rosterSlotRow(label: "RB2", player: viewModel.roster.rb2)
+                    rosterSlotRow(label: "WR1", player: viewModel.roster.wr1)
+                    rosterSlotRow(label: "WR2", player: viewModel.roster.wr2)
+                    rosterSlotRow(label: "WR3", player: viewModel.roster.wr3)
+                    rosterSlotRow(label: "TE", player: viewModel.roster.te)
+                    rosterSlotRow(label: "FLEX", player: viewModel.roster.flex)
+                    rosterSlotRow(label: "K", player: viewModel.roster.k)
+                    rosterSlotRow(label: "DST", player: viewModel.roster.dst)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6).opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Bench Section (Collapsible)
+    
+    private var benchSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Collapsible Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showBench.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Bench")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("\(viewModel.roster.bench.count) players")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Image(systemName: showBench ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .foregroundColor(.primary)
+            
+            // Collapsible Content
+            if showBench {
+                if viewModel.roster.bench.isEmpty {
+                    emptyBenchCard
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(Array(viewModel.roster.bench.enumerated()), id: \.offset) { _, player in
+                            enhancedPlayerCard(player)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6).opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var rosterTitle: String {
+        if viewModel.selectedDraft != nil && viewModel.isLiveMode {
+            return "My \(viewModel.selectedDraft?.name ?? "Draft") Roster"
+        } else {
+            return "My Roster"
+        }
+    }
+    
+    private var rosterSubtitle: String {
+        if viewModel.selectedDraft != nil && viewModel.isLiveMode {
+            return "Live roster from \(viewModel.sleeperDisplayName)'s draft • Tap players for stats"
+        } else {
+            return "Build your roster or connect to a live draft • Tap players for stats"
+        }
+    }
+    
+    // MARK: - Roster Summary
+    
+    private var rosterSummaryCard: some View {
+        HStack(spacing: 16) {
+            VStack(spacing: 4) {
+                Text("\(filledSlots)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                Text("Starters")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Divider()
+                .frame(height: 30)
+            
+            VStack(spacing: 4) {
+                Text("\(viewModel.roster.bench.count)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                Text("Bench")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Divider()
+                .frame(height: 30)
+            
+            VStack(spacing: 4) {
+                Text("\(totalPlayers)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                Text("Total")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .background(Color(.systemGray6).opacity(0.3))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    private var filledSlots: Int {
+        let roster = viewModel.roster
+        return [roster.qb, roster.rb1, roster.rb2, roster.wr1, roster.wr2, roster.wr3, 
+                roster.te, roster.flex, roster.k, roster.dst].compactMap { $0 }.count
+    }
+    
+    private var totalPlayers: Int {
+        filledSlots + viewModel.roster.bench.count
     }
     
     // MARK: - Enhanced Player Card (matching Draft War Room style)

@@ -53,7 +53,7 @@ struct DraftRoomView: View {
                     }
                 }
                 .listStyle(.plain)
-                .frame(height: 1440) // Changed from 480 to 1440 (3x taller)
+                .frame(height: 600) // Reduced since we removed the picks section
                 .background(Color(.systemGray6).opacity(0.3))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
@@ -352,41 +352,58 @@ struct DraftRoomView: View {
         }
     }
     
-    // MARK: -> Available Drafts Section
+    // MARK: -> Available Drafts Section (Now Collapsible)
+    
+    @State private var showAvailableDrafts = false
     
     private var availableDraftsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Available Drafts")
-                    .font(.headline)
-                
-                Spacer()
-                
-                Text("\(viewModel.allAvailableDrafts.count) drafts")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            if viewModel.allAvailableDrafts.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.title2)
-                        .foregroundColor(.orange)
-                    
-                    Text("No drafts found")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    Text("Connect to your Sleeper account to see league drafts")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            // Dropdown Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showAvailableDrafts.toggle()
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.orange.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else {
-                ScrollView {
+            } label: {
+                HStack {
+                    Text("Available Drafts")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("\(viewModel.allAvailableDrafts.count) drafts")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Image(systemName: showAvailableDrafts ? "chevron.up" : "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .foregroundColor(.primary)
+            
+            // Collapsible Content
+            if showAvailableDrafts {
+                if viewModel.allAvailableDrafts.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        
+                        Text("No drafts found")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text("Connect to your Sleeper account to see league drafts")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
                     LazyVStack(spacing: 8) {
                         ForEach(viewModel.allAvailableDrafts) { draft in
                             DraftSelectionCard(
@@ -401,9 +418,15 @@ struct DraftRoomView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 200)
             }
         }
+        .padding()
+        .background(Color.blue.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+        )
     }
     
     // MARK: -> Live Draft Picks Feed
@@ -468,14 +491,92 @@ struct DraftRoomView: View {
     
     @State private var manualDraftID: String = ""
     @State private var isConnectingToDraft = false
-    @State private var showManualDraftEntry = false
+    // Remove the local @State and use viewModel's @Published property instead
     
     private var manualDraftIDSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Show connected state only after position is selected or roster is found
+            if viewModel.isConnectedToManualDraft && 
+               !viewModel.manualDraftNeedsPosition && 
+               !viewModel.showManualDraftEntry {
+                // Connected state - minimized green card
+                connectedManualDraftCard
+            } else {
+                // Not connected or still configuring - show entry form
+                manualDraftEntryForm
+            }
+        }
+    }
+    
+    // MARK: - Connected Manual Draft Card
+    
+    private var connectedManualDraftCard: some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.white)
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Connected to Manual Draft")
+                    .font(.headline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                
+                if let draft = viewModel.manualDraftInfo {
+                    // Show draft name and ID
+                    if let draftName = draft.metadata?.name {
+                        Text(draftName)
+                            .font(.subheadline)
+                            .foregroundColor(.white.opacity(0.9))
+                        Text("ID: \(String(draft.draftID.suffix(12)))")
+                            .font(.caption)
+                            .fontDesign(.monospaced)
+                            .foregroundColor(.white.opacity(0.8))
+                    } else {
+                        Text("ID: \(String(draft.draftID.suffix(12)))")
+                            .font(.subheadline)
+                            .fontDesign(.monospaced)
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                } else if let selectedDraft = viewModel.selectedDraft,
+                          let draftID = selectedDraft.draftID {
+                    // Fallback to selectedDraft info
+                    Text("ID: \(String(draftID.suffix(12)))")
+                        .font(.subheadline)
+                        .fontDesign(.monospaced)
+                        .foregroundColor(.white.opacity(0.9))
+                } else {
+                    Text("Manual draft monitoring active")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+            
+            Spacer()
+            
+            Button("Disconnect") {
+                viewModel.disconnectFromLive()
+            }
+            .font(.caption)
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.2))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .padding()
+        .background(.green) // Using .green for the connected state
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+    
+    // MARK: - Manual Draft Entry Form
+    
+    private var manualDraftEntryForm: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Dropdown Header
             Button {
                 withAnimation(.easeInOut(duration: 0.3)) {
-                    showManualDraftEntry.toggle()
+                    viewModel.showManualDraftEntry.toggle() // Use viewModel property
                 }
             } label: {
                 HStack {
@@ -485,11 +586,13 @@ struct DraftRoomView: View {
                     
                     Spacer()
                     
-                    Text("For mock drafts")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("For mock/other drafts")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Image(systemName: showManualDraftEntry ? "chevron.up" : "chevron.down")
+                    Image(systemName: viewModel.showManualDraftEntry ? "chevron.up" : "chevron.down") // Use viewModel property
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -497,8 +600,13 @@ struct DraftRoomView: View {
             .foregroundColor(.primary)
             
             // Collapsible Content
-            if showManualDraftEntry {
-                VStack(alignment: .leading, spacing: 8) {
+            if viewModel.showManualDraftEntry { // Use viewModel property
+                VStack(alignment: .leading, spacing: 12) {
+                    // Simplified explanation - no green/orange status boxes
+                    Text("Enter any draft ID to monitor picks and get suggestions")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                    
                     HStack {
                         TextField("Enter Draft ID", text: $manualDraftID)
                             .textFieldStyle(.roundedBorder)
@@ -514,6 +622,71 @@ struct DraftRoomView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(manualDraftID.isEmpty || isConnectingToDraft)
+                    }
+                    
+                    // Manual Position Picker (show when needed)
+                    if viewModel.manualDraftNeedsPosition {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "questionmark.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.caption)
+                                
+                                Text("What's your draft position?")
+                                    .font(.callout)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                            }
+                            
+                            Text("Select your draft slot to enable pick alerts:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            // Use button grid instead of picker for better touch interaction
+                            let teamCount = viewModel.manualDraftInfo?.settings?.teams ??
+                                          viewModel.selectedDraft?.settings?.teams ??
+                                          viewModel.selectedDraft?.totalRosters ??
+                                          16
+                            
+                            let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+                            
+                            LazyVGrid(columns: columns, spacing: 8) {
+                                ForEach(1...teamCount, id: \.self) { position in
+                                    Button {
+                                        viewModel.selectedManualPosition = position
+                                    } label: {
+                                        Text("\(position)")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .frame(width: 40, height: 40)
+                                            .background(
+                                                viewModel.selectedManualPosition == position ? 
+                                                Color.blue : Color(.systemGray5)
+                                            )
+                                            .foregroundColor(
+                                                viewModel.selectedManualPosition == position ? 
+                                                .white : .primary
+                                            )
+                                            .clipShape(Circle())
+                                    }
+                                }
+                            }
+                            
+                            HStack(spacing: 12) {
+                                Button("Set Position \(viewModel.selectedManualPosition)") {
+                                    viewModel.setManualDraftPosition(viewModel.selectedManualPosition)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                
+                                Button("Skip") {
+                                    viewModel.dismissManualPositionPrompt()
+                                }
+                                .font(.callout)
+                                .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding()
+                        .background(Color.blue.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     
                     HStack(spacing: 8) {
@@ -916,52 +1089,76 @@ struct DraftRoomView: View {
         return findSleeperPlayerForSuggestion(player)
     }
 
-    // MARK: -> Main Body
+    // MARK: -> Main Body (Simplified - No NavigationView Wrapper)
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Sleeper Account Connection
-                connectionSection
+            LazyVStack(spacing: 20) {
+                // Connection status (show first if connected)
+                if viewModel.connectionStatus == .connected {
+                    liveStatusCard
+                }
                 
-                // Available League Drafts (when connected)
+                // Sleeper Account section (only show if NOT connected to avoid duplication)
+                if viewModel.connectionStatus != .connected {
+                    connectionSection
+                }
+                
+                // Available drafts (show if connected) - now collapsible
                 if viewModel.connectionStatus == .connected {
                     availableDraftsSection
                 }
                 
-                // Manual Draft Entry (always available)
+                // Manual draft ID entry
                 manualDraftIDSection
                 
-                // Live Draft Picks (if connected and has picks)
-                if (viewModel.isLiveMode || !viewModel.allDraftPicks.isEmpty) {
-                    liveDraftPicksSection
-                }
-                
-                // Manual Input (always available)
+                // Manual input section
                 manualInputSection
                 
-                // Top 25 Suggestions
+                // Suggestions (main section)
                 suggestionsSection
             }
             .padding()
         }
         .navigationTitle("Draft War Room")
         .navigationBarTitleDisplayMode(.large)
+        .background(Color(.systemGroupedBackground))
+        
+        // MARK: - Pick Alerts
+        .alert("🚨 YOUR TURN!", isPresented: $viewModel.showingPickAlert) {
+            Button("Got It!") {
+                viewModel.dismissPickAlert()
+            }
+            Button("View Suggestions") {
+                viewModel.dismissPickAlert()
+            }
+        } message: {
+            Text(viewModel.pickAlertMessage)
+        }
+        
+        .alert("Pick Confirmed", isPresented: $viewModel.showingConfirmationAlert) {
+            Button("Nice!") {
+                viewModel.dismissConfirmationAlert()
+            }
+        } message: {
+            Text(viewModel.confirmationAlertMessage)
+        }
+        
+        // Player stats sheet
         .sheet(isPresented: $showingPlayerStats) {
-            if let selectedPlayer = selectedPlayerForStats {
-                if let sleeperPlayer = findSleeperPlayer(for: selectedPlayer) {
-                    PlayerStatsCardView(
-                        player: sleeperPlayer,
-                        team: NFLTeam.team(for: selectedPlayer.team)
-                    )
-                } else {
-                    PlayerNotFoundView(player: selectedPlayer)
-                }
+            if let player = selectedPlayerForStats,
+               let sleeperPlayer = findSleeperPlayer(for: player) {
+                PlayerStatsCardView(
+                    player: sleeperPlayer,
+                    team: NFLTeam.team(for: player.team)
+                )
             }
         }
     }
 }
 
 #Preview {
-    DraftRoomView(viewModel: DraftRoomViewModel())
+    NavigationView {
+        DraftRoomView(viewModel: DraftRoomViewModel())
+    }
 }
