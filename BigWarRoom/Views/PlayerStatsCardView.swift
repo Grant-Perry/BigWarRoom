@@ -8,6 +8,32 @@
 
 import SwiftUI
 
+// MARK: -> Height Conversion Extension
+extension String {
+    /// Converts height from inches to feet and inches format
+    /// E.g., "73" becomes "6' 1""
+    var formattedHeight: String {
+        // Check if already in feet/inches format
+        if self.contains("'") || self.contains("\"") || self.contains("ft") {
+            return self
+        }
+        
+        // Try to convert from inches
+        guard let totalInches = Int(self) else {
+            return self // Return original if not a number
+        }
+        
+        let feet = totalInches / 12
+        let remainingInches = totalInches % 12
+        
+        if remainingInches == 0 {
+            return "\(feet)'"
+        } else {
+            return "\(feet)' \(remainingInches)\""
+        }
+    }
+}
+
 struct PlayerStatsCardView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
@@ -96,7 +122,7 @@ struct PlayerStatsCardView: View {
                     infoItem("Exp", "Y\(yearsExp)")
                 }
                 if let height = player.height {
-                    infoItem("Height", height)
+                    infoItem("Height", height.formattedHeight)
                 }
                 if let weight = player.weight {
                     infoItem("Weight", "\(weight) lbs")
@@ -122,7 +148,7 @@ struct PlayerStatsCardView: View {
                 }
                 
                 if let height = player.height, let weight = player.weight {
-                    detailRow("Size", "\(height), \(weight) lbs")
+                    detailRow("Size", "\(height.formattedHeight), \(weight) lbs")
                 }
                 
                 if let yearsExp = player.yearsExp {
@@ -368,7 +394,7 @@ struct PlayerStatsCardView: View {
 //            team: "CIN",
 //            number: 1,
 //            status: "Active",
-//            height: "6'0\"",
+//            height: "73",
 //            weight: "201",
 //            age: 24,
 //            college: "LSU",
