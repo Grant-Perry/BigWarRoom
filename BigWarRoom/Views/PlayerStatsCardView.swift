@@ -40,12 +40,16 @@ struct PlayerStatsCardView: View {
     @Environment(\.dismiss) private var dismiss
     
     @StateObject private var teamAssets = TeamAssetManager.shared
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
     
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
                 // Header with player image and basic info
                 playerHeaderSection
+                
+                // Team Depth Chart Section
+                teamDepthChartSection
                 
                 // Player Details from Sleeper
                 playerDetailsSection
@@ -65,6 +69,216 @@ struct PlayerStatsCardView: View {
             }
         }
         .background(Color(.systemBackground))
+    }
+    
+    // MARK: -> Team Depth Chart Section
+    
+    private var teamDepthChartSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Team Depth Chart")
+                    .font(.headline)
+                
+                Spacer()
+                
+                if let team = team {
+                    HStack(spacing: 6) {
+                        teamAssets.logoOrFallback(for: team.id)
+                            .frame(width: 20, height: 20)
+                        
+                        Text(team.name)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // Get team players organized by position
+            let teamPlayers = getTeamPlayers()
+            
+            if teamPlayers.isEmpty {
+                Text("No depth chart data available")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 20)
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(["QB", "RB", "WR", "TE", "K", "DEF"], id: \.self) { position in
+                        if let positionPlayers = teamPlayers[position], !positionPlayers.isEmpty {
+                            positionGroupView(position: position, players: positionPlayers)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(team?.backgroundColor ?? Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(team?.borderColor ?? Color.clear, lineWidth: 1)
+        )
+    }
+    
+    private func positionGroupView(position: String, players: [SleeperPlayer]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Position header
+            HStack {
+                Text(position)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(positionColorFor(position))
+                
+                Spacer()
+                
+                Text("\(players.count) players")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            // Players in this position
+            VStack(spacing: 6) {
+                ForEach(Array(players.enumerated()), id: \.element.id) { index, positionPlayer in
+                    depthChartPlayerRow(
+                        player: positionPlayer, 
+                        depth: index + 1,
+                        isCurrentPlayer: positionPlayer.playerID == player.playerID
+                    )
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    private func depthChartPlayerRow(player: SleeperPlayer, depth: Int, isCurrentPlayer: Bool) -> some View {
+        HStack(spacing: 12) {
+            // Depth position number
+            Text("\(depth)")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .frame(width: 20, height: 20)
+                .background(
+                    Circle()
+                        .fill(depth == 1 ? Color.green : depth == 2 ? Color.orange : Color.gray)
+                )
+            
+            // Player headshot
+            PlayerImageView(
+                player: player,
+                size: 32,
+                team: team
+            )
+            
+            // Player info
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(player.shortName)
+                        .font(.callout)
+                        .fontWeight(isCurrentPlayer ? .bold : .medium)
+                        .foregroundColor(isCurrentPlayer ? .primary : .secondary)
+                    
+                    if let number = player.number {
+                        Text("#\(number)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    // Fantasy rank if available
+                    if let searchRank = player.searchRank {
+                        Text("Rnk \(searchRank)")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+                    }
+                }
+                
+                // Injury status or experience
+                HStack(spacing: 8) {
+                    if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
+                        Text(String(injuryStatus.prefix(5)))
+                            .font(.caption2)
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.red.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    } else if let yearsExp = player.yearsExp {
+                        Text("Y\(yearsExp)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isCurrentPlayer ? Color.blue.opacity(0.1) : Color.clear)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isCurrentPlayer ? Color.blue : Color.clear, lineWidth: 1)
+        )
+    }
+    
+    private func getTeamPlayers() -> [String: [SleeperPlayer]] {
+        guard let playerTeam = player.team else { return [:] }
+        
+        // Get all players from the same team
+        let teamPlayers = playerDirectory.players.values.filter { p in
+            p.team?.uppercased() == playerTeam.uppercased() && 
+            p.status == "Active" &&
+            p.position != nil
+        }
+        
+        // Group by position
+        let playersByPosition = Dictionary(grouping: teamPlayers) { p in
+            p.position?.uppercased() ?? "UNKNOWN"
+        }
+        
+        // Sort each position group by depth chart order
+        var sortedByPosition: [String: [SleeperPlayer]] = [:]
+        
+        for (position, players) in playersByPosition {
+            guard position != "UNKNOWN" else { continue }
+            
+            let sortedPlayers = players.sorted { p1, p2 in
+                let order1 = p1.depthChartOrder ?? 99
+                let order2 = p2.depthChartOrder ?? 99
+                
+                // If depth chart orders are the same, use searchRank as tiebreaker
+                if order1 == order2 {
+                    let rank1 = p1.searchRank ?? 999
+                    let rank2 = p2.searchRank ?? 999
+                    return rank1 < rank2
+                }
+                
+                return order1 < order2
+            }
+            
+            sortedByPosition[position] = sortedPlayers
+        }
+        
+        return sortedByPosition
+    }
+    
+    private func positionColorFor(_ position: String) -> Color {
+        switch position {
+        case "QB": return .blue
+        case "RB": return .green
+        case "WR": return .purple
+        case "TE": return .orange
+        case "K": return .yellow
+        case "DEF": return .red
+        default: return .gray
+        }
     }
     
     // MARK: -> Header Section
@@ -383,37 +597,3 @@ struct PlayerStatsCardView: View {
         }
     }
 }
-//
-//#Preview {
-//    PlayerStatsCardView(
-//        player: SleeperPlayer(
-//            playerID: "wr-chase",
-//            firstName: "Ja'Marr",
-//            lastName: "Chase",
-//            position: "WR",
-//            team: "CIN",
-//            number: 1,
-//            status: "Active",
-//            height: "73",
-//            weight: "201",
-//            age: 24,
-//            college: "LSU",
-//            yearsExp: 3,
-//            fantasyPositions: ["WR"],
-//            injuryStatus: nil,
-//            depthChartOrder: 1,
-//            depthChartPosition: 1,
-//            searchRank: 5,
-//            hashtag: "#JaMarrChase",
-//            birthCountry: "United States",
-//            espnID: 4362628,
-//            yahooID: 32700,
-//            rotowireID: 14885,
-//            rotoworldID: 5479,
-//            fantasyDataID: 21688,
-//            sportradarID: "123",
-//            statsID: 123
-//        ),
-//        team: NFLTeam.team(for: "CIN")
-//    )
-//}
