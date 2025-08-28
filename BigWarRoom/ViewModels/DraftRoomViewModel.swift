@@ -573,18 +573,38 @@ final class DraftRoomViewModel: ObservableObject {
     
     /// Refreshes suggestions using AI first, then falls back to heuristic engine.
     func refreshSuggestions() async {
-        // If AI is disabled, skip all AI context, return heuristic only
-        if AppConstants.useAISuggestions == false {
-            let available = self.buildAvailablePlayers()
-            let fallback = await self.heuristicSuggestions(available: available, limit: 50)
-            self.suggestions = fallback
-            return
-        }
-
         suggestionsTask?.cancel()
         suggestionsTask = Task { [weak self] in
             guard let self else { return }
             let available = self.buildAvailablePlayers()
+            
+            // For "All" method, skip AI entirely and show all players sorted by rank
+            if self.selectedSortMethod == .all {
+                // Only include players with valid fantasy rankings for the "All" list
+                let playersWithRanks = available.filter { player in
+                    guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: player.id),
+                          let rank = sleeperPlayer.searchRank else { return false }
+                    return rank > 0 && rank < 10000  // Valid fantasy rankings
+                }
+                
+                let allPlayerSuggestions = playersWithRanks.map { player in
+                    Suggestion(player: player, reasoning: nil)
+                }
+                let sorted = self.sortedByPureRank(allPlayerSuggestions)
+                
+                await MainActor.run { 
+                    print("🎯 All method: Showing \(sorted.count) total ranked players (filtered from \(available.count) available)")
+                    self.suggestions = sorted 
+                }
+                return
+            }
+            
+            // If AI is disabled, skip all AI context, return heuristic only
+            if AppConstants.useAISuggestions == false {
+                let fallback = await self.heuristicSuggestions(available: available, limit: 50)
+                await MainActor.run { self.suggestions = fallback }
+                return
+            }
             
             // No AI context? Fall back immediately
             guard let (league, draft) = self.currentSleeperLeagueAndDraft() else {
@@ -673,16 +693,45 @@ final class DraftRoomViewModel: ObservableObject {
                 continuation.resume(returning: result ?? [])
             }
         }
-        return selectedSortMethod == .rankings ? sortedByPureRank(top) : Array(top.prefix(limit))
+        
+        // Don't apply additional limits for "rankings" or "all" methods 
+        if selectedSortMethod == .rankings {
+            return sortedByPureRank(top)
+        } else if selectedSortMethod == .all {
+            // This shouldn't be called for .all anymore, but just in case
+            return sortedByPureRank(top)
+        } else {
+            return Array(top.prefix(limit))
+        }
     }
     
     private func sortedByPureRank(_ list: [Suggestion]) -> [Suggestion] {
-        // Use Sleeper searchRank as "pure ranking"
-        return list.sorted { lhs, rhs in
+        // Use Sleeper searchRank as "pure ranking" - lower numbers = better players
+        let sortedList = list.sorted { lhs, rhs in
             let lRank = PlayerDirectoryStore.shared.player(for: lhs.player.id)?.searchRank ?? Int.max
             let rRank = PlayerDirectoryStore.shared.player(for: rhs.player.id)?.searchRank ?? Int.max
-            return lRank < rRank
+            
+            // If ranks are the same, use secondary sorting by player name for consistency
+            if lRank == rRank {
+                return lhs.player.shortKey < rhs.player.shortKey
+            }
+            return lRank < rRank  // 1, 2, 3, 4... (ascending order)
         }
+        
+        // Debug: Print first 20 players with their Sleeper ranks and our sequential position
+        if selectedSortMethod == .all {
+            print("🏆 Top 20 players - Sequential Position vs Sleeper Rank:")
+            for (index, suggestion) in sortedList.prefix(20).enumerated() {
+                let sleeperRank = PlayerDirectoryStore.shared.player(for: suggestion.player.id)?.searchRank ?? -1
+                let sequentialRank = index + 1
+                print("  \(sequentialRank). \(suggestion.player.shortKey) - Sleeper Rank #\(sleeperRank)")
+            }
+            
+            // Show total count
+            print("🎯 All method: Showing \(sortedList.count) players in strict 1-2-3-4... order")
+        }
+        
+        return sortedList
     }
     
     // MARK: - Picks Feed / My Pick
@@ -944,12 +993,14 @@ extension DraftRoomViewModel {
     enum SortMethod: CaseIterable, Identifiable {
         case wizard    // AI strategy
         case rankings  // Pure rankings
+        case all       // All players in ranked order
         
         var id: String { displayName }
         var displayName: String {
             switch self {
             case .wizard: return "Wizard"
             case .rankings: return "Rankings"
+            case .all: return "All"
             }
         }
     }

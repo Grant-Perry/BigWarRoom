@@ -43,19 +43,35 @@ struct DraftRoomView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // List with swipe actions instead of ScrollView
-                List {
-                    ForEach(viewModel.suggestions) { suggestion in
-                        enhancedSuggestionCard(suggestion)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                // Choose display method based on sort method
+                if viewModel.selectedSortMethod == .all {
+                    // LazyVStack for "All" - can handle thousands of players
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(viewModel.suggestions) { suggestion in
+                                enhancedSuggestionCardForAll(suggestion)
+                            }
+                        }
+                        .padding(.horizontal)
                     }
+                    .frame(height: 600)
+                    .background(Color(.systemGray6).opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    // List with swipe actions for Wizard and Rankings
+                    List {
+                        ForEach(viewModel.suggestions) { suggestion in
+                            enhancedSuggestionCard(suggestion)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                        }
+                    }
+                    .listStyle(.plain)
+                    .frame(height: 600) // Reduced since we removed the picks section
+                    .background(Color(.systemGray6).opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
-                .listStyle(.plain)
-                .frame(height: 600) // Reduced since we removed the picks section
-                .background(Color(.systemGray6).opacity(0.3))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -141,7 +157,7 @@ struct DraftRoomView: View {
                 Spacer()
                 
                 // Show current method description
-                Text(viewModel.selectedSortMethod == .wizard ? "AI Strategy" : "Pure Rankings")
+                Text(viewModel.selectedSortMethod == .wizard ? "AI Strategy" : viewModel.selectedSortMethod == .rankings ? "Pure Rankings" : "All Players")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -182,19 +198,76 @@ struct DraftRoomView: View {
             // Tap to show player stats
             showPlayerStats(for: suggestion.player)
         }
-        .swipeActions(edge: .trailing) {
+        // Only add swipe actions for non-"All" modes (List view)
+        .conditionalSwipeActions(condition: viewModel.selectedSortMethod != .all) {
             // Swipe left (from right edge) to Add to Feed
             Button("Add") {
                 addPlayerToFeed(suggestion)
             }
             .tint(.blue)
-        }
-        .swipeActions(edge: .leading) {
+        } leading: {
             // Swipe right (from left edge) to Lock as My Pick
             Button("Lock") {
                 lockPlayerAsPick(suggestion)
             }
             .tint(.green)
+        }
+    }
+    
+    // MARK: -> Enhanced Suggestion Card for "All" view (LazyVStack - no swipe actions)
+    
+    private func enhancedSuggestionCardForAll(_ suggestion: Suggestion) -> some View {
+        HStack(spacing: 12) {
+            // Player headshot - improved lookup logic
+            playerImageForSuggestion(suggestion.player)
+            
+            // Player info
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    // Custom player name and position display
+                    playerNameAndPositionView(for: suggestion)
+                    
+                    // Tier badge (T1 = Elite, T2 = Very Good, etc.)
+                    tierBadge(suggestion.player.tier)
+                    
+                    // Team logo (much larger size)
+                    TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+                        .frame(width: 42, height: 42)
+                    
+                    Spacer()
+                }
+                
+                // Player details: fantasy rank, jersey, years, injury status all on one line
+                playerDetailsRow(for: suggestion.player)
+            }
+        }
+        .padding(12)
+        .background(
+            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onTapGesture {
+            // Tap to show player stats
+            showPlayerStats(for: suggestion.player)
+        }
+        // Add gesture recognizers for add/lock actions since no swipe actions in LazyVStack
+        .onLongPressGesture(minimumDuration: 0.5) {
+            // Long press to lock as my pick
+            lockPlayerAsPick(suggestion)
+            
+            // Haptic feedback
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+        }
+        // Add contextual menu for additional actions
+        .contextMenu {
+            Button("Lock as My Pick") {
+                lockPlayerAsPick(suggestion)
+            }
+            
+            Button("Add to Feed") {
+                addPlayerToFeed(suggestion)
+            }
         }
     }
     
@@ -352,7 +425,7 @@ struct DraftRoomView: View {
         }
     }
     
-    // MARK: -> Available Drafts Section (Now Collapsible)
+    // MARK: -> Available Drafts (Now Collapsible)
     
     @State private var showAvailableDrafts = false
     
@@ -698,7 +771,7 @@ struct DraftRoomView: View {
                         .padding(.vertical, 4)
                         .background(Color.gray.opacity(0.1))
                         .foregroundColor(.gray)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .clipShape(RoundedRectangle(cornerRadius: 6));
                         
                         Button("Paste") {
                             if let clipboardText = UIPasteboard.general.string {
@@ -1153,6 +1226,24 @@ struct DraftRoomView: View {
                     team: NFLTeam.team(for: player.team)
                 )
             }
+        }
+    }
+}
+
+// MARK: -> Conditional Swipe Actions Extension
+
+extension View {
+    @ViewBuilder
+    func conditionalSwipeActions<T: View, L: View>(
+        condition: Bool,
+        @ViewBuilder trailing: () -> T,
+        @ViewBuilder leading: () -> L
+    ) -> some View {
+        if condition {
+            self.swipeActions(edge: .trailing, content: trailing)
+                .swipeActions(edge: .leading, content: leading)
+        } else {
+            self
         }
     }
 }
