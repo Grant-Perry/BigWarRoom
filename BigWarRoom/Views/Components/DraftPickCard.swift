@@ -11,6 +11,40 @@ import SwiftUI
 struct DraftPickCard: View {
     let pick: EnhancedPick
     let isRecent: Bool // Highlight recent picks
+    let myRosterID: Int? // To identify my picks
+    let isUsingPositionalLogic: Bool // NEW: Whether to use positional logic
+    let teamCount: Int // NEW: Team count for positional calculations
+    
+    // Computed property to check if this is my pick
+    private var isMyPick: Bool {
+        guard let myRosterID = myRosterID else { return false }
+        
+        // For ESPN leagues and mock drafts: FORCE positional logic
+        if isUsingPositionalLogic {
+            let draftSlot = myRosterID // myRosterID represents draft slot for positional logic
+            
+            // Calculate if this pick number belongs to our draft position using snake draft math
+            let round = ((pick.pickNumber - 1) / teamCount) + 1
+            
+            if round % 2 == 1 {
+                // Odd rounds: normal order (1, 2, 3, ..., teamCount)
+                let expectedSlot = ((pick.pickNumber - 1) % teamCount) + 1
+                return expectedSlot == draftSlot
+            } else {
+                // Even rounds: snake order (teamCount, ..., 3, 2, 1)
+                let expectedSlot = teamCount - ((pick.pickNumber - 1) % teamCount)
+                return expectedSlot == draftSlot
+            }
+        }
+        
+        // For Sleeper leagues with roster correlation: Use direct roster ID match
+        if let rosterInfo = pick.rosterInfo {
+            return rosterInfo.rosterID == myRosterID
+        }
+        
+        // No roster info and not using positional logic - can't determine ownership
+        return false
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -23,25 +57,26 @@ struct DraftPickCard: View {
                 
                 Spacer()
                 
-                // Positional rank badge (RB1, WR2, etc.) - NEW
+                // Show positional rank badge (RB1, WR2, etc.) with position colors if available,
+                // otherwise show basic position badge as fallback
                 if let positionRank = pick.player.positionalRank {
                     Text(positionRank)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(Color.cyan)
+                        .background(positionColor(pick.position))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
+                } else {
+                    // Fallback to basic position badge if no positional rank
+                    Text(pick.position)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(positionColor(pick.position))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
-                
-                // Position badge
-                Text(pick.position)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(positionColor(pick.position))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
             }
             
             // Player section: smaller image + prominent name + fantasy rank
@@ -85,10 +120,32 @@ struct DraftPickCard: View {
         .padding(6)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isRecent ? Color.blue.opacity(0.15) : Color(.systemGray6))
+                .fill(
+                    isMyPick ? 
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.gpGreen.opacity(0.3),
+                            Color.gpGreen.opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) :
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            isRecent ? Color.blue.opacity(0.15) : Color(.systemGray6),
+                            isRecent ? Color.blue.opacity(0.05) : Color(.systemGray6)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isRecent ? Color.blue.opacity(0.4) : Color.clear, lineWidth: 1.5)
+                        .stroke(
+                            isMyPick ? Color.gpGreen : 
+                            (isRecent ? Color.blue.opacity(0.4) : Color.clear), 
+                            lineWidth: isMyPick ? 2.0 : 1.5
+                        )
                 )
         )
         .frame(width: 125, height: 110)

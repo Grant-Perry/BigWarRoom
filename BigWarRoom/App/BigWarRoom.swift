@@ -34,7 +34,7 @@ struct BigWarRoom: View {
                     }
                 
                 // My Roster Tab
-                MyRosterView(viewModel: viewModel)
+                MyRosterView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "person.fill")
                         Text("My Roster")

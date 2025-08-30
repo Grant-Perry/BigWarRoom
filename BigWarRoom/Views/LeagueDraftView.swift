@@ -11,6 +11,8 @@ import SwiftUI
 struct LeagueDraftView: View {
     @ObservedObject var viewModel: DraftRoomViewModel
     @State private var showingRosterView = false
+    @State private var selectedPlayerForStats: SleeperPlayer? // Add state for player stats
+    @State private var showingPlayerStats = false // Add state for stats sheet
     
     var body: some View {
         ScrollView {
@@ -36,6 +38,12 @@ struct LeagueDraftView: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingRosterView) {
             RosterView(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingPlayerStats) {
+            if let player = selectedPlayerForStats,
+               let team = NFLTeam.team(for: player.team ?? "") {
+                PlayerStatsCardView(player: player, team: team)
+            }
         }
     }
     
@@ -144,7 +152,7 @@ struct LeagueDraftView: View {
             
             // Draft progress bar
             if let expectedPicks = expectedTotalPicks {
-                ProgressView(value: Double(viewModel.allDraftPicks.count), total: Double(expectedPicks))
+                ProgressView(value: min(max(Double(viewModel.allDraftPicks.count), 0), Double(expectedPicks)), total: Double(expectedPicks))
                     .progressViewStyle(LinearProgressViewStyle(tint: .blue))
                     .scaleEffect(y: 2)
                 
@@ -198,7 +206,16 @@ struct LeagueDraftView: View {
             
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(picks.sorted { $0.pickNumber < $1.pickNumber }) { pick in
-                    LeagueDraftPickCard(pick: pick)
+                    LeagueDraftPickCard(
+                        pick: pick, 
+                        myRosterID: viewModel.myRosterID, 
+                        viewModel: viewModel,
+                        onPlayerTap: { sleeperPlayer in
+                            // Handle player stats tap
+                            selectedPlayerForStats = sleeperPlayer
+                            showingPlayerStats = true
+                        }
+                    )
                 }
             }
             .padding(.horizontal, 8)
@@ -246,6 +263,42 @@ struct LeagueDraftView: View {
 
 struct LeagueDraftPickCard: View {
     let pick: EnhancedPick
+    let myRosterID: Int? // To identify my picks
+    @ObservedObject var viewModel: DraftRoomViewModel // Add viewModel to access team count
+    let onPlayerTap: (SleeperPlayer) -> Void // Add callback for player stats
+    
+    // Computed property to check if this is my pick
+    private var isMyPick: Bool {
+        guard let myRosterID = myRosterID else { return false }
+        
+        // For ESPN leagues using positional logic, ONLY use positional matching
+        // Check if we're using positional logic (no roster info correlation)
+        if pick.rosterInfo == nil || viewModel.selectedLeagueWrapper?.source == .espn {
+            // Pure positional logic match (for ESPN leagues using positional logic)
+            let teamCount = viewModel.currentDraftTeamCount // Use real team count from viewModel
+            let draftSlot = myRosterID // For positional logic, myRosterID represents draft slot
+            
+            // Calculate if this pick number belongs to our draft position
+            let round = ((pick.pickNumber - 1) / teamCount) + 1
+            
+            if round % 2 == 1 {
+                // Odd rounds: normal order
+                let expectedSlot = ((pick.pickNumber - 1) % teamCount) + 1
+                return expectedSlot == draftSlot
+            } else {
+                // Even rounds: snake order
+                let expectedSlot = teamCount - ((pick.pickNumber - 1) % teamCount)
+                return expectedSlot == draftSlot
+            }
+        }
+        
+        // Strategy 1: Direct roster ID match (for Sleeper leagues with real roster correlation)
+        if let rosterInfo = pick.rosterInfo {
+            return rosterInfo.rosterID == myRosterID
+        }
+        
+        return false
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -260,35 +313,32 @@ struct LeagueDraftPickCard: View {
                 
                 Spacer()
                 
-                // Positional rank badge (RB1, WR2, etc.) - NEW
+                // Show positional rank badge (RB1, WR2, etc.) with position colors if available,
+                // otherwise show basic position badge as fallback
                 if let positionRank = pick.player.positionalRank {
                     Text(positionRank)
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(Color.cyan)
+                        .background(positionColor(pick.position))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
+                } else {
+                    // Fallback to basic position badge if no positional rank
+                    Text(pick.position)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(positionColor(pick.position))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                
-                // Position badge
-                Text(pick.position)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(positionColor(pick.position))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             
             // Player section: image + name + details
             HStack(spacing: 14) {
-                // Player image
-                PlayerImageView(
-                    player: pick.player,
-                    size: 60,
-                    team: pick.team
-                )
+                // Player image - use enhanced lookup method to get real Sleeper player
+                playerImageForPick(pick.player)
                 
                 VStack(alignment: .leading, spacing: 6) {
                     // Player name
@@ -298,20 +348,8 @@ struct LeagueDraftPickCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     
-                    // Fantasy rank and positional rank
-                    HStack(spacing: 8) {
-                        if let searchRank = pick.player.searchRank {
-                            Text("FR: \(searchRank)")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                        
-                        if let positionRank = pick.player.positionalRank {
-                            Text("(\(positionRank))")
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.cyan)
-                        }
-                    }
+                    // Enhanced stats using real Sleeper player data
+                    enhancedPlayerDetailsRow()
                     
                     // Team info with logo
                     HStack(spacing: 8) {
@@ -331,6 +369,15 @@ struct LeagueDraftPickCard: View {
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(
+                    isMyPick ?
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.gpGreen.opacity(0.3),
+                            Color.gpGreen.opacity(0.1)
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) :
                     LinearGradient(
                         gradient: Gradient(colors: [
                             Color.blue.opacity(0.15),
@@ -342,10 +389,182 @@ struct LeagueDraftPickCard: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                        .stroke(
+                            isMyPick ? Color.gpGreen : Color.blue.opacity(0.2), 
+                            lineWidth: isMyPick ? 2.5 : 1
+                        )
                 )
         )
         .frame(width: 175, height: 130)
+        .onTapGesture {
+            // Handle tap to show player stats - same as Top 25
+            if let realSleeperPlayer = findRealSleeperPlayer(for: pick.player) {
+                onPlayerTap(realSleeperPlayer)
+            }
+        }
+    }
+    
+    // MARK: -> Enhanced Player Details Row (Same as DraftRoomView)
+    
+    @ViewBuilder
+    private func enhancedPlayerDetailsRow() -> some View {
+        HStack(spacing: 8) {
+            // Try to get real Sleeper player data for detailed info
+            if let realSleeperPlayer = findRealSleeperPlayer(for: pick.player) {
+                // Fantasy Rank
+                if let searchRank = realSleeperPlayer.searchRank {
+                    Text("FR: \(searchRank)")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                
+                // Positional rank (RB1, WR2, etc.)
+                if let positionRank = realSleeperPlayer.positionalRank {
+                    Text("(\(positionRank))")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.cyan)
+                }
+                
+                // Years of experience
+                if let yearsExp = realSleeperPlayer.yearsExp {
+                    Text("Yrs: \(yearsExp)")
+                        .font(.caption2)
+                        .foregroundColor(.blue)
+                        .fontWeight(.medium)
+                }
+                
+                // Injury status (red text if present)
+                if let injuryStatus = realSleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
+                   Text(String(injuryStatus.prefix(3)))
+                        .font(.caption2)
+                        .foregroundColor(.red)
+                        .fontWeight(.medium)
+                }
+            } else {
+                // Fallback when no Sleeper data - use original pick data
+                if let searchRank = pick.player.searchRank {
+                    Text("FR: \(searchRank)")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.orange)
+                }
+                
+                if let positionRank = pick.player.positionalRank {
+                    Text("(\(positionRank))")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.cyan)
+                }
+            }
+            
+            Spacer()
+        }
+    }
+    
+    // MARK: -> Player Image Helper (Enhanced Version)
+    
+    @ViewBuilder
+    private func playerImageForPick(_ player: SleeperPlayer) -> some View {
+        // Try to find the real Sleeper player using enhanced lookup
+        if let realSleeperPlayer = findRealSleeperPlayer(for: player) {
+            PlayerImageView(
+                player: realSleeperPlayer,
+                size: 60,
+                team: pick.team
+            )
+        } else {
+            // Fallback: Use the pick's player directly if it has valid data
+            if let _ = player.firstName, let _ = player.lastName {
+                PlayerImageView(
+                    player: player,
+                    size: 60,
+                    team: pick.team
+                )
+            } else {
+                // Final fallback with team colors
+                Circle()
+                    .fill(pick.team?.gradient ?? LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom))
+                    .overlay(
+                        Text(getPlayerInitial(player))
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(pick.team?.accentColor ?? .white)
+                    )
+                    .frame(width: 60, height: 60)
+            }
+        }
+    }
+    
+    // MARK: -> Enhanced Sleeper Player Lookup (Same logic as DraftRoomView)
+    
+    private func findRealSleeperPlayer(for fakePlayer: SleeperPlayer) -> SleeperPlayer? {
+        let allSleeperPlayers = PlayerDirectoryStore.shared.players.values
+        
+        // Strategy 1: Direct ID match (if it's already a real Sleeper player)
+        if let directMatch = PlayerDirectoryStore.shared.players[fakePlayer.playerID] {
+            return directMatch
+        }
+        
+        // For ESPN/fake players, try to match by name and team
+        if let firstName = fakePlayer.firstName,
+           let lastName = fakePlayer.lastName,
+           let team = fakePlayer.team,
+           let position = fakePlayer.position {
+            
+            // Strategy 2: Exact name, team, and position match
+            let exactMatch = allSleeperPlayers.first { sleeperPlayer in
+                let firstNameMatches = sleeperPlayer.firstName?.lowercased() == firstName.lowercased()
+                let lastNameMatches = sleeperPlayer.lastName?.lowercased() == lastName.lowercased()
+                let teamMatches = sleeperPlayer.team?.uppercased() == team.uppercased()
+                let positionMatches = sleeperPlayer.position?.uppercased() == position.uppercased()
+                
+                return firstNameMatches && lastNameMatches && teamMatches && positionMatches
+            }
+            
+            if let exactMatch = exactMatch {
+                return exactMatch
+            }
+            
+            // Strategy 3: Fuzzy name match with team (handles name variations)
+            let fuzzyMatch = allSleeperPlayers.first { sleeperPlayer in
+                guard let sleeperFirst = sleeperPlayer.firstName,
+                      let sleeperLast = sleeperPlayer.lastName else { return false }
+                
+                let firstInitialMatches = sleeperFirst.prefix(1).uppercased() == firstName.prefix(1).uppercased()
+                let lastNameContains = sleeperLast.lowercased().contains(lastName.lowercased()) || 
+                                       lastName.lowercased().contains(sleeperLast.lowercased())
+                let teamMatches = sleeperPlayer.team?.uppercased() == team.uppercased()
+                
+                return firstInitialMatches && lastNameContains && teamMatches
+            }
+            
+            if let fuzzyMatch = fuzzyMatch {
+                return fuzzyMatch
+            }
+            
+            // Strategy 4: Team + position match for common names
+            let teamPositionMatch = allSleeperPlayers.first { sleeperPlayer in
+                guard let sleeperLast = sleeperPlayer.lastName else { return false }
+                
+                let lastNameMatches = sleeperLast.lowercased() == lastName.lowercased()
+                let teamMatches = sleeperPlayer.team?.uppercased() == team.uppercased()
+                let positionMatches = sleeperPlayer.position?.uppercased() == position.uppercased()
+                
+                return lastNameMatches && teamMatches && positionMatches
+            }
+            
+            return teamPositionMatch
+        }
+        
+        return nil
+    }
+    
+    private func getPlayerInitial(_ player: SleeperPlayer) -> String {
+        if let firstName = player.firstName, !firstName.isEmpty {
+            return String(firstName.prefix(1)).uppercased()
+        } else if let lastName = player.lastName, !lastName.isEmpty {
+            return String(lastName.prefix(1)).uppercased()
+        } else if let displayName = pick.displayName.split(separator: " ").first {
+            return String(displayName.prefix(1)).uppercased()
+        }
+        return "?"
     }
     
     private func positionColor(_ position: String) -> Color {

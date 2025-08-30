@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MyRosterView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @ObservedObject var draftRoomViewModel: DraftRoomViewModel
     
     @State private var selectedPlayer: SleeperPlayer?
     @State private var showStats = false
@@ -37,7 +37,7 @@ struct MyRosterView: View {
                         
                         // Show draft connection status and turn indicator
                         VStack(spacing: 4) {
-                            if viewModel.isLiveMode && viewModel.selectedDraft != nil {
+                            if draftRoomViewModel.isLiveMode && draftRoomViewModel.selectedDraft != nil {
                                 HStack(spacing: 4) {
                                     Circle()
                                         .fill(.green)
@@ -50,7 +50,7 @@ struct MyRosterView: View {
                             }
                             
                             // "Your Turn" indicator
-                            if viewModel.isMyTurn {
+                            if draftRoomViewModel.isMyTurn {
                                 HStack(spacing: 4) {
                                     Circle()
                                         .fill(.orange)
@@ -129,16 +129,16 @@ struct MyRosterView: View {
             // Collapsible Content
             if showStartingLineup {
                 VStack(spacing: 14) {
-                    rosterSlotRow(label: "QB", player: viewModel.roster.qb)
-                    rosterSlotRow(label: "RB1", player: viewModel.roster.rb1)
-                    rosterSlotRow(label: "RB2", player: viewModel.roster.rb2)
-                    rosterSlotRow(label: "WR1", player: viewModel.roster.wr1)
-                    rosterSlotRow(label: "WR2", player: viewModel.roster.wr2)
-                    rosterSlotRow(label: "WR3", player: viewModel.roster.wr3)
-                    rosterSlotRow(label: "TE", player: viewModel.roster.te)
-                    rosterSlotRow(label: "FLEX", player: viewModel.roster.flex)
-                    rosterSlotRow(label: "K", player: viewModel.roster.k)
-                    rosterSlotRow(label: "DST", player: viewModel.roster.dst)
+                    rosterSlotRow(label: "QB", player: draftRoomViewModel.roster.qb)
+                    rosterSlotRow(label: "RB1", player: draftRoomViewModel.roster.rb1)
+                    rosterSlotRow(label: "RB2", player: draftRoomViewModel.roster.rb2)
+                    rosterSlotRow(label: "WR1", player: draftRoomViewModel.roster.wr1)
+                    rosterSlotRow(label: "WR2", player: draftRoomViewModel.roster.wr2)
+                    rosterSlotRow(label: "WR3", player: draftRoomViewModel.roster.wr3)
+                    rosterSlotRow(label: "TE", player: draftRoomViewModel.roster.te)
+                    rosterSlotRow(label: "FLEX", player: draftRoomViewModel.roster.flex)
+                    rosterSlotRow(label: "K", player: draftRoomViewModel.roster.k)
+                    rosterSlotRow(label: "DST", player: draftRoomViewModel.roster.dst)
                 }
             }
         }
@@ -165,7 +165,7 @@ struct MyRosterView: View {
                     Spacer()
                     
                     HStack(spacing: 8) {
-                        Text("\(viewModel.roster.bench.count) players")
+                        Text("\(draftRoomViewModel.roster.bench.count) players")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -179,11 +179,11 @@ struct MyRosterView: View {
             
             // Collapsible Content
             if showBench {
-                if viewModel.roster.bench.isEmpty {
+                if draftRoomViewModel.roster.bench.isEmpty {
                     emptyBenchCard
                 } else {
                     VStack(spacing: 12) {
-                        ForEach(Array(viewModel.roster.bench.enumerated()), id: \.offset) { _, player in
+                        ForEach(Array(draftRoomViewModel.roster.bench.enumerated()), id: \.offset) { _, player in
                             enhancedPlayerCard(player)
                         }
                     }
@@ -198,16 +198,16 @@ struct MyRosterView: View {
     // MARK: - Computed Properties
     
     private var rosterTitle: String {
-        if viewModel.selectedDraft != nil && viewModel.isLiveMode {
-            return "My \(viewModel.selectedDraft?.name ?? "Draft") Roster"
+        if draftRoomViewModel.selectedDraft != nil && draftRoomViewModel.isLiveMode {
+            return "My \(draftRoomViewModel.selectedDraft?.name ?? "Draft") Roster"
         } else {
             return "My Roster"
         }
     }
     
     private var rosterSubtitle: String {
-        if viewModel.selectedDraft != nil && viewModel.isLiveMode {
-            return "Live roster from \(viewModel.sleeperDisplayName)'s draft • Tap players for stats"
+        if draftRoomViewModel.selectedDraft != nil && draftRoomViewModel.isLiveMode {
+            return "Live roster from \(draftRoomViewModel.sleeperDisplayName)'s draft" // • Tap players for stats"
         } else {
             return "Build your roster or connect to a live draft • Tap players for stats"
         }
@@ -231,7 +231,7 @@ struct MyRosterView: View {
                 .frame(height: 30)
             
             VStack(spacing: 4) {
-                Text("\(viewModel.roster.bench.count)")
+                Text("\(draftRoomViewModel.roster.bench.count)")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
@@ -253,6 +253,19 @@ struct MyRosterView: View {
                     .foregroundColor(.secondary)
             }
             
+            Divider()
+                .frame(height: 30)
+            
+            VStack(spacing: 4) {
+                Text(pickDisplayText)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue)
+                Text("Pick")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
             Spacer()
         }
         .padding()
@@ -261,13 +274,29 @@ struct MyRosterView: View {
     }
     
     private var filledSlots: Int {
-        let roster = viewModel.roster
+        let roster = draftRoomViewModel.roster
         return [roster.qb, roster.rb1, roster.rb2, roster.wr1, roster.wr2, roster.wr3, 
                 roster.te, roster.flex, roster.k, roster.dst].compactMap { $0 }.count
     }
     
     private var totalPlayers: Int {
-        filledSlots + viewModel.roster.bench.count
+        filledSlots + draftRoomViewModel.roster.bench.count
+    }
+    
+    /// Display text for the pick metric - shows draft position if available
+    private var pickDisplayText: String {
+        // Show draft position if available (for ESPN leagues and manual drafts)
+        if let draftSlot = draftRoomViewModel.myRosterID, draftRoomViewModel.isUsingPositionalLogic {
+            return "\(draftSlot)"
+        }
+        // Show roster ID if available (for Sleeper leagues)
+        else if let rosterID = draftRoomViewModel.myRosterID {
+            return "\(rosterID)"
+        }
+        // Fallback when no draft context
+        else {
+            return "—"
+        }
     }
     
     // MARK: - Enhanced Player Card (matching Draft War Room style)

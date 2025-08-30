@@ -23,7 +23,6 @@ final class DraftPollingService: ObservableObject {
     @Published private(set) var pollingCountdown: Double = 0.0
     @Published private(set) var currentPollingInterval: Double = 3.0
     
-    private let apiClient = SleeperAPIClient.shared
     private let playerDirectory = PlayerDirectoryStore.shared
     
     private var pollingTask: Task<Void, Never>?
@@ -31,11 +30,18 @@ final class DraftPollingService: ObservableObject {
     private var pollInterval: TimeInterval = 3.0 // 3 seconds during active drafts
     private var lastPollTime: Date = Date()
     
+    // API client - can be Sleeper or ESPN
+    private var currentApiClient: DraftAPIClient? = nil
+    
     // MARK: -> Draft Polling
     
     /// Start polling a specific draft
-    func startPolling(draftID: String) {
+    func startPolling(draftID: String, apiClient: DraftAPIClient? = nil) {
         stopPolling() // Stop any existing polling
+        
+        currentApiClient = apiClient ?? SleeperAPIClient.shared
+        let clientType = currentApiClient is ESPNAPIClient ? "ESPN" : "Sleeper"
+        print("🔄 Starting polling with \(clientType) API client for draftID: \(draftID)")
         
         pollingTask = Task {
             await pollDraft(draftID: draftID)
@@ -71,24 +77,48 @@ final class DraftPollingService: ObservableObject {
     
     private func pollDraft(draftID: String) async {
         isPolling = true
+        
+        guard let currentApiClient else {
+            print("❌ No API client set")
+            isPolling = false
+            return
+        }
+        
         var lastPickCount = 0
-        print("🔄 Starting polling for: \(draftID)")
+        let clientType = currentApiClient is ESPNAPIClient ? "ESPN" : "Sleeper"
+        print("🔄 Starting \(clientType) polling for draftID: \(draftID)")
         
         while !Task.isCancelled {
             lastPollTime = Date()
             
             do {
-                let draft = try await apiClient.fetchDraft(draftID: draftID)
+                print("📡 \(clientType) API - Fetching draft: \(draftID)")
+                let draft = try await currentApiClient.fetchDraft(draftID: draftID)
                 currentDraft = draft
+                print("✅ \(clientType) - Draft fetched: \(draft.status.rawValue)")
                 
-                let picks = try await apiClient.fetchDraftPicks(draftID: draftID)
+                print("📡 \(clientType) API - Fetching draft picks...")
+                let picks = try await currentApiClient.fetchDraftPicks(draftID: draftID)
+                print("✅ \(clientType) - Fetched \(picks.count) draft picks")
                 
                 // Only log when there are new picks
                 if picks.count > lastPickCount {
                     let newPicks = Array(picks.suffix(picks.count - lastPickCount))
-                    print("🆕 \(newPicks.count) NEW PICKS DETECTED")
+                    print("🆕 \(clientType) - \(newPicks.count) NEW PICKS DETECTED")
+                    
+                    for (index, pick) in newPicks.enumerated() {
+                        if let playerID = pick.playerID,
+                           let player = PlayerDirectoryStore.shared.player(for: playerID) {
+                            print("  \(index + 1). Pick \(pick.pickNo): \(player.shortName) (\(player.position ?? "")) to team \(pick.rosterID ?? -1)")
+                        } else {
+                            print("  \(index + 1). Pick \(pick.pickNo): Unknown player (ID: \(pick.playerID ?? "nil"))")
+                        }
+                    }
                     
                     await handleNewPicks(newPicks)
+                    lastPickCount = picks.count
+                } else if picks.count != lastPickCount {
+                    print("📊 \(clientType) - Pick count changed from \(lastPickCount) to \(picks.count)")
                     lastPickCount = picks.count
                 }
                 
@@ -96,7 +126,7 @@ final class DraftPollingService: ObservableObject {
                 allPicks = picks.sorted { $0.pickNo < $1.pickNo } // Store all picks sorted by pick number
                 recentPicks = Array(picks.suffix(10)) // Keep last 10 for other uses
                 
-                print("📊 Polling update: \(allPicks.count) total picks, \(recentPicks.count) recent picks")
+                print("📊 \(clientType) polling update: \(allPicks.count) total picks, \(recentPicks.count) recent picks")
                 
                 // Adjust polling frequency based on draft status
                 if draft.status == .drafting {
@@ -117,13 +147,16 @@ final class DraftPollingService: ObservableObject {
                 try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
                 
             } catch {
-                print("❌ Polling error: \(error.localizedDescription)")
+                print("❌ \(clientType) Polling error: \(error.localizedDescription)")
+                if let espnError = error as? ESPNAPIError {
+                    print("🔍 ESPN-specific error: \(espnError.errorDescription ?? "Unknown ESPN error")")
+                }
                 self.error = error
                 try? await Task.sleep(nanoseconds: UInt64(10 * 1_000_000_000))
             }
         }
         
-        print("🛑 Polling stopped for: \(draftID)")
+        print("🛑 \(clientType) polling stopped for: \(draftID)")
         isPolling = false
     }
     

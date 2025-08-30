@@ -52,8 +52,14 @@ struct LiveDraftPicksView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                         
+                        // Add League ID display
+                        Text("League ID: \(selectedDraft.leagueID)")
+                            .font(.caption)
+                            .fontDesign(.monospaced)
+                            .foregroundColor(.secondary)
+                        
                         if let draftID = selectedDraft.draftID {
-                            Text("ID: \(String(draftID.suffix(12)))")
+                            Text("Draft ID: \(String(draftID.suffix(12)))")
                                 .font(.caption)
                                 .fontDesign(.monospaced)
                                 .foregroundColor(.secondary)
@@ -159,7 +165,10 @@ struct LiveDraftPicksView: View {
                 ForEach(viewModel.allDraftPicks.reversed()) { pick in // Most recent first
                     DraftPickCard(
                         pick: pick,
-                        isRecent: viewModel.recentLivePicks.contains { $0.playerID == pick.player.playerID }
+                        isRecent: viewModel.recentLivePicks.contains { $0.playerID == pick.player.playerID },
+                        myRosterID: viewModel.myRosterID,
+                        isUsingPositionalLogic: viewModel.isUsingPositionalLogic,
+                        teamCount: viewModel.currentDraftTeamCount
                     )
                 }
             }
