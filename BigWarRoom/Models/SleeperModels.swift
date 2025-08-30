@@ -265,22 +265,18 @@ struct SleeperPick: Codable, Identifiable {
     let pickNo: Int
     let round: Int
     let draftSlot: Int
-    let rosterID: Int?  // Changed from Int to Int? for mock drafts
-    let pickedBy: String? // user_id (can be empty)
+    let rosterID: Int?
+    let pickedBy: String?
     let playerID: String?
     let metadata: SleeperPickMetadata?
     let isKeeper: Bool?
     let timestamp: TimeInterval?
     
-    var id: String { "\(draftID)-\(pickNo)" }
+    let espnPlayerInfo: ESPNPlayerInfo?
     
-    /// Pick timestamp as Date
-    var pickDate: Date? {
-        guard let timestamp = timestamp else { return nil }
-        return Date(timeIntervalSince1970: timestamp / 1000)
-    }
+    var id: String { "\(draftID)_\(pickNo)" }
     
-    private enum CodingKeys: String, CodingKey {
+    enum CodingKeys: String, CodingKey {
         case draftID = "draft_id"
         case pickNo = "pick_no"
         case round
@@ -291,7 +287,48 @@ struct SleeperPick: Codable, Identifiable {
         case metadata
         case isKeeper = "is_keeper"
         case timestamp
+        // Don't include espnPlayerInfo in CodingKeys - it's not from API
     }
+    
+    init(draftID: String, pickNo: Int, round: Int, draftSlot: Int, rosterID: Int?, pickedBy: String?, playerID: String?, metadata: SleeperPickMetadata?, isKeeper: Bool?, timestamp: TimeInterval?, espnPlayerInfo: ESPNPlayerInfo? = nil) {
+        self.draftID = draftID
+        self.pickNo = pickNo
+        self.round = round
+        self.draftSlot = draftSlot
+        self.rosterID = rosterID
+        self.pickedBy = pickedBy
+        self.playerID = playerID
+        self.metadata = metadata
+        self.isKeeper = isKeeper
+        self.timestamp = timestamp
+        self.espnPlayerInfo = espnPlayerInfo
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        draftID = try container.decode(String.self, forKey: .draftID)
+        pickNo = try container.decode(Int.self, forKey: .pickNo)
+        round = try container.decode(Int.self, forKey: .round)
+        draftSlot = try container.decode(Int.self, forKey: .draftSlot)
+        rosterID = try container.decodeIfPresent(Int.self, forKey: .rosterID)
+        pickedBy = try container.decodeIfPresent(String.self, forKey: .pickedBy)
+        playerID = try container.decodeIfPresent(String.self, forKey: .playerID)
+        metadata = try container.decodeIfPresent(SleeperPickMetadata.self, forKey: .metadata)
+        isKeeper = try container.decodeIfPresent(Bool.self, forKey: .isKeeper)
+        timestamp = try container.decodeIfPresent(TimeInterval.self, forKey: .timestamp)
+        // ESPN player info is not decoded from API - only set programmatically
+        espnPlayerInfo = nil
+    }
+}
+
+struct ESPNPlayerInfo: Codable {
+    let espnPlayerID: Int
+    let fullName: String
+    let firstName: String?
+    let lastName: String?
+    let position: String?
+    let team: String?
+    let jerseyNumber: String?
 }
 
 // MARK: -> Pick Metadata (Rich Player Info)

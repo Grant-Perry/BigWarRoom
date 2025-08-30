@@ -18,47 +18,47 @@ enum Position: String, Codable, CaseIterable, Hashable {
     case dst = "DST"
 }
 
-// MARK: -> Position Filter
-enum PositionFilter: String, Codable, CaseIterable, Identifiable, Hashable {
-    case all = "ALL"
-    case qb = "QB"
-    case rb = "RB"
-    case wr = "WR"
-    case te = "TE"
-    case k = "K"
-    case dst = "DST"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .all: return "All"
-        case .qb: return "QB"
-        case .rb: return "RB"
-        case .wr: return "WR"
-        case .te: return "TE"
-        case .k: return "K"
-        case .dst: return "DST"
-        }
-    }
-}
+//// MARK: -> Position Filter
+//enum PositionFilter: String, Codable, CaseIterable, Identifiable, Hashable {
+//    case all = "ALL"
+//    case qb = "QB"
+//    case rb = "RB"
+//    case wr = "WR"
+//    case te = "TE"
+//    case k = "K"
+//    case dst = "DST"
+//    
+//    var id: String { rawValue }
+//    
+//    var displayName: String {
+//        switch self {
+//        case .all: return "All"
+//        case .qb: return "QB"
+//        case .rb: return "RB"
+//        case .wr: return "WR"
+//        case .te: return "TE"
+//        case .k: return "K"
+//        case .dst: return "DST"
+//        }
+//    }
+//}
 
 // MARK: -> Sort Method
-enum SortMethod: String, Codable, CaseIterable, Identifiable, Hashable {
-    case wizard = "WIZARD"
-    case rankings = "RANKINGS" 
-    case all = "ALL"
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .wizard: return "AI Wizard"
-        case .rankings: return "Pure Ranks"
-        case .all: return "All"
-        }
-    }
-}
+//enum SortMethod: String, Codable, CaseIterable, Identifiable, Hashable {
+//    case wizard = "WIZARD"
+//    case rankings = "RANKINGS" 
+//    case all = "ALL"
+//    
+//    var id: String { rawValue }
+//    
+//    var displayName: String {
+//        switch self {
+//        case .wizard: return "AI Wizard"
+//        case .rankings: return "Pure Ranks"
+//        case .all: return "All"
+//        }
+//    }
+//}
 
 // MARK: -> Team
 struct Team: Codable, Hashable {

@@ -103,7 +103,7 @@ struct PlayerStatsCardView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
             } else {
-                LazyVStack(spacing: 12) {
+                LazyVStack(spacing: 6) {
                     ForEach(["QB", "RB", "WR", "TE", "K", "DEF"], id: \.self) { position in
                         if let positionPlayers = teamPlayers[position], !positionPlayers.isEmpty {
                             positionGroupView(position: position, players: positionPlayers)
@@ -122,7 +122,7 @@ struct PlayerStatsCardView: View {
     }
     
     private func positionGroupView(position: String, players: [SleeperPlayer]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 4) {
             // Position header
             HStack {
                 Text(position)
@@ -138,7 +138,7 @@ struct PlayerStatsCardView: View {
             }
             
             // Players in this position
-            VStack(spacing: 6) {
+            VStack(spacing: 2) {
                 ForEach(Array(players.enumerated()), id: \.element.id) { index, positionPlayer in
                     depthChartPlayerRow(
                         player: positionPlayer, 
@@ -148,9 +148,9 @@ struct PlayerStatsCardView: View {
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
-    
+
     private func depthChartPlayerRow(player: SleeperPlayer, depth: Int, isCurrentPlayer: Bool) -> some View {
         HStack(spacing: 12) {
             // Depth position number
@@ -172,7 +172,7 @@ struct PlayerStatsCardView: View {
             )
             
             // Player info
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     Text(player.shortName)
                         .font(.callout)
@@ -196,9 +196,9 @@ struct PlayerStatsCardView: View {
                     }
                 }
                 
-                // Injury status or experience
-                HStack(spacing: 8) {
-                    if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
+                // Only show injury status, remove the year experience
+                if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
+                    HStack {
                         Text(String(injuryStatus.prefix(5)))
                             .font(.caption2)
                             .foregroundColor(.red)
@@ -206,18 +206,14 @@ struct PlayerStatsCardView: View {
                             .padding(.vertical, 1)
                             .background(Color.red.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 3))
-                    } else if let yearsExp = player.yearsExp {
-                        Text("Y\(yearsExp)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                        
+                        Spacer()
                     }
-                    
-                    Spacer()
                 }
             }
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isCurrentPlayer ? Color.blue.opacity(0.1) : Color.clear)

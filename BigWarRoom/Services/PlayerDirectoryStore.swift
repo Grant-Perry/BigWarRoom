@@ -44,6 +44,17 @@ final class PlayerDirectoryStore: ObservableObject {
         return Date().timeIntervalSince(lastUpdated) > cacheExpirationInterval
     }
     
+    /// Get a player by their ESPN ID (for ESPN league integration)
+    func playerByESPNID(_ espnID: String) -> SleeperPlayer? {
+        return players.values.first { $0.espnID == espnID }
+    }
+    
+    /// Get a player by their ESPN ID as Int
+    func playerByESPNID(_ espnID: Int) -> SleeperPlayer? {
+        let espnIDString = String(espnID)
+        return playerByESPNID(espnIDString)
+    }
+    
     /// Get a player by their Sleeper ID
     func player(for playerID: String) -> SleeperPlayer? {
         return players[playerID]

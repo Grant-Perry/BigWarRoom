@@ -110,7 +110,6 @@ struct PlayerStats2024: Codable, Identifiable {
         case "RB":
             let rushYds = rushYards ?? 0
             let rushTds = rushTDs ?? 0
-            var recYds = recYards ?? 0
             let recTds = recTDs ?? 0
             return "\(rushYds) RUSH YDS, \(rushTds + recTds) TD"
             
