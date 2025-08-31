@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Compact league selection card for sports app style UI
+// displays on the Connection -> Selected Draft -> Your Leagues
 //
 
 import SwiftUI
@@ -28,10 +29,10 @@ struct CompactLeagueCard: View {
                 
                 // League info
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(leagueWrapper.league.name)
+                    Text("  \(leagueWrapper.league.name)")
                         .font(.subheadline)
                         .fontWeight(.medium)
-                        .foregroundColor(.primary)
+                        .foregroundColor(.gpGreen)
                         .lineLimit(1)
                     
                     HStack(spacing: 6) {

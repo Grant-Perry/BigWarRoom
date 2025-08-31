@@ -39,13 +39,40 @@ struct DraftRoomView: View {
                             .foregroundColor(.primary)
                         
                         if viewModel.connectionStatus == .connected {
+						   HStack {
+							  Text("")
+						   }
                             HStack(spacing: 6) {
                                 Circle()
                                     .fill(.green)
                                     .frame(width: 8, height: 8)
-                                Text(viewModel.sleeperDisplayName)
+                                
+                                // Show service logos instead of username
+                                HStack(spacing: 15) {
+                                    // Always show Sleeper logo if we have any connection (since we connect through Sleeper)
+                                    AppConstants.sleeperLogo
+                                        .frame(width: 20, height: 20)
+										.shadow(color: .gpGreen.opacity(0.8), radius: 5)
+										.shadow(color: .gpGreen.opacity(0.6), radius: 10)
+										.shadow(color: .gpGreen.opacity(0.4), radius: 20)
+                                    Text(" ")
+                                    // Show ESPN logo if we have ESPN leagues
+                                    if viewModel.allAvailableDrafts.contains(where: { $0.source == .espn }) {
+                                        AppConstants.espnLogo
+                                            .frame(width: 20, height: 20)
+											.shadow(color: .gpGreen.opacity(0.8), radius: 5)
+											.shadow(color: .gpGreen.opacity(0.6), radius: 10)
+											.shadow(color: .gpGreen.opacity(0.4), radius: 20)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                // Current year in bold on the far right
+                                Text(selectedYear)
                                     .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
                             }
                         } else {
                             Text("Connect to get started")
