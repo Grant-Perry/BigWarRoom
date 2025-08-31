@@ -168,7 +168,8 @@ struct LiveDraftPicksView: View {
                         isRecent: viewModel.recentLivePicks.contains { $0.playerID == pick.player.playerID },
                         myRosterID: viewModel.myRosterID,
                         isUsingPositionalLogic: viewModel.isUsingPositionalLogic,
-                        teamCount: viewModel.currentDraftTeamCount
+                        teamCount: viewModel.currentDraftTeamCount,
+                        viewModel: viewModel
                     )
                 }
             }

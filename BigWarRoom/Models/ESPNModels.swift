@@ -49,6 +49,46 @@ struct ESPNLeague: Codable, Identifiable {
         return "ESPN League \(id)"
     }
     
+    /// Get manager name for a team's owners array - THE KEY MISSING PIECE!
+    func getManagerName(for owners: [String]?) -> String {
+        guard let owners = owners, let firstOwnerID = owners.first else {
+            return "Unknown Manager"
+        }
+        
+        // Look up the member by ID
+        if let member = members?.first(where: { $0.id == firstOwnerID }) {
+            // Priority 1: Build name from first/last name if available and meaningful
+            let firstName = member.firstName ?? ""
+            let lastName = member.lastName ?? ""
+            let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+            
+            if !firstName.isEmpty && !lastName.isEmpty && fullName != " " {
+                print("     🎯 Using firstName + lastName: '\(fullName)'")
+                return fullName
+            }
+            
+            // Priority 2: Use displayName if it's not generic ESPN crap
+            if let displayName = member.displayName, 
+               !displayName.isEmpty,
+               !displayName.lowercased().hasPrefix("espnfan"),
+               !displayName.lowercased().hasPrefix("team "),
+               displayName.count > 3 {
+                print("     🎯 Using meaningful displayName: '\(displayName)'")
+                return displayName
+            }
+            
+            // Priority 3: Fall back to displayName even if generic (better than nothing)
+            if let displayName = member.displayName, !displayName.isEmpty {
+                print("     ⚠️ Using generic displayName: '\(displayName)'")
+                return displayName
+            }
+        }
+        
+        // Final fallback
+        print("     ❌ No member found, using fallback")
+        return "Manager \(firstOwnerID.suffix(8))"
+    }
+    
     /// Convert to SleeperLeague for UI compatibility
     func toSleeperLeague() -> SleeperLeague {
         // For ESPN leagues, use leagueID as draftID when no separate draft ID exists
@@ -222,8 +262,8 @@ struct ESPNTeam: Codable, Identifiable {
         return nickname ?? location ?? "Team \(id)"
     }
     
-    /// Convert to SleeperRoster for compatibility
-    func toSleeperRoster(leagueID: String) -> SleeperRoster {
+    /// Convert to SleeperRoster for compatibility with league context for manager names
+    func toSleeperRoster(leagueID: String, league: ESPNLeague? = nil) -> SleeperRoster {
         // Convert ESPN player IDs to Sleeper player IDs using espnID matching
         let sleeperPlayerIDs = roster?.entries?.compactMap { entry -> String? in
             let espnPlayerID = String(entry.playerId)
@@ -241,12 +281,15 @@ struct ESPNTeam: Codable, Identifiable {
             "\(overall.wins)-\(overall.losses)-\(overall.ties)"
         }
         
+        // Get the real manager name using league context
+        let managerName = league?.getManagerName(for: owners) ?? "Unknown Manager"
+        
         return SleeperRoster(
             rosterID: id,
             ownerID: owners?.first,
             leagueID: leagueID,
             playerIDs: sleeperPlayerIDs, // Use converted Sleeper player IDs
-            draftSlot: nil, // ESPN doesn't always expose draft slot easily
+            draftSlot: id, // ESPN team ID maps to draft slot position
             wins: record?.overall?.wins,
             losses: record?.overall?.losses,
             ties: record?.overall?.ties,
@@ -256,7 +299,7 @@ struct ESPNTeam: Codable, Identifiable {
             settings: nil,
             metadata: SleeperRosterMetadata(
                 teamName: displayName,
-                ownerName: nil, // Would need to lookup member info
+                ownerName: managerName, // USE THE REAL MANAGER NAME FROM LEAGUE MEMBERS!
                 avatar: nil,
                 record: recordString
             )

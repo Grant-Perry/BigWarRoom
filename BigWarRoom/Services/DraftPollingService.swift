@@ -35,6 +35,21 @@ final class DraftPollingService: ObservableObject {
     
     // MARK: -> Draft Polling
     
+    /// Set completed draft data without starting polling timer (for completed drafts)
+    func setCompletedDraftData(draft: SleeperDraft, picks: [SleeperPick]) async {
+        print("📋 Setting completed draft data: \(draft.status.rawValue) with \(picks.count) picks")
+        
+        currentDraft = draft
+        allPicks = picks.sorted { $0.pickNo < $1.pickNo }
+        recentPicks = Array(picks.suffix(10))
+        lastUpdate = Date()
+        error = nil
+        isPolling = false // Explicitly set to false since we're not polling
+        pollingCountdown = 0.0
+        
+        print("✅ Completed draft data loaded - no polling needed for \(draft.status.rawValue) draft")
+    }
+    
     /// Start polling a specific draft
     func startPolling(draftID: String, apiClient: DraftAPIClient? = nil) {
         stopPolling() // Stop any existing polling
@@ -97,6 +112,20 @@ final class DraftPollingService: ObservableObject {
                 currentDraft = draft
                 print("✅ \(clientType) - Draft fetched: \(draft.status.rawValue)")
                 
+                // SMART POLLING: Check if draft is still worth polling
+                if draft.status != .drafting {
+                    print("🚫 Draft status is \(draft.status.rawValue) - not live anymore")
+                    
+                    // Fetch final picks and stop polling
+                    let picks = try await currentApiClient.fetchDraftPicks(draftID: draftID)
+                    allPicks = picks.sorted { $0.pickNo < $1.pickNo }
+                    recentPicks = Array(picks.suffix(10))
+                    lastUpdate = Date()
+                    
+                    print("📋 Draft completed - fetched final \(picks.count) picks and stopping polling")
+                    break // Exit polling loop
+                }
+                
                 print("📡 \(clientType) API - Fetching draft picks...")
                 let picks = try await currentApiClient.fetchDraftPicks(draftID: draftID)
                 print("✅ \(clientType) - Fetched \(picks.count) draft picks")
@@ -128,13 +157,16 @@ final class DraftPollingService: ObservableObject {
                 
                 print("📊 \(clientType) polling update: \(allPicks.count) total picks, \(recentPicks.count) recent picks")
                 
-                // Adjust polling frequency based on draft status
+                // SMART POLLING INTERVALS: Adjust based on draft activity
                 if draft.status == .drafting {
-                    pollInterval = 2.0
+                    pollInterval = 3.0 // More frequent for live drafts
+                    print("⚡ Live draft - polling every \(pollInterval)s")
                 } else if picks.count > 0 {
-                    pollInterval = 5.0
+                    pollInterval = 10.0 // Less frequent for completed drafts with picks
+                    print("📋 Completed draft - polling every \(pollInterval)s")
                 } else {
-                    pollInterval = 15.0
+                    pollInterval = 30.0 // Very infrequent for empty drafts
+                    print("⏰ Pre-draft - polling every \(pollInterval)s")
                 }
                 
                 await MainActor.run {
@@ -152,7 +184,9 @@ final class DraftPollingService: ObservableObject {
                     print("🔍 ESPN-specific error: \(espnError.errorDescription ?? "Unknown ESPN error")")
                 }
                 self.error = error
-                try? await Task.sleep(nanoseconds: UInt64(10 * 1_000_000_000))
+                
+                // Longer delay on errors to avoid hammering failed endpoints
+                try? await Task.sleep(nanoseconds: UInt64(30 * 1_000_000_000)) // 30 second delay on error
             }
         }
         

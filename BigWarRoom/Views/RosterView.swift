@@ -19,6 +19,18 @@ struct RosterView: View {
     @State private var selectedPlayerForStats: SleeperPlayer?
     @State private var showingPlayerStats = false
     
+    // Customizable styling properties
+    @State private var boxGradient = LinearGradient(
+        gradient: Gradient(stops: [
+            .init(color: Color.gpBlueDarkL, location: 0.0),
+            .init(color: Color.clear, location: 1.0)
+		]),
+        startPoint: .top,
+        endPoint: .bottom
+    )
+    
+    @State private var boxForeColor = Color.gpYellow
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -182,7 +194,7 @@ struct RosterView: View {
                         Text(teamDisplayName(for: teamSlot, from: picks))
                             .font(.title2)
                             .fontWeight(.bold)
-                            .foregroundColor(.primary)
+                            .foregroundColor(boxForeColor)
                         
                         Text("Draft Slot \(teamSlot)")
                             .font(.caption)
@@ -209,7 +221,8 @@ struct RosterView: View {
                     }
                 }
                 .padding(16)
-                .background(Color(.systemGray6).opacity(0.2))
+                .background(boxGradient)
+//				.opacity(0.35)
             }
             
             // Collapsible Content
@@ -323,9 +336,23 @@ struct RosterView: View {
     
     // MARK: -> Helpers
     
-    /// Get team/manager display name using ViewModel's public method
+    /// Get team/manager display name using ViewModel's public method - show first names only
     private func teamDisplayName(for teamSlot: Int, from picks: [EnhancedPick]) -> String {
-        return viewModel.teamDisplayName(for: teamSlot)
+        let fullName = viewModel.teamDisplayName(for: teamSlot)
+        
+        // Extract first name from the full manager name
+        let components = fullName.components(separatedBy: " ")
+        if let firstName = components.first, !firstName.isEmpty {
+            // Check if it's a meaningful first name (not generic like "Team" or "Manager")
+            if !firstName.lowercased().hasPrefix("team") && 
+               !firstName.lowercased().hasPrefix("manager") && 
+               firstName.count > 1 {
+                return firstName
+            }
+        }
+        
+        // Fallback to full name if we can't extract a meaningful first name
+        return fullName
     }
     
     /// Organize picks by fantasy position
@@ -355,136 +382,141 @@ struct RosterView: View {
 
 struct CompactTeamRosterPlayerCard: View {
     let pick: EnhancedPick
-    let onPlayerTap: (SleeperPlayer) -> Void // Add callback for player stats
-    @ObservedObject var viewModel: DraftRoomViewModel // Add viewModel to get all picks for order calculation
+    let onPlayerTap: (SleeperPlayer) -> Void
+    @ObservedObject var viewModel: DraftRoomViewModel
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Round.Pick.Order format in larger blue rounded rectangle 
-            Text(roundPickOrderFormat)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 40, height: 24)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.blue))
-            
-            // Player image - enhanced with real Sleeper player lookup (LARGER SIZE)
-            playerImageForPick()
-            
-            // Player info (LARGER TEXT)
-            VStack(alignment: .leading, spacing: 4) {
-                // LARGER player name font
-                Text(pick.displayName)
-                    .font(.system(size: 18, weight: .bold)) // Increased from 16 to 18
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+        VStack(spacing: 8) {
+            // Top row: Pick # + Team Logo + Position (all smaller)
+            HStack(spacing: 8) {
+                // Smaller pick number
+                Text(roundPickOrderFormat)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 32, height: 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.gpBlue)
+                    )
                 
-                HStack(spacing: 8) {
-                    // Only show positional rank badge if available, with position colors
-                    if let realPlayer = findRealSleeperPlayer(),
-                       let positionRank = realPlayer.positionalRank {
-                        Text(positionRank)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(positionColor(pick.position)) // Use position color scheme
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                    } else if let positionRank = pick.player.positionalRank {
-                        // Fallback to pick's positional rank with position colors
-                        Text(positionRank)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(positionColor(pick.position)) // Use position color scheme
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                    } else {
-                        // Fallback to basic position if no positional rank available
-                        Text(pick.position)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(positionColor(pick.position))
-                            .clipShape(RoundedRectangle(cornerRadius: 5))
-                    }
-                    
-                    TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
-                        .frame(width: 16, height: 16) // Increased from 14 to 16
-                    
-                    Text(pick.teamCode)
-                        .font(.system(size: 12)) // Increased from 11 to 12
-                        .foregroundColor(.secondary)
-                    
-                    // Enhanced fantasy rank using real Sleeper data (LARGER)
-                    if let realPlayer = findRealSleeperPlayer(),
-                       let searchRank = realPlayer.searchRank {
-                        Text("FR:\(searchRank)")
-                            .font(.system(size: 11, weight: .medium)) // Increased from 10 to 11
-                            .foregroundColor(.orange)
-                    } else if let searchRank = pick.player.searchRank {
-                        // Fallback to pick's search rank
-                        Text("FR:\(searchRank)")
-                            .font(.system(size: 11, weight: .medium)) // Increased from 10 to 11
-                            .foregroundColor(.orange)
-                    }
+                Spacer()
+                
+                // Team logo (smaller)
+                TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
+                    .frame(width: 14, height: 14)
+                
+                // Position badge (smaller)
+                if let realPlayer = findRealSleeperPlayer(),
+                   let positionRank = realPlayer.positionalRank {
+                    Text(positionRank)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(positionColor(pick.position))
+                        )
+                } else if let positionRank = pick.player.positionalRank {
+                    Text(positionRank)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(positionColor(pick.position))
+                        )
+                } else {
+                    Text(pick.position)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(positionColor(pick.position))
+                        )
                 }
             }
             
-            Spacer()
+            // Second row: Larger player image + Player name taking full width
+            HStack(spacing: 12) {
+                // Larger player image
+                ZStack {
+                    Circle()
+                        .fill(positionColor(pick.position).opacity(0.3))
+                        .frame(width: 52, height: 52)
+                        .blur(radius: 2)
+                    
+                    playerImageForPick()
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(positionColor(pick.position).opacity(0.6), lineWidth: 2)
+                        )
+                }
+                
+                // Player name taking full width
+                HStack {
+                    Text(pick.displayName)
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    
+                    Spacer()
+                    
+                    // Fantasy rank (if available)
+                    if let realPlayer = findRealSleeperPlayer(),
+                       let searchRank = realPlayer.searchRank {
+                        Text("#\(searchRank)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.gpYellow)
+                    } else if let searchRank = pick.player.searchRank {
+                        Text("#\(searchRank)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.gpYellow)
+                    }
+                }
+            }
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.blue.opacity(0.10),
-                            Color.blue.opacity(0.03)
-                        ]),
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.blue.opacity(0.15), lineWidth: 1)
-                )
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: Color.black.opacity(0.7), location: 0.0),
+                    .init(color: positionColor(pick.position).opacity(0.2), location: 0.5),
+                    .init(color: Color.black.opacity(0.8), location: 1.0)
+                ]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(positionColor(pick.position).opacity(0.4), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.3), radius: 4, x: 0, y: 2)
         .onTapGesture {
-            // Handle tap to show player stats - find real Sleeper player first
             if let realSleeperPlayer = findRealSleeperPlayer() {
                 onPlayerTap(realSleeperPlayer)
             }
         }
     }
     
-    // MARK: -> Round.Pick.Order Format Helper (FIXED CALCULATION)
+    // MARK: -> Round.Pick.Order Format Helper
     
     private var roundPickOrderFormat: String {
-        // Use the correct data that's already calculated in EnhancedPick
         let actualRound = pick.round
         let actualPickInRound = pick.pickInRound
         
-        // Calculate this team's pick order (how many picks this team has made chronologically)
         let allTeamPicks = viewModel.allDraftPicks
-            .filter { $0.draftSlot == pick.draftSlot }  // Same team
-            .sorted { $0.pickNumber < $1.pickNumber }    // Chronological order
+            .filter { $0.draftSlot == pick.draftSlot }
+            .sorted { $0.pickNumber < $1.pickNumber }
         
-        // Find the index of this pick in the team's chronological picks (1-indexed)
         let pickOrder = (allTeamPicks.firstIndex { $0.pickNumber == pick.pickNumber } ?? 0) + 1
-        
-        // DEBUG: Print the calculation for Josh Allen specifically
-        if pick.displayName.contains("Allen") {
-            print("🏈 DEBUG Josh Allen calculation:")
-            print("   Pick Number: \(pick.pickNumber)")
-            print("   Round: \(actualRound)")
-            print("   Pick in Round: \(actualPickInRound)")
-            print("   Draft Slot: \(pick.draftSlot)")
-            print("   All team picks: \(allTeamPicks.map { "\($0.pickNumber)-\($0.displayName)" })")
-            print("   Pick Order: \(pickOrder)")
-            print("   Final: \(actualRound).\(actualPickInRound).\(pickOrder)")
-        }
         
         return "\(actualRound).\(actualPickInRound).\(pickOrder)"
     }
@@ -496,36 +528,32 @@ struct CompactTeamRosterPlayerCard: View {
         if let realSleeperPlayer = findRealSleeperPlayer() {
             PlayerImageView(
                 player: realSleeperPlayer,
-                size: 50, // Increased from 40 to 50
+                size: 48,
                 team: pick.team
             )
         } else {
-            // Use the pick's player directly if it has valid data
             PlayerImageView(
                 player: pick.player,
-                size: 50, // Increased from 40 to 50
+                size: 48,
                 team: pick.team
             )
         }
     }
     
-    // MARK: -> Enhanced Sleeper Player Lookup (Same as Draft Board)
+    // MARK: -> Enhanced Sleeper Player Lookup
     
     private func findRealSleeperPlayer() -> SleeperPlayer? {
         let allSleeperPlayers = PlayerDirectoryStore.shared.players.values
         
-        // Strategy 1: Direct ID match (if it's already a real Sleeper player)
         if let directMatch = PlayerDirectoryStore.shared.players[pick.player.playerID] {
             return directMatch
         }
         
-        // For ESPN/fake players, try to match by name and team
         if let firstName = pick.player.firstName,
            let lastName = pick.player.lastName,
            let team = pick.player.team,
            let position = pick.player.position {
             
-            // Strategy 2: Exact name, team, and position match
             let exactMatch = allSleeperPlayers.first { sleeperPlayer in
                 let firstNameMatches = sleeperPlayer.firstName?.lowercased() == firstName.lowercased()
                 let lastNameMatches = sleeperPlayer.lastName?.lowercased() == lastName.lowercased()
@@ -539,7 +567,6 @@ struct CompactTeamRosterPlayerCard: View {
                 return exactMatch
             }
             
-            // Strategy 3: Fuzzy name match with team (handles name variations)
             let fuzzyMatch = allSleeperPlayers.first { sleeperPlayer in
                 guard let sleeperFirst = sleeperPlayer.firstName,
                       let sleeperLast = sleeperPlayer.lastName else { return false }
@@ -558,15 +585,16 @@ struct CompactTeamRosterPlayerCard: View {
         return nil
     }
     
+    // Enhanced position colors
     private func positionColor(_ position: String) -> Color {
         switch position.uppercased() {
-        case "QB": return .purple
-        case "RB": return .green
-        case "WR": return .blue
-        case "TE": return .orange
-        case "K": return .gray
-        case "DEF", "DST": return .red
-        default: return .gray
+        case "QB": return Color(red: 0.6, green: 0.3, blue: 0.9) // Purple
+        case "RB": return Color(red: 0.2, green: 0.8, blue: 0.4) // Green
+        case "WR": return Color(red: 0.3, green: 0.6, blue: 1.0) // Blue
+        case "TE": return Color(red: 1.0, green: 0.6, blue: 0.2) // Orange
+        case "K": return Color(red: 0.7, green: 0.7, blue: 0.7) // Gray
+        case "DEF", "DST": return Color(red: 0.9, green: 0.3, blue: 0.3) // Red
+        default: return Color(red: 0.6, green: 0.6, blue: 0.6) // Default Gray
         }
     }
 }

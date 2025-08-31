@@ -152,76 +152,221 @@ struct PlayerStatsCardView: View {
     }
 
     private func depthChartPlayerRow(player: SleeperPlayer, depth: Int, isCurrentPlayer: Bool) -> some View {
-        HStack(spacing: 12) {
-            // Depth position number
-            Text("\(depth)")
-                .font(.caption)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .frame(width: 20, height: 20)
-                .background(
-                    Circle()
-                        .fill(depth == 1 ? Color.green : depth == 2 ? Color.orange : Color.gray)
+        HStack(spacing: 14) {
+            // Enhanced depth position number with gradient
+            ZStack {
+                // Glow effect behind number
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            gradient: Gradient(colors: [
+                                depthCircleColor(depth).opacity(0.8),
+                                depthCircleColor(depth).opacity(0.3)
+                            ]),
+                            center: .center,
+                            startRadius: 2,
+                            endRadius: 15
+                        )
+                    )
+                    .frame(width: 28, height: 28)
+                    .blur(radius: 1)
+                
+                // Main circle with gradient
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                depthCircleColor(depth),
+                                depthCircleColor(depth).opacity(0.8)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 24, height: 24)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                    .shadow(color: depthCircleColor(depth).opacity(0.4), radius: 3, x: 0, y: 2)
+                
+                Text("\(depth)")
+                    .font(.system(size: 11, weight: .black))
+                    .foregroundColor(.white)
+            }
+            
+            // Enhanced player headshot with glow
+            ZStack {
+                // Position-colored glow behind image
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                positionColorFor(player.position ?? "").opacity(0.6),
+                                positionColorFor(player.position ?? "").opacity(0.2)
+                            ]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 38, height: 38)
+                    .blur(radius: 2)
+                
+                PlayerImageView(
+                    player: player,
+                    size: 34,
+                    team: team
                 )
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.6),
+                                    positionColorFor(player.position ?? "").opacity(0.4)
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                )
+            }
             
-            // Player headshot
-            PlayerImageView(
-                player: player,
-                size: 32,
-                team: team
-            )
-            
-            // Player info
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 6) {
+            // Enhanced player info section
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
                     Text(player.shortName)
-                        .font(.callout)
-                        .fontWeight(isCurrentPlayer ? .bold : .medium)
-                        .foregroundColor(isCurrentPlayer ? .primary : .secondary)
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundColor(isCurrentPlayer ? .white : .primary)
                     
                     if let number = player.number {
                         Text("#\(number)")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color.secondary.opacity(0.8))
+                            )
                     }
                     
                     Spacer()
                     
-                    // Fantasy rank if available
+                    // Enhanced fantasy rank with styling
                     if let searchRank = player.searchRank {
-                        Text("Rnk \(searchRank)")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.blue)
+                        HStack(spacing: 3) {
+                            Text("Rnk")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(.secondary)
+                            
+                            Text("\(searchRank)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.gpBlue)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color.gpBlue.opacity(0.15))
+                                .overlay(
+                                    Capsule()
+                                        .stroke(Color.gpBlue.opacity(0.3), lineWidth: 1)
+                                )
+                        )
                     }
                 }
                 
-                // Only show injury status, remove the year experience
+                // Enhanced injury status with better styling
                 if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
-                    HStack {
-                        Text(String(injuryStatus.prefix(5)))
-                            .font(.caption2)
+                    HStack(spacing: 4) {
+                        Image(systemName: "cross.circle.fill")
+                            .font(.system(size: 10))
                             .foregroundColor(.red)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(Color.red.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
                         
-                        Spacer()
+                        Text(String(injuryStatus.prefix(10)).capitalized)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.red)
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.red.opacity(0.15))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.red.opacity(0.4), lineWidth: 1)
+                            )
+                    )
                 }
             }
+            
+            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isCurrentPlayer ? Color.blue.opacity(0.1) : Color.clear)
+            ZStack {
+                // Main gradient background
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: isCurrentPlayer ? Color.gpGreen.opacity(0.4) : Color.black.opacity(0.6), location: 0.0),
+                        .init(color: positionColorFor(player.position ?? "").opacity(0.15), location: 0.5),
+                        .init(color: isCurrentPlayer ? Color.gpGreen.opacity(0.2) : Color.black.opacity(0.8), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                
+                // Subtle overlay pattern
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.white.opacity(0.05),
+                        Color.clear,
+                        Color.white.opacity(0.02)
+                    ]),
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isCurrentPlayer ? Color.blue : Color.clear, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            isCurrentPlayer ? Color.gpGreen : Color.white.opacity(0.2),
+                            isCurrentPlayer ? Color.gpGreen.opacity(0.6) : positionColorFor(player.position ?? "").opacity(0.3),
+                            Color.clear
+                        ]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: isCurrentPlayer ? 2 : 1
+                )
         )
+        .shadow(
+            color: isCurrentPlayer ? Color.gpGreen.opacity(0.3) : Color.black.opacity(0.2), 
+            radius: isCurrentPlayer ? 6 : 3, 
+            x: 0, 
+            y: isCurrentPlayer ? 3 : 2
+        )
+        .scaleEffect(isCurrentPlayer ? 1.02 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isCurrentPlayer)
+    }
+    
+    // Enhanced depth circle color function
+    private func depthCircleColor(_ depth: Int) -> Color {
+        switch depth {
+        case 1: return Color.green
+        case 2: return Color.orange  
+        case 3: return Color.purple
+        case 4: return Color.red
+        default: return Color.gray
+        }
     }
     
     private func getTeamPlayers() -> [String: [SleeperPlayer]] {

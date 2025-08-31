@@ -42,12 +42,12 @@ final class UnifiedLeagueManager: ObservableObject {
     // MARK: -> Fetch All Leagues
     
     /// Fetch leagues from both Sleeper and ESPN
-    func fetchAllLeagues(sleeperUserID: String? = nil) async {
+    func fetchAllLeagues(sleeperUserID: String? = nil, season: String = "2025") async {
         await withTaskGroup(of: Void.self) { group in
             // Fetch Sleeper leagues if user ID provided
             if let userID = sleeperUserID {
                 group.addTask { [weak self] in
-                    await self?.fetchSleeperLeagues(userID: userID)
+                    await self?.fetchSleeperLeagues(userID: userID, season: season)
                 }
             }
             
@@ -62,12 +62,12 @@ final class UnifiedLeagueManager: ObservableObject {
     }
     
     /// Fetch Sleeper leagues for a user
-    private func fetchSleeperLeagues(userID: String) async {
+    private func fetchSleeperLeagues(userID: String, season: String = "2025") async {
         isLoadingSleeperLeagues = true
         defer { isLoadingSleeperLeagues = false }
         
         do {
-            let leagues = try await sleeperClient.fetchLeagues(userID: userID, season: "2024")
+            let leagues = try await sleeperClient.fetchLeagues(userID: userID, season: season)
             
             // Filter to only leagues with drafts
             let leaguesWithDrafts = leagues.filter { $0.draftID != nil }
@@ -85,10 +85,10 @@ final class UnifiedLeagueManager: ObservableObject {
             allLeagues.removeAll { $0.source == .sleeper }
             allLeagues.append(contentsOf: sleeperWrappers)
             
-            print("✅ Fetched \(sleeperWrappers.count) Sleeper leagues")
+            print("✅ Fetched \(sleeperWrappers.count) Sleeper leagues for \(season) season")
             
         } catch {
-            print("❌ Failed to fetch Sleeper leagues: \(error)")
+            print("❌ Failed to fetch Sleeper leagues for \(season): \(error)")
         }
     }
     
@@ -136,8 +136,8 @@ final class UnifiedLeagueManager: ObservableObject {
     }
     
     /// Refresh all leagues
-    func refreshAllLeagues(sleeperUserID: String? = nil) async {
-        await fetchAllLeagues(sleeperUserID: sleeperUserID)
+    func refreshAllLeagues(sleeperUserID: String? = nil, season: String = "2025") async {
+        await fetchAllLeagues(sleeperUserID: sleeperUserID, season: season)
     }
     
     /// Check if any leagues are currently loading

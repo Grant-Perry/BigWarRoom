@@ -14,6 +14,7 @@ struct DraftPickCard: View {
     let myRosterID: Int? // To identify my picks
     let isUsingPositionalLogic: Bool // NEW: Whether to use positional logic
     let teamCount: Int // NEW: Team count for positional calculations
+    let viewModel: DraftRoomViewModel // Add viewModel to get manager names
     
     // Computed property to check if this is my pick
     private var isMyPick: Bool {
@@ -103,14 +104,23 @@ struct DraftPickCard: View {
                             .foregroundColor(.orange)
                     }
                     
-                    // Team info with logo
-                    HStack(spacing: 2) {
-                        TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
-                            .frame(width: 10, height: 10)
+                    // Team info with logo and manager name
+                    VStack(spacing: 2) {
+                        HStack(spacing: 2) {
+                            TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
+                                .frame(width: 12, height: 12)
+                            
+                            Text(pick.teamCode)
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
                         
-                        Text(pick.teamCode)
+                        // Manager first name
+                        Text(managerFirstName(for: pick.draftSlot))
                             .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                 }
                 
@@ -163,5 +173,24 @@ struct DraftPickCard: View {
         case "DEF", "DST": return .red
         default: return .gray
         }
+    }
+    
+    /// Extract first name from manager display name
+    private func managerFirstName(for draftSlot: Int) -> String {
+        let fullName = viewModel.teamDisplayName(for: draftSlot)
+        
+        // Extract first name from the full manager name
+        let components = fullName.components(separatedBy: " ")
+        if let firstName = components.first, !firstName.isEmpty {
+            // Check if it's a meaningful first name (not generic like "Team" or "Manager")
+            if !firstName.lowercased().hasPrefix("team") && 
+               !firstName.lowercased().hasPrefix("manager") && 
+               firstName.count > 1 {
+                return firstName
+            }
+        }
+        
+        // Fallback to full name if we can't extract a meaningful first name
+        return fullName
     }
 }

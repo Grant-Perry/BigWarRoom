@@ -8,16 +8,26 @@ import SwiftUI
 
 struct BigWarRoom: View {
     @StateObject private var viewModel = DraftRoomViewModel()
+    @State private var selectedTab = 0
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            TabView {
+            TabView(selection: $selectedTab) {
                 // Draft War Room Tab
-                DraftRoomView(viewModel: viewModel)
+                DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
                     .tabItem {
                         Image(systemName: "brain.head.profile")
                         Text("War Room")
                     }
+                    .tag(0)
+                
+                // AI Pick Suggestions Tab
+                AIPickSuggestionsView(viewModel: viewModel)
+                    .tabItem {
+                        Image(systemName: "wand.and.stars")
+                        Text("AI Picks")
+                    }
+                    .tag(1)
                 
                 // Live Draft Picks Tab
                 LiveDraftPicksView(viewModel: viewModel)
@@ -25,6 +35,7 @@ struct BigWarRoom: View {
                         Image(systemName: "list.bullet.rectangle.portrait")
                         Text("Live Picks")
                     }
+                    .tag(2)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -32,6 +43,7 @@ struct BigWarRoom: View {
                         Image(systemName: "sportscourt")
                         Text("Draft Board")
                     }
+                    .tag(3)
                 
                 // My Roster Tab
                 MyRosterView(draftRoomViewModel: viewModel)
@@ -39,6 +51,7 @@ struct BigWarRoom: View {
                         Image(systemName: "person.fill")
                         Text("My Roster")
                     }
+                    .tag(4)
             }
             .preferredColorScheme(.dark)
             
@@ -61,8 +74,4 @@ struct BigWarRoom: View {
             .ignoresSafeArea(edges: .bottom)
         }
     }
-}
-
-#Preview {
-    BigWarRoom()
 }

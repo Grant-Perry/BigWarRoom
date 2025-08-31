@@ -10,6 +10,7 @@ import SwiftUI
 
 struct DraftRoomView: View {
     @ObservedObject var viewModel: DraftRoomViewModel
+    @Binding var selectedTab: Int
 
     // MARK: -> State variables
     @State private var customSleeperInput: String = AppConstants.GpSleeperID
@@ -19,294 +20,8 @@ struct DraftRoomView: View {
     @State private var selectedPlayerForStats: Player?
     @State private var showingPlayerStats = false
     @State private var showConnectionSection = false // Default closed
+    @State private var selectedYear: String = "2025" // Add year selection state
 
-    // MARK: -> Enhanced Suggestions
-    
-    private var suggestionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Top \(viewModel.suggestions.count) Suggestions")
-                    .font(.headline)
-                
-                Spacer()
-                
-                if viewModel.isLiveMode {
-                    Image(systemName: "wifi")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                }
-            }
-            
-            // Position Filter
-            positionFilterSection
-            
-            if viewModel.suggestions.isEmpty {
-                // Loading state
-                VStack(spacing: 12) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading player suggestions...")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
-            } else {
-                // Choose display method based on sort method
-                if viewModel.selectedSortMethod == .all {
-                    // LazyVStack for "All" - can handle thousands of players
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(viewModel.suggestions) { suggestion in
-                                enhancedSuggestionCardForAll(suggestion)
-                            }
-                        }
-                        .padding(.horizontal)
-                    }
-                    .frame(height: 600)
-                    .background(Color(.systemGray6).opacity(0.3))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    // List with swipe actions for Wizard and Rankings
-                    List {
-                        ForEach(viewModel.suggestions) { suggestion in
-                            enhancedSuggestionCard(suggestion)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                        }
-                    }
-                    .listStyle(.plain)
-                    .frame(height: 600) // Reduced since we removed the picks section
-                    .background(Color(.systemGray6).opacity(0.3))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-        }
-    }
-    
-    // MARK: -> Position Filter Section
-    
-    private var positionFilterSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Sort Method Toggle
-            sortMethodToggle
-            
-            // Position Filter
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Filter by Position")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(PositionFilter.allCases) { filter in
-                            Button {
-                                viewModel.updatePositionFilter(filter)
-                            } label: {
-                                Text(filter.displayName)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        viewModel.selectedPositionFilter == filter 
-                                        ? Color.blue 
-                                        : Color(.systemGray5)
-                                    )
-                                    .foregroundColor(
-                                        viewModel.selectedPositionFilter == filter 
-                                        ? .white 
-                                        : .primary
-                                    )
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                }
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color(.systemGray6).opacity(0.2))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-    
-    // MARK: -> Sort Method Toggle
-    
-    private var sortMethodToggle: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Ranking Method")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 12) {
-                ForEach(SortMethod.allCases) { method in
-                    Button {
-                        viewModel.updateSortMethod(method)
-                    } label: {
-                        Text(method.displayName)
-                            .font(.system(size: 14, weight: .semibold))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                viewModel.selectedSortMethod == method 
-                                ? Color.green 
-                                : Color(.systemGray4)
-                            )
-                            .foregroundColor(
-                                viewModel.selectedSortMethod == method 
-                                ? .white 
-                                : .primary
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-                }
-                
-                Spacer()
-                
-                // Show current method description
-                Text(viewModel.selectedSortMethod == .wizard ? "AI Strategy" : viewModel.selectedSortMethod == .rankings ? "Pure Rankings" : "All Players")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    
-    private func enhancedSuggestionCard(_ suggestion: Suggestion) -> some View {
-        HStack(spacing: 12) {
-            // Player headshot - improved lookup logic
-            playerImageForSuggestion(suggestion.player)
-            
-            // Player info
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    // Custom player name and position display
-                    playerNameAndPositionView(for: suggestion)
-                    
-                    // Tier badge (T1 = Elite, T2 = Very Good, etc.)
-                    tierBadge(suggestion.player.tier)
-                    
-                    // Team logo (much larger size)
-                    TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
-                        .frame(width: 42, height: 42)
-                    
-                    Spacer()
-                }
-                
-                // Player details: fantasy rank, jersey, years, injury status all on one line
-                playerDetailsRow(for: suggestion.player)
-            }
-        }
-        .padding(12)
-        .background(
-            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            // Tap to show player stats
-            showPlayerStats(for: suggestion.player)
-        }
-        // Only add swipe actions for non-"All" modes (List view)
-        .conditionalSwipeActions(condition: viewModel.selectedSortMethod != .all) {
-            // Swipe left (from right edge) to Add to Feed
-            Button("Add") {
-                addPlayerToFeed(suggestion)
-            }
-            .tint(.blue)
-        } leading: {
-            // Swipe right (from left edge) to Lock as My Pick
-            Button("Lock") {
-                lockPlayerAsPick(suggestion)
-            }
-            .tint(.green)
-        }
-    }
-    
-    // MARK: -> Enhanced Suggestion Card for "All" view (LazyVStack - no swipe actions)
-    
-    private func enhancedSuggestionCardForAll(_ suggestion: Suggestion) -> some View {
-        HStack(spacing: 16) {  
-            // Player headshot with position number badge overlay
-            ZStack(alignment: .topTrailing) {
-                // Player headshot - improved lookup logic
-                playerImageForSuggestion(suggestion.player)
-                
-                // Sequential position number in blue gradient circle
-                if let index = viewModel.suggestions.firstIndex(where: { $0.id == suggestion.id }) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue, .blue.opacity(0.7)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                        )
-                        .offset(x: 4, y: -4)
-                }
-            }
-            
-            // Player info - expanded to fill more space
-            VStack(alignment: .leading, spacing: 6) {  
-                // Player name and position on TOP row with team logo/tier on trailing edge
-                HStack(spacing: 8) {
-                    // Custom player name and position display
-                    playerNameAndPositionView(for: suggestion)
-                    
-                    Spacer()
-                    
-                    // Team logo and tier badge all the way to trailing edge
-                    HStack(spacing: 8) {
-                        // Tier badge
-                        tierBadge(suggestion.player.tier)
-                        
-                        // Team logo
-                        TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
-                            .frame(width: 42, height: 42)
-                    }
-                }
-                
-                // Player details: jersey, years, injury status (second row)
-                playerDetailsRowForAll(for: suggestion.player)
-            }
-        }
-        .padding(.horizontal, 16)  
-        .padding(.vertical, 14)    
-        .background(
-            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            // Tap to show player stats
-            showPlayerStats(for: suggestion.player)
-        }
-        // Add gesture recognizers for add/lock actions since no swipe actions in LazyVStack
-        .onLongPressGesture(minimumDuration: 0.5) {
-            // Long press to lock as my pick
-            lockPlayerAsPick(suggestion)
-            
-            // Haptic feedback
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-        }
-        // Add contextual menu for additional actions
-        .contextMenu {
-            Button("Lock as My Pick") {
-                lockPlayerAsPick(suggestion)
-            }
-            
-            Button("Add to Feed") {
-                addPlayerToFeed(suggestion)
-            }
-        }
-    }
-    
     // MARK: -> Step 1: Quick Connect Section (Now Collapsible)
     
     private var quickConnectSection: some View {
@@ -352,6 +67,36 @@ struct DraftRoomView: View {
             // Connection options (only show if expanded)
             if showConnectionSection {
                 VStack(spacing: 12) {
+                    // Year picker section
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "calendar")
+                                .foregroundColor(.blue)
+                                .font(.caption)
+                            Text("Season Year")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        
+                        Picker("Season Year", selection: $selectedYear) {
+                            ForEach(AppConstants.availableYears, id: \.self) { year in
+                                Text(year).tag(year)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .onChange(of: selectedYear) { newYear in
+                            // Update AppConstants when year changes
+                            AppConstants.ESPNLeagueYear = newYear
+                            
+                            // Reconnect if already connected to get new year's data
+                            if viewModel.connectionStatus == .connected {
+                                Task {
+                                    await viewModel.connectWithUsernameOrID(customSleeperInput, season: newYear)
+                                }
+                            }
+                        }
+                    }
+                    
                     // Action buttons row
                     HStack(spacing: 12) {
                         if viewModel.connectionStatus == .connected {
@@ -368,7 +113,7 @@ struct DraftRoomView: View {
                             // Sleeper connection
                             Button {
                                 Task {
-                                    await viewModel.connectWithUsernameOrID(customSleeperInput)
+                                    await viewModel.connectWithUsernameOrID(customSleeperInput, season: selectedYear)
                                 }
                             } label: {
                                 HStack(spacing: 6) {
@@ -390,7 +135,11 @@ struct DraftRoomView: View {
                             
                             // ESPN connection
                             Button {
-                                Task { await viewModel.connectToESPNOnly() }
+                                Task { 
+                                    // Update ESPN year before connecting
+                                    AppConstants.ESPNLeagueYear = selectedYear
+                                    await viewModel.connectToESPNOnly() 
+                                }
                             } label: {
                                 HStack(spacing: 6) {
                                     AppConstants.espnLogo
@@ -518,6 +267,20 @@ struct DraftRoomView: View {
                                     .foregroundColor(.secondary)
                                     .padding(.top, 4)
                             }
+                        }
+                    }
+                }
+                .onAppear {
+                    // Auto-expand when leagues are available
+                    if !viewModel.allAvailableDrafts.isEmpty {
+                        showAllLeagues = true
+                    }
+                }
+                .onChange(of: viewModel.allAvailableDrafts.count) { newCount in
+                    // Auto-expand when leagues become available
+                    if newCount > 0 {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            showAllLeagues = true
                         }
                     }
                 }
@@ -727,12 +490,15 @@ struct DraftRoomView: View {
                         .padding(.bottom, 20)
                 }
                 
-                // STEP 4: Player Suggestions (Main Content)
-                suggestionsSection
-                    .padding(.horizontal)
+                // STEP 4: Draft Actions & Quick Tools
+                if viewModel.selectedDraft != nil || viewModel.isConnectedToManualDraft {
+                    draftQuickActionsSection
+                        .padding(.horizontal)
+                }
             }
         }
-        // Remove navigation title completely
+        .navigationTitle("War Room")
+        .navigationBarTitleDisplayMode(.large)
         .background(Color(.systemGroupedBackground))
         
         // Auto-connect on appear
@@ -740,8 +506,8 @@ struct DraftRoomView: View {
             // Auto-connect to default services on page load
             if viewModel.connectionStatus != .connected {
                 Task {
-                    // Connect to both Sleeper and ESPN with default user
-                    await viewModel.connectWithUsernameOrID(AppConstants.GpSleeperID)
+                    // Connect to both Sleeper and ESPN with default user using 2025 season
+                    await viewModel.connectWithUsernameOrID(AppConstants.GpSleeperID, season: selectedYear)
                     // Note: ESPN connection will be available as a separate service
                 }
             }
@@ -781,39 +547,346 @@ struct DraftRoomView: View {
         }
     }
     
+    // MARK: -> Draft Quick Actions Section
+    
+    private var draftQuickActionsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Quick Actions")
+                .font(.headline)
+            
+            // Action buttons grid
+            let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
+            
+            LazyVGrid(columns: columns, spacing: 12) {
+                // Navigate to AI Suggestions
+                Button {
+                    selectedTab = 1 // Switch to AI Picks tab
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "wand.and.stars")
+                            .font(.title2)
+                            .foregroundColor(.purple)
+                        
+                        Text("AI Picks")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        
+                        Text("Smart suggestions")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(.purple.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                // Navigate to Draft Board
+                Button {
+                    selectedTab = 3 // Switch to Draft Board tab
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "sportscourt")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                        
+                        Text("Draft Board")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        
+                        Text("Round by round")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(.blue.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                // Navigate to Live Picks
+                Button {
+                    selectedTab = 2 // Switch to Live Picks tab
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "list.bullet.rectangle.portrait")
+                            .font(.title2)
+                            .foregroundColor(.green)
+                        
+                        Text("Live Picks")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        
+                        Text("Real-time updates")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(.green.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                
+                // Navigate to My Roster
+                Button {
+                    selectedTab = 4 // Switch to My Roster tab
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "person.fill")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        
+                        Text("My Roster")
+                            .font(.callout)
+                            .fontWeight(.medium)
+                        
+                        Text("Team overview")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(.orange.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            
+            // Draft stats summary (if connected)
+            if !viewModel.allDraftPicks.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Draft Progress")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("\(viewModel.allDraftPicks.count)")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                            Text("Total Picks")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        if viewModel.isMyTurn {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("YOUR TURN")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.red)
+                                Text("Make your pick!")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Waiting")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                Text("Other managers")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+                .padding()
+                .background(.thinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            
+            // Top 25 AI Suggestions Section
+            topSuggestionsSection
+        }
+        .padding()
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // MARK: -> Top Suggestions Section
+    
+    private var topSuggestionsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Top AI Suggestions")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                Spacer()
+                
+                if !viewModel.suggestions.isEmpty {
+                    Text("Showing \(min(viewModel.suggestions.count, 5))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            if viewModel.suggestions.isEmpty {
+                // Loading state
+                VStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading AI suggestions...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+            } else {
+                // Show top 5 suggestions in compact format
+                LazyVStack(spacing: 8) {
+                    ForEach(viewModel.suggestions.prefix(5)) { suggestion in
+                        compactSuggestionCard(suggestion)
+                    }
+                }
+                
+                // "View All" button to navigate to AI Picks tab
+                if viewModel.suggestions.count > 5 {
+                    Button {
+                        selectedTab = 1 // Switch to AI Picks tab
+                    } label: {
+                        HStack {
+                            Text("View All \(viewModel.suggestions.count) Suggestions")
+                                .font(.callout)
+                                .fontWeight(.medium)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "arrow.right")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.purple)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.purple.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: -> Compact Suggestion Card
+    
+    private func compactSuggestionCard(_ suggestion: Suggestion) -> some View {
+        HStack(spacing: 10) {
+            // Player headshot (smaller)
+            playerImageForSuggestion(suggestion.player, size: 40)
+            
+            // Player info
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("\(suggestion.player.firstInitial) \(suggestion.player.lastName)")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    // Position
+                    if let sleeperPlayer = findSleeperPlayerForSuggestion(suggestion.player),
+                       let positionRank = sleeperPlayer.positionalRank {
+                        Text(positionRank)
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(positionColor(suggestion.player.position))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    } else {
+                        Text(suggestion.player.position.rawValue)
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(positionColor(suggestion.player.position))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                    }
+                    
+                    Spacer()
+                    
+                    // Team logo (smaller)
+                    TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+                        .frame(width: 24, height: 24)
+                }
+                
+                // Fantasy rank and tier
+                HStack(spacing: 6) {
+                    if let sleeperPlayer = findSleeperPlayerForSuggestion(suggestion.player),
+                       let searchRank = sleeperPlayer.searchRank {
+                        Text("Rank \(searchRank)")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                            .fontWeight(.medium)
+                    }
+                    
+                    Text("Tier \(suggestion.player.tier)")
+                        .font(.caption2)
+                        .foregroundColor(tierColor(suggestion.player.tier))
+                        .fontWeight(.medium)
+                    
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+                .opacity(0.6)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .onTapGesture {
+            showPlayerStats(for: suggestion.player)
+        }
+        .contextMenu {
+            Button("Lock as My Pick") {
+                lockPlayerAsPick(suggestion)
+            }
+            
+            Button("Add to Feed") {
+                addPlayerToFeed(suggestion)
+            }
+            
+            Button("View Stats") {
+                showPlayerStats(for: suggestion.player)
+            }
+        }
+    }
+
     // MARK: -> Helper Methods
     
     @ViewBuilder
-    private func playerImageForSuggestion(_ player: Player) -> some View {
-        // Try multiple lookup strategies to find the Sleeper player
+    private func playerImageForSuggestion(_ player: Player, size: CGFloat = 60) -> some View {
         if let sleeperPlayer = findSleeperPlayerForSuggestion(player) {
             PlayerImageView(
                 player: sleeperPlayer,
-                size: 60,
+                size: size,
                 team: NFLTeam.team(for: player.team)
             )
         } else {
-            // Fallback with team colors
             Circle()
                 .fill(NFLTeam.team(for: player.team)?.gradient ?? LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom))
                 .overlay(
                     Text(player.firstInitial)
-                        .font(.system(size: 24, weight: .bold))
+                        .font(.system(size: size/2.5, weight: .bold))
                         .foregroundColor(NFLTeam.team(for: player.team)?.accentColor ?? .white)
                 )
-                .frame(width: 60, height: 60)
+                .frame(width: size, height: size)
         }
     }
     
     private func findSleeperPlayerForSuggestion(_ player: Player) -> SleeperPlayer? {
         let allSleeperPlayers = PlayerDirectoryStore.shared.players.values
         
-        // Strategy 1: Direct ID match (works for real Sleeper data)
         if let directMatch = PlayerDirectoryStore.shared.players[player.id] {
             return directMatch
         }
         
-        // Strategy 2: Name + position + team match (works for seed data)
         let nameMatch = allSleeperPlayers.first { sleeperPlayer in
             let nameMatches = sleeperPlayer.shortName.lowercased() == "\(player.firstInitial) \(player.lastName)".lowercased()
             let positionMatches = sleeperPlayer.position?.uppercased() == player.position.rawValue
@@ -826,7 +899,6 @@ struct DraftRoomView: View {
             return nameMatch
         }
         
-        // Strategy 3: Fuzzy name match (handles slight differences)
         let fuzzyMatch = allSleeperPlayers.first { sleeperPlayer in
             guard let sleeperFirst = sleeperPlayer.firstName,
                   let sleeperLast = sleeperPlayer.lastName else { return false }
@@ -839,179 +911,54 @@ struct DraftRoomView: View {
             return firstInitialMatches && lastNameMatches && teamMatches
         }
         
-        if let fuzzyMatch = fuzzyMatch {
-            return fuzzyMatch
-        }
-        
-        return nil
+        return fuzzyMatch
     }
-    
-    // MARK: -> Player Stats Integration
     
     private func showPlayerStats(for player: Player) {
         selectedPlayerForStats = player
-        // Use async dispatch to ensure state is updated before presenting sheet
         DispatchQueue.main.async {
             showingPlayerStats = true
         }
     }
     
-    // MARK: -> Player Action Handlers
-    
     private func addPlayerToFeed(_ suggestion: Suggestion) {
-        // Add to the picks feed (other people's picks)
         let currentFeed = viewModel.picksFeed.isEmpty ? "" : viewModel.picksFeed + ", "
         viewModel.picksFeed = currentFeed + suggestion.player.shortKey
         viewModel.addFeedPick()
         
-        // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
     }
     
     private func lockPlayerAsPick(_ suggestion: Suggestion) {
-        // Lock as your own pick
         viewModel.myPickInput = suggestion.player.shortKey
         viewModel.lockMyPick()
         
-        // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
     }
-
-    // MARK: -> Player Details Row
-    private func playerDetailsRow(for player: Player) -> some View {
-        HStack(spacing: 8) {
-            // Try to get Sleeper player data for detailed info
-            if let sleeperPlayer = findSleeperPlayerForSuggestion(player) {
-                // Fantasy Rank
-                if let searchRank = sleeperPlayer.searchRank {
-                    Text("FantRnk: \(searchRank)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-                
-                // Years of experience
-                if let yearsExp = sleeperPlayer.yearsExp {
-                    Text("Yrs: \(yearsExp)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-                
-                // Injury status (red text if present)
-                if let injuryStatus = sleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
-                   Text(String(injuryStatus.prefix(5)))
-                        .font(.caption2)
-                        .foregroundColor(.red)
-                        .fontWeight(.medium)
-                }
-            } else {
-                // Fallback when no Sleeper data
-                Text("Tier \(player.tier) • \(player.team)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
+    
+    private func positionColor(_ position: Position) -> Color {
+        switch position.rawValue.uppercased() {
+        case "QB": return .purple
+        case "RB": return .green
+        case "WR": return .blue
+        case "TE": return .orange
+        case "K": return .gray
+        case "DEF": return .red
+        default: return .gray
         }
-    }
-    
-    // MARK: -> Player Details Row for "All" view (with FantRnk restored)
-    private func playerDetailsRowForAll(for player: Player) -> some View {
-        HStack(spacing: 8) {
-            // Try to get Sleeper player data for detailed info
-            if let sleeperPlayer = findSleeperPlayerForSuggestion(player) {
-                // Fantasy Rank (restored)
-                if let searchRank = sleeperPlayer.searchRank {
-                    Text("FantRnk: \(searchRank)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-                
-                // Jersey number  
-                if let number = sleeperPlayer.number {
-                    Text("#: \(number)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-                
-                // Years of experience
-                if let yearsExp = sleeperPlayer.yearsExp {
-                    Text("Yrs: \(yearsExp)")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-                
-                // Injury status (red text if present)
-                if let injuryStatus = sleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
-                   Text(String(injuryStatus.prefix(5)))
-                        .font(.caption2)
-                        .foregroundColor(.red)
-                        .fontWeight(.medium)
-                }
-            } else {
-                // Fallback when no Sleeper data
-                Text("Tier \(player.tier) • \(player.team)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-    }
-    
-    // MARK: -> Player Name and Position View
-    
-    private func playerNameAndPositionView(for suggestion: Suggestion) -> some View {
-        HStack(spacing: 6) {
-            // Player name - smaller font
-            Text("\(suggestion.player.firstInitial) \(suggestion.player.lastName)")
-                .font(.callout)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-            
-            // Position (smaller font) - only show if no positional rank available
-            if let sleeperPlayer = findSleeperPlayerForSuggestion(suggestion.player),
-               let positionRank = sleeperPlayer.positionalRank {
-                // Show positional rank instead of basic position
-                Text("- \(positionRank)")
-                    .font(.caption2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.cyan)
-            } else {
-                // Fallback to basic position if no positional rank
-                Text("- \(suggestion.player.position.rawValue)")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-    
-    private func tierBadge(_ tier: Int) -> some View {
-        Text("T\(tier)")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundColor(.white)
-            .padding(.horizontal, 4)
-            .padding(.vertical, 1)
-            .background(tierColor(tier))
-            .clipShape(RoundedRectangle(cornerRadius: 3))
     }
     
     private func tierColor(_ tier: Int) -> Color {
         switch tier {
-        case 1: return .purple        // Elite players - purple background
-        case 2: return .blue          // Very good players - blue  
-        case 3: return .orange        // Decent players - orange
-        default: return .gray         // Deep/bench players - gray
+        case 1: return .purple
+        case 2: return .blue
+        case 3: return .orange
+        default: return .gray
         }
     }
-
+    
     private func findSleeperPlayer(for player: Player) -> SleeperPlayer? {
         return findSleeperPlayerForSuggestion(player)
     }
@@ -1037,6 +984,6 @@ extension View {
 
 #Preview {
     NavigationView {
-        DraftRoomView(viewModel: DraftRoomViewModel())
+        DraftRoomView(viewModel: DraftRoomViewModel(), selectedTab: .constant(0))
     }
 }

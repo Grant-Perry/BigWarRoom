@@ -293,7 +293,7 @@ final class DraftRoomViewModel: ObservableObject {
     // MARK: - Connect / Disconnect
 
     /// Connect using either username or User ID (Sleeper only)
-    func connectWithUsernameOrID(_ input: String) async {
+    func connectWithUsernameOrID(_ input: String, season: String = "2025") async {
         connectionStatus = .connecting
         
         do {
@@ -304,24 +304,25 @@ final class DraftRoomViewModel: ObservableObject {
                 // Looks like a User ID (all numbers, long)
                 user = try await sleeperClient.fetchUserByID(userID: input)
                 currentUserID = input
-                print(" Connected using User ID: \(input)")
+                print("✅ Connected using User ID: \(input)")
             } else {
                 // Looks like a username
                 user = try await sleeperClient.fetchUser(username: input)
                 currentUserID = user.userID
-                print(" Connected using username: \(input) -> User ID: \(user.userID)")
+                print("✅ Connected using username: \(input) -> User ID: \(user.userID)")
             }
             
             sleeperDisplayName = user.displayName ?? user.username
             sleeperUsername = user.username
             
-            // Fetch leagues from both Sleeper and ESPN
-            await leagueManager.fetchAllLeagues(sleeperUserID: user.userID)
+            // Fetch leagues from both Sleeper and ESPN using the specified season
+            await leagueManager.fetchAllLeagues(sleeperUserID: user.userID, season: season)
             allAvailableDrafts = leagueManager.allLeagues
             
             connectionStatus = .connected
+            print("🏈 Connected to \(season) season leagues")
         } catch {
-            print(" Connection failed for input '\(input)': \(error)")
+            print("❌ Connection failed for input '\(input)': \(error)")
             connectionStatus = .disconnected
         }
     }
@@ -344,8 +345,8 @@ final class DraftRoomViewModel: ObservableObject {
         print(" Set currentUserID to SWID: \(AppConstants.SWID)")
     }
 
-    func connectWithUserID(_ userID: String) async {
-        await connectWithUsernameOrID(userID)
+    func connectWithUserID(_ userID: String, season: String = "2025") async {
+        await connectWithUsernameOrID(userID, season: season)
     }
 
     func disconnectFromLive() {
@@ -545,14 +546,75 @@ final class DraftRoomViewModel: ObservableObject {
         
         // Start polling the actual draft
         if let draftID = leagueWrapper.league.draftID {
-            print(" Starting draft polling for \(leagueWrapper.source.displayName) league with draftID: \(draftID)")
-            polling.startPolling(draftID: draftID, apiClient: apiClient)
+            print(" Checking draft status before starting polling...")
+            
+            // For ESPN leagues, check if draft is actually live before polling
+            if leagueWrapper.source == .espn {
+                // Try to get draft status first
+                do {
+                    let draft = try await apiClient.fetchDraft(draftID: draftID)
+                    
+                    print(" ESPN Draft Status: \(draft.status.rawValue)")
+                    print(" Draft Type: \(draft.type.rawValue)")
+                    
+                    if draft.status == .drafting {
+                        print(" ✅ ESPN draft is LIVE - starting polling")
+                        polling.startPolling(draftID: draftID, apiClient: apiClient)
+                    } else {
+                        print(" 🚫 ESPN draft is NOT live (status: \(draft.status.rawValue)) - skipping polling to save API calls")
+                        print("    Draft picks will still be fetched once for display")
+                        
+                        // Fetch picks once for display but don't start continuous polling
+                        do {
+                            let picks = try await apiClient.fetchDraftPicks(draftID: draftID)
+                            print(" ✅ Fetched \(picks.count) completed draft picks for display")
+                            
+                            // Update polling service with the completed data without starting timer
+                            await polling.setCompletedDraftData(draft: draft, picks: picks)
+                        } catch {
+                            print(" ⚠️ Could not fetch completed draft picks: \(error)")
+                        }
+                    }
+                } catch {
+                    print(" ⚠️ Could not check ESPN draft status: \(error)")
+                    print("    Defaulting to polling (might be necessary for some ESPN leagues)")
+                    polling.startPolling(draftID: draftID, apiClient: apiClient)
+                }
+            } else {
+                // For Sleeper leagues, always start polling (they handle it well)
+                print(" Sleeper league - starting polling for draftID: \(draftID)")
+                polling.startPolling(draftID: draftID, apiClient: apiClient)
+            }
         } else {
             print(" No draftID found for league: \(leagueWrapper.league.name)")
             // For ESPN leagues, try using the league ID as draft ID
             if leagueWrapper.source == .espn {
                 print(" ESPN league - trying to use leagueID as draftID: \(leagueWrapper.league.leagueID)")
-                polling.startPolling(draftID: leagueWrapper.league.leagueID, apiClient: apiClient)
+                
+                // Same status check logic for leagueID-as-draftID
+                do {
+                    let draft = try await apiClient.fetchDraft(draftID: leagueWrapper.league.leagueID)
+                    
+                    print(" ESPN Draft Status (using leagueID): \(draft.status.rawValue)")
+                    
+                    if draft.status == .drafting {
+                        print(" ✅ ESPN draft is LIVE - starting polling with leagueID")
+                        polling.startPolling(draftID: leagueWrapper.league.leagueID, apiClient: apiClient)
+                    } else {
+                        print(" 🚫 ESPN draft is NOT live - fetching completed picks only")
+                        
+                        // Fetch completed draft data without starting polling timer
+                        do {
+                            let picks = try await apiClient.fetchDraftPicks(draftID: leagueWrapper.league.leagueID)
+                            await polling.setCompletedDraftData(draft: draft, picks: picks)
+                        } catch {
+                            print(" ⚠️ Could not fetch completed draft picks: \(error)")
+                        }
+                    }
+                } catch {
+                    print(" ⚠️ Could not check draft status using leagueID: \(error)")
+                    polling.startPolling(draftID: leagueWrapper.league.leagueID, apiClient: apiClient)
+                }
             }
         }
         
@@ -932,8 +994,8 @@ final class DraftRoomViewModel: ObservableObject {
     }
     
     /// Refresh all available leagues
-    func refreshAllLeagues() async {
-        await leagueManager.refreshAllLeagues(sleeperUserID: currentUserID)
+    func refreshAllLeagues(season: String = "2025") async {
+        await leagueManager.refreshAllLeagues(sleeperUserID: currentUserID, season: season)
         allAvailableDrafts = leagueManager.allLeagues
     }
     

@@ -63,7 +63,7 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch a specific league by ID
     func fetchLeague(leagueID: String) async throws -> SleeperLeague {
-        // Updated view parameters to match SleepThis working version
+        // Updated view parameters to include members data for manager name mapping
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
         print("🌐 ESPN API Request: \(urlString)")
         print("🗓️ Using ESPN Year: \(AppConstants.ESPNLeagueYear)")
@@ -128,6 +128,30 @@ final class ESPNAPIClient: DraftAPIClient {
             print("✅ Fetched ESPN league: \(espnLeague.displayName)")
             print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
             print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
+            
+            // NEW: Log members data for debugging
+            if let members = espnLeague.members {
+                print("👥 Found \(members.count) league members:")
+                for member in members {
+                    let displayName = member.displayName ?? "No Display Name"
+                    let firstName = member.firstName ?? ""
+                    let lastName = member.lastName ?? ""
+                    let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+                    print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
+                }
+            } else {
+                print("⚠️ No members data found in league response")
+            }
+            
+            // NEW: Log team owners for debugging
+            if let teams = espnLeague.teams {
+                print("🏈 Team owner mapping:")
+                for team in teams {
+                    let owners = team.owners ?? []
+                    let managerName = espnLeague.getManagerName(for: team.owners)
+                    print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
+                }
+            }
             
             print("🔢 ESPN League Team Count Debug:")
             print("   Raw size field: \(espnLeague.size ?? -1)")
@@ -286,7 +310,10 @@ final class ESPNAPIClient: DraftAPIClient {
                         let teamCount = leagueResponse.totalRosters
                         let calculatedDraftSlot = calculateDraftSlot(pickNumber: pickNumber, teamCount: teamCount)
                         
-                        print("🔧 ESPN Pick \(pickNumber): TeamId=\(espnPick.teamId), CalculatedSlot=\(calculatedDraftSlot)")
+                        // NEW: Get the manager name for this team
+                        let managerName = leagueResponse.getManagerName(for: leagueResponse.teams?.first { $0.id == espnPick.teamId }?.owners)
+                        
+                        print("🔧 ESPN Pick \(pickNumber): TeamId=\(espnPick.teamId), CalculatedSlot=\(calculatedDraftSlot), Manager=\(managerName)")
                         
                         return SleeperPick(
                             draftID: draftID,
@@ -294,7 +321,7 @@ final class ESPNAPIClient: DraftAPIClient {
                             round: espnPick.roundId ?? calculateRound(pickNumber: pickNumber, teamCount: teamCount),
                             draftSlot: calculatedDraftSlot, // USE CALCULATED DRAFT SLOT, NOT teamId
                             rosterID: espnPick.teamId, // Keep rosterID as teamId for roster correlation
-                            pickedBy: String(espnPick.teamId),
+                            pickedBy: managerName, // USE ACTUAL MANAGER NAME instead of team ID
                             playerID: "espn_\(espnPick.playerId)", // Use prefixed ESPN ID
                             metadata: SleeperPickMetadata(
                                 firstName: player.firstName,
@@ -370,7 +397,7 @@ final class ESPNAPIClient: DraftAPIClient {
                                 round: round,
                                 draftSlot: draftPosition,
                                 rosterID: team.id,
-                                pickedBy: String(team.id),
+                                pickedBy: leagueResponse.getManagerName(for: team.owners), // USE MANAGER NAME
                                 playerID: "espn_\(player.id)", // Use a prefixed ESPN ID as playerID
                                 metadata: SleeperPickMetadata(
                                     firstName: player.firstName,
@@ -390,7 +417,7 @@ final class ESPNAPIClient: DraftAPIClient {
                             
                             draftPicks.append(pick)
                             
-                            print("✅ Created pick \(pickNumber): \(player.fullName ?? "Unknown") (ESPN ID: \(player.id)) - Round \(round), Pos \(draftPosition)")
+                            print("✅ Created pick \(pickNumber): \(player.fullName ?? "Unknown") (ESPN ID: \(player.id)) - Round \(round), Pos \(draftPosition), Manager: \(leagueResponse.getManagerName(for: team.owners))")
                         }
                     }
                 }
@@ -410,8 +437,8 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch rosters for a league
     func fetchRosters(leagueID: String) async throws -> [SleeperRoster] {
-        // Updated with working view parameters
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster"
+        // ENHANCED: Fetch both team and member data with comprehensive view parameters
+        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster&view=mSettings"
         print("🌐 ESPN Rosters API Request: \(urlString)")
     
         guard let url = URL(string: urlString) else {
@@ -431,18 +458,51 @@ final class ESPNAPIClient: DraftAPIClient {
               httpResponse.statusCode == 200 else {
             throw ESPNAPIError.invalidResponse
         }
+        
+        // COMPLETE JSON DUMP for debugging - this will be HUGE
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("🔍 COMPLETE ESPN JSON RESPONSE:")
+            print("=====================================")
+            print(responseString)
+            print("=====================================")
+        }
     
         let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
     
         guard let teams = espnLeague.teams else {
             return []
         }
-    
+        
+        // CRITICAL: Build member lookup dictionary and log everything
+        print("🔍 ESPN League Members Mapping:")
+        var memberLookup: [String: ESPNMember] = [:]
+        if let members = espnLeague.members {
+            print("   Found \(members.count) league members:")
+            for member in members {
+                memberLookup[member.id] = member
+                let displayName = member.displayName ?? "No Display Name"
+                let firstName = member.firstName ?? ""
+                let lastName = member.lastName ?? ""
+                let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+                print("   👤 Member \(member.id): Display=\"\(displayName)\", First=\"\(firstName)\", Last=\"\(lastName)\", Full=\"\(fullName)\"")
+            }
+        } else {
+            print("   ⚠️ No members array found in ESPN response - this is the problem!")
+        }
+        
+        // ENHANCED: Convert teams to rosters with proper owner name mapping
+        print("🔍 ESPN Team to Roster Mapping:")
         let rosters = teams.map { team in
-            team.toSleeperRoster(leagueID: leagueID)
+            print("   Team \(team.id): '\(team.displayName)'")
+            print("     Owners: \(team.owners ?? [])")
+            
+            let managerName = espnLeague.getManagerName(for: team.owners)
+            print("     ✅ Final Manager Name: '\(managerName)'")
+            
+            return team.toSleeperRoster(leagueID: leagueID, league: espnLeague)
         }
     
-        print("✅ Fetched \(rosters.count) ESPN rosters for league \(leagueID)")
+        print("✅ Fetched \(rosters.count) ESPN rosters for league \(leagueID) with enhanced owner mapping")
         return rosters
     }
     
