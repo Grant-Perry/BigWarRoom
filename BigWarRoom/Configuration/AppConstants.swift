@@ -70,14 +70,20 @@ struct AppConstants {
     }
 
     // ESPN - Updated with working credentials from SleepThis
-    static let ESPNLeagueID = ["1241361400", "1739710242"] // Keep hardcoded ESPN league IDs
+    static let ESPNLeagueID = ["1241361400", "1739710242", "1003758336"] // Keep hardcoded ESPN league IDs
 
     // Season configuration - can be changed dynamically
     @AppStorage("selectedESPNYear") static var ESPNLeagueYear: String = "2025"
     static let availableYears = ["2024", "2025", "2026"] // Add more years as needed
 
-   static let SWID = "{7D6C3526-D3A-4DBD-9849-3D9C03333E7C}"
+    static let SWID = "{7D6C3526-D3A-4DBD-9849-3D9C03333E7C}"
+
+
    static let ESPN_S2 = "AEAQAAVXgHBaJ%2Fq1pPpnsckBKlBKXxsRJyttQjQhae67N%2Bz5kVdRdn001uU8V30qYT3z9n7R%2FsLNqWd%2BskxNWwMKr7kpL1%2Fs2J6BCvH8su%2F8gsDOcv44fRm6zbxMq6kQHoFdwGjSf7bnoMp8j5gDC29iDExGMF%2B5ObIreHcchFk8AQGZVNi2cSTCdxevEuioMNPDTbehk%2B4kPI1n5KxqtXnm9Z5gz5UpJv42IJNmT0nwfqMq9Vjz0MYqvj%2BbN7%2B5%2Bky9PwK8%2FUgAeWXObJ9ezOlCZGMmEO4Wyrq2dDl8DeGJKg%3D%3D"
+
+
+   static let ESPN_S2_2025 = "AECZhMx2EpWMK1F56f5N8HfKaTHgYIOYYEH%2F2DhPxf0BzfWqW%2BQTWZk1QC%2F4WfO0OdC1sUcG1jYOUISX217BGcQOS8VuqspUYVSzrXMiUlEA2BFibvpLExGWa5Pxbdu10Ml%2FBcljaVp9DHmOlH2sEU2JCYK1fhEPUYJvadfhNovy%2F%2F4j94exvkMUMVvuAfyog0W%2BmHN0lMsJh3Qh7Yot7yueZoicSwYM7nuks2FJrE%2FTZ8hw%2B8NmLCP3mYD1TgXke1GbiP6jTudabpmcYq%2FGK3RKUdyJInaRDCK08BkWJ%2FShcrHNl7l6Q3FATnalIQeBjJU%3D"
+
 
     static let GpESPNID = SWID
     static let ESPN_AUTH = "{\"swid\":\"\(SWID)\"}"
