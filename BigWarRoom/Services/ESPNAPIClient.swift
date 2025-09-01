@@ -18,13 +18,10 @@ final class ESPNAPIClient: DraftAPIClient {
     private init() {}
     
     // MARK: -> Authentication Headers
-    private func authHeaders(use2025Token: Bool = false) -> [String: String] {
-        // Choose the appropriate ESPN_S2 token based on the flag
-        let espnS2Token = use2025Token ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
-        let cookieValue = "SWID=\(AppConstants.SWID); espn_s2=\(espnS2Token)"
-        
-        let tokenType = use2025Token ? "2025 token" : "default token"
-        print("🔐 ESPN Auth Cookie (\(tokenType)): \(String(cookieValue.prefix(50)))...")
+    private func authHeaders() -> [String: String] {
+        // Updated cookie format to match SleepThis working version
+        let cookieValue = "SWID=\(AppConstants.SWID); espn_s2=\(AppConstants.ESPN_S2)"
+        print("🔐 ESPN Auth Cookie: \(String(cookieValue.prefix(50)))...")
         
         return [
             "Cookie": cookieValue,
@@ -34,43 +31,6 @@ final class ESPNAPIClient: DraftAPIClient {
         ]
     }
     
-    // MARK: -> Authentication Retry Helper
-    private func makeAuthenticatedRequest(url: URL, use2025Token: Bool = false) async throws -> (Data, URLResponse) {
-        var request = URLRequest(url: url)
-        
-        // Add authentication headers
-        for (key, value) in authHeaders(use2025Token: use2025Token) {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw ESPNAPIError.invalidResponse
-        }
-        
-        print("📡 ESPN Response Status: \(httpResponse.statusCode)")
-        
-        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-            let tokenType = use2025Token ? "2025 token" : "default token"
-            print("❌ ESPN Authentication failed with \(tokenType) - status: \(httpResponse.statusCode)")
-            throw ESPNAPIError.authenticationFailed
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            print("❌ ESPN API returned status: \(httpResponse.statusCode)")
-            
-            // Try to log response for debugging
-            if let responseString = String(data: data, encoding: .utf8) {
-                print("📄 ESPN Response: \(String(responseString.prefix(500)))...")
-            }
-            
-            throw ESPNAPIError.invalidResponse
-        }
-        
-        return (data, response)
-    }
-
     // MARK: -> DraftAPIClient Protocol Implementation
     
     /// Fetch user by username (ESPN doesn't have direct username lookup)
@@ -111,77 +71,107 @@ final class ESPNAPIClient: DraftAPIClient {
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
         }
-        
-        // Try with default token first, then with 2025 token if it fails
-        do {
-            let (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: false)
-            return try await processLeagueResponse(data: data, leagueID: leagueID)
-        } catch ESPNAPIError.authenticationFailed {
-            print("🔄 Retrying ESPN league \(leagueID) with 2025 token...")
-            
-            do {
-                let (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: true)
-                print("✅ ESPN league \(leagueID) succeeded with 2025 token!")
-                return try await processLeagueResponse(data: data, leagueID: leagueID)
-            } catch {
-                print("❌ ESPN league \(leagueID) failed even with 2025 token: \(error)")
-                throw error
-            }
-        }
-    }
     
-    // MARK: -> League Response Processing Helper
-    private func processLeagueResponse(data: Data, leagueID: String) async throws -> SleeperLeague {
-        // Log successful response
-        print("✅ ESPN API Success - received \(data.count) bytes")
-
-        // Check if response looks like JSON
-        if let responseString = String(data: data, encoding: .utf8) {
-            if responseString.starts(with: "<") {
-                print("❌ ESPN returned HTML instead of JSON")
-                print("📄 HTML Response: \(String(responseString.prefix(300)))...")
+        var request = URLRequest(url: url)
+    
+        // Add authentication headers
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+    
+        do {
+            let (data, response) = try await session.data(for: request)
+    
+            guard let httpResponse = response as? HTTPURLResponse else {
                 throw ESPNAPIError.invalidResponse
             }
+    
+            print("📡 ESPN Response Status: \(httpResponse.statusCode)")
+    
+            if httpResponse.statusCode == 401 {
+                print("❌ ESPN Authentication failed - check espn_s2 and SWID cookies")
+                throw ESPNAPIError.authenticationFailed
+            }
+    
+            if httpResponse.statusCode == 403 {
+                print("❌ ESPN Access forbidden - league may be private or cookies expired")
+                throw ESPNAPIError.authenticationFailed
+            }
+    
+            guard httpResponse.statusCode == 200 else {
+                print("❌ ESPN API returned status: \(httpResponse.statusCode)")
+    
+                // Try to log response for debugging
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("📄 ESPN Response: \(String(responseString.prefix(500)))...")
+                }
+    
+                throw ESPNAPIError.invalidResponse
+            }
+    
+            // Log successful response
+            print("✅ ESPN API Success - received \(data.count) bytes")
+    
+            // Check if response looks like JSON
+            if let responseString = String(data: data, encoding: .utf8) {
+                if responseString.starts(with: "<") {
+                    print("❌ ESPN returned HTML instead of JSON")
+                    print("📄 HTML Response: \(String(responseString.prefix(300)))...")
+                    throw ESPNAPIError.invalidResponse
+                }
+                
+                // Log first bit of JSON for debugging
+                print("📄 JSON Response: \(String(responseString.prefix(500)))...")
+            }
+    
+            let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
+            print("✅ Fetched ESPN league: \(espnLeague.displayName)")
+            print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
+            print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
             
-            // Log first bit of JSON for debugging
-            print("📄 JSON Response: \(String(responseString.prefix(500)))...")
-        }
-
-        let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
-        print("✅ Fetched ESPN league: \(espnLeague.displayName)")
-        print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
-        print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
-        
-        // NEW: Log members data for debugging
-        if let members = espnLeague.members {
-            print("👥 Found \(members.count) league members:")
-            for member in members {
-                let displayName = member.displayName ?? "No Display Name"
-                let firstName = member.firstName ?? ""
-                let lastName = member.lastName ?? ""
-                let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-                print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
+            // NEW: Log members data for debugging
+            if let members = espnLeague.members {
+                print("👥 Found \(members.count) league members:")
+                for member in members {
+                    let displayName = member.displayName ?? "No Display Name"
+                    let firstName = member.firstName ?? ""
+                    let lastName = member.lastName ?? ""
+                    let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+                    print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
+                }
+            } else {
+                print("⚠️ No members data found in league response")
             }
-        } else {
-            print("⚠️ No members data found in league response")
-        }
-        
-        // NEW: Log team owners for debugging
-        if let teams = espnLeague.teams {
-            print("🏈 Team owner mapping:")
-            for team in teams {
-                let owners = team.owners ?? []
-                let managerName = espnLeague.getManagerName(for: team.owners)
-                print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
+            
+            // NEW: Log team owners for debugging
+            if let teams = espnLeague.teams {
+                print("🏈 Team owner mapping:")
+                for team in teams {
+                    let owners = team.owners ?? []
+                    let managerName = espnLeague.getManagerName(for: team.owners)
+                    print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
+                }
             }
-        }
-        
-        print("🔢 ESPN League Team Count Debug:")
-        print("   Raw size field: \(espnLeague.size ?? -1)")
-        print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
-        print("   Calculated totalRosters: \(espnLeague.totalRosters)")
+            
+            print("🔢 ESPN League Team Count Debug:")
+            print("   Raw size field: \(espnLeague.size ?? -1)")
+            print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
+            print("   Calculated totalRosters: \(espnLeague.totalRosters)")
 
-        return espnLeague.toSleeperLeague()
+            return espnLeague.toSleeperLeague()
+    
+        } catch DecodingError.keyNotFound(let key, let context) {
+            print("❌ ESPN JSON Decode Error - Missing key: \(key)")
+            print("📄 Context: \(context)")
+            throw ESPNAPIError.decodingError(DecodingError.keyNotFound(key, context))
+        } catch DecodingError.typeMismatch(let type, let context) {
+            print("❌ ESPN JSON Decode Error - Type mismatch: \(type)")
+            print("📄 Context: \(context)")
+            throw ESPNAPIError.decodingError(DecodingError.typeMismatch(type, context))
+        } catch {
+            print("❌ ESPN Network Error: \(error)")
+            throw ESPNAPIError.networkError(error)
+        }
     }
     
     /// Fetch draft information
@@ -199,14 +189,18 @@ final class ESPNAPIClient: DraftAPIClient {
             throw ESPNAPIError.invalidResponse
         }
         
-        // Try with default token first, then with 2025 token if it fails
-        let (data, _): (Data, URLResponse)
-        do {
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: false)
-        } catch ESPNAPIError.authenticationFailed {
-            print("🔄 Retrying ESPN draft \(draftID) with 2025 token...")
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: true)
-            print("✅ ESPN draft \(draftID) succeeded with 2025 token!")
+        var request = URLRequest(url: url)
+        
+        // Add authentication headers
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw ESPNAPIError.invalidResponse
         }
         
         let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
@@ -245,14 +239,19 @@ final class ESPNAPIClient: DraftAPIClient {
             throw ESPNAPIError.invalidResponse
         }
         
-        // Try with default token first, then with 2025 token if it fails
-        let (data, _): (Data, URLResponse)
-        do {
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: false)
-        } catch ESPNAPIError.authenticationFailed {
-            print("🔄 Retrying ESPN draft picks \(draftID) with 2025 token...")
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: true)
-            print("✅ ESPN draft picks \(draftID) succeeded with 2025 token!")
+        var request = URLRequest(url: url)
+        
+        // Add authentication headers
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            print("❌ ESPN Draft Picks API failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+            throw ESPNAPIError.invalidResponse
         }
         
         print("✅ ESPN Draft Picks API Success - received \(data.count) bytes")
@@ -346,6 +345,11 @@ final class ESPNAPIClient: DraftAPIClient {
                     
                     print("✅ Using \(sortedPicks.count) ACTUAL ESPN draft picks with CALCULATED draft slots")
                     return sortedPicks
+                } else {
+                    // NO FALLBACK - If there are no actual draft picks, return empty array
+                    print("❌ No actual ESPN draft picks found and roster reconstruction is disabled")
+                    print("   This prevents incorrect pick order calculations from team roster data")
+                    return []
                 }
             }
             
@@ -445,15 +449,19 @@ final class ESPNAPIClient: DraftAPIClient {
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
         }
-        
-        // Try with default token first, then with 2025 token if it fails
-        let (data, _): (Data, URLResponse)
-        do {
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: false)
-        } catch ESPNAPIError.authenticationFailed {
-            print("🔄 Retrying ESPN rosters \(leagueID) with 2025 token...")
-            (data, _) = try await makeAuthenticatedRequest(url: url, use2025Token: true)
-            print("✅ ESPN rosters \(leagueID) succeeded with 2025 token!")
+    
+        var request = URLRequest(url: url)
+    
+        // Add authentication headers
+        for (key, value) in authHeaders() {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+    
+        let (data, response) = try await session.data(for: request)
+    
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw ESPNAPIError.invalidResponse
         }
         
         // COMPLETE JSON DUMP for debugging - this will be HUGE
