@@ -57,8 +57,15 @@ final class UnifiedLeagueManager: ObservableObject {
             }
         }
         
-        // Sort leagues by name
-        allLeagues.sort { $0.league.name < $1.league.name }
+        // Sort leagues: Sleeper first, then ESPN, then by name within each source
+        allLeagues.sort { first, second in
+            // First, sort by source: Sleeper before ESPN
+            if first.source != second.source {
+                return first.source == .sleeper
+            }
+            // Within the same source, sort by league name
+            return first.league.name < second.league.name
+        }
     }
     
     /// Fetch Sleeper leagues for a user

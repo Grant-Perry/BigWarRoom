@@ -30,7 +30,6 @@ struct AppConstants {
    static let BigBoysLeagueID = "1136822872179224576"
    static let BigBoysDraftID = "1136822873030782976"
    static let TwoBrothersLeagueID = "1044844006657982464"
-   static let TweBrothersDraftID = "1044844007601504256"
 
 	  /// Returns the app's version string "X.Y (Build)" for display.
    static func getVersion() -> String {
