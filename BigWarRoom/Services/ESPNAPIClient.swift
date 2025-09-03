@@ -14,21 +14,20 @@ final class ESPNAPIClient: DraftAPIClient {
     // Updated to use working API subdomain from SleepThis
     private let baseURL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons"
     private let session = URLSession.shared
+    private let credentialsManager = ESPNCredentialsManager.shared
     
     private init() {}
     
     // MARK: -> Authentication Headers
     private func authHeaders() -> [String: String] {
-        // Updated cookie format to match SleepThis working version
-        let cookieValue = "SWID=\(AppConstants.SWID); espn_s2=\(AppConstants.ESPN_S2)"
-        print("🔐 ESPN Auth Cookie: \(String(cookieValue.prefix(50)))...")
+        // Use dynamic credentials instead of hardcoded ones
+        guard let headers = credentialsManager.generateAuthHeaders() else {
+            print("❌ No ESPN credentials configured")
+            return [:]
+        }
         
-        return [
-            "Cookie": cookieValue,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "BigWarRoom/3.12 (iOS)"
-        ]
+        print("🔐 ESPN Auth Cookie: \(String(headers["Cookie"]?.prefix(50) ?? ""))...")
+        return headers
     }
     
     // MARK: -> DraftAPIClient Protocol Implementation
@@ -45,10 +44,14 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch leagues for a user (ESPN requires knowing league IDs)
     func fetchLeagues(userID: String, season: String = "2024") async throws -> [SleeperLeague] {
-        // ESPN requires knowing specific league IDs, so we'll fetch the ones from AppConstants
+        // Use dynamic league IDs from credentials manager instead of hardcoded ones
+        guard !credentialsManager.leagueIDs.isEmpty else {
+            throw ESPNAPIError.unsupportedOperation("No ESPN league IDs configured. Please add your league IDs in ESPN Setup.")
+        }
+        
         var leagues: [SleeperLeague] = []
         
-        for leagueID in AppConstants.ESPNLeagueID {
+        for leagueID in credentialsManager.leagueIDs {
             do {
                 let league = try await fetchLeague(leagueID: leagueID)
                 leagues.append(league)
@@ -562,12 +565,15 @@ final class ESPNAPIClient: DraftAPIClient {
     func getCurrentUserMemberID(leagueID: String) async throws -> String? {
         let members = try await fetchLeagueMembers(leagueID: leagueID)
         
-        // In ESPN, you can identify yourself by the SWID
-        // The SWID in the cookie should match a member's ID
-        let cleanSWID = AppConstants.SWID.replacingOccurrences(of: "{", with: "").replacingOccurrences(of: "}", with: "")
+        // Use dynamic SWID instead of hardcoded one
+        guard let currentSWID = credentialsManager.getSWID() else {
+            throw ESPNAPIError.authenticationFailed
+        }
+        
+        let cleanSWID = currentSWID.replacingOccurrences(of: "{", with: "").replacingOccurrences(of: "}", with: "")
         
         return members.first { member in
-            member.id == AppConstants.SWID || member.id == cleanSWID
+            member.id == currentSWID || member.id == cleanSWID
         }?.id
     }
     

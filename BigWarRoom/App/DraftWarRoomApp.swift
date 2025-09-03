@@ -13,7 +13,7 @@ struct DraftWarRoomApp: App {
     // MARK: -> Scene
     var body: some Scene {
         WindowGroup {
-            BigWarRoom()
+            AppEntryView()
         }
     }
 }

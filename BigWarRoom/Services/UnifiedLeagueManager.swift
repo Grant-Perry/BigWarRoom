@@ -107,8 +107,13 @@ final class UnifiedLeagueManager: ObservableObject {
         print("🔍 Attempting to fetch ESPN leagues...")
         
         do {
-            // ESPN requires known league IDs from AppConstants
-            let leagues = try await espnClient.fetchLeagues(userID: "", season: AppConstants.ESPNLeagueYear)
+            // FIXED: Use proper ESPN user ID and season
+            let leagues = try await espnClient.fetchLeagues(
+                userID: AppConstants.GpESPNID, 
+                season: AppConstants.ESPNLeagueYear
+            )
+            
+            print("🎯 ESPN client returned \(leagues.count) leagues")
             
             let espnWrappers = leagues.map { league in
                 LeagueWrapper(
@@ -127,18 +132,19 @@ final class UnifiedLeagueManager: ObservableObject {
             
             // Log league details
             for wrapper in espnWrappers {
-                print("  📊 \(wrapper.league.name) (\(wrapper.league.totalRosters) teams) - Status: \(wrapper.league.status.displayName)")
+                print("  📊 ESPN: \(wrapper.league.name) (\(wrapper.league.totalRosters) teams) - Status: \(wrapper.league.status.displayName)")
             }
             
         } catch ESPNAPIError.authenticationFailed {
             print("🔐 ESPN authentication failed - cookies may be expired")
-            print("💡 User can still connect to Sleeper leagues and manual drafts")
+            print("💡 SWID: \(AppConstants.SWID)")
+            print("💡 ESPN_S2 length: \(AppConstants.ESPN_S2.count) chars")
         } catch ESPNAPIError.decodingError(let error) {
             print("📄 ESPN data format error: \(error)")
-            print("💡 ESPN may have changed their API structure")
         } catch {
             print("❌ Failed to fetch ESPN leagues: \(error)")
-            print("💡 ESPN connection failed, but Sleeper and manual drafts still work")
+            print("🔍 Error type: \(type(of: error))")
+            print("🔍 Error description: \(error.localizedDescription)")
         }
     }
     

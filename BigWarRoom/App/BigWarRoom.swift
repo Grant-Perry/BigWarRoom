@@ -21,11 +21,11 @@ struct BigWarRoom: View {
                     }
                     .tag(0)
                 
-                // AI Pick Suggestions Tab
-                AIPickSuggestionsView(viewModel: viewModel)
+                // Fantasy Tab (moved to position 1)
+                FantasyMatchupListView()
                     .tabItem {
-                        Image(systemName: "wand.and.stars")
-                        Text("AI Picks")
+                        Image(systemName: "football")
+                        Text("Fantasy")
                     }
                     .tag(1)
                 
@@ -45,13 +45,29 @@ struct BigWarRoom: View {
                     }
                     .tag(3)
                 
+                // AI Pick Suggestions Tab (moved to position 4)
+                AIPickSuggestionsView(viewModel: viewModel)
+                    .tabItem {
+                        Image(systemName: "wand.and.stars")
+                        Text("AI Picks")
+                    }
+                    .tag(4)
+                
                 // My Roster Tab
                 MyRosterView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "person.fill")
                         Text("My Roster")
                     }
-                    .tag(4)
+                    .tag(5)
+                
+                // OnBoarding Tab
+                OnBoardingView()
+                    .tabItem {
+                        Image(systemName: "gearshape")
+                        Text("Settings")
+                    }
+                    .tag(6)
             }
             .preferredColorScheme(.dark)
             

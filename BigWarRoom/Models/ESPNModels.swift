@@ -8,6 +8,9 @@
 
 import Foundation
 
+// NOTE: ESPN Fantasy League models are in ESPNFantasyModels.swift
+// This file contains other ESPN-related models for general league management
+
 // MARK: -> ESPN League
 struct ESPNLeague: Codable, Identifiable {
     let id: Int
