@@ -256,28 +256,39 @@ struct FantasyPlayerCard: View {
                         )
                     )
                 
-                // Team logo
-                if let team = player.team {
-                    AsyncImage(url: getTeamLogoURL(for: team)) { phase in
-                        switch phase {
-                        case .empty:
-                            ProgressView()
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        case .failure:
-                            Image(systemName: "sportscourt.fill")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        @unknown default:
-                            EmptyView()
+                // Team logo (local asset if available)
+                if let team = player.team, let obj = NFLTeam.team(for: team) {
+                    if let image = UIImage(named: obj.logoAssetName) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 80, height: 80)
+                            .offset(x: 20, y: -4)
+                            .opacity(0.6)
+                            .shadow(color: obj.primaryColor.opacity(0.5), radius: 10, x: 0, y: 0)
+                    } else {
+                        // Fallback to online logo
+                        AsyncImage(url: URL(string: "https://a.espncdn.com/i/teamlogos/nfl/500/\(team.lowercased()).png")) { phase in
+                            switch phase {
+                            case .empty:
+                                ProgressView()
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            case .failure:
+                                Image(systemName: "sportscourt.fill")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            @unknown default:
+                                EmptyView()
+                            }
                         }
+                        .frame(width: 80, height: 80)
+                        .offset(x: 20, y: -4)
+                        .opacity(0.6)
+                        .shadow(color: teamColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     }
-                    .frame(width: 80, height: 80)
-                    .offset(x: 20, y: -4)
-                    .opacity(0.6)
-                    .shadow(color: teamColor.opacity(0.5), radius: 10, x: 0, y: 0)
                 }
                 
                 HStack(spacing: 12) {
@@ -361,21 +372,16 @@ struct FantasyPlayerCard: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
-                    .stroke(Color.gray, lineWidth: 1)
+                    .stroke(teamColor.opacity(0.4), lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: 15))
         }
         .task {
-            // Set team color based on NFL team
-            if let team = player.team {
-                teamColor = NFLTeamColors.color(for: team)
+            // Set team color based on NFL team using the actual team manager
+            if let team = player.team, let obj = NFLTeam.team(for: team) {
+                teamColor = obj.primaryColor
             }
         }
-    }
-    
-    private func getTeamLogoURL(for team: String) -> URL? {
-        // NFL team logo URLs
-        return URL(string: "https://a.espncdn.com/i/teamlogos/nfl/500/\(team.lowercased()).png")
     }
 }
 
@@ -437,5 +443,4 @@ struct FantasyGameMatchupView: View {
 // MARK: -> NFLPlayer Model (Simplified)
 struct NFLPlayer {
     let jersey: String
-    let team: String
-}
+    let team: String}

@@ -31,7 +31,8 @@ struct DraftRoomView: View {
                 // STEP 1: Connection Section
                 QuickConnectSection(
                     viewModel: viewModel, 
-                    selectedYear: $selectedYear
+                    selectedYear: $selectedYear,
+                    selectedTab: $selectedTab
                 )
                 .padding(.horizontal)
                 .padding(.bottom, 16)
@@ -92,20 +93,47 @@ struct DraftRoomView: View {
     }
     
     // MARK: - Helper Methods (Minimal View Logic Only)
-    
+
     private func autoConnectIfConfigured() {
-        // Only auto-connect if user has already set up credentials
-        // Don't force Gp's default settings - respect the onboarding flow
-        if viewModel.connectionStatus != .connected {
-            if espnCredentials.hasValidCredentials || sleeperCredentials.hasValidCredentials {
-                Task {
-                    // Connect using stored credentials, not hardcoded defaults
-                    if let sleeperID = sleeperCredentials.getUserIdentifier() {
+        // Don't auto-connect if we already have leagues loaded (either service)
+        if !viewModel.allAvailableDrafts.isEmpty {
+            print("🔍 Auto-connect skipped - leagues already loaded")
+            return
+        }
+
+        let hasESPNCredentials = espnCredentials.hasValidCredentials
+        let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
+
+        print("🔍 Auto-connect check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials)")
+
+        Task {
+            await connectToAllAvailableServices()
+        }
+    }
+
+    /// Connects to all available fantasy services (ESPN & Sleeper), merging results.
+    /// Always runs both connections in parallel if creds exist, never prioritizes one.
+    private func connectToAllAvailableServices() async {
+        let hasESPNCredentials = espnCredentials.hasValidCredentials
+        let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
+
+        await withTaskGroup(of: Void.self) { group in
+            if hasESPNCredentials {
+                group.addTask {
+                    print("🚀 [AutoConnect] Connecting to ESPN leagues…")
+                    await viewModel.connectToESPNOnly()
+                }
+            }
+            if hasSleeperCredentials {
+                if let sleeperID = sleeperCredentials.getUserIdentifier() {
+                    group.addTask {
+                        print("🚀 [AutoConnect] Connecting to Sleeper leagues for user: \(sleeperID)")
                         await viewModel.connectWithUsernameOrID(sleeperID, season: selectedYear)
                     }
                 }
             }
         }
+        print("✅ [AutoConnect] Connected to all services with credentials. Leagues loaded: \(viewModel.allAvailableDrafts.count)")
     }
 }
 

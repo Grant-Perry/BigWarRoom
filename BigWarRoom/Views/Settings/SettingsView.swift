@@ -91,6 +91,19 @@ struct OnBoardingView: View {
                                 .padding()
                                 .background(Color.orange.opacity(0.1))
                                 .cornerRadius(12)
+                                
+                                Button("Clear All Persisted Data") {
+                                    viewModel.requestClearAllPersistedData()
+                                }
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red.opacity(0.2))
+                                .cornerRadius(12)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                                )
                             }
                         }
                     }

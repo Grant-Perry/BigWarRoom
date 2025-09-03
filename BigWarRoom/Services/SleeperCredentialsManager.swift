@@ -70,7 +70,8 @@ final class SleeperCredentialsManager: ObservableObject {
         } else if !currentUserID.isEmpty {
             return currentUserID
         }
-        return nil
+        // Fallback to default username if no credentials saved
+        return AppConstants.SleeperUser
     }
     
     /// Clear all Sleeper credentials and cache
@@ -88,6 +89,11 @@ final class SleeperCredentialsManager: ObservableObject {
         hasValidCredentials = false
         
         print("🗑️ Sleeper credentials and cache cleared")
+    }
+    
+    /// Check if we have actual user-entered credentials (not just defaults)
+    func hasUserEnteredCredentials() -> Bool {
+        return !currentUsername.isEmpty || !currentUserID.isEmpty
     }
     
     /// Cache discovered league IDs for better performance

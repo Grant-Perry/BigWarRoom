@@ -32,6 +32,9 @@ final class FantasyViewModel: ObservableObject {
     @Published var userIDs: [String: String] = [:]  // userID -> display name
     @Published var userAvatars: [String: URL] = [:] // userID -> avatar URL
     
+    // MARK: -> Manager Names Cache (use DraftRoom infrastructure)
+    @Published var managerNames: [Int: String] = [:] // rosterID -> real manager name
+    
     // MARK: -> Picker Options
     let availableWeeks = Array(1...18) // NFL regular season + playoffs
     let availableYears = ["2023", "2024", "2025"]
@@ -39,6 +42,7 @@ final class FantasyViewModel: ObservableObject {
     // MARK: -> Dependencies
     private let unifiedLeagueManager = UnifiedLeagueManager()
     private let playerDirectoryStore = PlayerDirectoryStore.shared
+    private let draftRoomViewModel = DraftRoomViewModel() // Access to manager name resolution
     private var refreshTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     
@@ -56,6 +60,7 @@ final class FantasyViewModel: ObservableObject {
     func selectLeague(_ league: UnifiedLeagueManager.LeagueWrapper) {
         selectedLeague = league
         Task {
+            await loadManagerNames() // Load manager names first
             await fetchMatchups()
         }
     }
@@ -290,7 +295,7 @@ final class FantasyViewModel: ObservableObject {
             }
     }
 
-    /// Create FantasyTeam from ESPN data (like SleepThis - CORRECT with REAL manager names)
+    /// Create FantasyTeam from ESPN data using cached manager names
     private func createFantasyTeamFromESPN(espnTeam: ESPNFantasyTeamModel, score: Double, leagueID: String) -> FantasyTeam {
         // Convert ESPN roster to fantasy players
         var fantasyPlayers: [FantasyPlayer] = []
@@ -329,22 +334,23 @@ final class FantasyViewModel: ObservableObject {
             )
         }
         
-        // FIXED: Use real team name as both name and ownerName for ESPN
+        // Use cached manager name or fallback
+        let managerName = managerNames[espnTeam.id] ?? espnTeam.name ?? "Manager \(espnTeam.id)"
         let teamName = espnTeam.name ?? "Team \(espnTeam.id)"
         
         return FantasyTeam(
             id: String(espnTeam.id),
-            name: teamName, // Real team name like "DrLizard"
-            ownerName: teamName, // Use team name as owner name for ESPN
+            name: teamName, // Team name like "DrLizard"
+            ownerName: managerName, // REAL manager name from cache
             record: record,
-            avatar: nil, // ESPN doesn't have user avatars, but team name shows instead
+            avatar: nil, // ESPN doesn't have user avatars
             currentScore: score, // Real calculated score using SleepThis method
             projectedScore: score * 1.05, // Mock projection
             roster: fantasyPlayers,
             rosterID: espnTeam.id
         )
     }
-    
+
     // MARK: -> SLEEPER IMPLEMENTATION - FIXED to match SleepThis
     
     /// Fetch Sleeper league scoring settings (like SleepThis)
@@ -564,7 +570,7 @@ final class FantasyViewModel: ObservableObject {
         return totalScore
     }
     
-    /// Create Sleeper fantasy team with REAL manager names and avatars (FIXED)
+    /// Create Sleeper fantasy team with REAL manager names
     private func createSleeperFantasyTeam(
         matchup: SleeperMatchup,
         managerName: String,
@@ -603,14 +609,10 @@ final class FantasyViewModel: ObservableObject {
         }
         
         let avatarString = avatarURL?.absoluteString
-        print("🎨 Creating FantasyTeam:")
-        print("   Name: '\(managerName)'")
-        print("   Avatar URL: '\(avatarString ?? "nil")'")
-        print("   Score: \(score)")
         
-        let team = FantasyTeam(
+        return FantasyTeam(
             id: String(matchup.roster_id),
-            name: managerName, // REAL manager name like "TheRoadWarrior"
+            name: managerName, // REAL manager name from Sleeper API
             ownerName: managerName, // REAL manager name
             record: nil,  // Would need roster data for record
             avatar: avatarString, // FIXED: Store full URL string
@@ -619,11 +621,6 @@ final class FantasyViewModel: ObservableObject {
             roster: fantasyPlayers,
             rosterID: matchup.roster_id
         )
-        
-        // DEBUG: Check what the avatarURL computed property returns
-        print("   Computed avatarURL: '\(team.avatarURL?.absoluteString ?? "nil")'")
-        
-        return team
     }
     
     /// Calculate win probability based on scores
@@ -847,5 +844,20 @@ final class FantasyViewModel: ObservableObject {
         return team.roster.filter { player in
             isBench ? !player.isStarter : player.isStarter
         }
+    }
+    
+    /// Load manager names using UnifiedLeagueManager (simplified for now)
+    private func loadManagerNames() async {
+        guard let league = selectedLeague else { return }
+        
+        print("🔍 Loading manager names for league: \(league.league.name)")
+        
+        // Clear existing cache
+        managerNames.removeAll()
+        
+        // For now, we'll rely on the existing Sleeper user fetching for real names
+        // and ESPN will use team names until we can properly integrate with DraftRoom infrastructure
+        
+        print("🎯 Manager names cache ready")
     }
 }

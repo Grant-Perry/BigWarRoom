@@ -2,7 +2,7 @@
 //  LoadingScreen.swift
 //  BigWarRoom
 //
-//  Beautiful loading screen with purple/blue gradients, bokeh effects, and growing app logo
+//  Beautiful splash screen with purple/blue gradients, bokeh effects, and growing app logo
 //
 
 import SwiftUI
@@ -10,133 +10,180 @@ import SwiftUI
 struct LoadingScreen: View {
     @State private var logoScale: CGFloat = 0.5
     @State private var logoGlow: CGFloat = 0.3
-    @State private var purpleExpansion: CGFloat = 0
-    @State private var showPurpleExpansion = false
-    @State private var gradientRotation: Double = 0
+    @State private var textOpacity: Double = 0.0
+    @State private var purpleWave: CGFloat = 0
     @State private var isComplete = false
     
-    /// Completion handler - true if needs onboarding, false if ready to go
+    /// Completion handler 
     let onComplete: (Bool) -> Void
     
-    /// Credentials managers for checking setup status
+    /// Credentials managers for checking persistent data
     @StateObject private var espnCredentials = ESPNCredentialsManager.shared
     @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
     
     var body: some View {
         ZStack {
-            // Base animated gradient background
+            // Static beautiful gradient background
             LinearGradient(
                 colors: [
-                    Color.purple.opacity(0.9),
-                    Color.blue.opacity(0.8),
-                    Color.purple.opacity(0.7),
-                    Color.blue.opacity(0.9)
+                    Color.piratesPrimary.opacity(0.9),
+                    Color.padresPrimary.opacity(0.8),
+                    Color.piratesPrimary.opacity(0.7),
+                    Color.padresPrimary.opacity(0.9)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .rotationEffect(.degrees(gradientRotation))
             .ignoresSafeArea()
             
-            // Purple expansion overlay - subtle expansion effect
-            if showPurpleExpansion {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                Color.purple.opacity(0.3),
-                                Color.purple.opacity(0.2),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 400 * purpleExpansion
-                        )
+            // Subtle animated wave overlay
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.purple.opacity(0.2),
+                            Color.blue.opacity(0.1),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 300
                     )
-                    .scaleEffect(purpleExpansion)
-                    .ignoresSafeArea()
-                    .animation(.easeOut(duration: 1.0), value: purpleExpansion)
-            }
+                )
+                .scaleEffect(purpleWave)
+                .ignoresSafeArea()
             
             // Bokeh background effects
             BokehLayer()
-                .opacity(showPurpleExpansion ? 0.6 : 1.0)
+                .opacity(0.6)
             
             // Main content
-            VStack(spacing: 40) {
+            VStack(spacing: 50) {
                 Spacer()
                 
-                // App Logo with beautiful growing effect - NO PROGRESS BAR!
-                AppConstants.appLogo
-                    .scaleEffect(logoScale)
-                    .shadow(color: .purple.opacity(logoGlow), radius: 20, x: 0, y: 0)
-                    .shadow(color: .blue.opacity(logoGlow * 0.8), radius: 30, x: 0, y: 0)
-                    .animation(.easeInOut(duration: 2.0), value: logoScale)
-                    .animation(.easeInOut(duration: 1.5), value: logoGlow)
+                // App Logo with version underneath
+                VStack(spacing: 12) {
+                    AppConstants.appLogo
+                        .scaleEffect(logoScale)
+                        .shadow(color: .purple.opacity(logoGlow), radius: 20, x: 0, y: 0)
+                        .shadow(color: .blue.opacity(logoGlow * 0.8), radius: 30, x: 0, y: 0)
+                        .animation(.spring(response: 1.5, dampingFraction: 0.8), value: logoScale)
+                        .animation(.easeInOut(duration: 2.0), value: logoGlow)
+                    
+                    // Version under the AppIcon
+                    Text("Version \(AppConstants.getVersion())")
+                        .font(.system(size: 12, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.7))
+                        .opacity(textOpacity)
+                }
+                
+                // App name and tagline
+                VStack(spacing: 16) {
+                    Text("BigWarRoom")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .opacity(textOpacity)
+                    
+                    Text("Your Fantasy Football Command Center")
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .opacity(textOpacity)
+                }
+                .animation(.easeIn(duration: 1.0).delay(1.0), value: textOpacity)
                 
                 Spacer()
                 
-                // Subtle app name
-                Text("BigWarRoom")
-                    .font(.system(size: 24, weight: .light, design: .rounded))
-                    .foregroundColor(.white.opacity(0.8))
-                    .opacity(logoScale > 0.8 ? 1.0 : 0.0)
-                    .animation(.easeIn(duration: 1.0).delay(1.0), value: logoScale)
+                // Loading dots
+                LoadingDots()
+                    .opacity(textOpacity)
                 
                 Spacer()
             }
+            .padding(.horizontal, 32)
         }
         .onAppear {
-            startLoadingSequence()
+            startSplashSequence()
         }
     }
     
-    /// Starts the beautiful loading animation sequence with growing logo
-    private func startLoadingSequence() {
-        // Grow the logo from small to normal size
-        withAnimation(.easeOut(duration: 1.5)) {
+    /// Starts the beautiful splash animation sequence
+    private func startSplashSequence() {
+        // Grow the logo
+        withAnimation(.spring(response: 1.2, dampingFraction: 0.7).delay(0.3)) {
             logoScale = 1.0
         }
         
-        // Intensify glow effect 
-        withAnimation(.easeInOut(duration: 1.8).delay(0.2)) {
+        // Intensify glow
+        withAnimation(.easeInOut(duration: 1.8).delay(0.5)) {
             logoGlow = 1.0
         }
         
-        // Trigger subtle purple expansion
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            triggerPurpleExpansion()
+        // Show text
+        withAnimation(.easeIn(duration: 0.8).delay(1.2)) {
+            textOpacity = 1.0
         }
         
-        // Background gradient rotation
-        withAnimation(.linear(duration: 2.0)) {
-            gradientRotation = 10
+        // Subtle wave animation
+        withAnimation(.easeOut(duration: 2.0).delay(0.8)) {
+            purpleWave = 1.5
         }
         
-        // Complete after 2 seconds total
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        // Complete after 2.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
             completeLoading()
         }
     }
     
-    /// Triggers the subtle purple expansion effect
-    private func triggerPurpleExpansion() {
-        showPurpleExpansion = true
-        
-        withAnimation(.easeOut(duration: 0.8)) {
-            purpleExpansion = 1.5
-        }
-    }
-    
-    /// Always loads SettingsView (OnBoardingView) - no credential checking
+    /// Checks if user has persistent data and completes loading
     private func completeLoading() {
+        // Check if user has any valid credentials setup
+        let hasESPNCredentials = espnCredentials.hasValidCredentials
+        let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
+        
+        // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
+        let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
+        
+        print("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
+        
         withAnimation(.easeInOut(duration: 0.5)) {
             isComplete = true
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            // Always show onboarding/settings - let user choose what to do
-            onComplete(true)
+            // Only show onboarding if NO credentials exist
+            let shouldShowOnboarding = !hasAnyCredentials
+            onComplete(shouldShowOnboarding)
+        }
+    }
+}
+
+// MARK: - Loading Dots Animation
+
+struct LoadingDots: View {
+    @State private var animationPhase: Int = 0
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.white.opacity(0.8))
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(animationPhase == index ? 1.3 : 1.0)
+                    .animation(
+                        .easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(Double(index) * 0.2),
+                        value: animationPhase
+                    )
+            }
+        }
+        .onAppear {
+            withAnimation {
+                animationPhase = 0
+            }
+            
+            Timer.scheduledTimer(withTimeInterval: 0.6, repeats: true) { _ in
+                animationPhase = (animationPhase + 1) % 3
+            }
         }
     }
 }
@@ -148,7 +195,7 @@ struct BokehLayer: View {
     
     var body: some View {
         ZStack {
-            ForEach(0..<15, id: \.self) { index in
+            ForEach(0..<12, id: \.self) { index in
                 if positions.indices.contains(index) {
                     let (position, size, color, opacity) = positions[index]
                     
@@ -156,7 +203,7 @@ struct BokehLayer: View {
                         .fill(color.opacity(opacity))
                         .frame(width: size, height: size)
                         .position(position)
-                        .blur(radius: size * 0.3)
+                        .blur(radius: size * 0.4)
                 }
             }
         }
@@ -170,22 +217,22 @@ struct BokehLayer: View {
         let screenWidth = UIScreen.main.bounds.width
         let screenHeight = UIScreen.main.bounds.height
         
-        positions = (0..<15).map { _ in
+        positions = (0..<12).map { _ in
             let x = CGFloat.random(in: 0...screenWidth)
             let y = CGFloat.random(in: 0...screenHeight)
-            let size = CGFloat.random(in: 30...120)
+            let size = CGFloat.random(in: 40...100)
             let color = [Color.purple, Color.blue, Color.white].randomElement()!
-            let opacity = Double.random(in: 0.1...0.4)
+            let opacity = Double.random(in: 0.1...0.3)
             
             return (CGPoint(x: x, y: y), size, color, opacity)
         }
     }
     
     private func startBokehAnimation() {
-        withAnimation(.easeInOut(duration: 8.0).repeatForever(autoreverses: true)) {
+        withAnimation(.easeInOut(duration: 10.0).repeatForever(autoreverses: true)) {
             positions = positions.map { (position, size, color, opacity) in
-                let newX = position.x + CGFloat.random(in: -50...50)
-                let newY = position.y + CGFloat.random(in: -50...50)
+                let newX = position.x + CGFloat.random(in: -30...30)
+                let newY = position.y + CGFloat.random(in: -30...30)
                 return (CGPoint(x: newX, y: newY), size, color, opacity)
             }
         }
@@ -196,6 +243,6 @@ struct BokehLayer: View {
 
 #Preview {
     LoadingScreen { _ in
-        print("Loading complete! Always showing settings.")
+        print("Splash complete!")
     }
 }

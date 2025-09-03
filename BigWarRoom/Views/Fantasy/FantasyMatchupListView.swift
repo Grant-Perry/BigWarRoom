@@ -33,7 +33,7 @@ struct FantasyMatchupListView: View {
                     }
                 }
             }
-            .navigationTitle("Crazy 8's")
+            .navigationTitle(viewModel.selectedLeague?.league.name ?? "Fantasy")
             .navigationBarTitleDisplayMode(.large)
             .preferredColorScheme(.dark)
             .task {
@@ -114,9 +114,10 @@ struct FantasyMatchupListView: View {
                     .foregroundColor(.blue)
                     .font(.system(size: 14))
                 
-                Text("Crazy 8's")
+                Text(viewModel.selectedLeague?.league.name ?? "Select League")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.blue)
+                    .lineLimit(1)
                 
                 Spacer()
                 
@@ -361,7 +362,7 @@ struct FantasyMatchupCard: View {
             
             // Team info
             VStack(spacing: 2) {
-                Text(team.name)
+                Text(team.ownerName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)

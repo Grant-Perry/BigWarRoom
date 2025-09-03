@@ -13,12 +13,14 @@ struct ESPNFantasyLeagueResponse: Codable {
     let teams: [ESPNFantasyTeamResponse]
     let schedule: [ESPNScheduleEntryResponse]
     let status: ESPNFantasyLeagueStatusResponse?
+    let members: [ESPNMember]? // Add members to get real manager names
 }
 
 // MARK: -> ESPN Fantasy Team
 struct ESPNFantasyTeamResponse: Codable, Identifiable {
     let id: Int
     let name: String? // Team name like "DrLizard", "EnglishConnection"
+    let owners: [String]? // Add owners array to map to members
     let record: ESPNFantasyTeamRecordResponse?
     let roster: ESPNFantasyTeamRosterResponse?
 }

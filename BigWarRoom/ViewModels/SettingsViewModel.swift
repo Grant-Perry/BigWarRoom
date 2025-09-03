@@ -94,6 +94,13 @@ final class OnBoardingViewModel: ObservableObject {
         showingClearConfirmation = true
     }
     
+    func requestClearAllPersistedData() {
+        pendingClearAction = {
+            self.performClearAllPersistedData()
+        }
+        showingClearConfirmation = true
+    }
+    
     private func performClearAllCache() {
         let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players"]
         for key in cacheKeys {
@@ -112,6 +119,28 @@ final class OnBoardingViewModel: ObservableObject {
         clearResultMessage = "✅ All service credentials cleared successfully!"
         showingClearResult = true
         print("🧹 Cleared ALL service credentials and data")
+    }
+    
+    private func performClearAllPersistedData() {
+        // Clear ALL UserDefaults data for the app
+        if let bundleID = Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removePersistentDomain(forName: bundleID)
+            UserDefaults.standard.synchronize()
+        }
+        
+        // Clear Keychain data
+        espnCredentials.clearCredentials()
+        sleeperCredentials.clearCredentials()
+        
+        // Clear any other persisted data
+        let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players", "selectedESPNYear"]
+        for key in cacheKeys {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+        
+        clearResultMessage = "✅ ALL persisted data cleared successfully! App reset to factory defaults."
+        showingClearResult = true
+        print("🧹🧹🧹 NUCLEAR OPTION: Cleared ALL persisted data - app reset to factory state")
     }
     
     func confirmClearAction() {

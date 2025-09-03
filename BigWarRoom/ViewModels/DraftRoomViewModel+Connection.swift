@@ -5,55 +5,63 @@ extension DraftRoomViewModel {
     
     /// Connect using either username or User ID (Sleeper only)
     func connectWithUsernameOrID(_ input: String, season: String = "2025") async {
-        connectionStatus = .connecting
-        
+        print("🚀 DraftRoomViewModel: Starting connection with input '\(input)', season: \(season)")
+
         do {
             let user: SleeperUser
-            
-            // Try to determine if input is a username or User ID
             if input.allSatisfy(\.isNumber) && input.count > 10 {
-                // Looks like a User ID (all numbers, long)
                 user = try await sleeperClient.fetchUserByID(userID: input)
                 currentUserID = input
                 print("✅ Connected using User ID: \(input)")
             } else {
-                // Looks like a username
                 user = try await sleeperClient.fetchUser(username: input)
                 currentUserID = user.userID
                 print("✅ Connected using username: \(input) -> User ID: \(user.userID)")
             }
-            
+
             sleeperDisplayName = user.displayName ?? user.username
             sleeperUsername = user.username
-            
-            // Fetch leagues from both Sleeper and ESPN using the specified season
-            await leagueManager.fetchAllLeagues(sleeperUserID: user.userID, season: season)
-            allAvailableDrafts = leagueManager.allLeagues
-            
+
+            print("🏈 DraftRoomViewModel: User connected - Display: \(sleeperDisplayName), Username: \(sleeperUsername)")
+
+            // Fetch just Sleeper leagues, do not overwrite the whole array!
+            await leagueManager.fetchSleeperLeagues(userID: user.userID, season: season)
+            // Remove existing Sleeper leagues, append latest, keep other services
+            let newSleeperLeagues = leagueManager.allLeagues.filter { $0.source == .sleeper }
+            allAvailableDrafts.removeAll { $0.source == .sleeper }
+            allAvailableDrafts.append(contentsOf: newSleeperLeagues )
+
+            print("🎯 Loaded Sleeper leagues (\(newSleeperLeagues.count)). All available drafts: \(allAvailableDrafts.count)")
             connectionStatus = .connected
-            print("🏈 Connected to \(season) season leagues")
         } catch {
             print("❌ Connection failed for input '\(input)': \(error)")
-            connectionStatus = .disconnected
+            // Do not set to disconnected, so multi-service is possible
         }
     }
 
     /// Connect to ESPN leagues only (without Sleeper account)
     func connectToESPNOnly() async {
-        connectionStatus = .connecting
-        
-        // Fetch ESPN leagues only
+        print("🚀 DraftRoomViewModel: Starting ESPN-only connection")
+
+        guard ESPNCredentialsManager.shared.hasValidCredentials else {
+            print("❌ DraftRoomViewModel: No valid ESPN credentials available")
+            return
+        }
+        // Fetch just ESPN leagues!
         await leagueManager.fetchESPNLeagues()
-        allAvailableDrafts = leagueManager.allLeagues
+        let newESPNLeagues = leagueManager.allLeagues.filter { $0.source == .espn }
+        allAvailableDrafts.removeAll { $0.source == .espn }
+        allAvailableDrafts.append(contentsOf: newESPNLeagues )
 
-        sleeperDisplayName = "ESPN User"
-        sleeperUsername = "espn_user"
-        // Set currentUserID to SWID for ESPN roster matching
-        currentUserID = AppConstants.SWID
-        connectionStatus = .connected
+        if let swid = ESPNCredentialsManager.shared.getSWID() {
+            currentUserID = swid
+            print("🏈 DraftRoomViewModel: Set currentUserID to saved SWID: \(String(swid.prefix(20)))...")
+        }
 
-        print("🏈 Connected to ESPN leagues")
-        print("🏈 Set currentUserID to SWID: \(AppConstants.SWID)")
+        if !newESPNLeagues.isEmpty {
+            connectionStatus = .connected
+            print("✅ ESPN-only connection complete - Found \(newESPNLeagues.count) ESPN leagues")
+        }
     }
 
     func connectWithUserID(_ userID: String, season: String = "2025") async {
@@ -61,6 +69,7 @@ extension DraftRoomViewModel {
     }
 
     func disconnectFromLive() {
+        print("🔌 DraftRoomViewModel: Disconnecting from live services")
         polling.stopPolling()
         selectedDraft = nil
         selectedLeagueWrapper = nil
@@ -86,8 +95,10 @@ extension DraftRoomViewModel {
     
     /// Refresh all available leagues
     func refreshAllLeagues(season: String = "2025") async {
+        print("🔄 DraftRoomViewModel: Refreshing all leagues for season \(season)")
         await leagueManager.refreshAllLeagues(sleeperUserID: currentUserID, season: season)
         allAvailableDrafts = leagueManager.allLeagues
+        print("🔄 DraftRoomViewModel: Refresh complete - \(allAvailableDrafts.count) leagues available")
     }
     
     /// Debug ESPN connection (wrapper method for the view)

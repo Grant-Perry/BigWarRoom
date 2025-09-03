@@ -3,7 +3,8 @@ import SwiftUI
 struct QuickConnectSection: View {
     @ObservedObject var viewModel: DraftRoomViewModel
     @Binding var selectedYear: String
-    @State private var customSleeperInput: String = "" // Don't default to Gp's ID
+    @Binding var selectedTab: Int // Add this for navigation
+    @State private var customSleeperInput: String = ""
     @State private var showConnectionSection = false
     
     var body: some View {
@@ -101,13 +102,17 @@ struct QuickConnectSection: View {
                     .foregroundColor(.green)
             }
             
-            // Service logos with more spacing
+            // Service logos - only show logos for services that actually have leagues
             HStack(spacing: 25) {
-                AppConstants.sleeperLogo
-                    .frame(width: 20, height: 20)
-                    .shadow(color: .green.opacity(0.3), radius: 2)
+                // Show Sleeper logo only if we have Sleeper leagues
+                if viewModel.allAvailableDrafts.contains(where: { $0.source == .sleeper }) {
+                    AppConstants.sleeperLogo
+                        .frame(width: 20, height: 20)
+                        .shadow(color: .green.opacity(0.3), radius: 2)
+                }
                 
-                if viewModel.allAvailableDrafts.contains(where: { $0.source == .espn }) {
+                // Show ESPN logo only if we have ESPN leagues
+                if viewModel.connectionStatus == .connected && viewModel.allAvailableDrafts.contains(where: { $0.source == .espn }) {
                     AppConstants.espnLogo
                         .frame(width: 20, height: 20)
                         .shadow(color: .green.opacity(0.3), radius: 2)
@@ -143,36 +148,53 @@ struct QuickConnectSection: View {
     
     private var serviceCardsSection: some View {
         VStack(spacing: 12) {
-            // Sleeper Card
+            // Sleeper Card - + button opens credential entry
             ConnectionServiceCard(
                 logo: AppConstants.sleeperLogo,
                 title: "Sleeper Fantasy",
                 subtitle: isSleeperConnected ? "✅ Connected" : "Connect to Sleeper",
                 isConnected: isSleeperConnected,
                 accentColor: .blue,
+                showUseDefault: true,
                 action: {
-                    if !isSleeperConnected {
-                        Task {
-                            await viewModel.connectWithUsernameOrID(customSleeperInput, season: selectedYear)
-                        }
+                    // + button action: Navigate to Sleeper setup in Settings
+                    print("🔧 Opening Sleeper credential entry")
+                    selectedTab = 6 // Navigate to Settings tab
+                },
+                useDefaultAction: {
+                    // Use Default button: Auto-connect with default credentials
+                    customSleeperInput = AppConstants.SleeperUser
+                    Task {
+                        await viewModel.connectWithUsernameOrID(AppConstants.SleeperUser, season: selectedYear)
                     }
                 }
             )
-            .disabled(customSleeperInput.isEmpty && !isSleeperConnected)
             
-            // ESPN Card
+            // ESPN Card - + button opens credential entry
             ConnectionServiceCard(
                 logo: AppConstants.espnLogo,
-                title: "ESPN Fantasy",
+                title: "ESPN Fantasy", 
                 subtitle: isESPNConnected ? "✅ Connected" : "Connect to ESPN",
                 isConnected: isESPNConnected,
                 accentColor: .orange,
+                showUseDefault: true,
                 action: {
-                    if !isESPNConnected {
-                        Task {
-                            AppConstants.ESPNLeagueYear = selectedYear
-                            await viewModel.connectToESPNOnly()
-                        }
+                    // + button action: Navigate to ESPN setup in Settings
+                    print("🔧 Opening ESPN credential entry")
+                    selectedTab = 6 // Navigate to Settings tab
+                },
+                useDefaultAction: {
+                    // Use Default button: Auto-connect with default ESPN credentials
+                    Task {
+                        // Fill default ESPN credentials first
+                        ESPNCredentialsManager.shared.saveCredentials(
+                            swid: AppConstants.SWID,
+                            espnS2: AppConstants.ESPN_S2,
+                            leagueIDs: AppConstants.ESPNLeagueID
+                        )
+                        
+                        AppConstants.ESPNLeagueYear = selectedYear
+                        await viewModel.connectToESPNOnly()
                     }
                 }
             )
@@ -194,7 +216,7 @@ struct QuickConnectSection: View {
                     .autocorrectionDisabled(true)
                 
                 Button("Use Default") {
-                    customSleeperInput = AppConstants.GpSleeperID
+                    customSleeperInput = AppConstants.SleeperUser
                 }
                 .font(.caption)
                 .foregroundColor(.blue)
@@ -217,10 +239,25 @@ struct QuickConnectSection: View {
         .cornerRadius(10)
     }
     
+    // MARK: - Helper Methods
+    
+    private func getSleeperCredentialOrPrompt() -> String {
+        // Check if user has saved Sleeper credentials
+        let sleeperManager = SleeperCredentialsManager.shared
+        if let identifier = sleeperManager.getUserIdentifier() {
+            customSleeperInput = identifier
+            return identifier
+        }
+        
+        // If no saved credentials, use default username
+        return AppConstants.SleeperUser
+    }
+    
     // MARK: - Computed Properties
     
     private var isSleeperConnected: Bool {
-        viewModel.connectionStatus == .connected
+        // Check if we actually have Sleeper leagues loaded (not just general connection status)
+        return viewModel.allAvailableDrafts.contains(where: { $0.source == .sleeper })
     }
     
     private var isESPNConnected: Bool {
@@ -236,52 +273,82 @@ struct ConnectionServiceCard<Logo: View>: View {
     let subtitle: String
     let isConnected: Bool
     let accentColor: Color
+    let showUseDefault: Bool
     let action: () -> Void
+    let useDefaultAction: (() -> Void)?
+    
+    init(logo: Logo, title: String, subtitle: String, isConnected: Bool, accentColor: Color, showUseDefault: Bool = false, action: @escaping () -> Void, useDefaultAction: (() -> Void)? = nil) {
+        self.logo = logo
+        self.title = title
+        self.subtitle = subtitle
+        self.isConnected = isConnected
+        self.accentColor = accentColor
+        self.showUseDefault = showUseDefault
+        self.action = action
+        self.useDefaultAction = useDefaultAction
+    }
     
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                logo
-                    .frame(width: 32, height: 32)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
+        VStack(spacing: 0) {
+            // Main connection card
+            Button(action: action) {
+                HStack(spacing: 12) {
+                    logo
+                        .frame(width: 32, height: 32)
                     
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(isConnected ? .green : accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundColor(isConnected ? .green : accentColor)
+                    }
+                    
+                    Spacer()
+                    
+                    if !isConnected {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(accentColor)
+                            .font(.title3)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.title3)
+                    }
                 }
-                
-                Spacer()
-                
-                if !isConnected {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundColor(accentColor)
-                        .font(.title3)
-                } else {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.title3)
-                }
+                .padding(16)
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
-                    .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        isConnected ? Color.green.opacity(0.3) : accentColor.opacity(0.2),
-                        lineWidth: isConnected ? 2 : 1
-                    )
-            )
+            .buttonStyle(.plain)
+            .disabled(isConnected)
+            
+            // Use Default button (only if not connected and showUseDefault is true)
+            if !isConnected && showUseDefault && useDefaultAction != nil {
+                Divider()
+                
+                Button("Use Default (Gp's Account)") {
+                    useDefaultAction?()
+                }
+                .font(.caption)
+                .foregroundColor(.blue)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.blue.opacity(0.05))
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(isConnected)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    isConnected ? Color.green.opacity(0.3) : accentColor.opacity(0.2),
+                    lineWidth: isConnected ? 2 : 1
+                )
+        )
     }
 }
