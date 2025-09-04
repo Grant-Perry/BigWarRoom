@@ -44,7 +44,7 @@ final class SleeperCredentialsManager: ObservableObject {
         self.selectedSeason = season
         self.hasValidCredentials = !username.isEmpty || !userID.isEmpty
         
-        print("✅ Sleeper credentials saved successfully")
+        // xprint("✅ Sleeper credentials saved successfully")
     }
     
     /// Load saved Sleeper credentials
@@ -60,7 +60,7 @@ final class SleeperCredentialsManager: ObservableObject {
         self.cachedLeagues = leagues
         self.hasValidCredentials = !username.isEmpty || !userID.isEmpty
         
-        print("📱 Loaded Sleeper credentials - Has valid: \(hasValidCredentials), Cached leagues: \(leagues.count)")
+        // xprint("📱 Loaded Sleeper credentials - Has valid: \(hasValidCredentials), Cached leagues: \(leagues.count)")
     }
     
     /// Get current username or user ID for API calls
@@ -88,7 +88,7 @@ final class SleeperCredentialsManager: ObservableObject {
         cachedLeagues = []
         hasValidCredentials = false
         
-        print("🗑️ Sleeper credentials and cache cleared")
+        // xprint("🗑️ Sleeper credentials and cache cleared")
     }
     
     /// Check if we have actual user-entered credentials (not just defaults)
@@ -102,7 +102,7 @@ final class SleeperCredentialsManager: ObservableObject {
         UserDefaults.standard.set(leagueIDs, forKey: cachedLeaguesKey)
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: leagueCacheTimestampKey)
         
-        print("💾 Cached \(leagueIDs.count) Sleeper league IDs")
+        // xprint("💾 Cached \(leagueIDs.count) Sleeper league IDs")
     }
     
     /// Check if league cache is still valid (within 1 hour)
@@ -121,7 +121,7 @@ final class SleeperCredentialsManager: ObservableObject {
         do {
             // Try to fetch user info to validate
             let user = try await SleeperAPIClient.shared.fetchUser(username: identifier)
-            print("✅ Sleeper credentials validation successful: \(user.displayName ?? identifier)")
+            // xprint("✅ Sleeper credentials validation successful: \(user.displayName ?? identifier)")
             
             // Update user ID if we only had username
             if currentUserID.isEmpty && !user.userID.isEmpty {
@@ -137,7 +137,7 @@ final class SleeperCredentialsManager: ObservableObject {
             
             return true
         } catch {
-            print("❌ Sleeper credentials validation failed: \(error)")
+            // xprint("❌ Sleeper credentials validation failed: \(error)")
             return false
         }
     }
@@ -154,7 +154,7 @@ final class SleeperCredentialsManager: ObservableObject {
             
             cacheDiscoveredLeagues(leagueIDs)
         } catch {
-            print("❌ Failed to refresh Sleeper league cache: \(error)")
+            // xprint("❌ Failed to refresh Sleeper league cache: \(error)")
         }
     }
     

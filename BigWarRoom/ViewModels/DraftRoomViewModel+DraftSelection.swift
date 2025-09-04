@@ -6,15 +6,15 @@ extension DraftRoomViewModel {
     func selectDraft(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         // ESPN leagues: Ask for position FIRST, then complete setup
         if leagueWrapper.source == .espn {
-            print("🏈 ESPN league selected - prompting for draft position first")
-            print("   League: \(leagueWrapper.league.name)")
-            print("   Total Rosters: \(leagueWrapper.league.totalRosters)")
+            // xprint("🏈 ESPN league selected - prompting for draft position first")
+            // xprint("   League: \(leagueWrapper.league.name)")
+            // xprint("   Total Rosters: \(leagueWrapper.league.totalRosters)")
             
             // Store the league wrapper and show position prompt
             pendingESPNLeagueWrapper = leagueWrapper
             
             // Debug the maxTeamsInDraft calculation
-            print("   maxTeamsInDraft will be: \(maxTeamsInDraft)")
+            // xprint("   maxTeamsInDraft will be: \(maxTeamsInDraft)")
             
             // Initialize ESPN draft position to 1 (don't rely on selectedManualPosition)
             selectedESPNDraftPosition = 1
@@ -41,9 +41,9 @@ extension DraftRoomViewModel {
                 let rosters = try await apiClient.fetchRosters(leagueID: leagueID)
                 allLeagueRosters = rosters
                 
-                print("🏈 Found \(rosters.count) rosters in league \(leagueID)")
+                // xprint("🏈 Found \(rosters.count) rosters in league \(leagueID)")
                 for (index, roster) in rosters.enumerated() {
-                    print("  Roster \(index + 1): ID=\(roster.rosterID), Owner=\(roster.ownerID ?? "nil"), Display=\(roster.ownerDisplayName ?? "nil")")
+                    // xprint("  Roster \(index + 1): ID=\(roster.rosterID), Owner=\(roster.ownerID ?? "nil"), Display=\(roster.ownerDisplayName ?? "nil")")
                 }
                 
                 await setupRosterIdentification(leagueWrapper: leagueWrapper, rosters: rosters)
@@ -59,7 +59,7 @@ extension DraftRoomViewModel {
                 lastMyPickCount = polling.allPicks.filter { $0.rosterID == _myRosterID }.count
                 
             } catch {
-                print("🏈 Failed to fetch rosters for \(leagueWrapper.source.displayName) league: \(error)")
+                // xprint("🏈 Failed to fetch rosters for \(leagueWrapper.source.displayName) league: \(error)")
                 draftRosters = [:]
                 _myRosterID = nil
                 myDraftSlot = nil
@@ -73,53 +73,53 @@ extension DraftRoomViewModel {
     private func setupRosterIdentification(leagueWrapper: UnifiedLeagueManager.LeagueWrapper, rosters: [SleeperRoster]) async {
         // ESPN leagues: Use the pre-selected draft pick to find roster
         if leagueWrapper.source == .espn {
-            print("🏈 ESPN league - using pre-selected draft pick: \(myDraftSlot ?? -1)")
+            // xprint("🏈 ESPN league - using pre-selected draft pick: \(myDraftSlot ?? -1)")
             
             // FIXED: Pure positional logic - ignore ESPN teamIds completely
             if let draftPosition = myDraftSlot {
                 // Don't try to match roster IDs - just use pure draft slot logic
                 _myRosterID = nil // Set to nil - we'll use draft slot matching instead
-                print("🏈 ESPN: Using pure positional logic for draft slot \(draftPosition)")
-                print("🏈 Your picks will be calculated using snake draft math from position \(draftPosition)")
+                // xprint("🏈 ESPN: Using pure positional logic for draft slot \(draftPosition)")
+                // xprint("🏈 Your picks will be calculated using snake draft math from position \(draftPosition)")
             } else {
-                print("🏈 Could not determine draft position for ESPN league")
+                // xprint("🏈 Could not determine draft position for ESPN league")
             }
             
         } else {
             // Sleeper leagues: Use Sleeper user ID matching
             if let userID = currentUserID {
-                print("🏈 Sleeper league - looking for my roster with userID: \(userID)")
+                // xprint("🏈 Sleeper league - looking for my roster with userID: \(userID)")
                 if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
                     _myRosterID = myRoster.rosterID
                     myDraftSlot = myRoster.draftSlot
-                    print("🏈 Found MY Sleeper roster! RosterID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)")
+                    // xprint("🏈 Found MY Sleeper roster! RosterID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)")
                 } else {
-                    print("🏈 Could not find my roster with Sleeper userID: \(userID)")
+                    // xprint("🏈 Could not find my roster with Sleeper userID: \(userID)")
                 }
             }
         }
         
         if _myRosterID == nil {
-            print("🏈 Could not identify my roster in this league")
+            // xprint("🏈 Could not identify my roster in this league")
         } else {
-            print("🏈 Successfully identified my roster: ID=\(_myRosterID!), DraftSlot=\(myDraftSlot ?? -1)")
+            // xprint("🏈 Successfully identified my roster: ID=\(_myRosterID!), DraftSlot=\(myDraftSlot ?? -1)")
         }
     }
     
     private func buildRosterDisplayInfo(rosters: [SleeperRoster], leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         var info: [Int: DraftRosterInfo] = [:]
 
-        print("🔍 DEBUG: Building draftRosters dictionary...")
-        print("   Found \(rosters.count) rosters in league")
-        print("   League source: \(leagueWrapper.source)")
+        // xprint("🔍 DEBUG: Building draftRosters dictionary...")
+        // xprint("   Found \(rosters.count) rosters in league")
+        // xprint("   League source: \(leagueWrapper.source)")
         
         for roster in rosters {
-            print("   Processing roster \(roster.rosterID):")
-            print("     ownerID: \(roster.ownerID ?? "nil")")
-            print("     draftSlot: \(roster.draftSlot ?? -1)")
-            print("     ownerDisplayName: \(roster.ownerDisplayName ?? "nil")")
-            print("     teamName: \(roster.metadata?.teamName ?? "nil")")
-            print("     ownerName: \(roster.metadata?.ownerName ?? "nil")")
+            // xprint("   Processing roster \(roster.rosterID):")
+            // xprint("     ownerID: \(roster.ownerID ?? "nil")")
+            // xprint("     draftSlot: \(roster.draftSlot ?? -1)")
+            // xprint("     ownerDisplayName: \(roster.ownerDisplayName ?? "nil")")
+            // xprint("     teamName: \(roster.metadata?.teamName ?? "nil")")
+            // xprint("     ownerName: \(roster.metadata?.ownerName ?? "nil")")
             
             let displayName = await resolveRosterDisplayName(for: roster)
             
@@ -129,12 +129,12 @@ extension DraftRoomViewModel {
                 displayName: displayName
             )
             
-            print("     Final result: rosterID \(roster.rosterID) → '\(displayName)' (draftSlot: \(roster.draftSlot ?? -1))")
+            // xprint("     Final result: rosterID \(roster.rosterID) → '\(displayName)' (draftSlot: \(roster.draftSlot ?? -1))")
         }
         
-        print("🔍 Final draftRosters mapping:")
+        // xprint("🔍 Final draftRosters mapping:")
         for (rosterID, rosterInfo) in info.sorted(by: { $0.key < $1.key }) {
-            print("   RosterID \(rosterID): '\(rosterInfo.displayName)' (owner: \(rosterInfo.ownerID ?? "nil"))")
+            // xprint("   RosterID \(rosterID): '\(rosterInfo.displayName)' (owner: \(rosterInfo.ownerID ?? "nil"))")
         }
         
         draftRosters = info
@@ -146,21 +146,21 @@ extension DraftRoomViewModel {
         // For ESPN leagues accessed through Sleeper, ALWAYS try Sleeper user lookup FIRST
         // Skip the generic ESPN team names and go straight to Sleeper user data
         if let ownerID = roster.ownerID, !ownerID.isEmpty {
-            print("     Trying Sleeper user lookup for ownerID: \(ownerID)")
+            // xprint("     Trying Sleeper user lookup for ownerID: \(ownerID)")
             
             // Try cache first
             if let cached = userCache[ownerID] {
                 displayName = cached.displayName ?? cached.username
-                print("     ✅ Using cached user: \(displayName ?? "nil")")
+                // xprint("     ✅ Using cached user: \(displayName ?? "nil")")
             } else {
                 // Fetch and store in cache
                 do {
                     let fetched = try await sleeperClient.fetchUserByID(userID: ownerID)
                     userCache[ownerID] = fetched
                     displayName = fetched.displayName ?? fetched.username
-                    print("     ✅ Fetched user: \(displayName ?? "nil") (username: \(fetched.username))")
+                    // xprint("     ✅ Fetched user: \(displayName ?? "nil") (username: \(fetched.username))")
                 } catch {
-                    print("     ❌ Could not fetch user for ownerID \(ownerID): \(error)")
+                    // xprint("     ❌ Could not fetch user for ownerID \(ownerID): \(error)")
                     displayName = nil
                 }
             }
@@ -170,19 +170,19 @@ extension DraftRoomViewModel {
         if displayName == nil || displayName!.isEmpty {
             if let name = roster.metadata?.teamName, !name.isEmpty, !name.hasPrefix("Team ") {
                 displayName = name
-                print("     Using non-generic teamName: \(name)")
+                // xprint("     Using non-generic teamName: \(name)")
             } else if let ownerName = roster.metadata?.ownerName, !ownerName.isEmpty {
                 displayName = ownerName
-                print("     Using ownerName: \(ownerName)")
+                // xprint("     Using ownerName: \(ownerName)")
             } else if let ownerDisplayName = roster.ownerDisplayName, !ownerDisplayName.isEmpty, !ownerDisplayName.hasPrefix("Team ") {
                 displayName = ownerDisplayName
-                print("     Using non-generic ownerDisplayName: \(ownerDisplayName)")
+                // xprint("     Using non-generic ownerDisplayName: \(ownerDisplayName)")
             }
         }
 
         if displayName == nil || displayName!.isEmpty {
             displayName = "Team \(roster.rosterID)"
-            print("     Using fallback: \(displayName!)")
+            // xprint("     Using fallback: \(displayName!)")
         }
         
         return displayName!
@@ -191,21 +191,21 @@ extension DraftRoomViewModel {
     private func startDraftPolling(leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         // Start polling the actual draft
         if let draftID = leagueWrapper.league.draftID {
-            print("🏈 Checking draft status before starting polling...")
+            // xprint("🏈 Checking draft status before starting polling...")
             
             // For ESPN leagues, check if draft is actually live before polling
             if leagueWrapper.source == .espn {
                 await handleESPNDraftPolling(draftID: draftID, apiClient: leagueWrapper.client)
             } else {
                 // For Sleeper leagues, always start polling (they handle it well)
-                print("🏈 Sleeper league - starting polling for draftID: \(draftID)")
+                // xprint("🏈 Sleeper league - starting polling for draftID: \(draftID)")
                 polling.startPolling(draftID: draftID, apiClient: leagueWrapper.client)
             }
         } else {
-            print("🏈 No draftID found for league: \(leagueWrapper.league.name)")
+            // xprint("🏈 No draftID found for league: \(leagueWrapper.league.name)")
             // For ESPN leagues, try using the league ID as draft ID
             if leagueWrapper.source == .espn {
-                print("🏈 ESPN league - trying to use leagueID as draftID: \(leagueWrapper.league.leagueID)")
+                // xprint("🏈 ESPN league - trying to use leagueID as draftID: \(leagueWrapper.league.leagueID)")
                 await handleESPNDraftPolling(draftID: leagueWrapper.league.leagueID, apiClient: leagueWrapper.client)
             }
         }
@@ -216,30 +216,30 @@ extension DraftRoomViewModel {
         do {
             let draft = try await apiClient.fetchDraft(draftID: draftID)
             
-            print("🏈 ESPN Draft Status: \(draft.status.rawValue)")
-            print("🏈 Draft Type: \(draft.type.rawValue)")
+            // xprint("🏈 ESPN Draft Status: \(draft.status.rawValue)")
+            // xprint("🏈 Draft Type: \(draft.type.rawValue)")
             
-            if draft.status == .drafting {
-                print("🏈 ✅ ESPN draft is LIVE - starting polling")
+            // FIXED: Be more liberal about when to poll - poll for any active/upcoming status
+            if draft.status.isActiveOrUpcoming {
+                // xprint("🏈 ✅ ESPN draft is ACTIVE/UPCOMING (status: \(draft.status.rawValue)) - starting polling")
                 polling.startPolling(draftID: draftID, apiClient: apiClient)
             } else {
-                print("🏈 🚫 ESPN draft is NOT live (status: \(draft.status.rawValue)) - skipping polling to save API calls")
-                print("    Draft picks will still be fetched once for display")
+                // xprint("🏈 🚫 ESPN draft is COMPLETED (status: \(draft.status.rawValue)) - fetching final picks only")
                 
                 // Fetch picks once for display but don't start continuous polling
                 do {
                     let picks = try await apiClient.fetchDraftPicks(draftID: draftID)
-                    print("🏈 ✅ Fetched \(picks.count) completed draft picks for display")
+                    // xprint("🏈 ✅ Fetched \(picks.count) completed draft picks for display")
                     
                     // Update polling service with the completed data without starting timer
                     await polling.setCompletedDraftData(draft: draft, picks: picks)
                 } catch {
-                    print("🏈 ⚠️ Could not fetch completed draft picks: \(error)")
+                    // xprint("🏈 ⚠️ Could not fetch completed draft picks: \(error)")
                 }
             }
         } catch {
-            print("🏈 ⚠️ Could not check ESPN draft status: \(error)")
-            print("    Defaulting to polling (might be necessary for some ESPN leagues)")
+            // xprint("🏈 ⚠️ Could not check ESPN draft status: \(error)")
+            // xprint("    Defaulting to polling (might be necessary for some ESPN leagues)")
             polling.startPolling(draftID: draftID, apiClient: apiClient)
         }
     }
@@ -247,11 +247,11 @@ extension DraftRoomViewModel {
     /// Handle ESPN draft pick selection
     func setESPNDraftPosition(_ position: Int) async {
         guard let pendingWrapper = pendingESPNLeagueWrapper else {
-            print("🏈 No pending ESPN league to configure")
+            // xprint("🏈 No pending ESPN league to configure")
             return
         }
         
-        print("🏈 ESPN draft pick selected: \(position)")
+        // xprint("🏈 ESPN draft pick selected: \(position)")
         
         // Set the position first
         myDraftSlot = position
@@ -262,13 +262,23 @@ extension DraftRoomViewModel {
         
         // Now complete the league selection with position set
         await completeLeagueSelection(pendingWrapper)
+        
+        // FIXED: Auto-navigate to Fantasy tab for ANY draft position confirmation as requested by Gp
+        DispatchQueue.main.async {
+            NSLog("🏈 Position \(position) selected - auto-navigating to Fantasy tab")
+            // Use notification to communicate with parent view
+            NotificationCenter.default.post(
+                name: Notification.Name("NavigateToFantasy"), 
+                object: nil
+            )
+        }
     }
     
     /// Cancel ESPN pick selection
     func cancelESPNPositionSelection() {
         pendingESPNLeagueWrapper = nil
         showingESPNPickPrompt = false
-        print("🏈 ESPN league selection cancelled")
+        // xprint("🏈 ESPN league selection cancelled")
     }
     
     // Legacy method for backward compatibility

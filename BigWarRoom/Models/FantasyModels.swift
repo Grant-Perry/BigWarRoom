@@ -172,10 +172,32 @@ struct FantasyPlayer: Identifiable, Codable {
         return "\(firstInitial) \(last)".trimmingCharacters(in: .whitespaces)
     }
     
-    /// Player headshot URL (try Sleeper first, then fallbacks)
+    /// Player headshot URL (try multiple sources like SleepThis)
     var headshotURL: URL? {
+        // Try Sleeper first (best quality)
         if let sleeperID = sleeperID {
             return URL(string: "https://sleepercdn.com/content/nfl/players/\(sleeperID).jpg")
+        }
+        
+        // Try ESPN headshots for ESPN players
+        if let espnID = espnID {
+            return URL(string: "https://a.espncdn.com/i/headshots/nfl/players/full/\(espnID).png")
+        }
+        
+        // Fallback: try to construct ESPN URL from name
+        if let firstName = firstName, let lastName = lastName, !firstName.isEmpty, !lastName.isEmpty {
+            let cleanFirst = firstName.replacingOccurrences(of: " ", with: "").lowercased()
+            let cleanLast = lastName.replacingOccurrences(of: " ", with: "").lowercased()
+            return URL(string: "https://a.espncdn.com/i/headshots/nfl/players/full/\(cleanFirst)-\(cleanLast).png")
+        }
+        
+        return nil
+    }
+    
+    /// ESPN player image URL (alternative)
+    var espnHeadshotURL: URL? {
+        if let espnID = espnID {
+            return URL(string: "https://a.espncdn.com/i/headshots/nfl/players/full/\(espnID).png")
         }
         return nil
     }
@@ -219,14 +241,14 @@ struct GameStatus: Codable {
         switch status.lowercased() {
         case "bye":
             return "BYE"
-        case "live":
+        case "live", "in":
             if let quarter = quarter, let timeRemaining = timeRemaining {
                 return "\(quarter) \(timeRemaining)"
             }
             return "LIVE"
-        case "postgame", "final":
+        case "postgame", "final", "post":
             return "FINAL"
-        case "pregame":
+        case "pregame", "pre":
             if let startTime = startTime {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "h:mm a"
@@ -242,6 +264,26 @@ struct GameStatus: Codable {
     var scoreString: String? {
         guard let homeScore = homeScore, let awayScore = awayScore else { return nil }
         return "\(awayScore)-\(homeScore)"
+    }
+    
+    /// Initialize from NFL game info
+    init(from gameInfo: NFLGameInfo) {
+        self.status = gameInfo.gameStatus
+        self.startTime = gameInfo.startDate
+        self.timeRemaining = gameInfo.gameTime
+        self.quarter = nil // ESPN API includes quarter in gameTime
+        self.homeScore = gameInfo.homeScore
+        self.awayScore = gameInfo.awayScore
+    }
+    
+    /// Standard initializer
+    init(status: String, startTime: Date? = nil, timeRemaining: String? = nil, quarter: String? = nil, homeScore: Int? = nil, awayScore: Int? = nil) {
+        self.status = status
+        self.startTime = startTime
+        self.timeRemaining = timeRemaining
+        self.quarter = quarter
+        self.homeScore = homeScore
+        self.awayScore = awayScore
     }
 }
 

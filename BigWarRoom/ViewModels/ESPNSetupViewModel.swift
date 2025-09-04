@@ -57,7 +57,7 @@ final class ESPNSetupViewModel: ObservableObject {
     func fillDefaultCredentials() {
         swid = AppConstants.SWID
         espnS2 = AppConstants.ESPN_S2
-        print("🔧 Auto-filled with default ESPN credentials")
+        // xprint("🔧 Auto-filled with default ESPN credentials")
     }
     
     func saveCredentials() {
@@ -113,7 +113,7 @@ final class ESPNSetupViewModel: ObservableObject {
         }
         showingClearResult = true
         
-        print("🔧 Added default ESPN league IDs: \(AppConstants.ESPNLeagueID)")
+        // xprint("🔧 Added default ESPN league IDs: \(AppConstants.ESPNLeagueID)")
     }
     
     func validateCredentials() {
@@ -174,7 +174,7 @@ final class ESPNSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ ESPN credentials cleared (leagues kept)!"
         showingClearResult = true
-        print("🧹 Cleared ESPN credentials only, kept league IDs")
+        // xprint("🧹 Cleared ESPN credentials only, kept league IDs")
     }
     
     private func performClearLeagueIDsOnly() {
@@ -184,7 +184,7 @@ final class ESPNSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Cleared \(clearedCount) league ID(s)!"
         showingClearResult = true
-        print("🧹 Cleared ESPN league IDs only")
+        // xprint("🧹 Cleared ESPN league IDs only")
     }
     
     func confirmClearAction() {

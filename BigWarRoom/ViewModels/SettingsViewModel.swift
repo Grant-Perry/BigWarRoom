@@ -1,17 +1,22 @@
 //
-//  OnBoardingViewModel.swift
+//  SettingsViewModel.swift
 //  BigWarRoom
 //
-//  ViewModel for main onboarding view
+//  ViewModel for both OnBoarding and Settings views
 //
 
 import Foundation
 import Combine
 
 @MainActor
-final class OnBoardingViewModel: ObservableObject {
-    // MARK: - Published Properties
+final class SettingsViewModel: ObservableObject {
+    // MARK: - Published Properties (Settings)
     @Published var selectedYear: String = AppConstants.ESPNLeagueYear
+    @Published var autoRefreshEnabled: Bool = true
+    @Published var debugModeEnabled: Bool = AppConstants.debug
+    @Published var isTestingConnection: Bool = false
+    
+    // MARK: - Published Properties (OnBoarding)
     @Published var showingESPNSetup: Bool = false
     @Published var showingSleeperSetup: Bool = false
     @Published var showingAbout: Bool = false
@@ -23,6 +28,10 @@ final class OnBoardingViewModel: ObservableObject {
     // MARK: - Dependencies
     private let espnCredentials = ESPNCredentialsManager.shared
     private let sleeperCredentials = SleeperCredentialsManager.shared
+    private let nflWeekService = NFLWeekService.shared
+    
+    // MARK: - Available Options
+    let availableYears = ["2023", "2024", "2025"]
     
     // MARK: - Computed Properties
     var espnStatus: String {
@@ -31,10 +40,6 @@ final class OnBoardingViewModel: ObservableObject {
         } else {
             return "Not configured"
         }
-    }
-    
-    var espnStatusColor: String {
-        espnCredentials.hasValidCredentials ? "green" : "secondary"
     }
     
     var sleeperStatus: String {
@@ -47,10 +52,6 @@ final class OnBoardingViewModel: ObservableObject {
         }
     }
     
-    var sleeperStatusColor: String {
-        sleeperCredentials.hasValidCredentials ? "green" : "secondary"
-    }
-    
     var espnHasCredentials: Bool {
         espnCredentials.hasValidCredentials
     }
@@ -59,13 +60,67 @@ final class OnBoardingViewModel: ObservableObject {
         sleeperCredentials.hasValidCredentials
     }
     
-    // MARK: - Actions
-    
-    func updateSelectedYear(_ newYear: String) {
-        selectedYear = newYear
-        AppConstants.ESPNLeagueYear = newYear
+    var currentNFLWeek: Int {
+        nflWeekService.currentWeek
     }
     
+    // MARK: - Initialization
+    init() {
+        // Load saved settings
+        loadUserPreferences()
+        
+        // Watch for debug mode changes
+        $debugModeEnabled
+            .sink { [weak self] newValue in
+                self?.updateDebugMode(newValue)
+            }
+            .store(in: &cancellables)
+        
+        // Watch for year changes
+        $selectedYear
+            .sink { [weak self] newYear in
+                self?.updateSelectedYear(newYear)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - Settings Management
+    
+    private func loadUserPreferences() {
+        // Load debug mode preference
+        debugModeEnabled = UserDefaults.standard.bool(forKey: "debugModeEnabled")
+        
+        // Load auto refresh preference
+        if UserDefaults.standard.object(forKey: "autoRefreshEnabled") != nil {
+            autoRefreshEnabled = UserDefaults.standard.bool(forKey: "autoRefreshEnabled")
+        }
+        
+        // Load selected year preference
+        if let savedYear = UserDefaults.standard.string(forKey: "selectedYear") {
+            selectedYear = savedYear
+            AppConstants.ESPNLeagueYear = savedYear
+        }
+    }
+    
+    private func updateDebugMode(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "debugModeEnabled")
+        
+        NSLog("🔧 Debug mode \(enabled ? "enabled" : "disabled")")
+    }
+    
+    func updateSelectedYear(_ newYear: String) {
+        // Don't set selectedYear here - it creates an infinite loop!
+        // selectedYear = newYear
+        
+        AppConstants.ESPNLeagueYear = newYear
+        UserDefaults.standard.set(newYear, forKey: "selectedYear")
+        
+        NSLog("📅 Updated selected year to: \(newYear)")
+    }
+    
+    // MARK: - OnBoarding Methods
     func showESPNSetup() {
         showingESPNSetup = true
     }
@@ -76,6 +131,48 @@ final class OnBoardingViewModel: ObservableObject {
     
     func showAbout() {
         showingAbout = true
+    }
+    
+    // MARK: - Connection Testing
+    
+    func testESPNConnection() {
+        guard let firstLeagueID = espnCredentials.leagueIDs.first else {
+            clearResultMessage = "❌ No ESPN league IDs configured to test with"
+            showingClearResult = true
+            return
+        }
+        
+        isTestingConnection = true
+        
+        Task {
+            do {
+                let league = try await ESPNAPIClient.shared.fetchLeague(leagueID: firstLeagueID)
+                
+                await MainActor.run {
+                    clearResultMessage = "✅ ESPN connection successful!\n\nLeague: \(league.name)\nTeams: \(league.totalRosters)"
+                    showingClearResult = true
+                    isTestingConnection = false
+                }
+                
+                NSLog("✅ ESPN connection test successful: \(league.name)")
+            } catch {
+                await MainActor.run {
+                    clearResultMessage = "❌ ESPN connection failed:\n\n\(error.localizedDescription)"
+                    showingClearResult = true
+                    isTestingConnection = false
+                }
+                
+                NSLog("❌ ESPN connection test failed: \(error)")
+            }
+        }
+    }
+    
+    func exportDebugLogs() {
+        // For now, just show a message about debug logs
+        clearResultMessage = "📋 Debug logging enabled!\n\nLogs are printed to the console during development. In a production build, you would implement proper log export functionality here."
+        showingClearResult = true
+        
+        NSLog("📤 Debug log export requested")
     }
     
     // MARK: - Clear Actions with Confirmation
@@ -109,16 +206,16 @@ final class OnBoardingViewModel: ObservableObject {
         
         clearResultMessage = "✅ All app cache cleared successfully!"
         showingClearResult = true
-        print("🧹 Clearing all app cache...")
+        NSLog("🧹 Clearing all app cache...")
     }
     
     private func performClearAllServices() {
         espnCredentials.clearCredentials()
         sleeperCredentials.clearCredentials()
         
-        clearResultMessage = "✅ All service credentials cleared successfully!"
+        clearResultMessage = "✅ All service credentials cleared successfully!\n\nYou'll need to reconnect your ESPN and Sleeper accounts."
         showingClearResult = true
-        print("🧹 Cleared ALL service credentials and data")
+        NSLog("🧹 Cleared ALL service credentials and data")
     }
     
     private func performClearAllPersistedData() {
@@ -133,14 +230,19 @@ final class OnBoardingViewModel: ObservableObject {
         sleeperCredentials.clearCredentials()
         
         // Clear any other persisted data
-        let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players", "selectedESPNYear"]
+        let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players", "selectedESPNYear", "debugModeEnabled", "autoRefreshEnabled"]
         for key in cacheKeys {
             UserDefaults.standard.removeObject(forKey: key)
         }
         
-        clearResultMessage = "✅ ALL persisted data cleared successfully! App reset to factory defaults."
+        clearResultMessage = "✅ Factory reset complete!\n\nALL data has been cleared. The app has been reset to factory defaults."
         showingClearResult = true
-        print("🧹🧹🧹 NUCLEAR OPTION: Cleared ALL persisted data - app reset to factory state")
+        NSLog("🧹🧹🧹 NUCLEAR OPTION: Cleared ALL persisted data - app reset to factory state")
+        
+        // Reset local state
+        debugModeEnabled = false
+        autoRefreshEnabled = true
+        selectedYear = "2024"
     }
     
     func confirmClearAction() {
@@ -157,25 +259,15 @@ final class OnBoardingViewModel: ObservableObject {
     func dismissClearResult() {
         showingClearResult = false
     }
-    
-    func testESPNConnection() {
-        guard let firstLeagueID = espnCredentials.leagueIDs.first else {
-            print("❌ No ESPN league IDs to test with")
-            return
-        }
-        
-        Task {
-            do {
-                let league = try await ESPNAPIClient.shared.fetchLeague(leagueID: firstLeagueID)
-                print("✅ ESPN connection test successful: \(league.name)")
-            } catch {
-                print("❌ ESPN connection test failed: \(error)")
-            }
-        }
-    }
-    
-    func exportDebugLogs() {
-        print("📤 Exporting debug logs...")
-        // Implement debug log export if you have a logging system
+}
+
+// Create a typealias for backward compatibility
+typealias OnBoardingViewModel = SettingsViewModel
+
+// MARK: - Debug Mode Helper
+
+extension UserDefaults {
+    var isDebugModeEnabled: Bool {
+        return bool(forKey: "debugModeEnabled")
     }
 }

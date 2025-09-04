@@ -35,7 +35,7 @@ extension DraftRoomViewModel {
                 let sorted = self.sortedByPureRank(allPlayerSuggestions)
                 
                 await MainActor.run { 
-                    print("🏈 All method: Showing \(sorted.count) total ranked players (filtered from \(available.count) available)")
+                    // xprint("🏈 All method: Showing \(sorted.count) total ranked players (filtered from \(available.count) available)")
                     self.suggestions = sorted 
                 }
                 return
@@ -215,15 +215,15 @@ extension DraftRoomViewModel {
         
         // Debug: Print first 20 players with their Sleeper ranks and our sequential position
         if selectedSortMethod == .all {
-            print("🏈 Top 20 players - Sequential Position vs Sleeper Rank:")
+            // xprint("🏈 Top 20 players - Sequential Position vs Sleeper Rank:")
             for (index, suggestion) in sortedList.prefix(20).enumerated() {
                 let sleeperRank = PlayerDirectoryStore.shared.player(for: suggestion.player.id)?.searchRank ?? -1
                 let sequentialRank = index + 1
-                print("  \(sequentialRank). \(suggestion.player.shortKey) - Sleeper Rank #\(sleeperRank)")
+                // xprint("  \(sequentialRank). \(suggestion.player.shortKey) - Sleeper Rank #\(sleeperRank)")
             }
             
             // Show total count
-            print("🏈 All method: Showing \(sortedList.count) players in strict 1-2-3-4... order")
+            // xprint("🏈 All method: Showing \(sortedList.count) players in strict 1-2-3-4... order")
         }
         
         return sortedList

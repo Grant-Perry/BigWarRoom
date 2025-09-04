@@ -58,7 +58,7 @@ extension DraftRoomViewModel {
                 }
             }
             
-            print("🏈 Positional Logic: Slot \(myDraftSlot) owns pick numbers: \(myPickNumbers.prefix(10))")
+            // xprint("🏈 Positional Logic: Slot \(myDraftSlot) owns pick numbers: \(myPickNumbers.prefix(10))")
             
             // Find all picks with these pick numbers
             let myPicks = picks.filter { myPickNumbers.contains($0.pickNo) }
@@ -69,13 +69,13 @@ extension DraftRoomViewModel {
                 }
             }
             
-            print("🏈 Updated roster using positional logic: \(myPicks.count) picks for slot \(myDraftSlot)")
+            // xprint("🏈 Updated roster using positional logic: \(myPicks.count) picks for slot \(myDraftSlot)")
         }
         
         // Update roster if it's different
         if !rostersAreEqual(newRoster, roster) {
             roster = newRoster
-            print("🏈 MyRoster updated with \(totalPlayersInRoster(newRoster)) players")
+            // xprint("🏈 MyRoster updated with \(totalPlayersInRoster(newRoster)) players")
         }
     }
     
@@ -123,7 +123,7 @@ extension DraftRoomViewModel {
             )
         }
         
-        print("🏈 Could not convert pick \(pick.pickNo) to internal Player format")
+        // xprint("🏈 Could not convert pick \(pick.pickNo) to internal Player format")
         return nil
     }
     
@@ -177,7 +177,7 @@ extension DraftRoomViewModel {
                 let teamCode = espnInfo.team ?? ""
                 let rosterInfo = pick.rosterID.flatMap { draftRosters[$0] }
                 
-                print("🏈 Using ESPN data for pick \(pick.pickNo): \(espnInfo.fullName)")
+                // xprint("🏈 Using ESPN data for pick \(pick.pickNo): \(espnInfo.fullName)")
                 
                 // Create a fake SleeperPlayer using JSON encoding/decoding trick
                 let playerData: [String: Any] = [
@@ -199,7 +199,7 @@ extension DraftRoomViewModel {
                    let player = try? JSONDecoder().decode(SleeperPlayer.self, from: jsonData) {
                     fakeSleeperPlayer = player
                 } else {
-                    print("⚠️ Failed to create fake SleeperPlayer from ESPN data")
+                    // xprint("⚠️ Failed to create fake SleeperPlayer from ESPN data")
                     
                     // Second attempt: Minimal fallback data  
                     let fallbackPlayerData: [String: Any] = [
@@ -212,7 +212,7 @@ extension DraftRoomViewModel {
                        let fallbackPlayer = try? JSONDecoder().decode(SleeperPlayer.self, from: fallbackJsonData) {
                         fakeSleeperPlayer = fallbackPlayer
                     } else {
-                        print("💥 Failed to create minimal SleeperPlayer, skipping pick")
+                        // xprint("💥 Failed to create minimal SleeperPlayer, skipping pick")
                         fakeSleeperPlayer = nil
                     }
                 }
@@ -244,7 +244,7 @@ extension DraftRoomViewModel {
                 let teamCode = sp.team ?? ""
                 let rosterInfo = pick.rosterID.flatMap { draftRosters[$0] }
                 
-                print("😴 Using Sleeper data for pick \(pick.pickNo): \(sp.shortName)")
+                // xprint("😴 Using Sleeper data for pick \(pick.pickNo): \(sp.shortName)")
                 
                 return EnhancedPick(
                     id: pick.id,
@@ -267,7 +267,7 @@ extension DraftRoomViewModel {
                 let teamCode = metadata.team ?? ""
                 let rosterInfo = pick.rosterID.flatMap { draftRosters[$0] }
                 
-                print("📝 Using metadata for pick \(pick.pickNo): \(displayName)")
+                // xprint("📝 Using metadata for pick \(pick.pickNo): \(displayName)")
                 
                 // Create minimal SleeperPlayer from metadata using similar approach
                 let playerData: [String: Any] = [
@@ -288,7 +288,7 @@ extension DraftRoomViewModel {
                    let player = try? JSONDecoder().decode(SleeperPlayer.self, from: jsonData) {
                     fallbackPlayer = player
                 } else {
-                    print("⚠️ Failed to create fallback SleeperPlayer from metadata")
+                    // xprint("⚠️ Failed to create fallback SleeperPlayer from metadata")
                     
                     // Second attempt: Minimal data
                     let minimalPlayerData: [String: Any] = [
@@ -301,7 +301,7 @@ extension DraftRoomViewModel {
                        let minimalPlayer = try? JSONDecoder().decode(SleeperPlayer.self, from: minimalJsonData) {
                         fallbackPlayer = minimalPlayer
                     } else {
-                        print("💥 Failed to create minimal SleeperPlayer from metadata, skipping pick")
+                        // xprint("💥 Failed to create minimal SleeperPlayer from metadata, skipping pick")
                         fallbackPlayer = nil
                     }
                 }
@@ -328,10 +328,10 @@ extension DraftRoomViewModel {
             
             // If all else fails, return nil (skip this pick)
             else {
-                print("❌ Could not build EnhancedPick for pick \(pick.pickNo) - no player data available")
-                print("   PlayerID: \(pick.playerID ?? "nil")")
-                print("   ESPN Info: \(pick.espnPlayerInfo != nil ? "present" : "nil")")
-                print("   Metadata: \(pick.metadata != nil ? "present" : "nil")")
+                // xprint("❌ Could not build EnhancedPick for pick \(pick.pickNo) - no player data available")
+                // xprint("   PlayerID: \(pick.playerID ?? "nil")")
+                // xprint("   ESPN Info: \(pick.espnPlayerInfo != nil ? "present" : "nil")")
+                // xprint("   Metadata: \(pick.metadata != nil ? "present" : "nil")")
                 return nil
             }
         }

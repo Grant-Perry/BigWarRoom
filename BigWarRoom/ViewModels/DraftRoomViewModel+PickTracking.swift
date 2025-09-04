@@ -51,7 +51,7 @@ extension DraftRoomViewModel {
                     confirmationAlertMessage = "🎉 PICK CONFIRMED!\n\n\(player.fullName)\n\(player.position ?? "") • \(player.team ?? "")\n\nRound \(pick.round), Pick \(pick.pickNo)"
                     showingConfirmationAlert = true
                     
-                    print("🏈 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
+                    // xprint("🏈 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
                 }
             }
         }
@@ -138,25 +138,25 @@ extension DraftRoomViewModel {
     
     /// Public Team Name Helper with Debugging
     func teamDisplayName(for draftSlot: Int) -> String {
-        print("🔍 DEBUG teamDisplayName for draftSlot \(draftSlot):")
-        print("   draftRosters count: \(draftRosters.count)")
+        // xprint("🔍 DEBUG teamDisplayName for draftSlot \(draftSlot):")
+        // xprint("   draftRosters count: \(draftRosters.count)")
         
         // Strategy 1: Find the rosterID that corresponds to this draft slot
         // Look through picks to find which roster ID is associated with this draft slot
         let picksForSlot = allDraftPicks.filter { $0.draftSlot == draftSlot }
-        print("   Picks for slot \(draftSlot): \(picksForSlot.count)")
+        // xprint("   Picks for slot \(draftSlot): \(picksForSlot.count)")
         
         // Get the roster ID from any pick in this draft slot
         var rosterIDForSlot: Int? = nil
         if let firstPick = picksForSlot.first {
             rosterIDForSlot = firstPick.rosterInfo?.rosterID
-            print("   Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)")
+            // xprint("   Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)")
         }
         
         // Strategy 2: If we found a roster ID, lookup its display name
         if let rosterID = rosterIDForSlot,
            let rosterInfo = draftRosters[rosterID] {
-            print("   Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'")
+            // xprint("   Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'")
             
             // Check if this is a real name (not generic "Team X")
             if !rosterInfo.displayName.isEmpty,
@@ -164,10 +164,10 @@ extension DraftRoomViewModel {
                rosterInfo.displayName != "Team \(draftSlot)",
                rosterInfo.displayName != "Team \(rosterID)",
                rosterInfo.displayName.count > 4 {
-                print("   ✅ Using real name: '\(rosterInfo.displayName)'")
+                // xprint("   ✅ Using real name: '\(rosterInfo.displayName)'")
                 return rosterInfo.displayName
             } else {
-                print("   ❌ Name '\(rosterInfo.displayName)' appears to be generic")
+                // xprint("   ❌ Name '\(rosterInfo.displayName)' appears to be generic")
             }
         }
         
@@ -180,7 +180,7 @@ extension DraftRoomViewModel {
             return directRoster.displayName
         }
         
-        print("   ❌ No real name found, using fallback")
+        // xprint("   ❌ No real name found, using fallback")
         return "Team \(draftSlot)"
     }
 }

@@ -126,7 +126,7 @@ final class AIService {
             guard let httpResponse = response as? HTTPURLResponse,
                   200..<300 ~= httpResponse.statusCode else {
                 if let body = String(data: data, encoding: .utf8) {
-                    print("❌ OpenAI error \( (response as? HTTPURLResponse)?.statusCode ?? -1 ): \(body)")
+                    // xprint("❌ OpenAI error \( (response as? HTTPURLResponse)?.statusCode ?? -1 ): \(body)")
                 }
                 throw AIError.invalidResponse
             }

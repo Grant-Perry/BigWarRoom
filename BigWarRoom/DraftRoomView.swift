@@ -15,49 +15,64 @@ struct DraftRoomView: View {
     @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 0) {
-                // Service Setup Notices (if not configured)
-                if !espnCredentials.hasValidCredentials || !sleeperCredentials.hasValidCredentials {
-                    ServiceSetupNotices(
-                        selectedTab: $selectedTab,
-                        showESPN: !espnCredentials.hasValidCredentials,
-                        showSleeper: !sleeperCredentials.hasValidCredentials
-                    )
-                    .padding(.horizontal)
-                    .padding(.bottom, 16)
-                }
-                
-                // STEP 1: Connection Section
-                QuickConnectSection(
-                    viewModel: viewModel, 
-                    selectedYear: $selectedYear,
-                    selectedTab: $selectedTab
-                )
-                .padding(.horizontal)
-                .padding(.bottom, 16)
-                
-                // STEP 2: Draft Selection (Show if connected)
-                if viewModel.connectionStatus == .connected {
-                    DraftSelectionSection(viewModel: viewModel)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // FIXED: Connection section stays pinned at top (outside ScrollView)
+                VStack(spacing: 16) {
+                    // Service Setup Notices (if not configured)
+                    if !espnCredentials.hasValidCredentials || !sleeperCredentials.hasValidCredentials {
+                        ServiceSetupNotices(
+                            selectedTab: $selectedTab,
+                            showESPN: !espnCredentials.hasValidCredentials,
+                            showSleeper: !sleeperCredentials.hasValidCredentials
+                        )
                         .padding(.horizontal)
-                        .padding(.bottom, 16)
-                }
-                
-                // STEP 3: Active Draft Status (Show if draft selected)
-                if viewModel.selectedDraft != nil || viewModel.isConnectedToManualDraft {
-                    ActiveDraftSection(viewModel: viewModel)
-                        .padding(.horizontal) 
-                        .padding(.bottom, 20)
-                }
-                
-                // STEP 4: Draft Actions & Quick Tools
-                if viewModel.selectedDraft != nil || viewModel.isConnectedToManualDraft {
-                    DraftQuickActionsSection(
-                        viewModel: viewModel,
+                    }
+                    
+                    // STEP 1: Connection Section - STAYS AT TOP
+                    QuickConnectSection(
+                        viewModel: viewModel, 
+                        selectedYear: $selectedYear,
                         selectedTab: $selectedTab
                     )
                     .padding(.horizontal)
+                }
+                .background(Color(.systemGroupedBackground))
+                
+                // Scrollable content below the connection section
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        // STEP 2: Draft Selection (Show if connected) - Enhanced to fill more space
+                        if viewModel.connectionStatus == .connected {
+                            DraftSelectionSection(viewModel: viewModel)
+                                .frame(minHeight: max(300, geometry.size.height * 0.4))
+                                .padding(.horizontal)
+                                .padding(.top, 16)
+                                .padding(.bottom, 16)
+                        }
+                        
+                        // STEP 3: Active Draft Status (Show if draft selected)
+                        if viewModel.selectedDraft != nil || viewModel.isConnectedToManualDraft {
+                            ActiveDraftSection(viewModel: viewModel)
+                                .padding(.horizontal) 
+                                .padding(.bottom, 20)
+                        }
+                        
+                        // STEP 4: Draft Actions & Quick Tools
+                        if viewModel.selectedDraft != nil || viewModel.isConnectedToManualDraft {
+                            DraftQuickActionsSection(
+                                viewModel: viewModel,
+                                selectedTab: $selectedTab
+                            )
+                            .padding(.horizontal)
+                            .padding(.bottom, 100) // Extra bottom padding for better scrolling
+                        }
+                        
+                        // Spacer to push content up and fill remaining space
+                        if viewModel.connectionStatus == .connected && !viewModel.allAvailableDrafts.isEmpty {
+                            Spacer(minLength: 50)
+                        }
+                    }
                 }
             }
         }
@@ -67,6 +82,11 @@ struct DraftRoomView: View {
         .onAppear {
             // Only auto-connect if user already has configured credentials
             autoConnectIfConfigured()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToFantasy"))) { _ in
+            // Auto-navigate to Fantasy tab when position 8 is confirmed
+            selectedTab = 1 // Fantasy tab is index 1
+            NSLog("🏈 Auto-navigated to Fantasy tab after confirming position")
         }
         .alert("YOUR TURN!", isPresented: $viewModel.showingPickAlert) {
             Button("Got It!") { viewModel.dismissPickAlert() }
@@ -80,10 +100,10 @@ struct DraftRoomView: View {
             Text(viewModel.confirmationAlertMessage)
         }
         .sheet(isPresented: $viewModel.showingESPNPickPrompt) {
-            ESPNDraftPickSelectionSheet(
+            ESPNDraftPickSelectionSheet.forDraft(
                 leagueName: viewModel.pendingESPNLeagueWrapper?.league.name ?? "ESPN League",
                 maxTeams: viewModel.maxTeamsInDraft,
-                selectedPick: $viewModel.selectedESPNDraftPosition,
+                selectedPosition: $viewModel.selectedESPNDraftPosition,
                 onConfirm: { pick in
                     Task { await viewModel.setESPNDraftPosition(pick) }
                 },
@@ -97,14 +117,14 @@ struct DraftRoomView: View {
     private func autoConnectIfConfigured() {
         // Don't auto-connect if we already have leagues loaded (either service)
         if !viewModel.allAvailableDrafts.isEmpty {
-            print("🔍 Auto-connect skipped - leagues already loaded")
+            // xprint("🔍 Auto-connect skipped - leagues already loaded")
             return
         }
 
         let hasESPNCredentials = espnCredentials.hasValidCredentials
         let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
 
-        print("🔍 Auto-connect check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials)")
+        // xprint("🔍 Auto-connect check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials)")
 
         Task {
             await connectToAllAvailableServices()
@@ -120,20 +140,20 @@ struct DraftRoomView: View {
         await withTaskGroup(of: Void.self) { group in
             if hasESPNCredentials {
                 group.addTask {
-                    print("🚀 [AutoConnect] Connecting to ESPN leagues…")
+                    // xprint("🚀 [AutoConnect] Connecting to ESPN leagues…")
                     await viewModel.connectToESPNOnly()
                 }
             }
             if hasSleeperCredentials {
                 if let sleeperID = sleeperCredentials.getUserIdentifier() {
                     group.addTask {
-                        print("🚀 [AutoConnect] Connecting to Sleeper leagues for user: \(sleeperID)")
+                        // xprint("🚀 [AutoConnect] Connecting to Sleeper leagues for user: \(sleeperID)")
                         await viewModel.connectWithUsernameOrID(sleeperID, season: selectedYear)
                     }
                 }
             }
         }
-        print("✅ [AutoConnect] Connected to all services with credentials. Leagues loaded: \(viewModel.allAvailableDrafts.count)")
+        // xprint("✅ [AutoConnect] Connected to all services with credentials. Leagues loaded: \(viewModel.allAvailableDrafts.count)")
     }
 }
 
@@ -208,7 +228,7 @@ struct ESPNSetupNoticeCard: View {
     private func quickSetupESPN() {
         // Don't auto-fill with Gp's credentials - let users set their own
         // This was forcing Gp's settings on everyone
-        print("🚀 Navigate to ESPN setup for user to enter their own credentials")
+        // xprint("🚀 Navigate to ESPN setup for user to enter their own credentials")
         selectedTab = 6 // Navigate to settings for proper setup
     }
 }
@@ -262,7 +282,7 @@ struct SleeperSetupNoticeCard: View {
     private func quickSetupSleeper() {
         // Don't auto-fill with Gp's credentials - let users set their own  
         // This was forcing Gp's settings on everyone
-        print("🚀 Navigate to Sleeper setup for user to enter their own credentials")
+        // xprint("🚀 Navigate to Sleeper setup for user to enter their own credentials")
         selectedTab = 6 // Navigate to settings for proper setup
     }
 }

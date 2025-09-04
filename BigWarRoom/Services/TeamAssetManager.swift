@@ -118,11 +118,11 @@ final class TeamAssetManager: ObservableObject {
                         logoCache[teamCode.uppercased()] = image
                         objectWillChange.send()
                     }
-                    print("📥 Downloaded logo for \(teamCode)")
+                    // xprint("📥 Downloaded logo for \(teamCode)")
                     return
                 }
             } catch {
-                print("❌ Failed to download logo for \(teamCode) from \(urlString): \(error)")
+                // xprint("❌ Failed to download logo for \(teamCode) from \(urlString): \(error)")
             }
         }
     }

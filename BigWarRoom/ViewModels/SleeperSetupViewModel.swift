@@ -59,7 +59,7 @@ final class SleeperSetupViewModel: ObservableObject {
         username = AppConstants.SleeperUser
         userID = AppConstants.GpSleeperID
         selectedSeason = "2025"
-        print("🔧 Auto-filled with default Sleeper credentials")
+        // xprint("🔧 Auto-filled with default Sleeper credentials")
     }
     
     func saveCredentials() {
@@ -140,7 +140,7 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Sleeper credentials cleared (cache kept)!"
         showingClearResult = true
-        print("🧹 Cleared Sleeper credentials only, kept league cache")
+        // xprint("🧹 Cleared Sleeper credentials only, kept league cache")
     }
     
     private func performClearCacheOnly() {
@@ -151,7 +151,7 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Cleared \(clearedCount) cached league(s)!"
         showingClearResult = true
-        print("🧹 Cleared Sleeper league cache only")
+        // xprint("🧹 Cleared Sleeper league cache only")
     }
     
     func confirmClearAction() {

@@ -83,13 +83,13 @@ final class PlayerDirectoryStore: ObservableObject {
     
     /// Refresh the player directory from Sleeper API
     func refreshPlayers() async {
-        print("🔄 Refreshing player directory from Sleeper API...")
+        // xprint("🔄 Refreshing player directory from Sleeper API...")
         isLoading = true
         error = nil
         
         do {
             let fetchedPlayers = try await apiClient.fetchAllPlayers() // Returns [String: SleeperPlayer]
-            print("✅ Fetched \(fetchedPlayers.count) players from Sleeper")
+            // xprint("✅ Fetched \(fetchedPlayers.count) players from Sleeper")
             
             players = fetchedPlayers
             lastUpdated = Date()
@@ -100,10 +100,10 @@ final class PlayerDirectoryStore: ObservableObject {
             // Cache the results
             cachePlayers()
             
-            print("🎯 Player directory updated with \(players.count) players")
+            // xprint("🎯 Player directory updated with \(players.count) players")
             
         } catch {
-            print("❌ Failed to refresh players: \(error)")
+            // xprint("❌ Failed to refresh players: \(error)")
             self.error = error
         }
         
@@ -113,7 +113,7 @@ final class PlayerDirectoryStore: ObservableObject {
     // MARK: -> Positional Rankings Calculation
     
     private func calculatePositionalRankings() {
-        print("📊 Calculating NFL team positional rankings...")
+        // xprint("📊 Calculating NFL team positional rankings...")
         
         var rankings: [String: [String: Int]] = [:]
         
@@ -161,17 +161,17 @@ final class PlayerDirectoryStore: ObservableObject {
                     if index < 3 {
                         let name = player.shortName
                         let depthOrder = player.depthChartOrder ?? 99
-                        print("     \(team) \(position)\(index + 1): \(name) (Depth: \(depthOrder))")
+                        // xprint("     \(team) \(position)\(index + 1): \(name) (Depth: \(depthOrder))")
                     }
                 }
             }
             
             rankings[position] = positionRankings
-            print("   \(position): \(positionRankings.count) players ranked across all teams")
+            // xprint("   \(position): \(positionRankings.count) players ranked across all teams")
         }
         
         positionalRankings = rankings
-        print("✅ NFL team positional rankings calculated for \(rankings.keys.count) positions")
+        // xprint("✅ NFL team positional rankings calculated for \(rankings.keys.count) positions")
     }
     
     // MARK: -> Player Conversion
@@ -240,16 +240,16 @@ final class PlayerDirectoryStore: ObservableObject {
             let data = try JSONEncoder().encode(Array(players.values))
             userDefaults.set(data, forKey: cacheKey)
             userDefaults.set(Date(), forKey: lastUpdatedKey)
-            print("💾 Cached \(players.count) players")
+            // xprint("💾 Cached \(players.count) players")
         } catch {
-            print("❌ Failed to cache players: \(error)")
+            // xprint("❌ Failed to cache players: \(error)")
         }
     }
     
     private func loadCachedPlayers() {
         guard let data = userDefaults.data(forKey: cacheKey),
               let cachedPlayers = try? JSONDecoder().decode([SleeperPlayer].self, from: data) else {
-            print("📭 No cached players found")
+            // xprint("📭 No cached players found")
             return
         }
         
@@ -261,9 +261,9 @@ final class PlayerDirectoryStore: ObservableObject {
         players = playerDict
         lastUpdated = userDefaults.object(forKey: lastUpdatedKey) as? Date
         
-        print("💾 Loaded \(players.count) cached players")
+        // xprint("💾 Loaded \(players.count) cached players")
         if let lastUpdated = lastUpdated {
-            print("📅 Cache from: \(lastUpdated)")
+            // xprint("📅 Cache from: \(lastUpdated)")
         }
         
         // Calculate positional rankings for cached data

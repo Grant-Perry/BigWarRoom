@@ -37,7 +37,7 @@ final class DraftPollingService: ObservableObject {
     
     /// Set completed draft data without starting polling timer (for completed drafts)
     func setCompletedDraftData(draft: SleeperDraft, picks: [SleeperPick]) async {
-        print("📋 Setting completed draft data: \(draft.status.rawValue) with \(picks.count) picks")
+        // xprint("📋 Setting completed draft data: \(draft.status.rawValue) with \(picks.count) picks")
         
         currentDraft = draft
         allPicks = picks.sorted { $0.pickNo < $1.pickNo }
@@ -47,7 +47,7 @@ final class DraftPollingService: ObservableObject {
         isPolling = false // Explicitly set to false since we're not polling
         pollingCountdown = 0.0
         
-        print("✅ Completed draft data loaded - no polling needed for \(draft.status.rawValue) draft")
+        // xprint("✅ Completed draft data loaded - no polling needed for \(draft.status.rawValue) draft")
     }
     
     /// Start polling a specific draft
@@ -56,7 +56,7 @@ final class DraftPollingService: ObservableObject {
         
         currentApiClient = apiClient ?? SleeperAPIClient.shared
         let clientType = currentApiClient is ESPNAPIClient ? "ESPN" : "Sleeper"
-        print("🔄 Starting polling with \(clientType) API client for draftID: \(draftID)")
+        // xprint("🔄 Starting polling with \(clientType) API client for draftID: \(draftID)")
         
         pollingTask = Task {
             await pollDraft(draftID: draftID)
@@ -79,13 +79,14 @@ final class DraftPollingService: ObservableObject {
     /// Force an immediate refresh
     func forceRefresh() async {
         pollingCountdown = 0.0 // Reset countdown to trigger immediate poll
-        print("🔄 Manual refresh triggered - resetting countdown")
+        // xprint("🔄 Manual refresh triggered - resetting countdown")
     }
     
     /// Check if draft is currently active and worth polling
     var shouldPoll: Bool {
-        // Poll if draft exists, regardless of status - let's see what's happening
-        currentDraft != nil
+        // FIXED: Poll for any active or upcoming draft status, not just existence
+        guard let draft = currentDraft else { return false }
+        return draft.status.isActiveOrUpcoming
     }
     
     // MARK: -> Private Polling Logic
@@ -94,27 +95,27 @@ final class DraftPollingService: ObservableObject {
         isPolling = true
         
         guard let currentApiClient else {
-            print("❌ No API client set")
+            // xprint("❌ No API client set")
             isPolling = false
             return
         }
         
         var lastPickCount = 0
         let clientType = currentApiClient is ESPNAPIClient ? "ESPN" : "Sleeper"
-        print("🔄 Starting \(clientType) polling for draftID: \(draftID)")
+        // xprint("🔄 Starting \(clientType) polling for draftID: \(draftID)")
         
         while !Task.isCancelled {
             lastPollTime = Date()
             
             do {
-                print("📡 \(clientType) API - Fetching draft: \(draftID)")
+                // xprint("📡 \(clientType) API - Fetching draft: \(draftID)")
                 let draft = try await currentApiClient.fetchDraft(draftID: draftID)
                 currentDraft = draft
-                print("✅ \(clientType) - Draft fetched: \(draft.status.rawValue)")
+                // xprint("✅ \(clientType) - Draft fetched: \(draft.status.rawValue)")
                 
-                // SMART POLLING: Check if draft is still worth polling
-                if draft.status != .drafting {
-                    print("🚫 Draft status is \(draft.status.rawValue) - not live anymore")
+                // FIXED: Only stop polling if draft is DEFINITELY complete - be more liberal
+                if draft.status == .complete {
+                    // xprint("🚫 Draft status is COMPLETE - stopping polling")
                     
                     // Fetch final picks and stop polling
                     let picks = try await currentApiClient.fetchDraftPicks(draftID: draftID)
@@ -122,32 +123,35 @@ final class DraftPollingService: ObservableObject {
                     recentPicks = Array(picks.suffix(10))
                     lastUpdate = Date()
                     
-                    print("📋 Draft completed - fetched final \(picks.count) picks and stopping polling")
+                    // xprint("📋 Draft completed - fetched final \(picks.count) picks and stopping polling")
                     break // Exit polling loop
+                } else {
+                    // Continue polling for ANY other status (.preDraft, .drafting, .paused)
+                    // xprint("🔄 Draft status is \(draft.status.rawValue) - continuing to poll")
                 }
                 
-                print("📡 \(clientType) API - Fetching draft picks...")
+                // xprint("📡 \(clientType) API - Fetching draft picks...")
                 let picks = try await currentApiClient.fetchDraftPicks(draftID: draftID)
-                print("✅ \(clientType) - Fetched \(picks.count) draft picks")
+                // xprint("✅ \(clientType) - Fetched \(picks.count) draft picks")
                 
                 // Only log when there are new picks
                 if picks.count > lastPickCount {
                     let newPicks = Array(picks.suffix(picks.count - lastPickCount))
-                    print("🆕 \(clientType) - \(newPicks.count) NEW PICKS DETECTED")
+                    // xprint("🆕 \(clientType) - \(newPicks.count) NEW PICKS DETECTED")
                     
                     for (index, pick) in newPicks.enumerated() {
                         if let playerID = pick.playerID,
                            let player = PlayerDirectoryStore.shared.player(for: playerID) {
-                            print("  \(index + 1). Pick \(pick.pickNo): \(player.shortName) (\(player.position ?? "")) to team \(pick.rosterID ?? -1)")
+                            // xprint("  \(index + 1). Pick \(pick.pickNo): \(player.shortName) (\(player.position ?? "")) to team \(pick.rosterID ?? -1)")
                         } else {
-                            print("  \(index + 1). Pick \(pick.pickNo): Unknown player (ID: \(pick.playerID ?? "nil"))")
+                            // xprint("  \(index + 1). Pick \(pick.pickNo): Unknown player (ID: \(pick.playerID ?? "nil"))")
                         }
                     }
                     
                     await handleNewPicks(newPicks)
                     lastPickCount = picks.count
                 } else if picks.count != lastPickCount {
-                    print("📊 \(clientType) - Pick count changed from \(lastPickCount) to \(picks.count)")
+                    // xprint("📊 \(clientType) - Pick count changed from \(lastPickCount) to \(picks.count)")
                     lastPickCount = picks.count
                 }
                 
@@ -155,18 +159,21 @@ final class DraftPollingService: ObservableObject {
                 allPicks = picks.sorted { $0.pickNo < $1.pickNo } // Store all picks sorted by pick number
                 recentPicks = Array(picks.suffix(10)) // Keep last 10 for other uses
                 
-                print("📊 \(clientType) polling update: \(allPicks.count) total picks, \(recentPicks.count) recent picks")
+                // xprint("📊 \(clientType) polling update: \(allPicks.count) total picks, \(recentPicks.count) recent picks")
                 
                 // SMART POLLING INTERVALS: Adjust based on draft activity
-                if draft.status == .drafting {
-                    pollInterval = 3.0 // More frequent for live drafts
-                    print("⚡ Live draft - polling every \(pollInterval)s")
+                if draft.status == .drafting || draft.status == .paused {
+                    pollInterval = 2.0 // More aggressive for live/paused drafts
+                    // xprint("⚡ LIVE/PAUSED draft - polling every \(pollInterval)s")
+                } else if draft.status == .preDraft {
+                    pollInterval = 5.0 // Moderate for pre-draft
+                    // xprint("⏰ PRE-DRAFT - polling every \(pollInterval)s")
                 } else if picks.count > 0 {
                     pollInterval = 10.0 // Less frequent for completed drafts with picks
-                    print("📋 Completed draft - polling every \(pollInterval)s")
+                    // xprint("📋 Completed draft - polling every \(pollInterval)s")
                 } else {
                     pollInterval = 30.0 // Very infrequent for empty drafts
-                    print("⏰ Pre-draft - polling every \(pollInterval)s")
+                    // xprint("⏰ Unknown draft state - polling every \(pollInterval)s")
                 }
                 
                 await MainActor.run {
@@ -179,9 +186,9 @@ final class DraftPollingService: ObservableObject {
                 try await Task.sleep(nanoseconds: UInt64(pollInterval * 1_000_000_000))
                 
             } catch {
-                print("❌ \(clientType) Polling error: \(error.localizedDescription)")
+                // xprint("❌ \(clientType) Polling error: \(error.localizedDescription)")
                 if let espnError = error as? ESPNAPIError {
-                    print("🔍 ESPN-specific error: \(espnError.errorDescription ?? "Unknown ESPN error")")
+                    // xprint("🔍 ESPN-specific error: \(espnError.errorDescription ?? "Unknown ESPN error")")
                 }
                 self.error = error
                 
@@ -190,17 +197,17 @@ final class DraftPollingService: ObservableObject {
             }
         }
         
-        print("🛑 \(clientType) polling stopped for: \(draftID)")
+        // xprint("🛑 \(clientType) polling stopped for: \(draftID)")
         isPolling = false
     }
     
     private func handleNewPicks(_ newPicks: [SleeperPick]) async {
-        print("🏈 New picks detected: \(newPicks.count)")
+        // xprint("🏈 New picks detected: \(newPicks.count)")
         
         for pick in newPicks {
             if let playerID = pick.playerID,
                let player = playerDirectory.player(for: playerID) {
-                print("📝 Pick \(pick.pickNo): \(player.shortName) (\(player.position ?? "")) to slot \(pick.draftSlot)")
+                // xprint("📝 Pick \(pick.pickNo): \(player.shortName) (\(player.position ?? "")) to slot \(pick.draftSlot)")
             }
         }
         
@@ -262,7 +269,9 @@ final class DraftPollingService: ObservableObject {
 extension DraftPollingService {
     /// Is the draft currently in progress?
     var isDraftActive: Bool {
-        currentDraft?.status == .drafting
+        // FIXED: Include paused drafts as "active" for UI purposes
+        guard let status = currentDraft?.status else { return false }
+        return status == .drafting || status == .paused
     }
     
     /// Draft progress (picks made / total picks)

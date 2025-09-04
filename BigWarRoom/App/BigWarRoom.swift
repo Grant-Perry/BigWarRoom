@@ -22,7 +22,7 @@ struct BigWarRoom: View {
                     .tag(0)
                 
                 // Fantasy Tab (moved to position 1)
-                FantasyMatchupListView()
+                FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "football")
                         Text("Fantasy")

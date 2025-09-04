@@ -20,30 +20,28 @@ struct CompactLeagueCard: View {
                 Group {
                     if leagueWrapper.source == .sleeper {
                         AppConstants.sleeperLogo
-                            .frame(width: 20, height: 20)
+                            .frame(width: 24, height: 24)
                     } else {
                         AppConstants.espnLogo
-                            .frame(width: 20, height: 20)
+                            .frame(width: 24, height: 24)
                     }
                 }
                 
                 // League info
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("  \(leagueWrapper.league.name)")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(leagueWrapper.league.name)
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(.gpGreen)
                         .lineLimit(1)
                     
-                    HStack(spacing: 6) {
+                    HStack(spacing: 8) {
                         Text("\(leagueWrapper.league.totalRosters) teams")
-                            .font(.caption2)
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.secondary)
                         
                         if leagueWrapper.league.status == .drafting {
                             Text("• DRAFTING")
-                                .font(.caption2)
-                                .fontWeight(.bold)
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.green)
                         }
                     }
@@ -55,26 +53,26 @@ struct CompactLeagueCard: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                        .font(.title3)
+                        .font(.system(size: 20))
                 } else {
                     Circle()
-                        .stroke(Color(.systemGray4), lineWidth: 1)
-                        .frame(width: 20, height: 20)
+                        .stroke(Color(.systemGray4), lineWidth: 1.5)
+                        .frame(width: 22, height: 22)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
             .background(
                 isSelected ? 
-                Color.green.opacity(0.1) : 
-                Color(.systemGray6).opacity(0.3)
+                Color.green.opacity(0.15) : 
+                Color(.systemGray6).opacity(0.5)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .overlay(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .stroke(
-                        isSelected ? Color.green : Color.clear, 
-                        lineWidth: 1.5
+                        isSelected ? Color.green.opacity(0.6) : Color.clear, 
+                        lineWidth: 2
                     )
             )
         }

@@ -26,10 +26,10 @@ struct LoadingScreen: View {
             // Static beautiful gradient background
             LinearGradient(
                 colors: [
-                    Color.piratesPrimary.opacity(0.9),
-                    Color.padresPrimary.opacity(0.8),
-                    Color.piratesPrimary.opacity(0.7),
-                    Color.padresPrimary.opacity(0.9)
+				  Color.marlinsPrimary.opacity(0.9),
+				  Color.rockiesPrimary.opacity(0.8),
+				  Color.marlinsPrimary.opacity(0.7),
+				  Color.rockiesPrimary.opacity(0.9)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -144,7 +144,7 @@ struct LoadingScreen: View {
         // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
-        print("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
+        // xprint("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
             isComplete = true
@@ -243,6 +243,6 @@ struct BokehLayer: View {
 
 #Preview {
     LoadingScreen { _ in
-        print("Splash complete!")
+        // xprint("Splash complete!")
     }
 }

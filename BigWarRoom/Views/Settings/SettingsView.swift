@@ -1,14 +1,15 @@
 //
-//  OnBoardingView.swift
+//  SettingsView.swift
 //  BigWarRoom
 //
-//  Main onboarding view for fantasy service setup
+//  RENAMED: This file contains OnBoardingView - keeping for new user onboarding
+//  The actual SettingsView will be in a separate file
 //
 
 import SwiftUI
 
 struct OnBoardingView: View {
-    @StateObject private var viewModel = OnBoardingViewModel()
+    @StateObject private var viewModel = SettingsViewModel()
     
     var body: some View {
         NavigationView {

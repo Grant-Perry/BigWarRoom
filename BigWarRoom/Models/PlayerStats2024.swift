@@ -256,15 +256,15 @@ final class PlayerStatsStore: ObservableObject {
         
         if let stats = await loadFromNFLAPI() {
             self.stats = stats
-            print("📊 Loaded \(stats.count) real player stats from NFL API")
+            // xprint("📊 Loaded \(stats.count) real player stats from NFL API")
         } else if let stats = await loadFromESPNAPI() {
             self.stats = stats
-            print("📊 Loaded \(stats.count) real player stats from ESPN")
+            // xprint("📊 Loaded \(stats.count) real player stats from ESPN")
         } else if let stats = await loadFromBundledRealData() {
             self.stats = stats
-            print("📊 Loaded \(stats.count) real player stats from bundled data")
+            // xprint("📊 Loaded \(stats.count) real player stats from bundled data")
         } else {
-            print("❌ Failed to load real stats - using empty dataset")
+            // xprint("❌ Failed to load real stats - using empty dataset")
             self.stats = [:]
         }
         
@@ -280,7 +280,7 @@ final class PlayerStatsStore: ObservableObject {
             // Parse NFL API response and convert to PlayerStats2024
             return parseNFLAPIData(data)
         } catch {
-            print("Failed to load from NFL API: \(error)")
+            // xprint("Failed to load from NFL API: \(error)")
             return nil
         }
     }
@@ -309,7 +309,7 @@ final class PlayerStatsStore: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             return parseESPNData(data, position: position)
         } catch {
-            print("Failed to load \(position) from ESPN: \(error)")
+            // xprint("Failed to load \(position) from ESPN: \(error)")
             return nil
         }
     }
@@ -317,7 +317,7 @@ final class PlayerStatsStore: ObservableObject {
     private func loadFromBundledRealData() async -> [String: PlayerStats2024]? {
         // Load from bundled real 2024 stats JSON file
         guard let url = Bundle.main.url(forResource: "nfl_2024_stats", withExtension: "json") else {
-            print("❌ No bundled real stats file found - add nfl_2024_stats.json to bundle")
+            // xprint("❌ No bundled real stats file found - add nfl_2024_stats.json to bundle")
             return nil
         }
         
@@ -327,7 +327,7 @@ final class PlayerStatsStore: ObservableObject {
             let statsArray = try decoder.decode([PlayerStats2024].self, from: data)
             return Dictionary(uniqueKeysWithValues: statsArray.map { ($0.playerID, $0) })
         } catch {
-            print("❌ Failed to parse bundled real stats: \(error)")
+            // xprint("❌ Failed to parse bundled real stats: \(error)")
             return nil
         }
     }

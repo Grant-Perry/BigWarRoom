@@ -66,7 +66,7 @@ struct ESPNLeague: Codable, Identifiable {
             let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
             
             if !firstName.isEmpty && !lastName.isEmpty && fullName != " " {
-                print("     🎯 Using firstName + lastName: '\(fullName)'")
+                // xprint("     🎯 Using firstName + lastName: '\(fullName)'")
                 return fullName
             }
             
@@ -76,19 +76,19 @@ struct ESPNLeague: Codable, Identifiable {
                !displayName.lowercased().hasPrefix("espnfan"),
                !displayName.lowercased().hasPrefix("team "),
                displayName.count > 3 {
-                print("     🎯 Using meaningful displayName: '\(displayName)'")
+                // xprint("     🎯 Using meaningful displayName: '\(displayName)'")
                 return displayName
             }
             
             // Priority 3: Fall back to displayName even if generic (better than nothing)
             if let displayName = member.displayName, !displayName.isEmpty {
-                print("     ⚠️ Using generic displayName: '\(displayName)'")
+                // xprint("     ⚠️ Using generic displayName: '\(displayName)'")
                 return displayName
             }
         }
         
         // Final fallback
-        print("     ❌ No member found, using fallback")
+        // xprint("     ❌ No member found, using fallback")
         return "Manager \(firstOwnerID.suffix(8))"
     }
     
@@ -274,11 +274,11 @@ struct ESPNTeam: Codable, Identifiable {
             if let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerID) {
                 return sleeperPlayer.playerID
             }
-            print("⚠️ Could not find Sleeper player for ESPN ID: \(espnPlayerID)")
+            // xprint("⚠️ Could not find Sleeper player for ESPN ID: \(espnPlayerID)")
             return nil
         } ?? []
         
-        print("🔄 Converted ESPN roster: \(roster?.entries?.count ?? 0) ESPN players -> \(sleeperPlayerIDs.count) Sleeper players")
+        // xprint("🔄 Converted ESPN roster: \(roster?.entries?.count ?? 0) ESPN players -> \(sleeperPlayerIDs.count) Sleeper players")
         
         let recordString = record?.overall.map { overall in
             "\(overall.wins)-\(overall.losses)-\(overall.ties)"
@@ -534,7 +534,7 @@ struct ESPNDraftPick: Codable, Identifiable {
         // Convert ESPN player ID to Sleeper player ID using espnID matching
         let espnPlayerIDString = String(playerId)
         guard let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerIDString) else {
-            print("⚠️ Could not find Sleeper player for ESPN draft pick ID: \(espnPlayerIDString)")
+//            // xprint("⚠️ Could not find Sleeper player for ESPN draft pick ID: \(espnPlayerIDString)")
             return nil
         }
         

@@ -154,7 +154,7 @@ final class DraftRoomViewModel: ObservableObject {
         // Priority 1: Use pending ESPN league data if we're in the picker
         if let pendingWrapper = pendingESPNLeagueWrapper {
             let totalRosters = pendingWrapper.league.totalRosters
-            print("🏈 maxTeamsInDraft - Using pending ESPN league: \(totalRosters)")
+            // xprint("🏈 maxTeamsInDraft - Using pending ESPN league: \(totalRosters)")
             return totalRosters
         }
         
@@ -164,7 +164,7 @@ final class DraftRoomViewModel: ObservableObject {
                       selectedDraft?.totalRosters ??
                       12 // Reduced default from 16 to 12 (more common)
         
-        print("🏈 maxTeamsInDraft - Using fallback: \(fallback)")
+        // xprint("🏈 maxTeamsInDraft - Using fallback: \(fallback)")
         return fallback
     }
     
@@ -206,11 +206,11 @@ final class DraftRoomViewModel: ObservableObject {
                 // Debug logging for mock draft tracking
                 if self.myDraftSlot != nil && self._myRosterID == nil {
                     let mySlotPicks = picks.filter { $0.draftSlot == self.myDraftSlot }
-                    print("🏈 Mock Draft Tracking - Slot \(self.myDraftSlot!): \(mySlotPicks.count) picks")
+                    // xprint("🏈 Mock Draft Tracking - Slot \(self.myDraftSlot!): \(mySlotPicks.count) picks")
                     for pick in mySlotPicks {
                         if let playerID = pick.playerID,
                            let player = self.playerDirectory.player(for: playerID) {
-                            print("   • Pick \(pick.pickNo): \(player.shortName)")
+                            // xprint("   • Pick \(pick.pickNo): \(player.shortName)")
                         }
                     }
                 }

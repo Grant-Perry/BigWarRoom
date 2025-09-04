@@ -60,7 +60,7 @@ struct BigWarRoomModified: View {
                     .tag(0)
                 
                 // Fantasy Tab
-                FantasyMatchupListView()
+                FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "football")
                         Text("Fantasy")
@@ -99,8 +99,8 @@ struct BigWarRoomModified: View {
                     }
                     .tag(5)
                 
-                // Settings Tab (OnBoarding)
-                OnBoardingView()
+                // Settings Tab - New proper Settings view
+                AppSettingsView()
                     .tabItem {
                         Image(systemName: "gearshape")
                         Text("Settings")

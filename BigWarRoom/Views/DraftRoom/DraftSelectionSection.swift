@@ -3,8 +3,6 @@ import SwiftUI
 struct DraftSelectionSection: View {
     @ObservedObject var viewModel: DraftRoomViewModel
     @State private var showAllLeagues = false
-    @State private var manualDraftID: String = ""
-    @State private var isConnectingToDraft = false
     
     var body: some View {
         VStack(spacing: 12) {
@@ -27,9 +25,6 @@ struct DraftSelectionSection: View {
             if !viewModel.allAvailableDrafts.isEmpty {
                 leaguesListSection
             }
-            
-            // Manual draft entry
-            manualDraftEntrySection
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -57,21 +52,18 @@ struct DraftSelectionSection: View {
             }
             
             if showAllLeagues {
-                ScrollView {
-                    LazyVStack(spacing: 6) {
-                        ForEach(viewModel.allAvailableDrafts) { leagueWrapper in
-                            CompactLeagueCard(
-                                leagueWrapper: leagueWrapper,
-                                isSelected: leagueWrapper.id == viewModel.selectedLeagueWrapper?.id,
-                                onSelect: {
-                                    Task { await viewModel.selectDraft(leagueWrapper) }
-                                }
-                            )
-                        }
+                LazyVStack(spacing: 8) {
+                    ForEach(viewModel.allAvailableDrafts) { leagueWrapper in
+                        CompactLeagueCard(
+                            leagueWrapper: leagueWrapper,
+                            isSelected: leagueWrapper.id == viewModel.selectedLeagueWrapper?.id,
+                            onSelect: {
+                                Task { await viewModel.selectDraft(leagueWrapper) }
+                            }
+                        )
                     }
-                    .padding(.horizontal, 4)
                 }
-                .frame(maxHeight: 300)
+                .padding(.horizontal, 4)
             }
         }
         .onAppear {
@@ -86,43 +78,6 @@ struct DraftSelectionSection: View {
                 withAnimation(.easeInOut(duration: 0.3)) {
                     showAllLeagues = true
                 }
-            }
-        }
-    }
-    
-    private var manualDraftEntrySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "keyboard")
-                    .foregroundColor(.orange)
-                    .font(.caption)
-                Text("Manual Draft ID")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-            }
-            
-            HStack(spacing: 8) {
-                TextField("Enter any draft ID", text: $manualDraftID)
-                    .textFieldStyle(.roundedBorder)
-                    .fontDesign(.monospaced)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled(true)
-                    .disabled(isConnectingToDraft)
-                
-                Button(isConnectingToDraft ? "..." : "Connect") {
-                    Task {
-                        isConnectingToDraft = true
-                        await viewModel.connectToManualDraft(draftID: manualDraftID)
-                        isConnectingToDraft = false
-                    }
-                }
-                .font(.callout)
-                .foregroundColor(.white)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.orange)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .disabled(manualDraftID.isEmpty || isConnectingToDraft)
             }
         }
     }

@@ -6,6 +6,8 @@ struct QuickConnectSection: View {
     @Binding var selectedTab: Int // Add this for navigation
     @State private var customSleeperInput: String = ""
     @State private var showConnectionSection = false
+    @State private var manualDraftID: String = ""
+    @State private var isConnectingToDraft = false
     
     var body: some View {
         VStack(spacing: 16) {
@@ -30,6 +32,8 @@ struct QuickConnectSection: View {
                     if viewModel.connectionStatus == .connected {
                         disconnectSection
                     }
+                    
+                    manualDraftEntrySection
                 }
             }
         }
@@ -158,7 +162,7 @@ struct QuickConnectSection: View {
                 showUseDefault: true,
                 action: {
                     // + button action: Navigate to Sleeper setup in Settings
-                    print("🔧 Opening Sleeper credential entry")
+                    // xprint("🔧 Opening Sleeper credential entry")
                     selectedTab = 6 // Navigate to Settings tab
                 },
                 useDefaultAction: {
@@ -180,7 +184,7 @@ struct QuickConnectSection: View {
                 showUseDefault: true,
                 action: {
                     // + button action: Navigate to ESPN setup in Settings
-                    print("🔧 Opening ESPN credential entry")
+                    // xprint("🔧 Opening ESPN credential entry")
                     selectedTab = 6 // Navigate to Settings tab
                 },
                 useDefaultAction: {
@@ -262,6 +266,44 @@ struct QuickConnectSection: View {
     
     private var isESPNConnected: Bool {
         viewModel.allAvailableDrafts.contains(where: { $0.source == .espn })
+    }
+    
+    private var manualDraftEntrySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "keyboard")
+                    .foregroundColor(.orange)
+                    .font(.caption)
+                Text("Manual Draft ID")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            
+            HStack(spacing: 8) {
+                TextField("Enter any draft ID", text: $manualDraftID)
+                    .textFieldStyle(.roundedBorder)
+                    .fontDesign(.monospaced)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .disabled(isConnectingToDraft)
+                
+                Button(isConnectingToDraft ? "..." : "Connect") {
+                    Task {
+                        isConnectingToDraft = true
+                        await viewModel.connectToManualDraft(draftID: manualDraftID)
+                        isConnectingToDraft = false
+                    }
+                }
+                .font(.callout)
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.orange)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .disabled(manualDraftID.isEmpty || isConnectingToDraft)
+            }
+        }
+        .padding(.top, 8) // Add some spacing from the sections above
     }
 }
 
