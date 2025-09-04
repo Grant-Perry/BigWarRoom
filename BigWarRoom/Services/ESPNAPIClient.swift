@@ -66,10 +66,29 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch a specific league by ID
     func fetchLeague(leagueID: String) async throws -> SleeperLeague {
+        // Try with the best token for this league first
+        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.ESPNLeagueYear)
+        
+        do {
+            return try await fetchLeagueWithToken(leagueID: leagueID, token: primaryToken)
+        } catch ESPNAPIError.authenticationFailed {
+            print("🔄 ESPN: Primary token failed for league \(leagueID), trying alternate token...")
+            
+            // Try with the alternate token
+            let alternateToken = leagueID == "1241361400" ? 
+                AppConstants.getPrimaryESPNToken(for: AppConstants.ESPNLeagueYear) : 
+                AppConstants.getAlternateESPNToken(for: AppConstants.ESPNLeagueYear)
+            
+            return try await fetchLeagueWithToken(leagueID: leagueID, token: alternateToken)
+        }
+    }
+    
+    /// Fetch league with a specific token
+    private func fetchLeagueWithToken(leagueID: String, token: String) async throws -> SleeperLeague {
         // Updated view parameters to include members data for manager name mapping
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
-        // xprint("🌐 ESPN API Request: \(urlString)")
-        // xprint("🗓️ Using ESPN Year: \(AppConstants.ESPNLeagueYear)")
+        print("🌐 ESPN API Request: \(urlString)")
+        print("🔑 Using token: \(String(token.prefix(50)))...")
     
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -77,10 +96,9 @@ final class ESPNAPIClient: DraftAPIClient {
     
         var request = URLRequest(url: url)
     
-        // Add authentication headers
-        for (key, value) in authHeaders() {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
+        // Use the specific token instead of credentials manager
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("SWID=\(AppConstants.SWID); espn_s2=\(token)", forHTTPHeaderField: "Cookie")
     
         do {
             let (data, response) = try await session.data(for: request)
@@ -89,90 +107,90 @@ final class ESPNAPIClient: DraftAPIClient {
                 throw ESPNAPIError.invalidResponse
             }
     
-            // xprint("📡 ESPN Response Status: \(httpResponse.statusCode)")
+            print("📡 ESPN Response Status: \(httpResponse.statusCode)")
     
             if httpResponse.statusCode == 401 {
-                // xprint("❌ ESPN Authentication failed - check espn_s2 and SWID cookies")
+                print("❌ ESPN Authentication failed - check espn_s2 and SWID cookies")
                 throw ESPNAPIError.authenticationFailed
             }
     
             if httpResponse.statusCode == 403 {
-                // xprint("❌ ESPN Access forbidden - league may be private or cookies expired")
+                print("❌ ESPN Access forbidden - league may be private or cookies expired")
                 throw ESPNAPIError.authenticationFailed
             }
     
             guard httpResponse.statusCode == 200 else {
-                // xprint("❌ ESPN API returned status: \(httpResponse.statusCode)")
+                print("❌ ESPN API returned status: \(httpResponse.statusCode)")
     
                 // Try to log response for debugging
                 if let responseString = String(data: data, encoding: .utf8) {
-                    // xprint("📄 ESPN Response: \(String(responseString.prefix(500)))...")
+                    print("📄 ESPN Response: \(String(responseString.prefix(500)))...")
                 }
     
                 throw ESPNAPIError.invalidResponse
             }
     
             // Log successful response
-            // xprint("✅ ESPN API Success - received \(data.count) bytes")
+            print("✅ ESPN API Success - received \(data.count) bytes")
     
             // Check if response looks like JSON
             if let responseString = String(data: data, encoding: .utf8) {
                 if responseString.starts(with: "<") {
-                    // xprint("❌ ESPN returned HTML instead of JSON")
-                    // xprint("📄 HTML Response: \(String(responseString.prefix(300)))...")
+                    print("❌ ESPN returned HTML instead of JSON")
+                    print("📄 HTML Response: \(String(responseString.prefix(300)))...")
                     throw ESPNAPIError.invalidResponse
                 }
                 
                 // Log first bit of JSON for debugging
-                // xprint("📄 JSON Response: \(String(responseString.prefix(500)))...")
+                print("📄 JSON Response: \(String(responseString.prefix(500)))...")
             }
     
             let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
-            // xprint("✅ Fetched ESPN league: \(espnLeague.displayName)")
-            // xprint("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
-            // xprint("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
+            print("✅ Fetched ESPN league: \(espnLeague.displayName)")
+            print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
+            print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
             
             // NEW: Log members data for debugging
             if let members = espnLeague.members {
-                // xprint("👥 Found \(members.count) league members:")
+                print("👥 Found \(members.count) league members:")
                 for member in members {
                     let displayName = member.displayName ?? "No Display Name"
                     let firstName = member.firstName ?? ""
                     let lastName = member.lastName ?? ""
                     let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-                    // xprint("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
+                    print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
                 }
             } else {
-                // xprint("⚠️ No members data found in league response")
+                print("⚠️ No members data found in league response")
             }
             
             // NEW: Log team owners for debugging
             if let teams = espnLeague.teams {
-                // xprint("🏈 Team owner mapping:")
+                print("🏈 Team owner mapping:")
                 for team in teams {
                     let owners = team.owners ?? []
                     let managerName = espnLeague.getManagerName(for: team.owners)
-                    // xprint("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
+                    print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
                 }
             }
             
-            // xprint("🔢 ESPN League Team Count Debug:")
-            // xprint("   Raw size field: \(espnLeague.size ?? -1)")
-            // xprint("   Teams array count: \(espnLeague.teams?.count ?? -1)")
-            // xprint("   Calculated totalRosters: \(espnLeague.totalRosters)")
+            print("🔢 ESPN League Team Count Debug:")
+            print("   Raw size field: \(espnLeague.size ?? -1)")
+            print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
+            print("   Calculated totalRosters: \(espnLeague.totalRosters)")
 
             return espnLeague.toSleeperLeague()
     
         } catch DecodingError.keyNotFound(let key, let context) {
-            // xprint("❌ ESPN JSON Decode Error - Missing key: \(key)")
-            // xprint("📄 Context: \(context)")
+            print("❌ ESPN JSON Decode Error - Missing key: \(key)")
+            print("📄 Context: \(context)")
             throw ESPNAPIError.decodingError(DecodingError.keyNotFound(key, context))
         } catch DecodingError.typeMismatch(let type, let context) {
-            // xprint("❌ ESPN JSON Decode Error - Type mismatch: \(type)")
-            // xprint("📄 Context: \(context)")
+            print("❌ ESPN JSON Decode Error - Type mismatch: \(type)")
+            print("📄 Context: \(context)")
             throw ESPNAPIError.decodingError(DecodingError.typeMismatch(type, context))
         } catch {
-            // xprint("❌ ESPN Network Error: \(error)")
+            print("❌ ESPN Network Error: \(error)")
             throw ESPNAPIError.networkError(error)
         }
     }

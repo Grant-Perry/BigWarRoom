@@ -122,7 +122,9 @@ struct ESPNLeague: Codable, Identifiable {
                 maxKeepers: nil,
                 tradeDeadline: settings?.tradeDeadline,
                 reserveSlots: nil,
-                taxiSlots: nil
+                taxiSlots: nil,
+                leagueType: nil,
+                isChopped: nil
             ),
             scoringSettings: nil, // Could be converted if needed
             rosterPositions: settings?.rosterSettings?.lineupSlots?.compactMap { slot in

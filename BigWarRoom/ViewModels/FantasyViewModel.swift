@@ -1,4 +1,4 @@
-//
+// 
 //  FantasyViewModel.swift
 //  BigWarRoom
 //
@@ -22,7 +22,11 @@ final class FantasyViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var showWeekSelector: Bool = false  // NEW: Controls week selector sheet
-
+    @Published var choppedWeekSummary: ChoppedWeekSummary?
+    @Published var currentChoppedSummary: ChoppedWeekSummary?
+    @Published var isLoadingChoppedData: Bool = false
+    @Published var hasActiveRosters: Bool = false // NEW: Track if league has active rosters
+    @Published var detectedAsChoppedLeague: Bool = false // NEW: Detected based on empty matchups + rosters
     @Published var nflGameService = NFLGameDataService.shared
 
     // Make nflWeekService publicly accessible for UI
@@ -130,6 +134,11 @@ final class FantasyViewModel: ObservableObject {
         byeWeekTeams = []  // Clear bye week teams too
         errorMessage = nil
         
+        // FIXED: Reset Chopped league detection flags
+        detectedAsChoppedLeague = false
+        hasActiveRosters = false
+        currentChoppedSummary = nil
+        
         // Clear ESPN-specific data
         espnTeamRecords.removeAll()
         espnTeamNames.removeAll()
@@ -181,8 +190,11 @@ final class FantasyViewModel: ObservableObject {
     func fetchMatchups() async {
         guard let league = selectedLeague else {
             matchups = []
+            currentChoppedSummary = nil
             return
         }
+        
+        print("🔍 FETCH MATCHUPS: Starting for league \(league.league.leagueID) source: \(league.source)")
         
         isLoading = true
         errorMessage = nil
@@ -190,6 +202,7 @@ final class FantasyViewModel: ObservableObject {
         // FIXED: Only clear matchups if this is a new league selection, not a refresh
         if matchups.isEmpty || matchups.first?.leagueID != league.league.leagueID {
             matchups = []
+            currentChoppedSummary = nil
         }
         
         let startTime = Date()
@@ -197,12 +210,44 @@ final class FantasyViewModel: ObservableObject {
         do {
             // Check if this is an ESPN league
             if league.source == .espn {
+                print("🏈 ESPN LEAGUE: Fetching ESPN data for \(league.league.leagueID)")
                 await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
             } else {
+                print("😴 SLEEPER LEAGUE: Fetching Sleeper data for \(league.league.leagueID)")
                 await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
                 await fetchSleeperWeeklyStats()
                 await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
                 await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
+            }
+            
+            // FUCKING SIMPLE FIX: If we end up with 0 matchups after processing, make it Chopped
+            print("🎯 FETCH COMPLETE: matchups.count = \(matchups.count)")
+            
+            if matchups.isEmpty && league.source == .sleeper {
+                print("🔥 CHOPPED DETECTION: 0 processed matchups for Sleeper league - MAKING IT CHOPPED!")
+                detectedAsChoppedLeague = true
+                hasActiveRosters = true
+                
+                // Force UI update
+                await MainActor.run {
+                    self.objectWillChange.send()
+                }
+            }
+            
+            // LOAD CHOPPED DATA IF APPLICABLE
+            if isChoppedLeague(selectedLeague) {
+                print("🔥 CHOPPED DETECTION: League detected as Chopped, loading summary...")
+                isLoadingChoppedData = true
+                currentChoppedSummary = await createRealChoppedSummaryWithHistory(
+                    leagueID: league.league.leagueID, 
+                    week: selectedWeek
+                )
+                isLoadingChoppedData = false
+            } else {
+                print("❌ CHOPPED DETECTION: League NOT detected as Chopped")
+                print("   - detectedAsChoppedLeague: \(detectedAsChoppedLeague)")
+                print("   - hasActiveRosters: \(hasActiveRosters)")
+                print("   - league.source: \(league.source)")
             }
             
         } catch {
@@ -221,6 +266,13 @@ final class FantasyViewModel: ObservableObject {
         }
         
         isLoading = false
+        
+        print("🎯 FINAL STATE: matchups.count = \(matchups.count), detectedAsChoppedLeague = \(detectedAsChoppedLeague)")
+        
+        // Check if this is a Chopped league
+        if isChoppedLeague(selectedLeague) {
+            choppedWeekSummary = await createRealChoppedSummaryWithHistory(leagueID: selectedLeague?.league.leagueID ?? "", week: selectedWeek)
+        }
     }
     
     // MARK: -> ESPN Fantasy Data Fetchinging (like SleepThis - CORRECT implementation)
@@ -250,6 +302,7 @@ final class FantasyViewModel: ObservableObject {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let schedule = json["schedule"] as? [[String: Any]] {
                     NSLog("📊 ESPN: \(leagueID) has \(schedule.count) total schedule entries")
+
                     
                     let currentWeekEntries = schedule.filter { entry in
                         if let matchupPeriodId = entry["matchupPeriodId"] as? Int {
@@ -379,7 +432,8 @@ final class FantasyViewModel: ObservableObject {
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(alternateToken)", forHTTPHeaderField: "Cookie")
         
-        let cancellable = URLSession.shared.dataTaskPublisher(for: request)
+        // FIXED: Use EXACT same approach as working ESPNFantasyTestView
+        URLSession.shared.dataTaskPublisher(for: request)
             .map(\.data)
             .decode(type: ESPNFantasyLeagueModel.self, decoder: JSONDecoder())
             .receive(on: DispatchQueue.main)
@@ -396,8 +450,7 @@ final class FantasyViewModel: ObservableObject {
                     await self?.processESPNFantasyDataLikeTestView(espnModel: model, leagueID: leagueID, week: week)
                 }
             })
-        
-        cancellable.store(in: &cancellables);
+            .store(in: &cancellables);
     }
     
     /// Process ESPN Fantasy data EXACTLY like the test view (WORKING)
@@ -629,27 +682,61 @@ final class FantasyViewModel: ObservableObject {
     
     /// Fetch REAL Sleeper matchups (like SleepThis - CORRECT implementation)
     private func fetchSleeperMatchups(leagueID: String, week: Int) async {
+        print("🔍 SLEEPER MATCHUPS: Fetching for league \(leagueID) week \(week)")
+        
         guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
+            print("❌ SLEEPER MATCHUPS: Invalid URL")
             return
         }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
+            print("📡 SLEEPER MATCHUPS: Making API call...")
+            let (data, response) = try await URLSession.shared.data(from: url)
             
+            if let httpResponse = response as? HTTPURLResponse {
+                print("📡 SLEEPER MATCHUPS: HTTP Status \(httpResponse.statusCode)")
+            }
+            
+            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
+            print("📊 SLEEPER MATCHUPS: Received \(sleeperMatchups.count) matchups")
+            
+            // FIXED: Detect Chopped leagues IMMEDIATELY when matchups are empty
             if sleeperMatchups.isEmpty {
-                errorMessage = "No matchups available for week \(week)"
+                print("🔥 CHOPPED DETECTION: No matchups found for week \(week) - IMMEDIATELY flagging as Chopped!")
+                print("🔥 CHOPPED: Setting detection flags...")
+                
+                // IMMEDIATELY set detection flags - no async waiting
+                detectedAsChoppedLeague = true
+                hasActiveRosters = true // Assume rosters exist if we got this far
+                
+                print("🔥 CHOPPED: detectedAsChoppedLeague = \(detectedAsChoppedLeague)")
+                print("🔥 CHOPPED: hasActiveRosters = \(hasActiveRosters)")
+                print("🔥 CHOPPED: This should trigger UI update!")
+                
+                // Force UI update by triggering objectWillChange
+                await MainActor.run {
+                    print("🔥 CHOPPED: Forcing UI update with objectWillChange.send()")
+                    self.objectWillChange.send()
+                }
+                
+                // Still check rosters in background for validation, but don't block UI
+                Task {
+                    await validateChoppedLeagueDetection(leagueID: leagueID, week: week)
+                }
+                
                 return
             }
             
+            print("🏈 SLEEPER MATCHUPS: Processing \(sleeperMatchups.count) regular matchups")
             // Process REAL matchups like SleepThis
             await processSleeperMatchups(sleeperMatchups, leagueID: leagueID)
             
         } catch {
+            print("❌ SLEEPER MATCHUPS: API Error - \(error.localizedDescription)")
             errorMessage = "Failed to fetch Sleeper matchups: \(error.localizedDescription)"
         }
     }
-
+    
     /// Process REAL Sleeper matchups (like SleepThis - CORRECT implementation)
     private func processSleeperMatchups(_ sleeperMatchups: [SleeperMatchup], leagueID: String) async {
         // xprint("🏈 Processing \(sleeperMatchups.count) REAL Sleeper matchups")
@@ -850,56 +937,65 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
+    /// Create mock game status for testing
+    private func createMockGameStatus() -> GameStatus {
+        let statuses = ["pregame", "live", "postgame", "bye"]
+        let randomStatus = statuses.randomElement() ?? "pregame"
+        
+        return GameStatus(
+            status: randomStatus,
+            startTime: Calendar.current.date(byAdding: .hour, value: Int.random(in: 1...6), to: Date()),
+            timeRemaining: randomStatus == "live" ? "14:32" : nil,
+            quarter: randomStatus == "live" ? "2nd" : nil,
+            homeScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil,
+            awayScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil
+        )
+    }
+    
     /// Refresh matchups (for auto-refresh) - FIXED for real-time updates without navigation disruption
     func refreshMatchups() async {
         guard let league = selectedLeague else {
             return
         }
         
+        print("🔄 REFRESH: Starting auto-refresh for \(league.league.name)")
+        
         // NEVER set isLoading or clear matchups during real-time refresh
         // This prevents navigation pops and UI blinking
         
         do {
             if league.source == .espn {
-                // Real-time ESPN refresh with AUTH RETRY - FIXED to use same URL as test view
-                guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(selectedYear)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(selectedWeek)") else {
-                    return
-                }
-                
-                let currentWeek = selectedWeek
-                let currentLeagueID = league.league.leagueID
-                
-                let cancellable = URLSession.shared.dataTaskPublisher(for: url)
-                    .map(\.data)
-                    .decode(type: ESPNFantasyLeagueModel.self, decoder: JSONDecoder())
-                    .receive(on: DispatchQueue.main)
-                    .sink(receiveCompletion: { [weak self] completion in
-                        switch completion {
-                        case .failure(let error):
-                            // Try alternate token if this fails
-                            Task {
-                                await self?.tryAlternateESPNToken(url: url, leagueID: currentLeagueID, week: currentWeek)
-                            }
-                        case .finished:
-                            break
-                        }
-                    }, receiveValue: { [weak self] model in
-                        Task {
-                            await self?.processESPNRefreshData(espnModel: model, leagueID: currentLeagueID, week: currentWeek)
-                        }
-                    })
-
-                cancellable.store(in: &cancellables)
+                print("🔄 ESPN REFRESH: Using proper authentication...")
+                // Use the same fetchESPNFantasyData method with proper auth
+                await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
             } else {
+                print("🔄 SLEEPER REFRESH: Refreshing Sleeper data...")
                 // Sleeper real-time refresh
                 await refreshSleeperData(leagueID: league.league.leagueID, week: selectedWeek)
             }
             
+            // CHOPPED LEAGUE REAL-TIME REFRESH
+            if isChoppedLeague(selectedLeague) {
+                await refreshChoppedData(leagueID: league.league.leagueID, week: selectedWeek)
+            }
+            
+            print("✅ REFRESH: Completed auto-refresh, matchups.count = \(matchups.count)")
+            
         } catch {
-            // Silent error handling for refresh
+            print("❌ REFRESH: Auto-refresh failed: \(error)")
+            // Don't clear matchups on refresh failure - keep existing data
         }
     }
-    
+
+    /// Real-time Chopped data refresh
+    private func refreshChoppedData(leagueID: String, week: Int) async {
+        // Update Chopped summary without showing loading state (to prevent UI blinking)
+        if let updatedSummary = await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week) {
+            currentChoppedSummary = updatedSummary
+            print("🔥 CHOPPED REFRESH: Updated rankings for week \(week)")
+        }
+    }
+
     /// Process ESPN refresh data without UI disruption
     private func processESPNRefreshData(espnModel: ESPNFantasyLeagueModel, leagueID: String, week: Int) async {
         let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
@@ -1047,32 +1143,332 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    /// Create mock game status for testing
-    private func createMockGameStatus() -> GameStatus {
-        let statuses = ["pregame", "live", "postgame", "bye"]
-        let randomStatus = statuses.randomElement() ?? "pregame"
+    /// Check if a league is a Chopped format
+    func isChoppedLeague(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper?) -> Bool {
+        guard let leagueWrapper = leagueWrapper,
+              leagueWrapper.source == .sleeper else {
+            print("❌ CHOPPED CHECK: Not a Sleeper league or nil league")
+            return false
+        }
         
-        return GameStatus(
-            status: randomStatus,
-            startTime: Calendar.current.date(byAdding: .hour, value: Int.random(in: 1...6), to: Date()),
-            timeRemaining: randomStatus == "live" ? "14:32" : nil,
-            quarter: randomStatus == "live" ? "2nd" : nil,
-            homeScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil,
-            awayScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil
-        )
+        print("🔍 CHOPPED CHECK: Checking league \(leagueWrapper.league.leagueID)")
+        print("   - detectedAsChoppedLeague: \(detectedAsChoppedLeague)")
+        print("   - hasActiveRosters: \(hasActiveRosters)")
+        
+        // NEW: Primary detection based on data structure
+        if detectedAsChoppedLeague {
+            print("🔥 CHOPPED CHECK: ✅ Detected via empty matchups + active rosters")
+            return true
+        }
+        
+        // FALLBACK: Keep existing settings check as backup
+        if let sleeperLeague = leagueWrapper.league as? SleeperLeague,
+           let isChopped = sleeperLeague.settings?.isChopped, isChopped {
+            print("🔥 CHOPPED CHECK: ✅ Detected via league settings")
+            return true
+        }
+        
+        print("❌ CHOPPED CHECK: NOT detected as Chopped league")
+        return false
+    }
+
+    /// Create a ChoppedWeekSummary from real Sleeper data
+    func createRealChoppedSummary(leagueID: String, week: Int) async -> ChoppedWeekSummary? {
+        return await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week)
     }
     
-    // MARK: -> Load Leagues
-    /// Load available leagues on app start
-    func loadLeagues() async {
-        // FIXED: Pass Sleeper user ID and season to get both ESPN and Sleeper leagues
-        await unifiedLeagueManager.fetchAllLeagues(
-            sleeperUserID: AppConstants.GpSleeperID, 
-            season: selectedYear
+    // MARK: -> CHOPPED ELIMINATION TRACKING 
+    /// Fetch complete elimination history for Chopped league
+    func fetchChoppedEliminationHistory(leagueID: String, currentWeek: Int) async -> [EliminationEvent] {
+        var eliminationHistory: [EliminationEvent] = []
+        
+        // Fetch data for all completed weeks (1 to currentWeek-1)
+        for week in 1..<currentWeek {
+            if let elimination = await calculateWeeklyElimination(leagueID: leagueID, week: week) {
+                eliminationHistory.append(elimination)
+            }
+        }
+        
+        print("💀 ELIMINATION TRACKER: Found \(eliminationHistory.count) eliminations across \(currentWeek-1) weeks")
+        return eliminationHistory.sorted { $0.week < $1.week } // Chronological order
+    }
+
+    /// Calculate who was eliminated in a specific week
+    private func calculateWeeklyElimination(leagueID: String, week: Int) async -> EliminationEvent? {
+        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
+            
+            // Calculate scores for all teams this week
+            var teamScores: [(rosterID: Int, score: Double, managerName: String)] = []
+            
+            for matchup in sleeperMatchups {
+                let teamScore = calculateSleeperTeamScore(matchup: matchup)
+                let managerID = rosterIDToManagerID[matchup.roster_id] ?? ""
+                let managerName = userIDs[managerID] ?? "Manager \(matchup.roster_id)"
+                
+                teamScores.append((
+                    rosterID: matchup.roster_id,
+                    score: teamScore,
+                    managerName: managerName
+                ))
+            }
+            
+            // Find the lowest scorer (eliminated team)
+            guard let lowestScorer = teamScores.min(by: { $0.score < $1.score }) else {
+                return nil
+            }
+            
+            // Check for ties at the bottom
+            let tiedTeams = teamScores.filter { $0.score == lowestScorer.score }
+            let dramaMeter = tiedTeams.count > 1 ? 1.0 : 0.6 // Higher drama for ties
+            
+            // Create elimination event
+            let eliminationTeam = FantasyTeam(
+                id: String(lowestScorer.rosterID),
+                name: lowestScorer.managerName,
+                ownerName: lowestScorer.managerName,
+                record: nil,
+                avatar: nil,
+                currentScore: lowestScorer.score,
+                projectedScore: lowestScorer.score,
+                roster: [],
+                rosterID: lowestScorer.rosterID
+            )
+            
+            let eliminationRanking = FantasyTeamRanking(
+                id: String(lowestScorer.rosterID),
+                team: eliminationTeam,
+                weeklyPoints: lowestScorer.score,
+                rank: teamScores.count, // Last place
+                eliminationStatus: .eliminated,
+                isEliminated: true,
+                survivalProbability: 0.0,
+                pointsFromSafety: 0.0,
+                weeksAlive: week
+            )
+            
+            // Calculate elimination margin (how close was it?)
+            let sortedScores = teamScores.map { $0.score }.sorted(by: >)
+            let secondLowest = sortedScores.count > 1 ? sortedScores[sortedScores.count - 2] : lowestScorer.score
+            let margin = secondLowest - lowestScorer.score
+            
+            return EliminationEvent(
+                id: "elimination_\(leagueID)_week_\(week)",
+                week: week,
+                eliminatedTeam: eliminationRanking,
+                eliminationScore: lowestScorer.score,
+                margin: margin,
+                dramaMeter: dramaMeter,
+                lastWords: tiedTeams.count > 1 ? "Eliminated by tiebreaker" : "Couldn't score enough to survive",
+                timestamp: Date() // Could calculate actual week end date
+            )
+        
+        } catch {
+            print("❌ ELIMINATION: Failed to fetch week \(week) data: \(error)")
+            return nil
+        }
+    }
+
+    /// Enhanced Chopped summary with elimination tracking
+    func createRealChoppedSummaryWithHistory(leagueID: String, week: Int) async -> ChoppedWeekSummary? {
+        // Fetch current week standings
+        let rankings = await fetchChoppedLeagueStandings(leagueID: leagueID, week: week)
+        
+        guard !rankings.isEmpty else {
+            return nil
+        }
+        
+        // Fetch elimination history for previous weeks
+        let eliminationHistory = await fetchChoppedEliminationHistory(leagueID: leagueID, currentWeek: week)
+        
+        // Determine current week status based on scoring
+        let hasAnyScoring = rankings.contains { $0.weeklyPoints > 0 }
+        let isScheduled = !hasAnyScoring
+        
+        // Adjust elimination status for scheduled games
+        let adjustedRankings = rankings.map { ranking -> FantasyTeamRanking in
+            if isScheduled {
+                // Everyone is safe during scheduled mode
+                return FantasyTeamRanking(
+                    id: ranking.id,
+                    team: ranking.team,
+                    weeklyPoints: ranking.weeklyPoints,
+                    rank: ranking.rank,
+                    eliminationStatus: .safe, // Everyone safe when no games played
+                    isEliminated: false,
+                    survivalProbability: 1.0, // 100% survival when no games played
+                    pointsFromSafety: 0.0,
+                    weeksAlive: ranking.weeksAlive
+                )
+            } else {
+                // Use calculated status when games are live/complete
+                return ranking
+            }
+        }
+        
+        let eliminatedTeam = isScheduled ? nil : rankings.last
+        let cutoffScore = eliminatedTeam?.weeklyPoints ?? 0.0
+        let allScores = rankings.map { $0.weeklyPoints }
+        let avgScore = allScores.reduce(0, +) / Double(allScores.count)
+        let highScore = allScores.max() ?? 0.0
+        let lowScore = allScores.min() ?? 0.0
+        
+        // Create enhanced summary with historical eliminations
+        let summary = ChoppedWeekSummary(
+            id: "chopped_with_history_\(leagueID)_\(week)",
+            week: week,
+            rankings: adjustedRankings,
+            eliminatedTeam: eliminatedTeam,
+            cutoffScore: cutoffScore,
+            isComplete: !isScheduled && !hasLiveGames(),
+            totalSurvivors: adjustedRankings.filter { !$0.isEliminated }.count,
+            averageScore: avgScore,
+            highestScore: highScore,
+            lowestScore: lowScore,
+            eliminationHistory: eliminationHistory
         )
+        
+        // Store elimination history for UI access (we'll add this to the model)
+        // For now, print the history
+        if !eliminationHistory.isEmpty {
+            print("💀 ELIMINATION HISTORY:")
+            for elimination in eliminationHistory {
+                print("   Week \(elimination.week): \(elimination.eliminatedTeam.team.ownerName) - \(elimination.eliminationScore) pts (margin: \(elimination.margin))")
+            }
+        }
+        
+        return summary
+    }
+
+    /// Check if there are currently live NFL games
+    private func hasLiveGames() -> Bool {
+        // Simple check - could be enhanced with real NFL game status
+        let calendar = Calendar.current
+        let now = Date()
+        let weekday = calendar.component(.weekday, from: now)
+        let hour = calendar.component(.hour, from: now)
+        
+        // NFL games typically on Sunday (1), Monday (2), Thursday (5)
+        // During typical game hours
+        if weekday == 1 && hour >= 13 && hour <= 23 { return true } // Sunday 1-11 PM
+        if weekday == 2 && hour >= 20 && hour <= 23 { return true } // Monday 8-11 PM  
+        if weekday == 5 && hour >= 20 && hour <= 23 { return true } // Thursday 8-11 PM
+        
+        return false
     }
     
-    // MARK: -> Helper Methods for Detail View
+    /// Fetch Chopped league standings (all rosters ranked by weekly points)
+    func fetchChoppedLeagueStandings(leagueID: String, week: Int) async -> [FantasyTeamRanking] {
+        // First get league settings and users
+        await fetchSleeperScoringSettings(leagueID: leagueID)
+        await fetchSleeperWeeklyStats()
+        await fetchSleeperLeagueUsersAndRosters(leagueID: leagueID)
+        
+        // Get all matchups for the week (even for Chopped leagues, Sleeper returns individual roster scores)
+        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
+            return []
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
+            
+            // Convert each roster to a FantasyTeam with real scoring
+            var allTeams: [FantasyTeam] = []
+            
+            for matchup in sleeperMatchups {
+                let teamScore = calculateSleeperTeamScore(matchup: matchup)
+                let managerID = rosterIDToManagerID[matchup.roster_id] ?? ""
+                let managerName = userIDs[managerID] ?? "Manager \(matchup.roster_id)"
+                let avatarURL = userAvatars[managerID]
+                
+                // Use shared DraftRoomViewModel for better manager names
+                var finalManagerName = managerName
+                if let sharedDraftRoom = sharedDraftRoomViewModel {
+                    let allPicks = sharedDraftRoom.allDraftPicks
+                    if let correspondingPick = allPicks.first(where: { $0.rosterInfo?.rosterID == matchup.roster_id }) {
+                        let draftSlotBasedName = sharedDraftRoom.teamDisplayName(for: correspondingPick.draftSlot)
+                        
+                        if !draftSlotBasedName.isEmpty,
+                           !draftSlotBasedName.lowercased().hasPrefix("team "),
+                           !draftSlotBasedName.lowercased().hasPrefix("manager "),
+                           draftSlotBasedName.count > 4 {
+                            finalManagerName = draftSlotBasedName
+                        }
+                    }
+                }
+                
+                let fantasyTeam = createSleeperFantasyTeam(
+                    matchup: matchup,
+                    managerName: finalManagerName,
+                    avatarURL: avatarURL,
+                    score: teamScore
+                )
+                
+                allTeams.append(fantasyTeam)
+            }
+            
+            // Sort teams by score (highest to lowest)
+            let sortedTeams = allTeams.sorted { team1, team2 in
+                let score1 = team1.currentScore ?? 0.0
+                let score2 = team2.currentScore ?? 0.0
+                return score1 > score2
+            }
+            
+            // Create rankings with elimination status
+            let rankings = sortedTeams.enumerated().map { index, team -> FantasyTeamRanking in
+                let rank = index + 1
+                let teamScore = team.currentScore ?? 0.0
+                let totalTeams = sortedTeams.count
+                
+                // Calculate elimination status based on position
+                let status: EliminationStatus
+                if rank == 1 {
+                    status = .champion
+                } else if rank == totalTeams {
+                    status = .critical  // Last place = death row
+                } else if rank > (totalTeams * 3 / 4) {
+                    status = .danger    // Bottom 25%
+                } else if rank > (totalTeams / 2) {
+                    status = .warning   // Bottom 50%
+                } else {
+                    status = .safe      // Top 50%
+                }
+                
+                // Calculate survival probability (simple algorithm)
+                let averageScore = sortedTeams.compactMap { $0.currentScore }.reduce(0, +) / Double(totalTeams)
+                let survivalProb = min(1.0, max(0.1, teamScore / (averageScore * 1.2)))
+                
+                // Points from elimination line (distance from last place)
+                let eliminationScore = sortedTeams.last?.currentScore ?? 0.0
+                let safetyMargin = teamScore - eliminationScore
+                
+                return FantasyTeamRanking(
+                    id: team.id,
+                    team: team,
+                    weeklyPoints: teamScore,
+                    rank: rank,
+                    eliminationStatus: status,
+                    isEliminated: false, // No one eliminated in current week view
+                    survivalProbability: survivalProb,
+                    pointsFromSafety: safetyMargin,
+                    weeksAlive: week // Assume they've survived this many weeks
+                )
+            }
+            
+            print("🔥 CHOPPED: Created \(rankings.count) real team rankings for league \(leagueID) week \(week)")
+            return rankings
+            
+        } catch {
+            print("❌ CHOPPED: Failed to fetch league standings: \(error)")
+            return []
+        }
+    }
     
     /// Get score for a team in a matchup
     func getScore(for matchup: FantasyMatchup, teamIndex: Int) -> Double {
@@ -1350,6 +1746,62 @@ final class FantasyViewModel: ObservableObject {
         // Refresh matchups for the new week
         Task {
             await fetchMatchups()
+        }
+    }
+    
+    // MARK: -> Load Leagues
+    /// Load available leagues on app start
+    func loadLeagues() async {
+        await unifiedLeagueManager.fetchAllLeagues(
+            sleeperUserID: AppConstants.GpSleeperID, 
+            season: selectedYear
+        )
+    }
+
+    
+    /// NEW: Validate Chopped league detection in background (don't block UI)
+    private func validateChoppedLeagueDetection(leagueID: String, week: Int) async {
+        print("🔍 CHOPPED VALIDATION: Checking rosters for league \(leagueID)")
+        
+        // Check if we have active rosters in the league (for validation)
+        guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/rosters") else {
+            print("❌ CHOPPED VALIDATION: Invalid rosters URL")
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: rostersURL)
+            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            
+            print("📊 CHOPPED VALIDATION: Found \(rosters.count) rosters")
+            
+            if !rosters.isEmpty {
+                print("🔥 CHOPPED VALIDATED: \(rosters.count) active rosters confirmed - this is definitely a Chopped league!")
+                
+                await MainActor.run {
+                    hasActiveRosters = true
+                    print("🔥 CHOPPED: Updated hasActiveRosters = \(hasActiveRosters)")
+                }
+                
+                // Load Chopped leaderboard data
+                isLoadingChoppedData = true
+                currentChoppedSummary = await createRealChoppedSummaryWithHistory(
+                    leagueID: leagueID, 
+                    week: week
+                )
+                isLoadingChoppedData = false
+            } else {
+                // Revert detection if no rosters found
+                print("❌ CHOPPED DETECTION FAILED: No rosters found - reverting detection")
+                await MainActor.run {
+                    detectedAsChoppedLeague = false
+                    hasActiveRosters = false
+                    errorMessage = "No matchups or active rosters found for week \(week)"
+                }
+            }
+            
+        } catch {
+            print("⚠️ CHOPPED VALIDATION ERROR: \(error) - keeping detection as is")
         }
     }
 }

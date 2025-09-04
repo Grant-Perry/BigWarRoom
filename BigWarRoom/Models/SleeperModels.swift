@@ -107,6 +107,20 @@ struct SleeperLeagueSettings: Codable {
     let tradeDeadline: Int?
     let reserveSlots: Int?
     let taxiSlots: Int?
+    let leagueType: String?
+    let isChopped: Bool?
+    
+    /// Detect if this is a Chopped/elimination league - FIXED: Only use explicit settings
+    var isChoppedLeague: Bool {
+        // Check explicit Chopped flag first
+        if let isChopped = isChopped {
+            return isChopped
+        }
+        
+        // The proper way is to check if matchups are empty but rosters exist
+        
+        return false
+    }
     
     private enum CodingKeys: String, CodingKey {
         case teams
@@ -117,6 +131,8 @@ struct SleeperLeagueSettings: Codable {
         case tradeDeadline = "trade_deadline"
         case reserveSlots = "reserve_slots"
         case taxiSlots = "taxi_slots"
+        case leagueType = "league_type"
+        case isChopped = "is_chopped"
     }
 }
 

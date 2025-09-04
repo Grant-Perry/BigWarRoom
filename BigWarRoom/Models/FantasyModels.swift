@@ -310,6 +310,192 @@ enum MatchupStatus: String, Codable, CaseIterable {
     }
 }
 
+// MARK: -> CHOPPED LEAGUE BATTLE ROYALE MODELS 🔥💀🏆
+
+/// Chopped League Team Ranking - APOCALYPTIC EDITION
+struct FantasyTeamRanking: Identifiable {
+    let id: String
+    let team: FantasyTeam
+    let weeklyPoints: Double
+    let rank: Int
+    let eliminationStatus: EliminationStatus
+    let isEliminated: Bool
+    let survivalProbability: Double // 0.0 - 1.0
+    let pointsFromSafety: Double // How many points above/below safety line
+    let weeksAlive: Int
+    
+    /// Weekly points formatted
+    var weeklyPointsString: String {
+        return String(format: "%.2f", weeklyPoints)
+    }
+    
+    /// Rank display (e.g., "1st", "2nd", "3rd")
+    var rankDisplay: String {
+        let suffix: String
+        switch rank {
+        case 1: suffix = "st"
+        case 2: suffix = "nd" 
+        case 3: suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(rank)\(suffix)"
+    }
+    
+    /// Survival probability as percentage
+    var survivalPercentage: String {
+        return String(format: "%.0f%%", survivalProbability * 100)
+    }
+    
+    /// Points from safety line display
+    var safetyMarginDisplay: String {
+        if pointsFromSafety >= 0 {
+            return "+\(String(format: "%.1f", pointsFromSafety))"
+        } else {
+            return String(format: "%.1f", pointsFromSafety)
+        }
+    }
+}
+
+/// Elimination Status - DEATH GAME EDITION
+enum EliminationStatus: String, CaseIterable {
+    case champion = "champion"      // #1 seed, untouchable
+    case safe = "safe"             // Comfortably safe
+    case warning = "warning"       // Getting close to danger
+    case danger = "danger"         // Bottom 25%, in real danger
+    case critical = "critical"     // Last place, about to be chopped
+    case eliminated = "eliminated"  // DEAD 💀
+    
+    var displayName: String {
+        switch self {
+        case .champion: return "Champion"
+        case .safe: return "Safe"
+        case .warning: return "Warning"
+        case .danger: return "DANGER ZONE"
+        case .critical: return "CRITICAL"
+        case .eliminated: return "ELIMINATED"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .champion: return .yellow
+        case .safe: return .green
+        case .warning: return .blue
+        case .danger: return .orange
+        case .critical: return .red
+        case .eliminated: return .black
+        }
+    }
+    
+    var emoji: String {
+        switch self {
+        case .champion: return "👑"
+        case .safe: return "✅"
+        case .warning: return "⚡"
+        case .danger: return "⚠️"
+        case .critical: return "🚨"
+        case .eliminated: return "💀"
+        }
+    }
+    
+    var dramaticMessage: String {
+        switch self {
+        case .champion: return "REIGNING SUPREME"
+        case .safe: return "Living to fight another day"
+        case .warning: return "Treading dangerous waters"
+        case .danger: return "ON THE CHOPPING BLOCK"
+        case .critical: return "MOMENTS FROM ELIMINATION"
+        case .eliminated: return "CHOPPED AND OUT"
+        }
+    }
+}
+
+/// Chopped Week Summary - ENHANCED WITH ELIMINATION HISTORY
+struct ChoppedWeekSummary: Identifiable {
+    let id: String
+    let week: Int
+    let rankings: [FantasyTeamRanking]
+    let eliminatedTeam: FantasyTeamRanking?
+    let cutoffScore: Double
+    let isComplete: Bool
+    let totalSurvivors: Int
+    let averageScore: Double
+    let highestScore: Double
+    let lowestScore: Double
+    let eliminationHistory: [EliminationEvent] // Track all previous eliminations
+    
+    /// Teams still alive (not eliminated)
+    var aliveTeams: [FantasyTeamRanking] {
+        return rankings.filter { !$0.isEliminated }
+    }
+    
+    /// Teams in critical danger (last place)
+    var criticalTeams: [FantasyTeamRanking] {
+        return aliveTeams.filter { $0.eliminationStatus == .critical }
+    }
+    
+    /// Teams in danger zone (bottom 25%)
+    var dangerZoneTeams: [FantasyTeamRanking] {
+        return aliveTeams.filter { $0.eliminationStatus == .danger }
+    }
+    
+    /// Teams with warning status
+    var warningTeams: [FantasyTeamRanking] {
+        return aliveTeams.filter { $0.eliminationStatus == .warning }
+    }
+    
+    /// Safe teams
+    var safeTeams: [FantasyTeamRanking] {
+        return aliveTeams.filter { $0.eliminationStatus == .safe }
+    }
+    
+    /// Champion (top team)
+    var champion: FantasyTeamRanking? {
+        return aliveTeams.first { $0.eliminationStatus == .champion }
+    }
+    
+    /// All eliminated teams from current week
+    var eliminatedTeams: [FantasyTeamRanking] {
+        return rankings.filter { $0.isEliminated }
+    }
+    
+    /// Is this week scheduled (no scoring yet)?
+    var isScheduled: Bool {
+        return !rankings.contains { $0.weeklyPoints > 0 }
+    }
+    
+    /// All teams historically eliminated (from eliminationHistory)
+    var historicallyEliminatedTeams: [FantasyTeamRanking] {
+        return eliminationHistory.map { $0.eliminatedTeam }
+    }
+}
+
+/// Elimination Event - DRAMATIC CEREMONY DATA
+struct EliminationEvent: Identifiable {
+    let id: String
+    let week: Int
+    let eliminatedTeam: FantasyTeamRanking
+    let eliminationScore: Double
+    let margin: Double // How close was it?
+    let dramaMeter: Double // 0.0 - 1.0, how dramatic was this elimination?
+    let lastWords: String? // Optional dramatic message
+    let timestamp: Date
+    
+    var dramaMeterDisplay: String {
+        switch dramaMeter {
+        case 0.8...1.0: return "HEARTBREAKING"
+        case 0.6..<0.8: return "Dramatic"
+        case 0.4..<0.6: return "Close Call"
+        case 0.2..<0.4: return "Expected"
+        default: return "Blowout"
+        }
+    }
+    
+    var marginDisplay: String {
+        return String(format: "%.2f pts", margin)
+    }
+}
+
 // MARK: -> NFL Team Colors
 struct NFLTeamColors {
     private static let teamColors: [String: Color] = [

@@ -24,8 +24,12 @@ struct AppConstants {
     // LEGACY: Keep these for backward compatibility but they're now managed by ESPNCredentialsManager
     // These are Gp's original credentials - users will set their own in ESPNSetupView
     static let SWID = "{7D6C3526-D3A-4DBD-9849-3D9C03333E7C}"
-    static let ESPN_S2_2025 = "AEAQAAVXgHBaJ%2Fq1pPpnsckBKlBKXxsRJyttQjQhae67N%2Bz5kVdRdn001uU8V30qYT3z9n7R%2FsLNqWd%2BskxNWwMKr7kpL1%2Fs2J6BCvH8su%2F8gsDOcv44fRm6zbxMq6kQHoFdwGjSf7bnoMp8j5gDC29iDExGMF%2B5ObIreHcchFk8AQGZVNi2cSTCdxevEuioMNPDTbehk%2B4kPI1n5KxqtXnm9Z5gz5UpJv42IJNmT0nwfqMq9Vjz0MYqvj%2BbN7%2B5%2Bky9PwK8%2FUgAeWXObJ9ezOlCZGMmEO4Wyrq2dDl8DeGJKg%3D%3D"
-    static let ESPN_S2 = "AECZhMx2EpWMK1F56f5N8HfKaTHgYIOYYEH%2F2DhPxf0BzfWqW%2BQTWZk1QC%2F4WfO0OdC1sUcG1jYOUISX217BGcQOS8VuqspUYVSzrXMiUlEA2JCYK1fhEPUYJvadfhNovy%2F%2F4j94exvkMUMVvuAfyog0W%2BmHN0lMsJh3Qh7Yot7yueZoicSwYM7nuks2FJrE%2FTZ8hw%2B8NmLCP3mYD1TgXke1GbiP6jTudabpmcYq%2FGK3RKUdyJInaRDCK08BkWJ%2FShcrHNl7l6Q3FATnalIQeBjJU%3D"
+    static let ESPN_S2_2025_Orig = "AEAQAAVXgHBaJ%2Fq1pPpnsckBKlBKXxsRJyttQjQhae67N%2Bz5kVdRdn001uU8V30qYT3z9n7R%2FsLNqWd%2BskxNWwMKr7kpL1%2Fs2J6BCvH8su%2F8gsDOcv44fRm6zbxMq6kQHoFdwGjSf7bnoMp8j5gDC29iDExGMF%2B5ObIreHcchFk8AQGZVNi2cSTCdxevEuioMNPDTbehk%2B4kPI1n5KxqtXnm9Z5gz5UpJv42IJNmT0nwfqMq9Vjz0MYqvj%2BbN7%2B5%2Bky9PwK8%2FUgAeWXObJ9ezOlCZGMmEO4Wyrq2dDl8DeGJKg%3D%3D"
+    
+   static let ESPN_S2 = "AECZhMx2EpWMK1F56f5N8HfKaTHgYIOYYEH%2F2DhPxf0BzfWqW%2BQTWZk1QC%2F4WfO0OdC1sUcG1jYOUISX217BGcQOS8VuqspUYVSzrXMiUlEA2JCYK1fhEPUYJvadfhNovy%2F%2F4j94exvkMUMVvuAfyog0W%2BmHN0lMsJh3Qh7Yot7yueZoicSwYM7nuks2FJrE%2FTZ8hw%2B8NmLCP3mYD1TgXke1GbiP6jTudabpmcYq%2FGK3RKUdyJInaRDCK08BkWJ%2FShcrHNl7l6Q3FATnalIQeBjJU%3D"
+
+   static let ESPN_S2_2025 = "AEB88BoMXDka9K83s5stW9QsDt0GljM%2B1sNtLZd%2B9sDDlsYFz0SL9k3Aa0npXxbSxnmpFs4%2B1l4KgEil3tJb4unSis8ub8D%2BgT8ELZFoAAWD%2Brdg5F8kHsDaciUsquw9IECawaht67iaricSWJFmDeU8ae3xuyF71U1p22btvkbQdrWOC%2FQ%2BxMAxZhRl5HfrS1INxkQT%2BPAzM1K0IwtFqZBHXm8BWdu0f5OukBHqj%2BDkc1geGREKsbBz7dtRbtWDGs8Uk%2Bav63lCvpRVj7Cl0le7UlXe2II3CpJGKnQkLvmXojWV1YxHldhZ6mWv4JPs0to%3D"
+
     static let ESPNLeagueID = ["1241361400", "1739710242", "1003758336", "1486575797", "1471913910"] // Gp's original league IDs
 
     static let GpESPNID = SWID
@@ -65,13 +69,6 @@ struct AppConstants {
                     .resizable()
                     .scaledToFit()
                     .frame(width: 100, height: 100)
-            } else if let appIcon = Bundle.main.appIcon {
-                // Use the actual app icon
-                Image(uiImage: appIcon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 100, height: 100)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
             } else {
                 // Fallback designed logo with beautiful glow - NO ROTATION
                 GlowingAppLogo()
@@ -136,6 +133,31 @@ struct AppConstants {
             }
         }
     }
+    
+    // MARK: -> ESPN Token Management
+    /// Get the primary ESPN token for a given year
+    static func getPrimaryESPNToken(for year: String) -> String {
+        return year == "2025" ? ESPN_S2_2025 : ESPN_S2
+    }
+    
+    /// Get the alternate ESPN token for a given year (for fallback)
+    static func getAlternateESPNToken(for year: String) -> String {
+        return year == "2025" ? ESPN_S2 : ESPN_S2_2025
+    }
+    
+    /// Get the best ESPN token for a specific league (with known problematic leagues)
+    static func getESPNTokenForLeague(_ leagueID: String, year: String) -> String {
+        // Known problematic leagues that need the 2025 token first
+        let problematicLeagues = ["1241361400"] // Add more as needed
+        
+        if problematicLeagues.contains(leagueID) {
+            // Use ESPN_S2_2025 first for problematic leagues (regardless of year)
+            return ESPN_S2_2025
+        } else {
+            // Use primary token for normal leagues
+            return getPrimaryESPNToken(for: year)
+        }
+    }
 }
 
 // MARK: - Glowing App Logo Component (No Rotation!)
@@ -193,19 +215,5 @@ private struct GlowingAppLogo: View {
                 glowIntensity = 0.8
             }
         }
-    }
-}
-
-// MARK: - Bundle Extension for App Icon
-
-extension Bundle {
-    var appIcon: UIImage? {
-        if let icons = infoDictionary?["CFBundleIcons"] as? [String: Any],
-           let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
-           let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String],
-           let iconFileName = iconFiles.last {
-            return UIImage(named: iconFileName)
-        }
-        return nil
     }
 }

@@ -36,7 +36,9 @@ extension DraftRoomViewModel {
                     maxKeepers: nil,
                     tradeDeadline: nil,
                     reserveSlots: nil,
-                    taxiSlots: nil
+                    taxiSlots: nil,
+                    leagueType: nil,
+                    isChopped: nil
                 ),
                 scoringSettings: nil,
                 rosterPositions: nil

@@ -2,8 +2,6 @@
 //  FantasyMatchupListView.swift  
 //  BigWarRoom
 //
-//  Fantasy matchup list with league picker, week picker, and matchup cards
-//
 // MARK: -> Fantasy Matchup List View
 
 import SwiftUI
@@ -11,6 +9,7 @@ import SwiftUI
 struct FantasyMatchupListView: View {
     let draftRoomViewModel: DraftRoomViewModel  // Accept the shared view model
     @StateObject private var viewModel = FantasyViewModel()
+    @State private var forceChoppedMode = false // DEBUG: Force chopped mode
     
     var body: some View {
         NavigationView {
@@ -25,16 +24,42 @@ struct FantasyMatchupListView: View {
                     
                     // Matchups content
                     if viewModel.isLoading {
+                        let _ = print("⏳ UI CONDITION: Loading state")
                         loadingView
-                    } else if viewModel.matchups.isEmpty {
+                    } else if viewModel.detectedAsChoppedLeague || isChoppedLeague || forceChoppedMode {
+                        // CHOPPED LEAGUE: Detected via empty matchups + rosters OR settings
+                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard!")
+                        let _ = print("   - viewModel.detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
+                        let _ = print("   - isChoppedLeague (computed): \(isChoppedLeague)")
+                        let _ = print("   - forceChoppedMode: \(forceChoppedMode)")
+                        let _ = print("   - viewModel.matchups.count: \(viewModel.matchups.count)")
+                        let _ = print("   - viewModel.hasActiveRosters: \(viewModel.hasActiveRosters)")
+                        choppedLeaderboardView
+                    } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
+                        // EMPTY STATE: No matchups and no rosters
+                        let _ = print("❌ UI CONDITION: Showing empty state")
+                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
+                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
+                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
+                        let _ = print("   - selectedLeague: \(viewModel.selectedLeague?.league.name ?? "nil")")
+                        let _ = print("   - selectedLeague.source: \(viewModel.selectedLeague?.source.displayName ?? "nil")")
                         emptyStateView
+                    } else if viewModel.matchups.isEmpty && viewModel.hasActiveRosters {
+                        // CHOPPED LEAGUE: No matchups but has rosters (safety net)
+                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard (safety net)!")
+                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
+                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
+                        choppedLeaderboardView
                     } else {
+                        // NORMAL LEAGUE: Has matchups
+                        let _ = print("✅ UI CONDITION: Showing normal matchups")
+                        let _ = print("   - matchups.count: \(viewModel.matchups.count)")
                         matchupsList
                     }
                 }
             }
-            .navigationTitle(viewModel.selectedLeague?.league.name ?? "Fantasy")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle(shouldHideTitle ? "" : (viewModel.selectedLeague?.league.name ?? "Fantasy"))
+            .navigationBarTitleDisplayMode(shouldHideTitle ? .inline : .large)
             .navigationBarItems(trailing: 
                 Button("Week \(viewModel.selectedWeek)") {
                     viewModel.presentWeekSelector()
@@ -60,33 +85,255 @@ struct FantasyMatchupListView: View {
             .task {
                 await setupConnectedLeague()
             }
+            .onReceive(draftRoomViewModel.$selectedLeagueWrapper) { newLeague in
+                // Detect when league changes from War Room and refresh immediately
+                Task {
+                    print("🔄 LEAGUE CHANGE DETECTED: \(newLeague?.league.name ?? "nil")")
+                    await setupConnectedLeague()
+                }
+            }
             .onAppear {
                 // Pass the shared DraftRoomViewModel to FantasyViewModel
                 viewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
+                
+                // Also check for league changes on appear (in case we missed the publisher)
+                Task {
+                    await setupConnectedLeague()
+                }
             }
+        }
+    }
+    
+    // MARK: -> Chopped League Detection
+    private var isChoppedLeague: Bool {
+        // NEW: Use FantasyViewModel's data-based detection
+        if viewModel.detectedAsChoppedLeague {
+            return true
+        }
+        
+        // FALLBACK: Check connected league settings (only for Sleeper)
+        if let leagueWrapper = draftRoomViewModel.selectedLeagueWrapper,
+           leagueWrapper.source == .sleeper,
+           let sleeperLeague = leagueWrapper.league as? SleeperLeague {
+            return sleeperLeague.settings?.isChoppedLeague ?? false
+        }
+        
+        return false
+    }
+    
+    /// Should hide the navigation title (only for Chopped leagues)
+    private var shouldHideTitle: Bool {
+        // Only hide title for confirmed Chopped leagues (avoid flickering)
+        guard let league = viewModel.selectedLeague else { return false }
+        
+        // ESPN leagues should ALWAYS show title
+        if league.source == .espn { return false }
+        
+        // Only hide for definitively detected Chopped leagues
+        return viewModel.detectedAsChoppedLeague || forceChoppedMode
+    }
+    
+    // MARK: -> Chopped Leaderboard View
+    private var choppedLeaderboardView: some View {
+        // Use async loading for real Chopped data
+        if let leagueWrapper = draftRoomViewModel.selectedLeagueWrapper,
+           leagueWrapper.source == .sleeper {
+            return AnyView(
+                AsyncChoppedLeaderboardView(
+                    leagueWrapper: leagueWrapper,
+                    week: viewModel.selectedWeek,
+                    fantasyViewModel: viewModel
+                )
+            )
+        } else {
+            // Fallback to mock data for non-Sleeper leagues
+            let choppedSummary = createChoppedSummaryFromMatchups()
+            return AnyView(
+                ChoppedLeaderboardView(
+                    choppedSummary: choppedSummary,
+                    leagueName: viewModel.selectedLeague?.league.name ?? "Chopped League"
+                )
+            )
+        }
+    }
+    
+    // MARK: -> Create Chopped Summary from Matchups
+    private func createChoppedSummaryFromMatchups() -> ChoppedWeekSummary {
+        // If this is a real Chopped league, fetch real data
+        if let leagueWrapper = draftRoomViewModel.selectedLeagueWrapper,
+           leagueWrapper.source == .sleeper {
+            
+            // Try to get real Chopped data from FantasyViewModel
+            let task = Task {
+                return await viewModel.createRealChoppedSummary(
+                    leagueID: leagueWrapper.league.leagueID,
+                    week: viewModel.selectedWeek
+                )
+            }
+            
+            // For now, we'll use the existing logic but this will be improved
+            // In the next iteration, we'll make this async properly
+        }
+        
+        // Collect all teams from matchups and bye weeks (EXISTING LOGIC)
+        var allTeams: [FantasyTeam] = []
+        
+        // Add teams from matchups
+        for matchup in viewModel.matchups {
+            allTeams.append(matchup.homeTeam)
+            allTeams.append(matchup.awayTeam)
+        }
+        
+        // Add bye week teams
+        allTeams.append(contentsOf: viewModel.byeWeekTeams)
+        
+        // If no teams found, create MOCK CHOPPED LEAGUE data for demo
+        if allTeams.isEmpty {
+            allTeams = createMockChoppedTeams()
+        }
+        
+        // Sort by current score (highest to lowest)
+        let sortedTeams = allTeams.sorted { team1, team2 in
+            let score1 = team1.currentScore ?? 0.0
+            let score2 = team2.currentScore ?? 0.0
+            return score1 > score2
+        }
+        
+        // Create team rankings with survival data
+        let teamRankingList = sortedTeams.enumerated().map { (index, team) -> FantasyTeamRanking in
+            let rank = index + 1
+            let isLastPlace = (rank == sortedTeams.count)
+            let isDangerZone = rank > (sortedTeams.count * 3 / 4) // Bottom 25%
+            
+            let status: EliminationStatus
+            if rank == 1 {
+                status = .champion
+            } else if isLastPlace {
+                status = .critical
+            } else if isDangerZone {
+                status = .danger
+            } else if rank > (sortedTeams.count / 2) {
+                status = .warning
+            } else {
+                status = .safe
+            }
+            
+            let teamScore = team.currentScore ?? 0.0
+            let averageScore = sortedTeams.compactMap { $0.currentScore }.reduce(0, +) / Double(sortedTeams.count)
+            let survivalProb = min(1.0, max(0.0, (teamScore / averageScore) * 0.7)) // Simple survival calculation
+            
+            return FantasyTeamRanking(
+                id: team.id,
+                team: team,
+                weeklyPoints: teamScore,
+                rank: rank,
+                eliminationStatus: status,
+                isEliminated: false, // No one eliminated yet in this mock
+                survivalProbability: survivalProb,
+                pointsFromSafety: 0.0, // Will calculate below
+                weeksAlive: viewModel.selectedWeek
+            )
+        }
+        
+        // Calculate cutoff and update safety margins
+        let cutoffScore = teamRankingList.last?.weeklyPoints ?? 0.0
+        let finalTeamRankings = teamRankingList.map { ranking in
+            return FantasyTeamRanking(
+                id: ranking.id,
+                team: ranking.team,
+                weeklyPoints: ranking.weeklyPoints,
+                rank: ranking.rank,
+                eliminationStatus: ranking.eliminationStatus,
+                isEliminated: ranking.isEliminated,
+                survivalProbability: ranking.survivalProbability,
+                pointsFromSafety: ranking.weeklyPoints - cutoffScore,
+                weeksAlive: ranking.weeksAlive
+            )
+        }
+        
+        // Summary statistics
+        let eliminatedTeam = finalTeamRankings.last
+        let allScores = finalTeamRankings.map { $0.weeklyPoints }
+        let avgScore = allScores.reduce(0, +) / Double(allScores.count)
+        let highScore = allScores.max() ?? 0.0
+        let lowScore = allScores.min() ?? 0.0
+        
+        return ChoppedWeekSummary(
+            id: "week_\(viewModel.selectedWeek)",
+            week: viewModel.selectedWeek,
+            rankings: finalTeamRankings,
+            eliminatedTeam: eliminatedTeam,
+            cutoffScore: cutoffScore,
+            isComplete: true,
+            totalSurvivors: finalTeamRankings.filter { !$0.isEliminated }.count,
+            averageScore: avgScore,
+            highestScore: highScore,
+            lowestScore: lowScore,
+            eliminationHistory: [] // No historical data for mock/fallback
+        )
+    }
+    
+    // MARK: -> Create Mock Chopped Teams for Demo
+    private func createMockChoppedTeams() -> [FantasyTeam] {
+        let mockTeams = [
+            ("The Chopped Champions", "Gp", 142.8),
+            ("Survival Squad", "Mike", 138.2),
+            ("Last Stand United", "Sarah", 135.6),
+            ("Death Dodgers", "Chris", 131.4),
+            ("Battle Royale Bros", "Alex", 128.9),
+            ("Elimination Elites", "Jordan", 125.3),
+            ("Final Four", "Taylor", 122.7),
+            ("Danger Zone Dawgs", "Casey", 118.1),
+            ("Critical Condition", "Jamie", 114.5),
+            ("About To Be Chopped", "Riley", 98.2)
+        ]
+        
+        return mockTeams.enumerated().map { index, teamData in
+            FantasyTeam(
+                id: "mock_team_\(index)",
+                name: teamData.0,
+                ownerName: teamData.1,
+                record: TeamRecord(wins: Int.random(in: 5...12), losses: Int.random(in: 1...8), ties: 0),
+                avatar: nil,
+                currentScore: teamData.2,
+                projectedScore: teamData.2 + Double.random(in: -10...10),
+                roster: [],
+                rosterID: index + 1
+            )
         }
     }
     
     // MARK: -> Connected League Setup
     /// Setup Fantasy to show only the connected league from War Room
     private func setupConnectedLeague() async {
+        print("🔄 SETUP: Checking for connected league changes...")
+        
         await viewModel.loadLeagues()
         
         // FIXED: Only use connected league from War Room - no switching allowed
         if let connectedLeagueWrapper = draftRoomViewModel.selectedLeagueWrapper {
-            // xprint("🏈 Fantasy: Using connected league from War Room: '\(connectedLeagueWrapper.league.name)'")
+            print("🏈 Fantasy: Connected league: '\(connectedLeagueWrapper.league.name)' (\(connectedLeagueWrapper.league.leagueID))")
             
-            // Find matching league in Fantasy's available leagues
-            if let matchingLeague = viewModel.availableLeagues.first(where: { 
-                $0.league.leagueID == connectedLeagueWrapper.league.leagueID 
-            }) {
-                // xprint("🏈 Fantasy: Loading matchups for: '\(matchingLeague.league.name)'")
-                viewModel.selectLeague(matchingLeague)
+            // Check if this is a different league than currently selected
+            let isNewLeague = viewModel.selectedLeague?.league.leagueID != connectedLeagueWrapper.league.leagueID
+            
+            if isNewLeague {
+                print("🔄 LEAGUE SWITCH: Switching from '\(viewModel.selectedLeague?.league.name ?? "none")' to '\(connectedLeagueWrapper.league.name)'")
+                
+                // Find matching league in Fantasy's available leagues
+                if let matchingLeague = viewModel.availableLeagues.first(where: { 
+                    $0.league.leagueID == connectedLeagueWrapper.league.leagueID 
+                }) {
+                    print("🏈 Fantasy: Loading matchups for new league: '\(matchingLeague.league.name)'")
+                    viewModel.selectLeague(matchingLeague)
+                } else {
+                    print("❌ Fantasy: Connected league not found in available leagues")
+                }
             } else {
-                // xprint("🏈 Fantasy: Connected league not found in available leagues")
+                print("✅ Fantasy: Same league already selected, no change needed")
             }
         } else {
-            // xprint("🏈 Fantasy: No connected league from War Room")
+            print("⚠️ Fantasy: No connected league from War Room")
         }
     }
     
@@ -211,6 +458,30 @@ struct FantasyMatchupListView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.red.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+                .padding(.horizontal, 20)
+                
+                // FORCE CHOPPED MODE BUTTON
+                Button(action: {
+                    forceChoppedMode.toggle()
+                }) {
+                    HStack {
+                        Text("💀")
+                        Text(forceChoppedMode ? "DISABLE CHOPPED MODE" : "🔥 FORCE CHOPPED BATTLE ROYALE 🔥")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.red)
+                        Text("💀")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red.opacity(forceChoppedMode ? 0.2 : 0.1))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
                                     .stroke(Color.red.opacity(0.3), lineWidth: 1)
