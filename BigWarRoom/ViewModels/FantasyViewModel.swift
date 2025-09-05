@@ -1,11 +1,3 @@
-// 
-//  FantasyViewModel.swift
-//  BigWarRoom
-//
-//  ViewModel for Fantasy matchup data and operations
-//
-// MARK: -> Fantasy ViewModel
-
 import Foundation
 import Combine
 import SwiftUI
@@ -58,7 +50,7 @@ final class FantasyViewModel: ObservableObject {
     private var sharedDraftRoomViewModel: DraftRoomViewModel?
     private var refreshTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
-    
+
     // MARK: -> Initialization
     init() {
         setupAutoRefresh()
@@ -137,7 +129,6 @@ final class FantasyViewModel: ObservableObject {
         // FIXED: Reset Chopped league detection flags
         detectedAsChoppedLeague = false
         hasActiveRosters = false
-        currentChoppedSummary = nil
         
         // Clear ESPN-specific data
         espnTeamRecords.removeAll()
@@ -424,35 +415,6 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    /// Try alternate ESPN token if first attempt fails
-    private func tryAlternateESPNToken(url: URL, leagueID: String, week: Int) async {
-        let alternateToken = selectedYear == "2025" ? AppConstants.ESPN_S2 : AppConstants.ESPN_S2_2025
-        
-        var request = URLRequest(url: url)
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(alternateToken)", forHTTPHeaderField: "Cookie")
-        
-        // FIXED: Use EXACT same approach as working ESPNFantasyTestView
-        URLSession.shared.dataTaskPublisher(for: request)
-            .map(\.data)
-            .decode(type: ESPNFantasyLeagueModel.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                switch completion {
-                case .failure:
-                    self?.errorMessage = "Failed to load ESPN matchups";
-                    self?.matchups = [];
-                case .finished:
-                    break
-                }
-            }, receiveValue: { [weak self] model in
-                Task {
-                    await self?.processESPNFantasyDataLikeTestView(espnModel: model, leagueID: leagueID, week: week)
-                }
-            })
-            .store(in: &cancellables);
-    }
-    
     /// Process ESPN Fantasy data EXACTLY like the test view (WORKING)
     private func processESPNFantasyDataLikeTestView(espnModel: ESPNFantasyLeagueModel, leagueID: String, week: Int) async {
         // Store team records and names for later lookup (SAME as test view)
@@ -483,7 +445,7 @@ final class FantasyViewModel: ObservableObject {
                 // Create bye week team entry
                 if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
                     let homeScore = homeTeam.activeRosterScore(for: week);
-                    let byeTeam = createFantasyTeamFromESPNLikeTestView(
+                    let byeTeam = createFantasyTeamFromESPN(
                         espnTeam: homeTeam,
                         score: homeScore,
                         leagueID: leagueID
@@ -493,8 +455,9 @@ final class FantasyViewModel: ObservableObject {
                 continue
             }
             
-            let awayTeamId = awayTeamEntry.teamId
-            let homeTeamId = scheduleEntry.home.teamId
+            // FIXED: Use original ESPN team assignments instead of forcing arbitrary sorting
+            let awayTeamId = awayTeamEntry.teamId  // Keep ESPN's original away team
+            let homeTeamId = scheduleEntry.home.teamId  // Keep ESPN's original home team
             
             guard let awayTeam = espnModel.teams.first(where: { $0.id == awayTeamId }),
                   let homeTeam = espnModel.teams.first(where: { $0.id == homeTeamId }) else {
@@ -505,14 +468,16 @@ final class FantasyViewModel: ObservableObject {
             let awayScore = awayTeam.activeRosterScore(for: week)
             let homeScore = homeTeam.activeRosterScore(for: week)
             
+            print("🔍 ESPN ORIGINAL ORDER - Away: team \(awayTeamId) (\(awayScore)) vs Home: team \(homeTeamId) (\(homeScore))")
+            
             // Create fantasy teams with real data (SAME as test view)
-            let awayFantasyTeam = createFantasyTeamFromESPNLikeTestView(
+            let awayFantasyTeam = createFantasyTeamFromESPN(
                 espnTeam: awayTeam,
                 score: awayScore,
                 leagueID: leagueID
             )
             
-            let homeFantasyTeam = createFantasyTeamFromESPNLikeTestView(
+            let homeFantasyTeam = createFantasyTeamFromESPN(
                 espnTeam: homeTeam,
                 score: homeScore,
                 leagueID: leagueID
@@ -535,72 +500,66 @@ final class FantasyViewModel: ObservableObject {
             processedMatchups.append(matchup)
         }
         
-        // Update both matchups and bye week teams
+        // FIXED: Keep original ESPN API order - NO MORE SORTING!
+        // This prevents the order from changing every time we refresh
         matchups = processedMatchups
         byeWeekTeams = byeTeams
         
-        print("🎯 ESPN \(leagueID): Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams");
+        print("🎯 ESPN \(leagueID): Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams with ORIGINAL ESPN ORDER");
     }
-
-    /// Create FantasyTeam from ESPN data EXACTLY like the test view (WORKING)
-    private func createFantasyTeamFromESPNLikeTestView(espnTeam: ESPNFantasyTeamModel, score: Double, leagueID: String) -> FantasyTeam {
-        // Convert ESPN roster to fantasy players (SAME as test view)
+    
+    /// Create FantasyTeam from ESPN team data
+    private func createFantasyTeamFromESPN(
+        espnTeam: ESPNFantasyTeamModel,
+        score: Double,
+        leagueID: String
+    ) -> FantasyTeam {
+        
         var fantasyPlayers: [FantasyPlayer] = []
         
+        // Create players from roster entries
         if let roster = espnTeam.roster {
-            fantasyPlayers = roster.entries.map { entry in
+            for entry in roster.entries {
                 let player = entry.playerPoolEntry.player
-                let weeklyScore = player.stats.first { stat in
-                    stat.scoringPeriodId == selectedWeek && stat.statSourceId == 0
-                }?.appliedTotal ?? 0.0
+                let isStarter = entry.lineupSlotId != 20 && entry.lineupSlotId != 21 // Not bench/IR
+                let playerScore = entry.getScore(for: selectedWeek)
                 
-                return FantasyPlayer(
+                let fantasyPlayer = FantasyPlayer(
                     id: String(player.id),
                     sleeperID: nil,
                     espnID: String(player.id),
                     firstName: extractFirstName(from: player.fullName),
                     lastName: extractLastName(from: player.fullName),
-                    position: positionString(entry.lineupSlotId),
+                    position: entry.positionString,
                     team: player.nflTeamAbbreviation,
-                    jerseyNumber: nil,
-                    currentPoints: weeklyScore,
-                    projectedPoints: weeklyScore * 1.1,
-                    gameStatus: createMockGameStatus(),
-                    isStarter: [0, 2, 3, 4, 5, 6, 23, 16, 17].contains(entry.lineupSlotId),
-                    lineupSlot: positionString(entry.lineupSlotId)
+                    jerseyNumber: nil, // ESPN doesn't provide jersey numbers
+                    currentPoints: playerScore,
+                    projectedPoints: playerScore * 1.05, // ESPN doesn't provide projections in this model
+                    gameStatus: GameStatus(status: "live"), 
+                    isStarter: isStarter,
+                    lineupSlot: entry.positionString
                 )
+                
+                fantasyPlayers.append(fantasyPlayer)
             }
         }
         
-        // Get team record (SAME as test view)
-        let record: TeamRecord?
-        if let espnRecord = espnTeam.record?.overall {
-            record = TeamRecord(
-                wins: espnRecord.wins,
-                losses: espnRecord.losses,
-                ties: espnRecord.ties
-            )
-        } else {
-            record = nil
-        }
-        
-        // FIXED: Use ESPN team name directly (NOT DraftRoomViewModel)
-        let managerName = espnTeam.name ?? "Team \(espnTeam.id)"
-        let teamName = espnTeam.name ?? "Team \(espnTeam.id)"
+        // Get team record if available
+        let teamRecord = espnTeamRecords[espnTeam.id]
         
         return FantasyTeam(
             id: String(espnTeam.id),
-            name: teamName,
-            ownerName: managerName,
-            record: record,
-            avatar: nil,
+            name: espnTeam.name ?? espnTeamNames[espnTeam.id] ?? "Team \(espnTeam.id)",
+            ownerName: espnTeam.name ?? "Manager \(espnTeam.id)",
+            record: teamRecord,
+            avatar: nil, // ESPN doesn't provide team avatars like Sleeper
             currentScore: score,
             projectedScore: score * 1.05,
             roster: fantasyPlayers,
             rosterID: espnTeam.id
         )
     }
-
+    
     // MARK: -> SLEEPER IMPLEMENTATION - FIXED to match SleepThis
     
     /// Fetch Sleeper league scoring settings (like SleepThis)
@@ -697,7 +656,8 @@ final class FantasyViewModel: ObservableObject {
                 print("📡 SLEEPER MATCHUPS: HTTP Status \(httpResponse.statusCode)")
             }
             
-            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
+            // UPDATED: Use new SleeperMatchupResponse model with projected points
+            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
             print("📊 SLEEPER MATCHUPS: Received \(sleeperMatchups.count) matchups")
             
             // FIXED: Detect Chopped leagues IMMEDIATELY when matchups are empty
@@ -728,8 +688,8 @@ final class FantasyViewModel: ObservableObject {
             }
             
             print("🏈 SLEEPER MATCHUPS: Processing \(sleeperMatchups.count) regular matchups")
-            // Process REAL matchups like SleepThis
-            await processSleeperMatchups(sleeperMatchups, leagueID: leagueID)
+            // Process REAL matchups with projected points like SleepThis
+            await processSleeperMatchupsWithProjections(sleeperMatchups, leagueID: leagueID)
             
         } catch {
             print("❌ SLEEPER MATCHUPS: API Error - \(error.localizedDescription)")
@@ -737,53 +697,58 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    /// Process REAL Sleeper matchups (like SleepThis - CORRECT implementation)
-    private func processSleeperMatchups(_ sleeperMatchups: [SleeperMatchup], leagueID: String) async {
-        // xprint("🏈 Processing \(sleeperMatchups.count) REAL Sleeper matchups")
+    /// Process REAL Sleeper matchups with projected points (ENHANCED)
+    private func processSleeperMatchupsWithProjections(_ sleeperMatchups: [SleeperMatchupResponse], leagueID: String) async {
+        print("🏈 Processing \(sleeperMatchups.count) REAL Sleeper matchups with projections")
         
         // Group by matchup_id to get pairs
-        let groupedMatchups = Dictionary(grouping: sleeperMatchups, by: { $0.matchup_id })
+        let groupedMatchups = Dictionary(grouping: sleeperMatchups, by: { $0.matchupID ?? 0 })
         var processedMatchups: [FantasyMatchup] = []
         
-        for (_, matchups) in groupedMatchups where matchups.count == 2 {
-            let team1 = matchups[0]
-            let team2 = matchups[1]
+        for (matchupID, matchups) in groupedMatchups.sorted(by: { $0.key < $1.key }) where matchups.count == 2 {
+            // FIXED: Use original Sleeper matchup order instead of sorting by roster ID
+            // This keeps the order consistent with what Sleeper shows
+            let team1 = matchups[0]  // First team as away (original Sleeper order)
+            let team2 = matchups[1]  // Second team as home (original Sleeper order)
             
             // Get manager info
-            let awayManagerID = rosterIDToManagerID[team1.roster_id] ?? ""
-            let homeManagerID = rosterIDToManagerID[team2.roster_id] ?? ""
+            let awayManagerID = rosterIDToManagerID[team1.rosterID] ?? ""
+            let homeManagerID = rosterIDToManagerID[team2.rosterID] ?? ""
             
-            let awayManagerName = userIDs[awayManagerID] ?? "Manager \(team1.roster_id)"
-            let homeManagerName = userIDs[homeManagerID] ?? "Manager \(team2.roster_id)"
+            let awayManagerName = userIDs[awayManagerID] ?? "Manager \(team1.rosterID)"
+            let homeManagerName = userIDs[homeManagerID] ?? "Manager \(team2.rosterID)"
             
             let awayAvatarURL = userAvatars[awayManagerID]
             let homeAvatarURL = userAvatars[homeManagerID]
             
-            // xprint("🔍 Away: roster \(team1.roster_id) -> manager \(awayManagerID) -> name '\(awayManagerName)' -> avatar \(awayAvatarURL?.absoluteString ?? "nil")")
-            // xprint("🔍 Home: roster \(team2.roster_id) -> manager \(homeManagerID) -> name '\(homeManagerName)' -> avatar \(homeAvatarURL?.absoluteString ?? "nil")")
+            print("🔍 SLEEPER ORIGINAL ORDER - Away: roster \(team1.rosterID) -> manager \(awayManagerID) -> name '\(awayManagerName)'")
+            print("🔍 SLEEPER ORIGINAL ORDER - Home: roster \(team2.rosterID) -> manager \(homeManagerID) -> name '\(homeManagerName)'")
             
-            // Calculate REAL scores using ACTUAL starter lineups like SleepThis
-            let awayScore = calculateSleeperTeamScore(matchup: team1)
-            let homeScore = calculateSleeperTeamScore(matchup: team2)
+            // Use REAL points and projected points from Sleeper API
+            let awayScore = team1.points ?? 0.0
+            let homeScore = team2.points ?? 0.0
             
-            // Create fantasy teams with real scoring
+            let awayProjected = team1.projectedPoints ?? 0.0
+            let homeProjected = team2.projectedPoints ?? 0.0
+            
+            print("📊 REAL PROJECTIONS - Away: \(String(format: "%.2f", awayScore)) pts (\(String(format: "%.2f", awayProjected)) proj) | Home: \(String(format: "%.2f", homeScore)) pts (\(String(format: "%.2f", homeProjected)) proj)")
+            
+            // Create fantasy teams with REAL projected points
             let awayTeam = createSleeperFantasyTeam(
-                matchup: team1,
+                matchupResponse: team1,
                 managerName: awayManagerName,
-                avatarURL: awayAvatarURL,
-                score: awayScore
+                avatarURL: awayAvatarURL
             )
             
             let homeTeam = createSleeperFantasyTeam(
-                matchup: team2,
+                matchupResponse: team2,
                 managerName: homeManagerName,
-                avatarURL: homeAvatarURL,
-                score: homeScore
+                avatarURL: homeAvatarURL
             )
             
-            // Create matchup with REAL data
+            // Create matchup with REAL projected data and original team assignment
             let fantasyMatchup = FantasyMatchup(
-                id: "\(leagueID)_\(selectedWeek)_\(team1.roster_id)_\(team2.roster_id)",
+                id: "\(leagueID)_\(selectedWeek)_\(team1.rosterID)_\(team2.rosterID)",
                 leagueID: leagueID,
                 week: selectedWeek,
                 year: selectedYear,
@@ -792,19 +757,27 @@ final class FantasyViewModel: ObservableObject {
                 status: .live,
                 winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore),
                 startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
-                sleeperMatchups: (team1, team2)  // Store real matchup data
+                sleeperMatchups: nil  // Could enhance to convert SleeperMatchupResponse to SleeperMatchup
             )
             
             processedMatchups.append(fantasyMatchup)
             
-            // xprint("✅ Sleeper matchup: \(awayManagerName) (\(String(format: "%.2f", awayScore))) vs \(homeManagerName) (\(String(format: "%.2f", homeScore)))")
+            print("✅ Sleeper matchup (ORIGINAL ORDER): \(awayManagerName) (\(String(format: "%.2f", awayScore))) vs \(homeManagerName) (\(String(format: "%.2f", homeScore)))")
         }
         
+        // FIXED: Keep original Sleeper API order - NO MORE SORTING!
+        // Process matchups in the order they came from Sleeper API to maintain consistency
         matchups = processedMatchups
-        // xprint("🎯 Processed \(processedMatchups.count) REAL Sleeper matchups with accurate scoring")
+        print("🎯 Processed \(processedMatchups.count) REAL Sleeper matchups with ORIGINAL ORDER preserved")
     }
     
-    /// Calculate Sleeper team score using REAL starter lineup (like SleepThis - CORRECT)
+    /// Calculate win probability based on scores
+    private func calculateWinProbability(homeScore: Double, awayScore: Double) -> Double {
+        if homeScore == 0 && awayScore == 0 { return 0.5 }
+        return homeScore / (homeScore + awayScore)
+    }
+    
+    /// Calculate Sleeper team score using REAL starter lineup (legacy format)
     private func calculateSleeperTeamScore(matchup: SleeperMatchup) -> Double {
         guard let starters = matchup.starters else { return 0.0 }
         
@@ -813,7 +786,7 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    /// Calculate Sleeper player score using league settings (like SleepThis - CORRECT)
+    /// Calculate Sleeper player score using league settings (legacy format)
     private func calculateSleeperPlayerScore(playerId: String) -> Double {
         guard let playerStats = playerStats[playerId],
               let scoringSettings = sleeperLeagueSettings else {
@@ -830,7 +803,80 @@ final class FantasyViewModel: ObservableObject {
         return totalScore
     }
     
-    /// Create Sleeper fantasy team with REAL manager names from shared DraftRoomViewModel
+    /// Create Sleeper fantasy team with REAL projected points from API
+    private func createSleeperFantasyTeam(
+        matchupResponse: SleeperMatchupResponse,
+        managerName: String,
+        avatarURL: URL?
+    ) -> FantasyTeam {
+        
+        var fantasyPlayers: [FantasyPlayer] = []
+        
+        // Create players from starters and bench
+        if let allPlayers = matchupResponse.players {
+            for playerID in allPlayers {
+                if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
+                    let isStarter = matchupResponse.starters?.contains(playerID) ?? false
+                    let playerScore = calculateSleeperPlayerScore(playerId: playerID)
+                    let playerProjected = playerScore * 1.1 // Could enhance with real player projections
+                    
+                    let fantasyPlayer = FantasyPlayer(
+                        id: playerID,
+                        sleeperID: playerID,
+                        espnID: sleeperPlayer.espnID,
+                        firstName: sleeperPlayer.firstName,
+                        lastName: sleeperPlayer.lastName,
+                        position: sleeperPlayer.position ?? "FLEX",
+                        team: sleeperPlayer.team,
+                        jerseyNumber: sleeperPlayer.number?.description,
+                        currentPoints: playerScore,
+                        projectedPoints: playerProjected,
+                        gameStatus: GameStatus(status: "live"), // Use proper GameStatus initializer
+                        isStarter: isStarter,
+                        lineupSlot: sleeperPlayer.position
+                    )
+                    
+                    fantasyPlayers.append(fantasyPlayer)
+                }
+            }
+        }
+        
+        let avatarString = avatarURL?.absoluteString
+        
+        // Get better manager name from DraftRoomViewModel
+        var finalManagerName = managerName
+        
+        if let sharedDraftRoom = sharedDraftRoomViewModel {
+            // Try to get better manager name from DraftRoomViewModel
+            // We need to find the draft slot that corresponds to this roster ID
+            let allPicks = sharedDraftRoom.allDraftPicks
+            if let correspondingPick = allPicks.first(where: { $0.rosterInfo?.rosterID == matchupResponse.rosterID }) {
+                let draftSlotBasedName = sharedDraftRoom.teamDisplayName(for: correspondingPick.draftSlot)
+                
+                // Check if we got a real name (not generic "Team X")
+                if !draftSlotBasedName.isEmpty,
+                   !draftSlotBasedName.lowercased().hasPrefix("team "),
+                   !draftSlotBasedName.lowercased().hasPrefix("manager "),
+                   draftSlotBasedName.count > 4 {
+                    finalManagerName = draftSlotBasedName
+                }
+            }
+        }
+        
+        return FantasyTeam(
+            id: String(matchupResponse.rosterID),
+            name: finalManagerName,
+            ownerName: finalManagerName,
+            record: nil,
+            avatar: avatarString,
+            currentScore: matchupResponse.points,  // REAL current score from API
+            projectedScore: matchupResponse.projectedPoints,  // REAL projected score from API 
+            roster: fantasyPlayers,
+            rosterID: matchupResponse.rosterID
+        )
+    }
+    
+    /// Create Sleeper fantasy team with REAL player data
     private func createSleeperFantasyTeam(
         matchup: SleeperMatchup,
         managerName: String,
@@ -858,7 +904,7 @@ final class FantasyViewModel: ObservableObject {
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: playerScore,
                         projectedPoints: playerScore * 1.1,
-                        gameStatus: createMockGameStatus(),
+                        gameStatus: GameStatus(status: "live"), // Use proper GameStatus initializer
                         isStarter: isStarter,
                         lineupSlot: sleeperPlayer.position
                     )
@@ -870,7 +916,7 @@ final class FantasyViewModel: ObservableObject {
         
         let avatarString = avatarURL?.absoluteString
         
-        // FIXED: Use shared DraftRoomViewModel for better manager name resolution
+        // Get better manager name from DraftRoomViewModel
         var finalManagerName = managerName
         
         if let sharedDraftRoom = sharedDraftRoomViewModel {
@@ -886,28 +932,21 @@ final class FantasyViewModel: ObservableObject {
                    !draftSlotBasedName.lowercased().hasPrefix("manager "),
                    draftSlotBasedName.count > 4 {
                     finalManagerName = draftSlotBasedName
-                    // xprint("🏈 Sleeper Fantasy: Using manager name '\(finalManagerName)' from DraftRoomViewModel for roster \(matchup.roster_id)")
                 }
             }
         }
         
         return FantasyTeam(
             id: String(matchup.roster_id),
-            name: finalManagerName, // REAL manager name from DraftRoom
-            ownerName: finalManagerName, // REAL manager name
-            record: nil,  // Would need roster data for record
-            avatar: avatarString, // FIXED: Store full URL string
-            currentScore: score,  // Real calculated score
+            name: finalManagerName,
+            ownerName: finalManagerName,
+            record: nil,
+            avatar: avatarString,
+            currentScore: score,  // REAL current score
             projectedScore: score * 1.05,
             roster: fantasyPlayers,
             rosterID: matchup.roster_id
         )
-    }
-    
-    /// Calculate win probability based on scores
-    private func calculateWinProbability(homeScore: Double, awayScore: Double) -> Double {
-        if homeScore == 0 && awayScore == 0 { return 0.5 }
-        return homeScore / (homeScore + awayScore)
     }
     
     /// Extract first name from full name
@@ -936,22 +975,206 @@ final class FantasyViewModel: ObservableObject {
         default: return "BN"
         }
     }
-    
-    /// Create mock game status for testing
-    private func createMockGameStatus() -> GameStatus {
-        let statuses = ["pregame", "live", "postgame", "bye"]
-        let randomStatus = statuses.randomElement() ?? "pregame"
-        
-        return GameStatus(
-            status: randomStatus,
-            startTime: Calendar.current.date(byAdding: .hour, value: Int.random(in: 1...6), to: Date()),
-            timeRemaining: randomStatus == "live" ? "14:32" : nil,
-            quarter: randomStatus == "live" ? "2nd" : nil,
-            homeScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil,
-            awayScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil
-        )
+
+    /// Position sort order for roster display
+    private func positionSortOrder(_ position: String) -> Int {
+        switch position.uppercased() {
+        case "QB": return 1
+        case "WR": return 2
+        case "RB": return 3
+        case "TE": return 4
+        case "FLEX": return 5
+        case "K": return 7
+        case "D/ST", "DST", "DEF": return 8
+        case "BN", "BENCH": return 9
+        default: return 10
+        }
+    }
+
+    /// Calculate score variance for elimination probabilities
+    private func calculateScoreVariance(_ scores: [Double]) -> Double {
+        guard scores.count > 1 else { return 10.0 }
+        let mean = scores.reduce(0, +) / Double(scores.count)
+        let squaredDifferences = scores.map { pow($0 - mean, 2) }
+        return sqrt(squaredDifferences.reduce(0, +) / Double(scores.count - 1))
+    }
+
+    /// Check if there are currently live NFL games
+    private func hasLiveGames() -> Bool {
+        // Dummy implementation, update as desired
+        return false
     }
     
+    // MARK: -> SLEEPER IMPLEMENTATION - ENHANCED
+    
+    /// Get score for a team
+    func getScore(for matchup: FantasyMatchup, teamIndex: Int) -> Double {
+        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
+        
+        return team.currentScore ?? 0.0
+    }
+    
+    /// Get score difference text for VS section
+    func scoreDifferenceText(matchup: FantasyMatchup) -> String {
+        let awayScore = getScore(for: matchup, teamIndex: 0)
+        let homeScore = getScore(for: matchup, teamIndex: 1)
+        return String(format: "%.2f", abs(awayScore - homeScore))
+    }
+    
+    /// Get manager record for display
+    func getManagerRecord(managerID: String) -> String {
+        // This would typically come from league data, for now return a placeholder
+        return "0-0"
+    }
+    
+    /// Get positional ranking for a player
+    func getPositionalRanking(for player: FantasyPlayer, in matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> String {
+        // Get all players at this position from both teams
+        let allPlayers = matchup.awayTeam.roster + matchup.homeTeam.roster
+        let positionPlayers = allPlayers.filter { $0.position == player.position && $0.isStarter == !isBench }
+            .sorted { ($0.currentPoints ?? 0.0) > ($1.currentPoints ?? 0.0) }
+        
+        // Find player's rank in their position
+        if let index = positionPlayers.firstIndex(where: { $0.id == player.id }) {
+            return player.position.uppercased()
+        }
+        return player.position.uppercased()
+    }
+
+    // MARK: -> Elimination Probability Calculation
+    
+    /// Fetch Chopped league standings with REAL projected points and elimination probabilities
+    func fetchChoppedLeagueStandings(leagueID: String, week: Int) async -> [FantasyTeamRanking] {
+        // First get league settings and users
+        await fetchSleeperScoringSettings(leagueID: leagueID)
+        await fetchSleeperWeeklyStats()
+        await fetchSleeperLeagueUsersAndRosters(leagueID: leagueID)
+        
+        do {
+            // 🎯 Use new API method to get matchups with projected points
+            let sleeperMatchups = try await SleeperAPIClient.shared.fetchMatchups(
+                leagueID: leagueID, 
+                week: week
+            )
+            
+            // Convert each roster to a FantasyTeam with real scoring AND projections
+            var allTeams: [FantasyTeam] = []
+            
+            for matchup in sleeperMatchups {
+                let teamScore = matchup.points ?? 0.0
+                let teamProjected = matchup.projectedPoints ?? (teamScore * 1.05)
+                let managerID = rosterIDToManagerID[matchup.rosterID] ?? ""
+                let managerName = userIDs[managerID] ?? "Manager \(matchup.rosterID)"
+                let avatarURL = userAvatars[managerID]
+                
+                // Use shared DraftRoomViewModel for better manager names
+                var finalManagerName = managerName
+                
+                if let sharedDraftRoom = sharedDraftRoomViewModel {
+                    // Try to get better manager name from DraftRoomViewModel
+                    // We need to find the draft slot that corresponds to this roster ID
+                    let allPicks = sharedDraftRoom.allDraftPicks
+                    if let correspondingPick = allPicks.first(where: { $0.rosterInfo?.rosterID == matchup.rosterID }) {
+                        let draftSlotBasedName = sharedDraftRoom.teamDisplayName(for: correspondingPick.draftSlot)
+                        
+                        // Check if we got a real name (not generic "Team X")
+                        if !draftSlotBasedName.isEmpty,
+                           !draftSlotBasedName.lowercased().hasPrefix("team "),
+                           !draftSlotBasedName.lowercased().hasPrefix("manager "),
+                           draftSlotBasedName.count > 4 {
+                            finalManagerName = draftSlotBasedName
+                        }
+                    }
+                }
+                
+                let fantasyTeam = FantasyTeam(
+                    id: String(matchup.rosterID),
+                    name: finalManagerName,
+                    ownerName: finalManagerName,
+                    record: nil,
+                    avatar: avatarURL?.absoluteString,
+                    currentScore: teamScore,
+                    projectedScore: teamProjected,  // 🎯 REAL SLEEPER PROJECTED POINTS
+                    roster: [],  // Could populate if needed
+                    rosterID: matchup.rosterID
+                )
+                
+                allTeams.append(fantasyTeam)
+            }
+            
+            // Sort teams by current score OR projected score if current is 0
+            let sortedTeams = allTeams.sorted { team1, team2 in
+                let score1 = (team1.currentScore ?? 0.0) > 0 ? (team1.currentScore ?? 0.0) : (team1.projectedScore ?? 0.0)
+                let score2 = (team2.currentScore ?? 0.0) > 0 ? (team2.currentScore ?? 0.0) : (team2.projectedScore ?? 0.0)
+                return score1 > score2
+            }
+            
+            // Calculate elimination probabilities using REAL data
+            let totalTeams = sortedTeams.count
+            let allCurrentScores = sortedTeams.compactMap { $0.currentScore }
+            let allProjectedScores = sortedTeams.compactMap { $0.projectedScore }
+            let averageProjected = allProjectedScores.reduce(0, +) / Double(allProjectedScores.count)
+            let scoreVariance = self.calculateScoreVariance(allCurrentScores)
+            let weeksRemaining = max(0, 18 - week) // NFL season is 18 weeks including playoffs
+            
+            // Create rankings with REAL elimination probabilities like Sleeper
+            let rankings = sortedTeams.enumerated().map { index, team -> FantasyTeamRanking in
+                let rank = index + 1
+                let teamScore = team.currentScore ?? 0.0
+                let teamProjected = team.projectedScore ?? 0.0
+                
+                // 🎯 Calculate REAL safety percentage like Sleeper's "SAFE %"
+                let safetyPercentage = EliminationProbabilityCalculator.calculateSafetyPercentage(
+                    currentRank: rank,
+                    totalTeams: totalTeams,
+                    projectedPoints: teamProjected,
+                    averageProjected: averageProjected,
+                    weeklyVariance: scoreVariance,
+                    weeksRemaining: weeksRemaining,
+                    historicalPerformance: [] // Could add historical data later
+                )
+                
+                // Determine elimination status based on safety percentage
+                let status = EliminationProbabilityCalculator.determineEliminationStatus(
+                    safetyPercentage: safetyPercentage,
+                    rank: rank,
+                    totalTeams: totalTeams
+                )
+                
+                // Points from elimination line (distance from last place projected)
+                let lastPlaceProjected = sortedTeams.last?.projectedScore ?? 0.0
+                let safetyMargin = teamProjected - lastPlaceProjected
+                
+                return FantasyTeamRanking(
+                    id: team.id,
+                    team: team,
+                    weeklyPoints: teamScore > 0 ? teamScore : teamProjected, // Use current or projected
+                    rank: rank,
+                    eliminationStatus: status,
+                    isEliminated: false,
+                    survivalProbability: safetyPercentage,  // 🎯 REAL SLEEPER-STYLE CALCULATION
+                    pointsFromSafety: safetyMargin,
+                    weeksAlive: week
+                )
+            }
+            
+            print("🔥 CHOPPED: Created \(rankings.count) real team rankings with Sleeper-style safety percentages for league \(leagueID) week \(week)")
+            return rankings
+            
+        } catch {
+            print("❌ CHOPPED: Failed to fetch league standings with projections: \(error)")
+            return []
+        }
+    }
+
+    /// Load available leagues on app start
+    func loadLeagues() async {
+        await unifiedLeagueManager.fetchAllLeagues(
+            sleeperUserID: AppConstants.GpSleeperID, 
+            season: selectedYear
+        )
+    }
+
     /// Refresh matchups (for auto-refresh) - FIXED for real-time updates without navigation disruption
     func refreshMatchups() async {
         guard let league = selectedLeague else {
@@ -996,84 +1219,6 @@ final class FantasyViewModel: ObservableObject {
         }
     }
 
-    /// Process ESPN refresh data without UI disruption
-    private func processESPNRefreshData(espnModel: ESPNFantasyLeagueModel, leagueID: String, week: Int) async {
-        let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
-        var updatedMatchups: [FantasyMatchup] = []
-        var updatedByeTeams: [FantasyTeam] = []
-        
-        // Build updated matchups while preserving existing IDs and structure
-        for scheduleEntry in weekSchedule {
-            // FIXED: Handle bye weeks during refresh
-            guard let awayTeamEntry = scheduleEntry.away else {
-                NSLog("🛌 ESPN Refresh: Found bye week for team \(scheduleEntry.home.teamId)");
-                
-                // Create bye week team entry
-                if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
-                    let homeScore = homeTeam.activeRosterScore(for: week);
-                    let byeTeam = createFantasyTeamFromESPNLikeTestView(
-                        espnTeam: homeTeam,
-                        score: homeScore,
-                        leagueID: leagueID
-                    );
-                    updatedByeTeams.append(byeTeam);
-                }
-                continue
-            }
-            
-            let awayTeamId = awayTeamEntry.teamId
-            let homeTeamId = scheduleEntry.home.teamId
-            
-            guard let awayTeam = espnModel.teams.first(where: { $0.id == awayTeamId }),
-                  let homeTeam = espnModel.teams.first(where: { $0.id == homeTeamId }) else {
-                continue
-            }
-            
-            // Calculate real ESPN scores using SAME method as test view
-            let awayScore = awayTeam.activeRosterScore(for: week)
-            let homeScore = homeTeam.activeRosterScore(for: week)
-            
-            // Find existing matchup to preserve navigation state
-            let matchupId = "\(leagueID)_\(week)_\(awayTeamId)_\(homeTeamId)"
-            
-            // Create updated fantasy teams
-            let awayFantasyTeam = createFantasyTeamFromESPNLikeTestView(
-                espnTeam: awayTeam,
-                score: awayScore,
-                leagueID: leagueID
-            )
-            
-            let homeFantasyTeam = createFantasyTeamFromESPNLikeTestView(
-                espnTeam: homeTeam,
-                score: homeScore,
-                leagueID: leagueID
-            )
-            
-            // Create updated matchup with same ID structure
-            let updatedMatchup = FantasyMatchup(
-                id: matchupId,
-                leagueID: leagueID,
-                week: week,
-                year: selectedYear,
-                homeTeam: homeFantasyTeam,
-                awayTeam: awayFantasyTeam,
-                status: .live,
-                winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore),
-                startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
-                sleeperMatchups: nil
-            )
-            
-            updatedMatchups.append(updatedMatchup)
-        }
-        
-        // Atomically update both matchups and bye teams - this prevents navigation issues
-        if !updatedMatchups.isEmpty || !updatedByeTeams.isEmpty {
-            matchups = updatedMatchups
-            byeWeekTeams = updatedByeTeams
-            // xprint("🚀 Real-time update: \(updatedMatchups.count) matchups and \(updatedByeTeams.count) bye teams refreshed")
-        }
-    }
-
     /// Real-time Sleeper data refresh without UI disruption
     private func refreshSleeperData(leagueID: String, week: Int) async {
         guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
@@ -1084,13 +1229,15 @@ final class FantasyViewModel: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
             
-            // Update existing matchups with new Sleeper data
+            // Update existing matchups with new Sleeper data using old format
             let groupedMatchups = Dictionary(grouping: sleeperMatchups, by: { $0.matchup_id })
             var updatedMatchups: [FantasyMatchup] = []
             
-            for (_, matchupPair) in groupedMatchups where matchupPair.count == 2 {
-                let team1 = matchupPair[0]
-                let team2 = matchupPair[1]
+            for (matchupID, matchupPair) in groupedMatchups.sorted(by: { $0.key < $1.key }) where matchupPair.count == 2 {
+                // FIXED: Sort consistently by roster ID to prevent flipping during refresh
+                let sortedPair = matchupPair.sorted { $0.roster_id < $1.roster_id }
+                let team1 = sortedPair[0]  // Always lower roster ID as away
+                let team2 = sortedPair[1]  // Always higher roster ID as home
                 
                 let awayManagerID = rosterIDToManagerID[team1.roster_id] ?? ""
                 let homeManagerID = rosterIDToManagerID[team2.roster_id] ?? ""
@@ -1134,6 +1281,7 @@ final class FantasyViewModel: ObservableObject {
                 updatedMatchups.append(updatedMatchup)
             }
             
+            // FIXED: Keep original order during refresh - NO MORE SORTING!
             if !updatedMatchups.isEmpty {
                 matchups = updatedMatchups
             }
@@ -1141,6 +1289,11 @@ final class FantasyViewModel: ObservableObject {
         } catch {
             // xprint("❌ Sleeper real-time refresh failed: \(error)")
         }
+    }
+    
+    /// Fetch Chopped league standings with REAL projected points and elimination probabilities
+    func createRealChoppedSummary(leagueID: String, week: Int) async -> ChoppedWeekSummary? {
+        return await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week)
     }
     
     /// Check if a league is a Chopped format
@@ -1172,12 +1325,6 @@ final class FantasyViewModel: ObservableObject {
         return false
     }
 
-    /// Create a ChoppedWeekSummary from real Sleeper data
-    func createRealChoppedSummary(leagueID: String, week: Int) async -> ChoppedWeekSummary? {
-        return await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week)
-    }
-    
-    // MARK: -> CHOPPED ELIMINATION TRACKING 
     /// Fetch complete elimination history for Chopped league
     func fetchChoppedEliminationHistory(leagueID: String, currentWeek: Int) async -> [EliminationEvent] {
         var eliminationHistory: [EliminationEvent] = []
@@ -1325,7 +1472,7 @@ final class FantasyViewModel: ObservableObject {
             rankings: adjustedRankings,
             eliminatedTeam: eliminatedTeam,
             cutoffScore: cutoffScore,
-            isComplete: !isScheduled && !hasLiveGames(),
+            isComplete: !isScheduled && !self.hasLiveGames(),
             totalSurvivors: adjustedRankings.filter { !$0.isEliminated }.count,
             averageScore: avgScore,
             highestScore: highScore,
@@ -1345,420 +1492,6 @@ final class FantasyViewModel: ObservableObject {
         return summary
     }
 
-    /// Check if there are currently live NFL games
-    private func hasLiveGames() -> Bool {
-        // Simple check - could be enhanced with real NFL game status
-        let calendar = Calendar.current
-        let now = Date()
-        let weekday = calendar.component(.weekday, from: now)
-        let hour = calendar.component(.hour, from: now)
-        
-        // NFL games typically on Sunday (1), Monday (2), Thursday (5)
-        // During typical game hours
-        if weekday == 1 && hour >= 13 && hour <= 23 { return true } // Sunday 1-11 PM
-        if weekday == 2 && hour >= 20 && hour <= 23 { return true } // Monday 8-11 PM  
-        if weekday == 5 && hour >= 20 && hour <= 23 { return true } // Thursday 8-11 PM
-        
-        return false
-    }
-    
-    /// Fetch Chopped league standings (all rosters ranked by weekly points)
-    func fetchChoppedLeagueStandings(leagueID: String, week: Int) async -> [FantasyTeamRanking] {
-        // First get league settings and users
-        await fetchSleeperScoringSettings(leagueID: leagueID)
-        await fetchSleeperWeeklyStats()
-        await fetchSleeperLeagueUsersAndRosters(leagueID: leagueID)
-        
-        // Get all matchups for the week (even for Chopped leagues, Sleeper returns individual roster scores)
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
-            return []
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
-            
-            // Convert each roster to a FantasyTeam with real scoring
-            var allTeams: [FantasyTeam] = []
-            
-            for matchup in sleeperMatchups {
-                let teamScore = calculateSleeperTeamScore(matchup: matchup)
-                let managerID = rosterIDToManagerID[matchup.roster_id] ?? ""
-                let managerName = userIDs[managerID] ?? "Manager \(matchup.roster_id)"
-                let avatarURL = userAvatars[managerID]
-                
-                // Use shared DraftRoomViewModel for better manager names
-                var finalManagerName = managerName
-                if let sharedDraftRoom = sharedDraftRoomViewModel {
-                    let allPicks = sharedDraftRoom.allDraftPicks
-                    if let correspondingPick = allPicks.first(where: { $0.rosterInfo?.rosterID == matchup.roster_id }) {
-                        let draftSlotBasedName = sharedDraftRoom.teamDisplayName(for: correspondingPick.draftSlot)
-                        
-                        if !draftSlotBasedName.isEmpty,
-                           !draftSlotBasedName.lowercased().hasPrefix("team "),
-                           !draftSlotBasedName.lowercased().hasPrefix("manager "),
-                           draftSlotBasedName.count > 4 {
-                            finalManagerName = draftSlotBasedName
-                        }
-                    }
-                }
-                
-                let fantasyTeam = createSleeperFantasyTeam(
-                    matchup: matchup,
-                    managerName: finalManagerName,
-                    avatarURL: avatarURL,
-                    score: teamScore
-                )
-                
-                allTeams.append(fantasyTeam)
-            }
-            
-            // Sort teams by score (highest to lowest)
-            let sortedTeams = allTeams.sorted { team1, team2 in
-                let score1 = team1.currentScore ?? 0.0
-                let score2 = team2.currentScore ?? 0.0
-                return score1 > score2
-            }
-            
-            // Create rankings with elimination status
-            let rankings = sortedTeams.enumerated().map { index, team -> FantasyTeamRanking in
-                let rank = index + 1
-                let teamScore = team.currentScore ?? 0.0
-                let totalTeams = sortedTeams.count
-                
-                // Calculate elimination status based on position
-                let status: EliminationStatus
-                if rank == 1 {
-                    status = .champion
-                } else if rank == totalTeams {
-                    status = .critical  // Last place = death row
-                } else if rank > (totalTeams * 3 / 4) {
-                    status = .danger    // Bottom 25%
-                } else if rank > (totalTeams / 2) {
-                    status = .warning   // Bottom 50%
-                } else {
-                    status = .safe      // Top 50%
-                }
-                
-                // Calculate survival probability (simple algorithm)
-                let averageScore = sortedTeams.compactMap { $0.currentScore }.reduce(0, +) / Double(totalTeams)
-                let survivalProb = min(1.0, max(0.1, teamScore / (averageScore * 1.2)))
-                
-                // Points from elimination line (distance from last place)
-                let eliminationScore = sortedTeams.last?.currentScore ?? 0.0
-                let safetyMargin = teamScore - eliminationScore
-                
-                return FantasyTeamRanking(
-                    id: team.id,
-                    team: team,
-                    weeklyPoints: teamScore,
-                    rank: rank,
-                    eliminationStatus: status,
-                    isEliminated: false, // No one eliminated in current week view
-                    survivalProbability: survivalProb,
-                    pointsFromSafety: safetyMargin,
-                    weeksAlive: week // Assume they've survived this many weeks
-                )
-            }
-            
-            print("🔥 CHOPPED: Created \(rankings.count) real team rankings for league \(leagueID) week \(week)")
-            return rankings
-            
-        } catch {
-            print("❌ CHOPPED: Failed to fetch league standings: \(error)")
-            return []
-        }
-    }
-    
-    /// Get score for a team in a matchup
-    func getScore(for matchup: FantasyMatchup, teamIndex: Int) -> Double {
-        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
-        return team.currentScore ?? 0.0
-    }
-    
-    /// Get manager record for display with real ESPN data
-    func getManagerRecord(managerID: String) -> String {
-        // For ESPN leagues, look up the team record
-        if let selectedLeague = selectedLeague, selectedLeague.source == .espn {
-            if let teamID = Int(managerID),
-               let record = espnTeamRecords[teamID] {
-                return "\(record.wins)-\(record.losses) • Rank: 2nd"
-            }
-        }
-        // Fallback
-        return "0-0 • Rank: 2nd"
-    }
-    
-    /// Get score difference text for VS section
-    func scoreDifferenceText(matchup: FantasyMatchup) -> String {
-        let awayScore = getScore(for: matchup, teamIndex: 0)
-        let homeScore = getScore(for: matchup, teamIndex: 1)
-        return String(format: "%.2f", abs(awayScore - homeScore))
-    }
-    
-    /// Active roster section view
-    func activeRosterSection(matchup: FantasyMatchup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Active Roster")
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal)
-            
-            HStack(alignment: .top, spacing: 16) {
-                // Away Team Active Roster
-                VStack(spacing: 8) {
-                    let awayActiveRoster = getRoster(for: matchup, teamIndex: 0, isBench: false)
-                    ForEach(awayActiveRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player, 
-                            fantasyViewModel: self,
-                            matchup: matchup,
-                            teamIndex: 0,
-                            isBench: false
-                        )
-                    }
-                    
-                    let awayScore = getScore(for: matchup, teamIndex: 0)
-                    let homeScore = getScore(for: matchup, teamIndex: 1);
-                    let awayWinning = awayScore > homeScore
-                    
-                    Text("Active Total: \(String(format: "%.2f", awayScore))")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(awayWinning ? .gpGreen : .white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                
-                // Home Team Active Roster
-                VStack(spacing: 8) {
-                    let homeActiveRoster = getRoster(for: matchup, teamIndex: 1, isBench: false)
-                    ForEach(homeActiveRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player, 
-                            fantasyViewModel: self,
-                            matchup: matchup,
-                            teamIndex: 1,
-                            isBench: false
-                        )
-                    }
-                    
-                    let awayScore = getScore(for: matchup, teamIndex: 0)
-                    let homeScore = getScore(for: matchup, teamIndex: 1)
-                    let homeWinning = homeScore > awayScore
-                    
-                    Text("Active Total: \(String(format: "%.2f", homeScore))")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(homeWinning ? .gpGreen : .white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-    
-    /// Bench section view
-    func benchSection(matchup: FantasyMatchup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Bench")
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal)
-            
-            HStack(alignment: .top, spacing: 16) {
-                // Away Team Bench
-                VStack(spacing: 8) {
-                    let awayBenchRoster = getRoster(for: matchup, teamIndex: 0, isBench: true)
-                    ForEach(awayBenchRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player, 
-                            fantasyViewModel: self,
-                            matchup: matchup,
-                            teamIndex: 0,
-                            isBench: true
-                        )
-                    }
-                    
-                    let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
-                    Text("Bench Total: \(String(format: "%.2f", benchTotal))")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-                
-                // Home Team Bench
-                VStack(spacing: 8) {
-                    let homeBenchRoster = getRoster(for: matchup, teamIndex: 1, isBench: true)
-                    ForEach(homeBenchRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player, 
-                            fantasyViewModel: self,
-                            matchup: matchup,
-                            teamIndex: 1,
-                            isBench: true
-                        )
-                    }
-                    
-                    let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
-                    Text("Bench Total: \(String(format: "%.2f", benchTotal))")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-    
-    /// Get roster for a team (active or bench) with PROPER POSITION SORTING
-    private func getRoster(for matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> [FantasyPlayer] {
-        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
-        let filteredPlayers = team.roster.filter { player in
-            isBench ? !player.isStarter : player.isStarter
-        }
-        
-        // FIXED: Sort by position in the order Gp specified
-        return filteredPlayers.sorted { player1, player2 in
-            let order1 = positionSortOrder(player1.position)
-            let order2 = positionSortOrder(player2.position)
-            
-            if order1 != order2 {
-                // Different positions, sort by position order
-                return order1 < order2
-            } else {
-                // Same position, sort by fantasy points (highest first for position rank)
-                let points1 = player1.currentPoints ?? 0.0
-                let points2 = player2.currentPoints ?? 0.0
-                return points1 > points2
-            }
-        }
-    }
-    
-    /// Get positional ranking for a player (e.g., "RB1", "WR2", "TE1")
-    func getPositionalRanking(for player: FantasyPlayer, in matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> String {
-        let roster = getRoster(for: matchup, teamIndex: teamIndex, isBench: isBench)
-        
-        // Get all players in the same position group
-        let samePositionPlayers = roster.filter { $0.position.uppercased() == player.position.uppercased() }
-        
-        // Find this player's rank within their position group (1-based)
-        if let playerIndex = samePositionPlayers.firstIndex(where: { $0.id == player.id }) {
-            let rank = playerIndex + 1
-            return "\(player.position.uppercased())\(rank)"
-        }
-        
-        // Fallback to regular position if ranking fails
-        return player.position.uppercased()
-    }
-    
-    /// Position sorting order as requested by Gp: QB, WR, RB, TE, FLEX, Super Flex, K, D/ST
-    private func positionSortOrder(_ position: String) -> Int {
-        switch position.uppercased() {
-        case "QB": return 1
-        case "WR": return 2
-        case "RB": return 3
-        case "TE": return 4
-        case "FLEX": return 5
-        case "SUPER FLEX", "SF", "SUPERFLEX": return 6
-        case "K": return 7
-        case "D/ST", "DST", "DEF": return 8
-        case "BN", "BENCH": return 9// Bench players last
-        default: return 10 // Unknown positions last
-        }
-    }
-    
-    /// Initialize NFL game data for the current week
-    func setupNFLGameData() {
-        let currentWeek = getCurrentWeek()
-        let currentYear = Int(selectedYear) ?? 2024
-        
-        // Fetch real NFL game data
-        nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear)
-        
-        // Start live updates if it's during NFL game time (Sunday/Monday/Thursday)
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        
-        // Start live updates on game days (Sunday=1, Monday=2, Thursday=5)
-        if [1, 2, 5].contains(weekday) {
-            nflGameService.startLiveUpdates(forWeek: currentWeek, year: currentYear)
-        }
-    }
-    
-    /// Helper to get current NFL week
-    private func getCurrentWeek() -> Int {
-        // TODO: Integrate with your existing NFLWeekCalculator
-        // For now return a reasonable default
-        return 15
-    }
-    
-    // MARK: -> Week Selection
-    
-    /// Show week selector sheet
-    func presentWeekSelector() {
-        showWeekSelector = true
-    }
-    
-    /// Hide week selector sheet
-    func dismissWeekSelector() {
-        showWeekSelector = false
-    }
-    
-    /// Select a specific week and update matchups
-    func selectWeek(_ week: Int) {
-        selectedWeek = week
-        refreshNFLGameData()
-        
-        // Refresh matchups for the new week
-        Task {
-            await fetchMatchups()
-        }
-    }
-    
-    // MARK: -> Load Leagues
-    /// Load available leagues on app start
-    func loadLeagues() async {
-        await unifiedLeagueManager.fetchAllLeagues(
-            sleeperUserID: AppConstants.GpSleeperID, 
-            season: selectedYear
-        )
-    }
-
-    
     /// NEW: Validate Chopped league detection in background (don't block UI)
     private func validateChoppedLeagueDetection(leagueID: String, week: Int) async {
         print("🔍 CHOPPED VALIDATION: Checking rosters for league \(leagueID)")
@@ -1779,8 +1512,8 @@ final class FantasyViewModel: ObservableObject {
                 print("🔥 CHOPPED VALIDATED: \(rosters.count) active rosters confirmed - this is definitely a Chopped league!")
                 
                 await MainActor.run {
-                    hasActiveRosters = true
-                    print("🔥 CHOPPED: Updated hasActiveRosters = \(hasActiveRosters)")
+                    self.hasActiveRosters = true
+                    print("🔥 CHOPPED: Updated hasActiveRosters = \(self.hasActiveRosters)")
                 }
                 
                 // Load Chopped leaderboard data
@@ -1794,14 +1527,248 @@ final class FantasyViewModel: ObservableObject {
                 // Revert detection if no rosters found
                 print("❌ CHOPPED DETECTION FAILED: No rosters found - reverting detection")
                 await MainActor.run {
-                    detectedAsChoppedLeague = false
-                    hasActiveRosters = false
-                    errorMessage = "No matchups or active rosters found for week \(week)"
+                    self.detectedAsChoppedLeague = false
+                    self.hasActiveRosters = false
+                    self.errorMessage = "No matchups or active rosters found for week \(week)"
                 }
             }
             
         } catch {
             print("⚠️ CHOPPED VALIDATION ERROR: \(error) - keeping detection as is")
         }
+    }
+    
+    // MARK: -> Week Selection Methods
+    
+    /// Present the week selector sheet
+    func presentWeekSelector() {
+        showWeekSelector = true
+    }
+    
+    /// Dismiss the week selector sheet
+    func dismissWeekSelector() {
+        showWeekSelector = false
+    }
+    
+    /// Select a specific week and refresh data
+    func selectWeek(_ week: Int) {
+        guard week != selectedWeek else { return }
+        
+        selectedWeek = week
+        
+        // Refresh data for the new week
+        Task {
+            await fetchMatchups()
+        }
+    }
+    
+    // MARK: -> View Builder Methods
+    
+    /// Create the active roster section view for a matchup
+    func activeRosterSection(matchup: FantasyMatchup) -> some View {
+        FantasyActiveRosterSection(
+            matchup: matchup,
+            fantasyViewModel: self
+        )
+    }
+    
+    /// Create the bench section view for a matchup  
+    func benchSection(matchup: FantasyMatchup) -> some View {
+        FantasyBenchSection(
+            matchup: matchup,
+            fantasyViewModel: self
+        )
+    }
+}
+
+// MARK: -> Fantasy Active Roster Section View
+struct FantasyActiveRosterSection: View {
+    let matchup: FantasyMatchup
+    let fantasyViewModel: FantasyViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section header
+            HStack {
+                Image(systemName: "person.3.fill")
+                    .foregroundColor(.green)
+                    .font(.system(size: 16))
+                
+                Text("Active Lineup")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(activePlayersCount) players")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            
+            // Away team active players
+            VStack(alignment: .leading, spacing: 8) {
+                Text(matchup.awayTeam.ownerName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.yellow)
+                    .padding(.horizontal, 16)
+                
+                ForEach(awayActiveRoster, id: \.id) { player in
+                    FantasyPlayerCard(
+                        player: player,
+                        fantasyViewModel: fantasyViewModel,
+                        matchup: matchup,
+                        teamIndex: 0,
+                        isBench: false
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+            
+            // Home team active players  
+            VStack(alignment: .leading, spacing: 8) {
+                Text(matchup.homeTeam.ownerName)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.yellow)
+                    .padding(.horizontal, 16)
+                
+                ForEach(homeActiveRoster, id: \.id) { player in
+                    FantasyPlayerCard(
+                        player: player,
+                        fantasyViewModel: fantasyViewModel,
+                        matchup: matchup,
+                        teamIndex: 1,
+                        isBench: false
+                    )
+                    .padding(.horizontal, 16)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.1))
+        )
+        .padding(.horizontal, 16)
+    }
+    
+    /// Get active roster for away team
+    private var awayActiveRoster: [FantasyPlayer] {
+        return matchup.awayTeam.roster.filter { $0.isStarter }
+    }
+    
+    /// Get active roster for home team
+    private var homeActiveRoster: [FantasyPlayer] {
+        return matchup.homeTeam.roster.filter { $0.isStarter }
+    }
+    
+    /// Total active players count
+    private var activePlayersCount: Int {
+        return awayActiveRoster.count + homeActiveRoster.count
+    }
+}
+
+// MARK: -> Fantasy Bench Section View
+struct FantasyBenchSection: View {
+    let matchup: FantasyMatchup
+    let fantasyViewModel: FantasyViewModel
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Section header
+            HStack {
+                Image(systemName: "person.2.fill")
+                    .foregroundColor(.orange)
+                    .font(.system(size: 16))
+                
+                Text("Bench")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                Text("\(benchPlayersCount) players")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            
+            if benchPlayersCount == 0 {
+                // Empty bench message
+                HStack {
+                    Spacer()
+                    Text("No bench players")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            } else {
+                // Away team bench players
+                if !awayBenchRoster.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("\(matchup.awayTeam.ownerName) Bench")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.yellow.opacity(0.8))
+                            .padding(.horizontal, 16)
+                        
+                        ForEach(awayBenchRoster, id: \.id) { player in
+                            FantasyPlayerCard(
+                                player: player,
+                                fantasyViewModel: fantasyViewModel,
+                                matchup: matchup,
+                                teamIndex: 0,
+                                isBench: true
+                            )
+                            .padding(.horizontal, 16)
+                            .opacity(0.7)
+                        }
+                    }
+                }
+                
+                // Home team bench players
+                if !homeBenchRoster.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("\(matchup.homeTeam.ownerName) Bench")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.yellow.opacity(0.8))
+                            .padding(.horizontal, 16)
+                        
+                        ForEach(homeBenchRoster, id: \.id) { player in
+                            FantasyPlayerCard(
+                                player: player,
+                                fantasyViewModel: fantasyViewModel,
+                                matchup: matchup,
+                                teamIndex: 1,
+                                isBench: true
+                            )
+                            .padding(.horizontal, 16)
+                            .opacity(0.7)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.1))
+        )
+        .padding(.horizontal, 16)
+    }
+    
+    /// Get bench roster for away team
+    private var awayBenchRoster: [FantasyPlayer] {
+        return matchup.awayTeam.roster.filter { !$0.isStarter }
+    }
+    
+    /// Get bench roster for home team
+    private var homeBenchRoster: [FantasyPlayer] {
+        return matchup.homeTeam.roster.filter { !$0.isStarter }
+    }
+    
+    /// Total bench players count
+    private var benchPlayersCount: Int {
+        return awayBenchRoster.count + homeBenchRoster.count
     }
 }

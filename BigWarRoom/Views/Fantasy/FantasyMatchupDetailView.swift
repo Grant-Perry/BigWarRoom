@@ -12,7 +12,7 @@ struct FantasyMatchupDetailView: View {
     let matchup: FantasyMatchup
     @ObservedObject var fantasyViewModel: FantasyViewModel
     let leagueName: String
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss // Use new dismiss instead of presentationMode
     
     var body: some View {
         let awayTeamScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
@@ -24,7 +24,7 @@ struct FantasyMatchupDetailView: View {
             // Header with back button and countdown timer
             HStack {
                 Button(action: {
-                    presentationMode.wrappedValue.dismiss()
+                    dismiss()
                 }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 18, weight: .medium))
@@ -32,6 +32,20 @@ struct FantasyMatchupDetailView: View {
                         .frame(width: 44, height: 44)
                         .background(Color.gray.opacity(0.2))
                         .clipShape(Circle())
+                }
+                
+                Spacer()
+                
+                // League name and week info (preserve navigation context)
+                VStack(spacing: 2) {
+                    Text(leagueName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    
+                    Text("Week \(fantasyViewModel.selectedWeek)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
                 }
                 
                 Spacer()
@@ -76,6 +90,7 @@ struct FantasyMatchupDetailView: View {
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
         }
         .navigationBarHidden(true)
+        .navigationBarBackButtonHidden(true) // Ensure we use our custom back button
         .preferredColorScheme(.dark)
         .background(Color.black)
     }

@@ -13,9 +13,16 @@ import SwiftUI
 struct SleeperMatchup: Codable {
     let roster_id: Int
     let points: Double?
+    let projected_points: Double?  // Added projected points support
     let matchup_id: Int
     let starters: [String]?
     let players: [String]?
+    
+    /// Projected points formatted
+    var projectedPointsString: String {
+        guard let projected_points = projected_points else { return "0.00" }
+        return String(format: "%.2f", projected_points)
+    }
 }
 
 // MARK: -> Fantasy Matchup (not Codable due to complex nested structures)
@@ -496,6 +503,92 @@ struct EliminationEvent: Identifiable {
     }
 }
 
+/// Elimination Probability Calculator - THE SLEEPER SAUCE 🔥
+struct EliminationProbabilityCalculator {
+    
+    /// Calculate elimination probability like Sleeper's "SAFE %" 
+    static func calculateSafetyPercentage(
+        currentRank: Int,
+        totalTeams: Int,
+        projectedPoints: Double,
+        averageProjected: Double,
+        weeklyVariance: Double,
+        weeksRemaining: Int,
+        historicalPerformance: [Double] = []
+    ) -> Double {
+        
+        // Base safety calculation
+        let rankPercentile = Double(totalTeams - currentRank) / Double(totalTeams)
+        
+        // Projected points factor (how much above/below average)
+        let projectedFactor = projectedPoints / averageProjected
+        let projectedBonus = (projectedFactor - 1.0) * 0.3  // 30% weight to projections
+        
+        // Historical consistency factor
+        let consistencyFactor: Double
+        if !historicalPerformance.isEmpty {
+            let variance = calculateVariance(historicalPerformance)
+            consistencyFactor = max(0.0, 1.0 - (variance / averageProjected))
+        } else {
+            consistencyFactor = 0.5  // Neutral if no history
+        }
+        
+        // Weeks remaining factor (more weeks = more opportunity to recover)
+        let timeRemaining = Double(weeksRemaining) / 17.0  // NFL season length
+        let timeFactor = timeRemaining * 0.2  // 20% weight to time remaining
+        
+        // Combine all factors
+        var safetyPercentage = rankPercentile + projectedBonus + (consistencyFactor * 0.2) + timeFactor
+        
+        // Apply weekly variance adjustment (high variance = more unpredictable)
+        let varianceFactor = min(weeklyVariance / averageProjected, 0.5)  // Cap at 50%
+        safetyPercentage *= (1.0 - varianceFactor * 0.1)  // Slight penalty for high variance
+        
+        // Clamp between 1% and 99% (never 0% or 100%)
+        return max(0.01, min(0.99, safetyPercentage))
+    }
+    
+    /// Calculate variance of historical performance
+    private static func calculateVariance(_ scores: [Double]) -> Double {
+        guard scores.count > 1 else { return 0.0 }
+        
+        let mean = scores.reduce(0, +) / Double(scores.count)
+        let squaredDifferences = scores.map { pow($0 - mean, 2) }
+        return squaredDifferences.reduce(0, +) / Double(scores.count - 1)
+    }
+    
+    /// Determine elimination status based on safety percentage
+    static func determineEliminationStatus(
+        safetyPercentage: Double, 
+        rank: Int, 
+        totalTeams: Int
+    ) -> EliminationStatus {
+        
+        // Champion (top 10% with >80% safety)
+        if rank == 1 || (rank <= max(1, totalTeams / 10) && safetyPercentage > 0.8) {
+            return .champion
+        }
+        
+        // Critical (bottom team or very low safety)
+        if rank == totalTeams || safetyPercentage < 0.15 {
+            return .critical
+        }
+        
+        // Danger zone (bottom 25% or safety < 30%)
+        if rank > (totalTeams * 3 / 4) || safetyPercentage < 0.30 {
+            return .danger
+        }
+        
+        // Warning (safety 30-60%)
+        if safetyPercentage < 0.60 {
+            return .warning
+        }
+        
+        // Safe (everything else)
+        return .safe
+    }
+}
+
 // MARK: -> NFL Team Colors
 struct NFLTeamColors {
     private static let teamColors: [String: Color] = [
@@ -557,8 +650,7 @@ struct NFLTeamColors {
         switch team.uppercased() {
         case "DAL": return .gray
         case "NYG": return .red
-        case "PHI": return .gray
-        case "WSH": return .yellow
+        case "PHI": return .gray        case "WSH": return .yellow
         case "CHI": return .orange
         case "DET": return .gray
         case "GB": return .yellow

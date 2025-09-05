@@ -60,13 +60,15 @@ struct FantasyMatchupListView: View {
             }
             .navigationTitle(shouldHideTitle ? "" : (viewModel.selectedLeague?.league.name ?? "Fantasy"))
             .navigationBarTitleDisplayMode(shouldHideTitle ? .inline : .large)
-            .navigationBarItems(trailing: 
-                Button("Week \(viewModel.selectedWeek)") {
-                    viewModel.presentWeekSelector()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Week \(viewModel.selectedWeek)") {
+                        viewModel.presentWeekSelector()
+                    }
+                    .font(.headline)
+                    .foregroundColor(.blue)
                 }
-                .font(.headline)
-                .foregroundColor(.blue)
-            )
+            }
             .preferredColorScheme(.dark)
             .sheet(isPresented: $viewModel.showWeekSelector) {
                 ESPNDraftPickSelectionSheet.forFantasy(
@@ -102,6 +104,7 @@ struct FantasyMatchupListView: View {
                 }
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle()) // Force stack navigation style
     }
     
     // MARK: -> Chopped League Detection
@@ -596,13 +599,13 @@ struct FantasyMatchupCard: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             
-            // Main matchup content
+            // Main matchup content - FIXED: Match detail view order (away left, home right)
             HStack(spacing: 0) {
-                // Home team
+                // Away team (left side) - CONSISTENT with detail view
                 teamSection(
-                    team: matchup.homeTeam,
-                    score: matchup.homeTeam.currentScoreString,
-                    isHome: true
+                    team: matchup.awayTeam,
+                    score: matchup.awayTeam.currentScoreString,
+                    isHome: false
                 )
                 
                 // VS divider  
@@ -621,11 +624,11 @@ struct FantasyMatchupCard: View {
                 }
                 .frame(width: 60)
                 
-                // Away team
+                // Home team (right side) - CONSISTENT with detail view
                 teamSection(
-                    team: matchup.awayTeam,
-                    score: matchup.awayTeam.currentScoreString,
-                    isHome: false
+                    team: matchup.homeTeam,
+                    score: matchup.homeTeam.currentScoreString,
+                    isHome: true
                 )
             }
             .padding(.horizontal, 16)
@@ -688,12 +691,26 @@ struct FantasyMatchupCard: View {
                     .lineLimit(1)
             }
             
-            // Score
+            // Score - FIXED: Consistent color coding (away=red when losing, home=green when winning)
             Text(score)
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(isHome ? .green : .red)
+                .foregroundColor(scoreColor(isHome: isHome))
         }
         .frame(maxWidth: .infinity)
+    }
+    
+    /// FIXED: Proper score color logic based on actual winning/losing
+    private func scoreColor(isHome: Bool) -> Color {
+        let awayScore = Double(matchup.awayTeam.currentScoreString) ?? 0.0
+        let homeScore = Double(matchup.homeTeam.currentScoreString) ?? 0.0
+        
+        if awayScore == homeScore {
+            return .yellow // Tie
+        } else if isHome {
+            return homeScore > awayScore ? .green : .red
+        } else {
+            return awayScore > homeScore ? .green : .red
+        }
     }
     
     /// Custom ESPN team avatar with unique colors and better styling

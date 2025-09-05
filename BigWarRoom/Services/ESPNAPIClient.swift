@@ -541,6 +541,32 @@ final class ESPNAPIClient: DraftAPIClient {
         throw ESPNAPIError.unsupportedOperation("ESPN doesn't provide NFL state info")
     }
     
+    /// Fetch users in a league (ESPN equivalent using members data)
+    func fetchUsers(leagueID: String) async throws -> [SleeperLeagueUser] {
+        let members = try await fetchLeagueMembers(leagueID: leagueID)
+        
+        // Convert ESPN members to Sleeper league users format
+        let users = members.map { member in
+            SleeperLeagueUser(
+                userID: member.id,
+                username: member.displayName ?? "User \(member.id)",
+                displayName: member.displayName,
+                avatar: nil, // ESPN doesn't provide avatar URLs
+                metadata: SleeperUserMetadata(teamName: nil),
+                isOwner: false // Would need additional logic to determine ownership
+            )
+        }
+        
+        return users
+    }
+    
+    /// Fetch matchups for a league week (ESPN format)
+    func fetchMatchups(leagueID: String, week: Int) async throws -> [SleeperMatchupResponse] {
+        // ESPN doesn't have the same matchup structure as Sleeper
+        // This would require fetching schedule data and converting it
+        throw ESPNAPIError.unsupportedOperation("ESPN matchup fetching with projected points not yet implemented. Use Sleeper API for Chopped league features.")
+    }
+    
     // MARK: -> ESPN Specific Methods
     
     /// Find league ID that contains a specific draft ID

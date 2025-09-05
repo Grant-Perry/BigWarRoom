@@ -17,6 +17,8 @@ protocol DraftAPIClient {
     func fetchDraft(draftID: String) async throws -> SleeperDraft
     func fetchDraftPicks(draftID: String) async throws -> [SleeperPick]
     func fetchRosters(leagueID: String) async throws -> [SleeperRoster]
+    func fetchUsers(leagueID: String) async throws -> [SleeperLeagueUser]
+    func fetchMatchups(leagueID: String, week: Int) async throws -> [SleeperMatchupResponse]
     func fetchAllPlayers() async throws -> [String: SleeperPlayer]
     func fetchNFLState() async throws -> SleeperNFLState
 }
@@ -30,6 +32,7 @@ final class SleeperAPIClient: DraftAPIClient {
     private init() {}
     
     // MARK: -> User
+
     func fetchUser(username: String) async throws -> SleeperUser {
         let url = URL(string: "\(baseURL)/user/\(username)")!
         let (data, response) = try await session.data(from: url)
@@ -89,6 +92,36 @@ final class SleeperAPIClient: DraftAPIClient {
         let league = try JSONDecoder().decode(SleeperLeague.self, from: data)
         // xprint("✅ Fetched league: \(league.name)")
         return league
+    }
+    
+    /// Fetch users in a league
+    func fetchUsers(leagueID: String) async throws -> [SleeperLeagueUser] {
+        let url = URL(string: "\(baseURL)/league/\(leagueID)/users")!
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SleeperAPIError.invalidResponse
+        }
+        
+        let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: data)
+        // print("✅ Fetched \(users.count) users for league \(leagueID)")
+        return users
+    }
+    
+    /// Fetch matchups for a league week (ESSENTIAL FOR PROJECTED POINTS)
+    func fetchMatchups(leagueID: String, week: Int) async throws -> [SleeperMatchupResponse] {
+        let url = URL(string: "\(baseURL)/league/\(leagueID)/matchups/\(week)")!
+        let (data, response) = try await session.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw SleeperAPIError.invalidResponse
+        }
+        
+        let matchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
+        // print("✅ Fetched \(matchups.count) matchups for league \(leagueID), week \(week)")
+        return matchups
     }
     
     /// Fetch rosters for a league

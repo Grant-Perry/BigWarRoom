@@ -655,3 +655,87 @@ struct SleeperRosterMetadata: Codable {
         case record
     }
 }
+
+// MARK: -> League Users (for team names and metadata)
+struct SleeperLeagueUser: Codable, Identifiable {
+    let userID: String
+    let username: String
+    let displayName: String?
+    let avatar: String?
+    let metadata: SleeperUserMetadata?
+    let isOwner: Bool?
+    
+    var id: String { userID }
+    
+    /// Team name from metadata
+    var teamName: String? {
+        return metadata?.teamName ?? displayName
+    }
+    
+    /// Avatar URL (full size)
+    var avatarURL: URL? {
+        guard let avatar = avatar else { return nil }
+        return URL(string: "https://sleepercdn.com/avatars/\(avatar)")
+    }
+    
+    /// Avatar thumbnail URL
+    var avatarThumbnailURL: URL? {
+        guard let avatar = avatar else { return nil }
+        return URL(string: "https://sleepercdn.com/avatars/thumbs/\(avatar)")
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case userID = "user_id"
+        case username
+        case displayName = "display_name"
+        case avatar
+        case metadata
+        case isOwner = "is_owner"
+    }
+}
+
+// MARK: -> User Metadata (for team names)
+struct SleeperUserMetadata: Codable {
+    let teamName: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case teamName = "team_name"
+    }
+}
+
+// MARK: -> Matchup Response (THE KEY MODEL FOR PROJECTED POINTS)
+struct SleeperMatchupResponse: Codable, Identifiable {
+    let rosterID: Int
+    let points: Double?
+    let projectedPoints: Double?  // 🎯 THIS IS WHAT WE NEED!
+    let matchupID: Int?
+    let starters: [String]?
+    let players: [String]?
+    let customPoints: Double?  // If commissioner manually adjusts
+    
+    var id: String { 
+        return "\(rosterID)_\(matchupID ?? 0)"
+    }
+    
+    /// Current points formatted
+    var pointsString: String {
+        guard let points = points else { return "0.00" }
+        return String(format: "%.2f", points)
+    }
+    
+    /// Projected points formatted (KEY FOR CHOPPED PREDICTIONS)
+    var projectedPointsString: String {
+        guard let projectedPoints = projectedPoints else { return "0.00" }
+        return String(format: "%.2f", projectedPoints)
+    }
+    
+    private enum CodingKeys: String, CodingKey {
+        case rosterID = "roster_id"
+        case points
+        case projectedPoints = "projected_points"  // 🔥 Real Sleeper projections
+        case matchupID = "matchup_id"
+        case starters
+        case players
+        case customPoints = "custom_points"
+    }
+}

@@ -729,22 +729,47 @@ struct SurvivalCard: View {
                         .foregroundColor(ranking.eliminationStatus.color)
                 }
                 
-                Text("Survival: \(ranking.survivalPercentage)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.green)
+                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY
+                HStack(spacing: 12) {
+                    Text("SAFE \(ranking.survivalPercentage)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(ranking.survivalProbability > 0.6 ? Color.green : ranking.survivalProbability > 0.3 ? Color.orange : Color.red)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill((ranking.survivalProbability > 0.6 ? Color.green : ranking.survivalProbability > 0.3 ? Color.orange : Color.red).opacity(0.2))
+                        )
+                    
+                    // Show projected score if different from current
+                    if let projected = ranking.team.projectedScore, 
+                       let current = ranking.team.currentScore,
+                       abs(projected - current) > 1.0 {
+                        Text("PROJ: \(String(format: "%.1f", projected))")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.cyan)
+                    }
+                }
             }
             
             Spacer()
             
-            // Points
+            // Points with projected display
             VStack(alignment: .trailing, spacing: 4) {
                 Text(ranking.weeklyPointsString)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
                 
-                Text("pts")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gray)
+                // Show "PROJ" or "PTS" based on scoring status
+                if let current = ranking.team.currentScore, current > 0 {
+                    Text("PTS")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.gray)
+                } else if let projected = ranking.team.projectedScore, projected > 0 {
+                    Text("PROJ")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.cyan)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -788,7 +813,7 @@ struct SurvivalCard: View {
                 LinearGradient(
                     gradient: Gradient(colors: [
                         ranking.team.espnTeamColor,
-                        ranking.team.espnTeamColor.opacity(0.7)
+                        ranking.team.espnTeamColor.opacity(0.8)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -847,10 +872,19 @@ struct DangerZoneCard: View {
                         .tracking(1)
                 }
                 
+                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY FOR DANGER ZONE
                 HStack(spacing: 12) {
-                    Text("Survival: \(ranking.survivalPercentage)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(ranking.survivalProbability > 0.5 ? .green : .orange)
+                    Text("SAFE \(ranking.survivalPercentage)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.orange.opacity(0.3))
+                        )
+                        .scaleEffect(warningPulse ? 1.05 : 1.0)
+                        .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
                     
                     Text("From Safety: \(ranking.safetyMarginDisplay)")
                         .font(.system(size: 10, weight: .medium))
@@ -866,10 +900,18 @@ struct DangerZoneCard: View {
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.orange)
                 
-                Text("DANGER")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.orange)
-                    .tracking(1)
+                // Show current vs projected status
+                if let current = ranking.team.currentScore, current > 0 {
+                    Text("CURRENT")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.orange)
+                        .tracking(1)
+                } else if let projected = ranking.team.projectedScore, projected > 0 {
+                    Text("PROJECTED")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.orange)
+                        .tracking(1)
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -980,10 +1022,29 @@ struct CriticalCard: View {
                         .tracking(1)
                 }
                 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("💔 Survival: \(ranking.survivalPercentage)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.red)
+                // 🎯 ULTRA-DRAMATIC SAFE % DISPLAY FOR DEATH ROW
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("SAFE \(ranking.survivalPercentage)")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.red.opacity(0.3))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(Color.red, lineWidth: 2)
+                                    )
+                            )
+                            .scaleEffect(heartbeat ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartbeat)
+                        
+                        Text("💔")
+                            .scaleEffect(heartbeat ? 1.3 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(0.2), value: heartbeat)
+                    }
                     
                     Text("⚰️ From Elimination: \(ranking.safetyMarginDisplay)")
                         .font(.system(size: 10, weight: .medium))
@@ -1001,10 +1062,23 @@ struct CriticalCard: View {
                     .scaleEffect(heartbeat ? 1.05 : 1.0)
                     .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartbeat)
                 
-                Text("CRITICAL")
-                    .font(.system(size: 8, weight: .black))
-                    .foregroundColor(.red)
-                    .tracking(1)
+                // Dramatic scoring status
+                if let current = ranking.team.currentScore, current > 0 {
+                    Text("FINAL SCORE")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.red)
+                        .tracking(1)
+                } else if let projected = ranking.team.projectedScore, projected > 0 {
+                    Text("PROJECTED")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.red)
+                        .tracking(1)
+                } else {
+                    Text("CRITICAL")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.red)
+                        .tracking(1)
+                }
             }
         }
         .padding(.horizontal, 16)
