@@ -12,27 +12,8 @@ struct NFLWeekCalculator {
     
     /// Get current NFL week (you can integrate with Sleeper API later)
     static func getCurrentWeek() -> Int {
-        // TODO: Integrate with Sleeper API for accurate week calculation
-        // For now, return a reasonable default based on current date
-        let calendar = Calendar.current
-        let now = Date()
-        
-        // NFL season typically starts first week of September
-        // This is a basic calculation - you can enhance with Sleeper API
-        let components = calendar.dateComponents([.month, .weekOfYear], from: now)
-        
-        if let month = components.month {
-            switch month {
-            case 9: return max(1, (components.weekOfYear ?? 1) - 35) // Early September
-            case 10: return min(8, (components.weekOfYear ?? 1) - 35) // October
-            case 11: return min(12, (components.weekOfYear ?? 1) - 35) // November  
-            case 12: return min(17, (components.weekOfYear ?? 1) - 35) // December
-            case 1: return min(18, (components.weekOfYear ?? 1) + 17) // January playoffs
-            default: return 15 // Default to week 15 for testing
-            }
-        }
-        
-        return 15 // Fallback
+        // Use NFLWeekService for accurate week calculation
+        return NFLWeekService.shared.currentWeek
     }
     
     /// Setup real NFL game data for the calculated current week

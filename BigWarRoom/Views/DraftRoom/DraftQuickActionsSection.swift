@@ -29,13 +29,13 @@ struct DraftQuickActionsSection: View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 2)
         
         return LazyVGrid(columns: columns, spacing: 12) {
-            // Navigate to AI Suggestions
+            // Navigate to Fantasy
             NavigationButton(
-                title: "AI Picks",
-                subtitle: "Smart suggestions",
-                icon: "wand.and.stars",
-                color: .purple,
-                action: { selectedTab = 1 }
+                title: "Fantasy",
+                subtitle: "Matchups & leagues",
+                icon: "football",
+                color: .green,
+                action: { selectedTab = 2 }
             )
             
             // Navigate to Draft Board
@@ -44,7 +44,7 @@ struct DraftQuickActionsSection: View {
                 subtitle: "Round by round",
                 icon: "sportscourt",
                 color: .blue,
-                action: { selectedTab = 3 }
+                action: { selectedTab = 4 }
             )
             
             // Navigate to Live Picks
@@ -52,17 +52,17 @@ struct DraftQuickActionsSection: View {
                 title: "Live Picks",
                 subtitle: "Real-time updates",
                 icon: "list.bullet.rectangle.portrait",
-                color: .green,
-                action: { selectedTab = 2 }
+                color: .orange,
+                action: { selectedTab = 3 }
             )
             
-            // Navigate to My Roster
+            // Navigate to AI Picks
             NavigationButton(
-                title: "My Roster",
-                subtitle: "Team overview",
-                icon: "person.fill",
-                color: .orange,
-                action: { selectedTab = 4 }
+                title: "AI Picks",
+                subtitle: "Smart suggestions",
+                icon: "wand.and.stars",
+                color: .purple,
+                action: { selectedTab = 5 }
             )
         }
     }

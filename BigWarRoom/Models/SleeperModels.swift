@@ -11,7 +11,7 @@ import Foundation
 // MARK: -> User
 struct SleeperUser: Codable, Identifiable {
     let userID: String
-    let username: String
+    let username: String?  // 🔥 FIX: Make username optional since not all users have it
     let displayName: String?
     let avatar: String?
     
@@ -109,17 +109,26 @@ struct SleeperLeagueSettings: Codable {
     let taxiSlots: Int?
     let leagueType: String?
     let isChopped: Bool?
+    let type: Int?  // 🔥 THE KEY FIELD: 0=Redraft, 1=Keeper, 2=Dynasty, 3=Guillotine/Chopped
     
-    /// Detect if this is a Chopped/elimination league - FIXED: Only use explicit settings
+    /// Detect if this is a Chopped/elimination league - CENTRALIZED METHOD
     var isChoppedLeague: Bool {
-        // Check explicit Chopped flag first
-        if let isChopped = isChopped {
-            return isChopped
+        // PRIMARY: Check if type is 3 (Guillotine/Chopped) - THE OFFICIAL WAY
+        if let type = type, type == 3 {
+            return true
         }
         
-        // The proper way is to check if matchups are empty but rosters exist
+        // FALLBACK: Check explicit Chopped flag for older leagues
+        if let isChopped = isChopped, isChopped {
+            return true
+        }
         
         return false
+    }
+    
+    /// STATIC helper method for checking any Sleeper league - CENTRALIZED FOR ENTIRE APP
+    static func isChoppedLeague(_ league: SleeperLeague?) -> Bool {
+        return league?.settings?.isChoppedLeague ?? false
     }
     
     private enum CodingKeys: String, CodingKey {
@@ -133,6 +142,7 @@ struct SleeperLeagueSettings: Codable {
         case taxiSlots = "taxi_slots"
         case leagueType = "league_type"
         case isChopped = "is_chopped"
+        case type = "type"  // 🔥 Add the type field
     }
 }
 
@@ -659,7 +669,7 @@ struct SleeperRosterMetadata: Codable {
 // MARK: -> League Users (for team names and metadata)
 struct SleeperLeagueUser: Codable, Identifiable {
     let userID: String
-    let username: String
+    let username: String?  // 🔥 FIX: Make username optional 
     let displayName: String?
     let avatar: String?
     let metadata: SleeperUserMetadata?

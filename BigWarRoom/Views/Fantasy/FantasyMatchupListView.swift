@@ -23,8 +23,8 @@ struct FantasyMatchupListView: View {
                     connectionStatusHeader
                     
                     // Matchups content
-                    if viewModel.isLoading {
-                        let _ = print("⏳ UI CONDITION: Loading state")
+                    if viewModel.isLoading || shouldShowLoadingState {
+                        let _ = print("⏳ UI CONDITION: Loading state - showing spinning football")
                         loadingView
                     } else if viewModel.detectedAsChoppedLeague || isChoppedLeague || forceChoppedMode {
                         // CHOPPED LEAGUE: Detected via empty matchups + rosters OR settings
@@ -35,21 +35,20 @@ struct FantasyMatchupListView: View {
                         let _ = print("   - viewModel.matchups.count: \(viewModel.matchups.count)")
                         let _ = print("   - viewModel.hasActiveRosters: \(viewModel.hasActiveRosters)")
                         choppedLeaderboardView
-                    } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
-                        // EMPTY STATE: No matchups and no rosters
-                        let _ = print("❌ UI CONDITION: Showing empty state")
-                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
-                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
-                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
-                        let _ = print("   - selectedLeague: \(viewModel.selectedLeague?.league.name ?? "nil")")
-                        let _ = print("   - selectedLeague.source: \(viewModel.selectedLeague?.source.displayName ?? "nil")")
-                        emptyStateView
                     } else if viewModel.matchups.isEmpty && viewModel.hasActiveRosters {
                         // CHOPPED LEAGUE: No matchups but has rosters (safety net)
                         let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard (safety net)!")
                         let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
                         let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
                         choppedLeaderboardView
+                    } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
+                        // TRUE EMPTY STATE: Only after we've confirmed data loading is complete
+                        let _ = print("❌ UI CONDITION: Confirmed empty state (not loading)")
+                        let _ = print("   - shouldShowLoadingState: \(shouldShowLoadingState)")
+                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
+                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
+                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
+                        emptyStateView
                     } else {
                         // NORMAL LEAGUE: Has matchups
                         let _ = print("✅ UI CONDITION: Showing normal matchups")
@@ -105,6 +104,32 @@ struct FantasyMatchupListView: View {
             }
         }
         .navigationViewStyle(StackNavigationViewStyle()) // Force stack navigation style
+    }
+    
+    // MARK: -> Loading State Detection
+    /// Determines when to show loading spinner instead of empty state
+    private var shouldShowLoadingState: Bool {
+        // Always show loading if no connected league yet
+        guard let connectedLeague = draftRoomViewModel.selectedLeagueWrapper else {
+            return true
+        }
+        
+        // Show loading if we have a connected league but no selected league in viewModel yet
+        if viewModel.selectedLeague == nil {
+            return true
+        }
+        
+        // Show loading if league IDs don't match (still switching leagues)
+        if viewModel.selectedLeague?.league.leagueID != connectedLeague.league.leagueID {
+            return true
+        }
+        
+        // Show loading if we have no matchups AND no rosters AND not detected as chopped yet
+        if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters && !viewModel.detectedAsChoppedLeague {
+            return true
+        }
+        
+        return false
     }
     
     // MARK: -> Chopped League Detection
@@ -509,21 +534,14 @@ struct FantasyMatchupListView: View {
                 .font(.system(size: 48))
                 .foregroundColor(.gray)
             
-            Text("No matchups found")
+            Text("No matchups available")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
             
-            if draftRoomViewModel.selectedLeagueWrapper != nil {
-                Text("No matchups available for the current week")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-            } else {
-                Text("Connect to a league in War Room first")
-                    .font(.system(size: 14))
-                    .foregroundColor(.gray)
-                    .multilineTextAlignment(.center)
-            }
+            Text("This week may not have started yet or league data is unavailable")
+                .font(.system(size: 14))
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -599,9 +617,9 @@ struct FantasyMatchupCard: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             
-            // Main matchup content - FIXED: Match detail view order (away left, home right)
+            // Main matchup content
             HStack(spacing: 0) {
-                // Away team (left side) - CONSISTENT with detail view
+                // Away team (left side)
                 teamSection(
                     team: matchup.awayTeam,
                     score: matchup.awayTeam.currentScoreString,
@@ -624,7 +642,7 @@ struct FantasyMatchupCard: View {
                 }
                 .frame(width: 60)
                 
-                // Home team (right side) - CONSISTENT with detail view
+                // Home team (right side)
                 teamSection(
                     team: matchup.homeTeam,
                     score: matchup.homeTeam.currentScoreString,
@@ -691,26 +709,12 @@ struct FantasyMatchupCard: View {
                     .lineLimit(1)
             }
             
-            // Score - FIXED: Consistent color coding (away=red when losing, home=green when winning)
+            // Score
             Text(score)
                 .font(.system(size: 20, weight: .bold))
-                .foregroundColor(scoreColor(isHome: isHome))
+                .foregroundColor(isHome ? .green : .red)
         }
         .frame(maxWidth: .infinity)
-    }
-    
-    /// FIXED: Proper score color logic based on actual winning/losing
-    private func scoreColor(isHome: Bool) -> Color {
-        let awayScore = Double(matchup.awayTeam.currentScoreString) ?? 0.0
-        let homeScore = Double(matchup.homeTeam.currentScoreString) ?? 0.0
-        
-        if awayScore == homeScore {
-            return .yellow // Tie
-        } else if isHome {
-            return homeScore > awayScore ? .green : .red
-        } else {
-            return awayScore > homeScore ? .green : .red
-        }
     }
     
     /// Custom ESPN team avatar with unique colors and better styling

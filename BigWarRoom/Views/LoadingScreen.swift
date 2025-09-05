@@ -63,7 +63,8 @@ struct LoadingScreen: View {
                 
                 // App Logo with version underneath
                 VStack(spacing: 12) {
-                    AppConstants.appLogo
+                    AppIconView()
+                        .frame(width: 120, height: 120)
                         .scaleEffect(logoScale)
                         .shadow(color: .purple.opacity(logoGlow), radius: 20, x: 0, y: 0)
                         .shadow(color: .blue.opacity(logoGlow * 0.8), radius: 30, x: 0, y: 0)
@@ -236,6 +237,41 @@ struct BokehLayer: View {
                 return (CGPoint(x: newX, y: newY), size, color, opacity)
             }
         }
+    }
+}
+
+// MARK: - App Icon View
+
+struct AppIconView: View {
+    var body: some View {
+        if let iconName = getAppIconName(),
+           let uiImage = UIImage(named: iconName) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous)) // iOS app icon corner radius
+        } else {
+            // Fallback if app icon can't be loaded
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay(
+                    Image(systemName: "brain.head.profile")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white)
+                )
+        }
+    }
+    
+    private func getAppIconName() -> String? {
+        guard let infoPlist = Bundle.main.infoDictionary,
+              let iconDict = infoPlist["CFBundleIcons"] as? [String: Any],
+              let primaryIconDict = iconDict["CFBundlePrimaryIcon"] as? [String: Any],
+              let iconFiles = primaryIconDict["CFBundleIconFiles"] as? [String] else {
+            return nil
+        }
+        
+        // Return the largest icon (usually the last one in the array)
+        return iconFiles.last
     }
 }
 

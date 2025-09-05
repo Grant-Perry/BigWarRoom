@@ -23,7 +23,8 @@ struct AppConstants {
 
     // LEGACY: Keep these for backward compatibility but they're now managed by ESPNCredentialsManager
     // These are Gp's original credentials - users will set their own in ESPNSetupView
-    static let SWID = "{7D6C3526-D3A-4DBD-9849-3D9C03333E7C}"
+    static let SWID = "{7D6C3526-D30A-4DBD-9849-3D9C03333E7C}"
+
     static let ESPN_S2_2025_Orig = "AEAQAAVXgHBaJ%2Fq1pPpnsckBKlBKXxsRJyttQjQhae67N%2Bz5kVdRdn001uU8V30qYT3z9n7R%2FsLNqWd%2BskxNWwMKr7kpL1%2Fs2J6BCvH8su%2F8gsDOcv44fRm6zbxMq6kQHoFdwGjSf7bnoMp8j5gDC29iDExGMF%2B5ObIreHcchFk8AQGZVNi2cSTCdxevEuioMNPDTbehk%2B4kPI1n5KxqtXnm9Z5gz5UpJv42IJNmT0nwfqMq9Vjz0MYqvj%2BbN7%2B5%2Bky9PwK8%2FUgAeWXObJ9ezOlCZGMmEO4Wyrq2dDl8DeGJKg%3D%3D"
     
    static let ESPN_S2 = "AECZhMx2EpWMK1F56f5N8HfKaTHgYIOYYEH%2F2DhPxf0BzfWqW%2BQTWZk1QC%2F4WfO0OdC1sUcG1jYOUISX217BGcQOS8VuqspUYVSzrXMiUlEA2JCYK1fhEPUYJvadfhNovy%2F%2F4j94exvkMUMVvuAfyog0W%2BmHN0lMsJh3Qh7Yot7yueZoicSwYM7nuks2FJrE%2FTZ8hw%2B8NmLCP3mYD1TgXke1GbiP6jTudabpmcYq%2FGK3RKUdyJInaRDCK08BkWJ%2FShcrHNl7l6Q3FATnalIQeBjJU%3D"

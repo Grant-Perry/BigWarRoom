@@ -163,7 +163,7 @@ struct QuickConnectSection: View {
                 action: {
                     // + button action: Navigate to Sleeper setup in Settings
                     // xprint("🔧 Opening Sleeper credential entry")
-                    selectedTab = 6 // Navigate to Settings tab
+                    selectedTab = 7 // Navigate to Settings tab (now index 7)
                 },
                 useDefaultAction: {
                     // Use Default button: Auto-connect with default credentials
@@ -185,7 +185,7 @@ struct QuickConnectSection: View {
                 action: {
                     // + button action: Navigate to ESPN setup in Settings
                     // xprint("🔧 Opening ESPN credential entry")
-                    selectedTab = 6 // Navigate to Settings tab
+                    selectedTab = 7 // Navigate to Settings tab (now index 7)
                 },
                 useDefaultAction: {
                     // Use Default button: Auto-connect with default ESPN credentials

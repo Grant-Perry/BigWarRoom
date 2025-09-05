@@ -13,21 +13,29 @@ struct BigWarRoom: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             TabView(selection: $selectedTab) {
+                // MATCHUPS HUB - THE COMMAND CENTER (NEW MAIN TAB)
+                MatchupsHubView()
+                    .tabItem {
+                        Image(systemName: "target")
+                        Text("Mission Control")
+                    }
+                    .tag(0)
+                
                 // Draft War Room Tab
                 DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
                     .tabItem {
                         Image(systemName: "brain.head.profile")
                         Text("War Room")
                     }
-                    .tag(0)
+                    .tag(1)
                 
-                // Fantasy Tab (moved to position 1)
+                // Fantasy Tab (moved to position 2)
                 FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "football")
                         Text("Fantasy")
                     }
-                    .tag(1)
+                    .tag(2)
                 
                 // Live Draft Picks Tab
                 LiveDraftPicksView(viewModel: viewModel)
@@ -35,7 +43,7 @@ struct BigWarRoom: View {
                         Image(systemName: "list.bullet.rectangle.portrait")
                         Text("Live Picks")
                     }
-                    .tag(2)
+                    .tag(3)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -43,15 +51,15 @@ struct BigWarRoom: View {
                         Image(systemName: "sportscourt")
                         Text("Draft Board")
                     }
-                    .tag(3)
+                    .tag(4)
                 
-                // AI Pick Suggestions Tab (moved to position 4)
+                // AI Pick Suggestions Tab (moved to position 5)
                 AIPickSuggestionsView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "wand.and.stars")
                         Text("AI Picks")
                     }
-                    .tag(4)
+                    .tag(5)
                 
                 // My Roster Tab
                 MyRosterView(draftRoomViewModel: viewModel)
@@ -59,7 +67,7 @@ struct BigWarRoom: View {
                         Image(systemName: "person.fill")
                         Text("My Roster")
                     }
-                    .tag(5)
+                    .tag(6)
                 
                 // OnBoarding Tab
                 OnBoardingView()
@@ -67,7 +75,7 @@ struct BigWarRoom: View {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(6)
+                    .tag(7)
             }
             .preferredColorScheme(.dark)
             

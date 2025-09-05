@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DraftSelectionSection: View {
     @ObservedObject var viewModel: DraftRoomViewModel
+    @Binding var selectedTab: Int
     @State private var showAllLeagues = false
     
     var body: some View {
@@ -58,7 +59,14 @@ struct DraftSelectionSection: View {
                             leagueWrapper: leagueWrapper,
                             isSelected: leagueWrapper.id == viewModel.selectedLeagueWrapper?.id,
                             onSelect: {
-                                Task { await viewModel.selectDraft(leagueWrapper) }
+                                Task { 
+                                    await viewModel.selectDraft(leagueWrapper)
+                                    // Navigate to Fantasy tab after selecting league
+                                    await MainActor.run {
+                                        selectedTab = 2 // Fantasy tab is now index 2
+                                        print("🏈 Auto-navigated to Fantasy tab after selecting league: \(leagueWrapper.league.name)")
+                                    }
+                                }
                             }
                         )
                     }

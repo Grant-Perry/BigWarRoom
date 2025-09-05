@@ -73,7 +73,7 @@ struct TopSuggestionsSection: View {
     
     private var viewAllButton: some View {
         Button {
-            selectedTab = 1 // Switch to AI Picks tab
+            selectedTab = 5 // Switch to AI Picks tab (now index 5)
         } label: {
             HStack {
                 Text("View All \(viewModel.suggestions.count) Suggestions")

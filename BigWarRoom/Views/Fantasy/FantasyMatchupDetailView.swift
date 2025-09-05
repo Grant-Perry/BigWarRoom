@@ -10,13 +10,27 @@ import SwiftUI
 
 struct FantasyMatchupDetailView: View {
     let matchup: FantasyMatchup
-    @ObservedObject var fantasyViewModel: FantasyViewModel
     let leagueName: String
+    var fantasyViewModel: FantasyViewModel? = nil
     @Environment(\.dismiss) private var dismiss // Use new dismiss instead of presentationMode
     
+    // Default initializer for backward compatibility
+    init(matchup: FantasyMatchup, leagueName: String) {
+        self.matchup = matchup
+        self.leagueName = leagueName
+        self.fantasyViewModel = nil
+    }
+    
+    // Full initializer with FantasyViewModel
+    init(matchup: FantasyMatchup, fantasyViewModel: FantasyViewModel, leagueName: String) {
+        self.matchup = matchup
+        self.leagueName = leagueName
+        self.fantasyViewModel = fantasyViewModel
+    }
+    
     var body: some View {
-        let awayTeamScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
-        let homeTeamScore = fantasyViewModel.getScore(for: matchup, teamIndex: 1)
+        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
         
@@ -43,7 +57,7 @@ struct FantasyMatchupDetailView: View {
                         .foregroundColor(.white)
                         .lineLimit(1)
                     
-                    Text("Week \(fantasyViewModel.selectedWeek)")
+                    Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                 }
@@ -82,8 +96,13 @@ struct FantasyMatchupDetailView: View {
             
             ScrollView {
                 VStack(spacing: 16) {
-                    fantasyViewModel.activeRosterSection(matchup: matchup)
-                    fantasyViewModel.benchSection(matchup: matchup)
+                    if let viewModel = fantasyViewModel {
+                        viewModel.activeRosterSection(matchup: matchup)
+                        viewModel.benchSection(matchup: matchup)
+                    } else {
+                        // Fallback content when no view model is available
+                        simplifiedRosterView
+                    }
                 }
                 .padding(.top, 8)
             }
@@ -93,6 +112,53 @@ struct FantasyMatchupDetailView: View {
         .navigationBarBackButtonHidden(true) // Ensure we use our custom back button
         .preferredColorScheme(.dark)
         .background(Color.black)
+    }
+    
+    // Simplified roster view for when no FantasyViewModel is available
+    private var simplifiedRosterView: some View {
+        VStack(spacing: 16) {
+            // Home team roster
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(matchup.homeTeam.name) Roster")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal)
+                
+                LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                    ForEach(matchup.homeTeam.roster.filter { $0.isStarter }) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel(),
+                            matchup: matchup,
+                            teamIndex: 1,
+                            isBench: false
+                        )
+                        .padding(.horizontal)
+                    }
+                }
+            }
+            
+            // Away team roster  
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(matchup.awayTeam.name) Roster")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding(.horizontal)
+                
+                LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
+                    ForEach(matchup.awayTeam.roster.filter { $0.isStarter }) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel(),
+                            matchup: matchup,
+                            teamIndex: 0,
+                            isBench: false
+                        )
+                        .padding(.horizontal)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -206,7 +272,7 @@ struct FantasyDetailHeaderView: View {
     let matchup: FantasyMatchup
     let awayTeamIsWinning: Bool
     let homeTeamIsWinning: Bool
-    @ObservedObject var fantasyViewModel: FantasyViewModel
+    let fantasyViewModel: FantasyViewModel?
     
     var body: some View {
         ZStack {
@@ -230,13 +296,13 @@ struct FantasyDetailHeaderView: View {
                     // Away team (left side)
                     FantasyManagerDetails(
                         managerName: matchup.awayTeam.ownerName,
-                        managerRecord: fantasyViewModel.getManagerRecord(managerID: matchup.awayTeam.id),
+                        managerRecord: fantasyViewModel?.getManagerRecord(managerID: matchup.awayTeam.id) ?? "0-0",
                         score: matchup.awayTeam.currentScore ?? 0.0,
                         isWinning: awayTeamIsWinning,
                         avatarURL: matchup.awayTeam.avatarURL,
                         fantasyViewModel: fantasyViewModel,
                         rosterID: matchup.awayTeam.rosterID,
-                        selectedYear: Int(fantasyViewModel.selectedYear) ?? 2024
+                        selectedYear: Int(fantasyViewModel?.selectedYear ?? "2024") ?? 2024
                     )
                     
                     VStack(spacing: 2) {
@@ -244,11 +310,11 @@ struct FantasyDetailHeaderView: View {
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.gray)
                         
-                        Text("Week \(fantasyViewModel.selectedWeek)")
+                        Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
                             .font(.system(size: 10))
                             .foregroundColor(.gray)
                         
-                        Text(fantasyViewModel.scoreDifferenceText(matchup: matchup))
+                        Text(fantasyViewModel?.scoreDifferenceText(matchup: matchup) ?? "")
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.gpGreen)
                             .padding(.horizontal, 6)
@@ -263,13 +329,13 @@ struct FantasyDetailHeaderView: View {
                     // Home team (right side)
                     FantasyManagerDetails(
                         managerName: matchup.homeTeam.ownerName,
-                        managerRecord: fantasyViewModel.getManagerRecord(managerID: matchup.homeTeam.id),
+                        managerRecord: fantasyViewModel?.getManagerRecord(managerID: matchup.homeTeam.id) ?? "0-0",
                         score: matchup.homeTeam.currentScore ?? 0.0,
                         isWinning: homeTeamIsWinning,
                         avatarURL: matchup.homeTeam.avatarURL,
                         fantasyViewModel: fantasyViewModel,
                         rosterID: matchup.homeTeam.rosterID,
-                        selectedYear: Int(fantasyViewModel.selectedYear) ?? 2024
+                        selectedYear: Int(fantasyViewModel?.selectedYear ?? "2024") ?? 2024
                     )
                 }
                 .padding(.horizontal)
@@ -566,7 +632,7 @@ struct FantasyPlayerCard: View {
 struct FantasyGameMatchupView: View {
     let player: FantasyPlayer
     @StateObject private var gameViewModel = NFLGameMatchupViewModel()
-    @State private var currentWeek = 15
+    @State private var currentWeek: Int = NFLWeekService.shared.currentWeek
     @StateObject private var nflWeekService = NFLWeekService.shared
     
     var body: some View {

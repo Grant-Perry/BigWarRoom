@@ -36,36 +36,44 @@ struct BigWarRoomWithConditionalStart: View {
     }
 }
 
-// Modified BigWarRoom that conditionally starts on Settings or War Room
+// Modified BigWarRoom that conditionally starts on Settings or Mission Control
 struct BigWarRoomModified: View {
     @StateObject private var viewModel = DraftRoomViewModel()
     @State private var selectedTab: Int
     
     // Initialize with conditional starting tab
     init(startOnSettings: Bool) {
-        // If user needs onboarding → start on Settings (6)
-        // If user has credentials → start on War Room (0)
-        _selectedTab = State(initialValue: startOnSettings ? 6 : 0)
+        // If user needs onboarding → start on Settings (7)
+        // If user has credentials → start on Mission Control (0)
+        _selectedTab = State(initialValue: startOnSettings ? 7 : 0)
     }
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             TabView(selection: $selectedTab) {
+                // MATCHUPS HUB - THE COMMAND CENTER (NEW MAIN TAB)
+                MatchupsHubView()
+                    .tabItem {
+                        Image(systemName: "target")
+                        Text("Mission Control")
+                    }
+                    .tag(0)
+                
                 // Draft War Room Tab
                 DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
                     .tabItem {
                         Image(systemName: "brain.head.profile")
                         Text("War Room")
                     }
-                    .tag(0)
+                    .tag(1)
                 
-                // Fantasy Tab
+                // Fantasy Tab (moved to position 2)
                 FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "football")
                         Text("Fantasy")
                     }
-                    .tag(1)
+                    .tag(2)
                 
                 // Live Draft Picks Tab
                 LiveDraftPicksView(viewModel: viewModel)
@@ -73,7 +81,7 @@ struct BigWarRoomModified: View {
                         Image(systemName: "list.bullet.rectangle.portrait")
                         Text("Live Picks")
                     }
-                    .tag(2)
+                    .tag(3)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -81,15 +89,15 @@ struct BigWarRoomModified: View {
                         Image(systemName: "sportscourt")
                         Text("Draft Board")
                     }
-                    .tag(3)
+                    .tag(4)
                 
-                // AI Pick Suggestions Tab
+                // AI Pick Suggestions Tab (moved to position 5)
                 AIPickSuggestionsView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "wand.and.stars")
                         Text("AI Picks")
                     }
-                    .tag(4)
+                    .tag(5)
                 
                 // My Roster Tab
                 MyRosterView(draftRoomViewModel: viewModel)
@@ -97,7 +105,7 @@ struct BigWarRoomModified: View {
                         Image(systemName: "person.fill")
                         Text("My Roster")
                     }
-                    .tag(5)
+                    .tag(6)
                 
                 // Settings Tab - New proper Settings view
                 AppSettingsView()
@@ -105,7 +113,7 @@ struct BigWarRoomModified: View {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(6)
+                    .tag(7)
             }
             .preferredColorScheme(.dark)
             
@@ -132,7 +140,7 @@ struct BigWarRoomModified: View {
     AppEntryView()
 }
 
-#Preview("War Room Default") {
+#Preview("Mission Control Default") {
     BigWarRoomWithConditionalStart(shouldShowOnboarding: false)
 }
 

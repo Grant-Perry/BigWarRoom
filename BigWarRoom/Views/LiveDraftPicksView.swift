@@ -21,7 +21,8 @@ struct LiveDraftPicksView: View {
                     
                     // Live Picks Content
                     if viewModel.allDraftPicks.isEmpty {
-                        emptyStateView
+                        FantasyLoadingIndicator()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         liveDraftPicksGrid
                     }
@@ -101,42 +102,6 @@ struct LiveDraftPicksView: View {
         .padding()
         .background(Color.green.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    
-    // MARK: - Empty State
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "clock.circle")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-            
-            Text("Waiting for draft picks...")
-                .font(.title2)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-            
-            Text("Picks will appear here as they happen in real-time")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-            
-            if viewModel.selectedDraft == nil && !viewModel.isConnectedToManualDraft {
-                VStack(spacing: 8) {
-                    Text("Connect to a draft in the War Room tab")
-                        .font(.callout)
-                        .foregroundColor(.blue)
-                    
-                    Button("Go to War Room") {
-                        // This would require TabView selection binding
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-                .padding(.top, 8)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 40)
     }
     
     // MARK: - Live Draft Picks Grid

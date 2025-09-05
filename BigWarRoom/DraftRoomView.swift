@@ -44,7 +44,7 @@ struct DraftRoomView: View {
                     LazyVStack(spacing: 0) {
                         // STEP 2: Draft Selection (Show if connected) - Enhanced to fill more space
                         if viewModel.connectionStatus == .connected {
-                            DraftSelectionSection(viewModel: viewModel)
+                            DraftSelectionSection(viewModel: viewModel, selectedTab: $selectedTab)
                                 .frame(minHeight: max(300, geometry.size.height * 0.4))
                                 .padding(.horizontal)
                                 .padding(.top, 16)
@@ -85,7 +85,7 @@ struct DraftRoomView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToFantasy"))) { _ in
             // Auto-navigate to Fantasy tab when position 8 is confirmed
-            selectedTab = 1 // Fantasy tab is index 1
+            selectedTab = 2 // Fantasy tab is now index 2
             NSLog("🏈 Auto-navigated to Fantasy tab after confirming position")
         }
         .alert("YOUR TURN!", isPresented: $viewModel.showingPickAlert) {
@@ -209,7 +209,7 @@ struct ESPNSetupNoticeCard: View {
                     .controlSize(.small)
                     
                     Button("Custom Setup") {
-                        selectedTab = 6 // Navigate to OnBoarding tab
+                        selectedTab = 7 // Navigate to Settings tab (now index 7)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -229,7 +229,7 @@ struct ESPNSetupNoticeCard: View {
         // Don't auto-fill with Gp's credentials - let users set their own
         // This was forcing Gp's settings on everyone
         // xprint("🚀 Navigate to ESPN setup for user to enter their own credentials")
-        selectedTab = 6 // Navigate to settings for proper setup
+        selectedTab = 7 // Navigate to settings for proper setup
     }
 }
 
@@ -263,7 +263,7 @@ struct SleeperSetupNoticeCard: View {
                     .controlSize(.small)
                     
                     Button("Custom Setup") {
-                        selectedTab = 6 // Navigate to Settings tab
+                        selectedTab = 7 // Navigate to Settings tab (now index 7)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
@@ -283,6 +283,6 @@ struct SleeperSetupNoticeCard: View {
         // Don't auto-fill with Gp's credentials - let users set their own  
         // This was forcing Gp's settings on everyone
         // xprint("🚀 Navigate to Sleeper setup for user to enter their own credentials")
-        selectedTab = 6 // Navigate to settings for proper setup
+        selectedTab = 7 // Navigate to settings for proper setup
     }
 }

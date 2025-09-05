@@ -620,6 +620,55 @@ final class ESPNAPIClient: DraftAPIClient {
         }?.id
     }
     
+    /// Fetch ESPN league data for team ownership information
+    func fetchESPNLeagueData(leagueID: String) async throws -> ESPNLeague {
+        // Try with the best token for this league first
+        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.ESPNLeagueYear)
+        
+        do {
+            return try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: primaryToken)
+        } catch ESPNAPIError.authenticationFailed {
+            print("🔄 ESPN: Primary token failed for league ownership \(leagueID), trying alternate token...")
+            
+            // Try with the alternate token
+            let alternateToken = leagueID == "1241361400" ? 
+                AppConstants.getPrimaryESPNToken(for: AppConstants.ESPNLeagueYear) : 
+                AppConstants.getAlternateESPNToken(for: AppConstants.ESPNLeagueYear)
+            
+            return try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: alternateToken)
+        }
+    }
+    
+    /// Fetch ESPN league data with a specific token
+    private func fetchESPNLeagueDataWithToken(leagueID: String, token: String) async throws -> ESPNLeague {
+        // Use minimal view parameters to just get team and member data
+        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
+        
+        guard let url = URL(string: urlString) else {
+            throw ESPNAPIError.invalidResponse
+        }
+        
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("SWID=\(AppConstants.SWID); espn_s2=\(token)", forHTTPHeaderField: "Cookie")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ESPNAPIError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+            throw ESPNAPIError.authenticationFailed
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw ESPNAPIError.invalidResponse
+        }
+        
+        return try JSONDecoder().decode(ESPNLeague.self, from: data)
+    }
+    
     // MARK: -> ESPN Debug Methods
     
     /// Debug method to test ESPN API connection and log response

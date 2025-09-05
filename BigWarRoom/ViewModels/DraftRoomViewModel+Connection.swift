@@ -19,8 +19,8 @@ extension DraftRoomViewModel {
                 // xprint("✅ Connected using username: \(input) -> User ID: \(user.userID)")
             }
 
-            sleeperDisplayName = user.displayName ?? user.username
-            sleeperUsername = user.username
+            sleeperDisplayName = user.displayName ?? user.username ?? "Unknown User"
+            sleeperUsername = user.username ?? "unknown"
 
             // xprint("🏈 DraftRoomViewModel: User connected - Display: \(sleeperDisplayName), Username: \(sleeperUsername)")
 

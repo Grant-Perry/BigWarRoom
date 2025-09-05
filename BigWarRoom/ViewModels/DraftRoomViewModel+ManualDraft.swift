@@ -38,7 +38,8 @@ extension DraftRoomViewModel {
                     reserveSlots: nil,
                     taxiSlots: nil,
                     leagueType: nil,
-                    isChopped: nil
+                    isChopped: nil,
+                    type: nil  // Add the type field
                 ),
                 scoringSettings: nil,
                 rosterPositions: nil
