@@ -28,7 +28,6 @@ final class MatchupsHubViewModel: ObservableObject {
     
     // MARK: -> Dependencies
     private let unifiedLeagueManager = UnifiedLeagueManager()
-    private let fantasyViewModel = FantasyViewModel()
     private let sleeperCredentials = SleeperCredentialsManager.shared
     private var refreshTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -42,42 +41,15 @@ final class MatchupsHubViewModel: ObservableObject {
     init() {
         setupAutoRefresh()
         
-        // Take control of FantasyViewModel to prevent refresh conflicts
-        fantasyViewModel.setMatchupsHubControl(true)
     }
     
     deinit {
         refreshTimer?.invalidate()
         
-        // Release control of FantasyViewModel
-        fantasyViewModel.setMatchupsHubControl(false)
     }
     
     // MARK: -> Sleeper User Identification
     
-    /// Get the current user's roster ID in a Sleeper league
-    private func getCurrentUserRosterID(leagueID: String) async -> Int? {
-        guard !sleeperCredentials.currentUserID.isEmpty else {
-            print("❌ SLEEPER: No user ID available for roster identification")
-            return nil
-        }
-        
-        do {
-            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: leagueID)
-            let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
-            
-            if let userRoster = userRoster {
-                print("🎯 SLEEPER: Found user roster ID \(userRoster.rosterID) for user \(sleeperCredentials.currentUserID)")
-                return userRoster.rosterID
-            } else {
-                print("⚠️ SLEEPER: No roster found for user \(sleeperCredentials.currentUserID) in league \(leagueID)")
-                return nil
-            }
-        } catch {
-            print("❌ SLEEPER: Failed to fetch rosters for league \(leagueID): \(error)")
-            return nil
-        }
-    }
     
     // MARK: -> Main Loading Function
     /// Load all matchups across all connected leagues
@@ -170,9 +142,10 @@ final class MatchupsHubViewModel: ObservableObject {
         }
     }
     
-    /// Load matchup for a single league
+    /// Load matchup for a single league using isolated LeagueMatchupProvider
+    /// 🔥 NO MORE SHARED STATE - each league gets its own provider instance!
     private func loadSingleLeagueMatchup(_ league: UnifiedLeagueManager.LeagueWrapper) async -> UnifiedMatchup? {
-        let leagueKey = "\(league.id)_\(fantasyViewModel.selectedWeek)_\(fantasyViewModel.selectedYear)"
+        let leagueKey = "\(league.id)_\(getCurrentWeek())_\(getCurrentYear())"
         
         // 🔥 FIX: Bulletproof race condition prevention with lock
         loadingLock.lock()
@@ -194,49 +167,34 @@ final class MatchupsHubViewModel: ObservableObject {
         await updateLoadingState("Loading \(league.league.name)...")
         
         do {
-            // Set the league in fantasy view model
-            fantasyViewModel.selectLeague(league)
+            // 🔥 NEW APPROACH: Create isolated provider for this league
+            let provider = LeagueMatchupProvider(
+                league: league, 
+                week: getCurrentWeek(), 
+                year: getCurrentYear()
+            )
             
-            // 🔥 FIX: Populate name resolution data BEFORE fetching matchups
-            if league.source == .sleeper {
-                await fantasyViewModel.fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
-                await updateLeagueLoadingState(league.id, status: .loading, progress: 0.3)
+            await updateLeagueLoadingState(league.id, status: .loading, progress: 0.2)
+            
+            // Step 1: Identify user's team ID
+            guard let myTeamID = await provider.identifyMyTeamID() else {
+                print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
+                await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
+                return nil
             }
             
-            // Now load matchups - this will have proper manager names
-            await fantasyViewModel.fetchMatchups()
-            await updateLeagueLoadingState(league.id, status: .loading, progress: 0.6)
+            print("🎯 PROVIDER: Identified myTeamID = '\(myTeamID)' for \(league.league.name)")
+            await updateLeagueLoadingState(league.id, status: .loading, progress: 0.4)
             
-            // For Sleeper leagues, wait longer for chopped detection to complete properly
-            if league.source == .sleeper {
-                // Wait longer for background chopped validation to complete
-                try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-                await updateLeagueLoadingState(league.id, status: .loading, progress: 0.7)
-                
-                // Additional check: Wait for detectedAsChoppedLeague to be set if matchups are empty
-                var attempts = 0
-                while attempts < 5 && fantasyViewModel.matchups.isEmpty && !fantasyViewModel.detectedAsChoppedLeague {
-                    try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-                    attempts += 1
-                    print("⏳ WAITING: Attempt \(attempts) - waiting for chopped detection to complete...")
-                }
-            }
+            // Step 2: Fetch matchups using isolated provider
+            let matchups = try await provider.fetchMatchups()
+            await updateLeagueLoadingState(league.id, status: .loading, progress: 0.7)
             
-            // NOW check if it's chopped using the centralized method
-            let isChopped = league.isChoppedLeague
-            print("🔍 CHOPPED CHECK RESULT: League \(league.league.name) -> isChopped: \(isChopped)")
-            print("   - Final matchups.count: \(fantasyViewModel.matchups.count)")
-            
-            if isChopped {
+            // Step 3: Check if this is a Chopped league
+            if provider.isChoppedLeague() {
                 print("🔥 CHOPPED: Processing chopped league: \(league.league.name)")
                 
-                // Use FantasyViewModel's existing chopped summary creation
-                let choppedSummary = await fantasyViewModel.createRealChoppedSummary(
-                    leagueID: league.league.leagueID, 
-                    week: fantasyViewModel.selectedWeek
-                )
-                
-                if let choppedSummary = choppedSummary,
+                if let choppedSummary = await provider.getChoppedSummary(),
                    let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
                     
                     let unifiedMatchup = UnifiedMatchup(
@@ -252,29 +210,24 @@ final class MatchupsHubViewModel: ObservableObject {
                     print("✅ Created Chopped league entry for \(league.league.name): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
                     return unifiedMatchup
                 } else {
-                    print("❌ CHOPPED: Failed to create chopped summary or find my team for \(league.league.name)")
-                    // Fall back to regular matchup processing
+                    print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name)")
+                    await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
+                    return nil
                 }
             }
             
-            // For regular leagues (non-Chopped) OR if chopped processing failed
+            // Step 4: Handle regular leagues
             print("🏈 REGULAR: Processing regular league: \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
             
-            // 🔥 FIX: Better error handling for empty matchups
-            if fantasyViewModel.matchups.isEmpty {
-                print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(fantasyViewModel.selectedWeek)")
+            if matchups.isEmpty {
+                print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(getCurrentWeek())")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-                
-                // For ESPN leagues, this might be a valid state (bye week, wrong week, etc.)
-                if league.source == .espn {
-                    print("🏈 ESPN: Empty matchups might be normal for week \(fantasyViewModel.selectedWeek)")
-                }
                 return nil
             }
             
-            // Find MY matchup using proper identification
-            if let myMatchup = await findMyMatchupInLeague(league, matchups: fantasyViewModel.matchups) {
+            // Step 5: Find user's matchup using provider
+            if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
                 let unifiedMatchup = UnifiedMatchup(
                     id: "\(league.id)_\(myMatchup.id)",
                     league: league,
@@ -289,7 +242,7 @@ final class MatchupsHubViewModel: ObservableObject {
                 return unifiedMatchup
             } else {
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-                print("❌ REGULAR: No matchup found for user in \(league.league.name)")
+                print("❌ REGULAR: No matchup found for team ID '\(myTeamID)' in \(league.league.name)")
                 return nil
             }
             
@@ -344,134 +297,27 @@ final class MatchupsHubViewModel: ObservableObject {
         return choppedSummary.rankings.first
     }
     
-    /// Find the user's matchup in a specific league using proper identification
-    private func findMyMatchupInLeague(_ league: UnifiedLeagueManager.LeagueWrapper, matchups: [FantasyMatchup]) async -> FantasyMatchup? {
-        
-        // For Sleeper leagues, use roster ID matching (most reliable)
-        if league.source == .sleeper {
-            if let userRosterID = await getCurrentUserRosterID(leagueID: league.league.leagueID) {
-                for matchup in matchups {
-                    if matchup.homeTeam.rosterID == userRosterID || matchup.awayTeam.rosterID == userRosterID {
-                        print("🎯 SLEEPER: Found MY matchup by roster ID \(userRosterID): \(matchup.homeTeam.ownerName) vs \(matchup.awayTeam.ownerName)")
-                        return matchup
-                    }
-                }
-            }
-            
-            // Fallback to username matching for Sleeper
-            let authenticatedUsername = sleeperCredentials.currentUsername
-            if !authenticatedUsername.isEmpty {
-                for matchup in matchups {
-                    if matchup.homeTeam.ownerName.lowercased() == authenticatedUsername.lowercased() ||
-                       matchup.awayTeam.ownerName.lowercased() == authenticatedUsername.lowercased() {
-                        print("🎯 SLEEPER: Found MY matchup by username '\(authenticatedUsername)': \(matchup.homeTeam.ownerName) vs \(matchup.awayTeam.ownerName)")
-                        return matchup
-                    }
-                }
-            }
-            
-            // Last resort: Match by "Gp" pattern
-            for matchup in matchups {
-                if matchup.homeTeam.ownerName.lowercased().contains("gp") ||
-                   matchup.awayTeam.ownerName.lowercased().contains("gp") {
-                    print("🎯 SLEEPER: Found MY matchup by 'Gp' pattern: \(matchup.homeTeam.ownerName) vs \(matchup.awayTeam.ownerName)")
-                    return matchup
-                }
-            }
-            
-            print("⚠️ SLEEPER: Could not identify user matchup in league \(league.league.name)")
-            print("   Available teams: \(matchups.flatMap { [$0.homeTeam.ownerName, $0.awayTeam.ownerName] }.joined(separator: ", "))")
+    /// Get the current user's roster ID in a Sleeper league (helper for Chopped leagues)
+    private func getCurrentUserRosterID(leagueID: String) async -> Int? {
+        guard !sleeperCredentials.currentUserID.isEmpty else {
+            print("❌ SLEEPER: No user ID available for roster identification")
+            return nil
         }
         
-        // 🔥 FIX: For ESPN leagues, use SWID matching to find MY team!
-        if league.source == .espn {
-            let myESPNID = AppConstants.GpESPNID
-            print("🔍 ESPN: Looking for my SWID '\(myESPNID)' in league \(league.league.name)")
-            
-            // Get ESPN team ownership data
-            let teamOwnership = await getESPNTeamOwnership(leagueID: league.league.leagueID)
-            
-            // 🔥 DEBUG: Log all matchup roster IDs vs team ownership
-            print("🔍 ESPN DEBUG: Matchup roster IDs vs team ownership for \(league.league.name):")
-            for (index, matchup) in matchups.enumerated() {
-                print("   Matchup \(index + 1): Home=\(matchup.homeTeam.ownerName) (roster:\(matchup.homeTeam.rosterID ?? -1)) vs Away=\(matchup.awayTeam.ownerName) (roster:\(matchup.awayTeam.rosterID ?? -1))")
-            }
-            print("   Team ownership: \(teamOwnership)")
-            
-            // Find MY matchup by checking which team I own
-            for (index, matchup) in matchups.enumerated() {
-                // Check if I own the home team
-                if let homeRosterID = matchup.homeTeam.rosterID {
-                    print("🔍 ESPN: Checking home team - roster \(homeRosterID), owners: \(teamOwnership[homeRosterID] ?? [])")
-                    if let homeOwners = teamOwnership[homeRosterID] {
-                        let containsCheck = homeOwners.contains(myESPNID)
-                        print("🧪 ESPN: Contains check for home team \(homeRosterID): myESPNID='\(myESPNID)' in \(homeOwners) = \(containsCheck)")
-                        
-                        if containsCheck {
-                            print("🎯 ESPN: Found MY matchup by home team roster ID \(homeRosterID): \(matchup.homeTeam.ownerName) vs \(matchup.awayTeam.ownerName)")
-                            return matchup
-                        }
-                    }
-                } else {
-                    print("⚠️ ESPN: Home team rosterID is nil for matchup \(index + 1)")
-                }
-                
-                // Check if I own the away team
-                if let awayRosterID = matchup.awayTeam.rosterID {
-                    print("🔍 ESPN: Checking away team - roster \(awayRosterID), owners: \(teamOwnership[awayRosterID] ?? [])")
-                    if let awayOwners = teamOwnership[awayRosterID] {
-                        let containsCheck = awayOwners.contains(myESPNID)
-                        print("🧪 ESPN: Contains check for away team \(awayRosterID): myESPNID='\(myESPNID)' in \(awayOwners) = \(containsCheck)")
-                        
-                        if containsCheck {
-                            print("🎯 ESPN: Found MY matchup by away team roster ID \(awayRosterID): \(matchup.awayTeam.ownerName) vs \(matchup.homeTeam.ownerName)")
-                            return matchup
-                        }
-                    }
-                } else {
-                    print("⚠️ ESPN: Away team rosterID is nil for matchup \(index + 1)")
-                }
-            }
-            
-            print("⚠️ ESPN: Could not identify user matchup in league \(league.league.name)")
-            print("   Available teams: \(matchups.flatMap { [$0.homeTeam.ownerName, $0.awayTeam.ownerName] }.joined(separator: ", "))")
-            print("   My SWID: \(myESPNID)")
-            print("   Team ownership: \(teamOwnership)")
-            
-            // Fallback: return first matchup but with warning
-            if let firstMatchup = matchups.first {
-                print("⚠️ ESPN: Falling back to first matchup: \(firstMatchup.homeTeam.ownerName) vs \(firstMatchup.awayTeam.ownerName)")
-                return firstMatchup
-            }
-        }
-        
-        return nil
-    }
-    
-    /// Get ESPN team ownership mapping for a specific league
-    private func getESPNTeamOwnership(leagueID: String) async -> [Int: [String]] {
         do {
-            // Fetch the full ESPN league data to get team ownership
-            let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: leagueID)
+            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: leagueID)
+            let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
             
-            var ownership: [Int: [String]] = [:]
-            
-            if let teams = espnLeague.teams {
-                for team in teams {
-                    ownership[team.id] = team.owners ?? []
-                }
-                
-                print("📋 ESPN: Retrieved team ownership for league \(leagueID):")
-                for (teamID, owners) in ownership {
-                    print("   Team \(teamID): \(owners)")
-                }
+            if let userRoster = userRoster {
+                print("🎯 SLEEPER: Found user roster ID \(userRoster.rosterID) for user \(sleeperCredentials.currentUserID)")
+                return userRoster.rosterID
+            } else {
+                print("⚠️ SLEEPER: No roster found for user \(sleeperCredentials.currentUserID) in league \(leagueID)")
+                return nil
             }
-            
-            return ownership
-            
         } catch {
-            print("❌ ESPN: Failed to fetch team ownership for league \(leagueID): \(error)")
-            return [:]
+            print("❌ SLEEPER: Failed to fetch rosters for league \(leagueID): \(error)")
+            return nil
         }
     }
     
@@ -506,6 +352,7 @@ final class MatchupsHubViewModel: ObservableObject {
     }
     
     /// Refresh existing matchups without full reload
+    /// 🔥 UPDATED: Uses isolated providers to prevent race conditions
     private func refreshMatchups() async {
         guard !myMatchups.isEmpty && !isLoading else {
             await loadAllMatchups()
@@ -529,16 +376,22 @@ final class MatchupsHubViewModel: ObservableObject {
                     activeRefreshes -= 1
                 }
                 
-                fantasyViewModel.selectLeague(matchup.league)
+                // 🔥 NEW APPROACH: Create fresh provider for refresh
+                let provider = LeagueMatchupProvider(
+                    league: matchup.league,
+                    week: getCurrentWeek(),
+                    year: getCurrentYear()
+                )
+                
+                // Get user's team ID
+                guard let myTeamID = await provider.identifyMyTeamID() else {
+                    print("⚠️ REFRESH: Could not identify team for \(matchup.league.league.name)")
+                    return
+                }
                 
                 if matchup.isChoppedLeague {
-                    // Refresh Chopped league data using FantasyViewModel's method
-                    let choppedSummary = await fantasyViewModel.createRealChoppedSummary(
-                        leagueID: matchup.league.league.leagueID,
-                        week: fantasyViewModel.selectedWeek
-                    )
-                    
-                    if let choppedSummary = choppedSummary,
+                    // Refresh Chopped league data
+                    if let choppedSummary = await provider.getChoppedSummary(),
                        let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: matchup.league.league.leagueID) {
                         
                         await MainActor.run {
@@ -556,20 +409,24 @@ final class MatchupsHubViewModel: ObservableObject {
                     }
                 } else {
                     // Refresh regular matchup data
-                    await fantasyViewModel.refreshMatchups()
-                    
-                    if let updatedMatchup = await findMyMatchupInLeague(matchup.league, matchups: fantasyViewModel.matchups) {
-                        await MainActor.run {
-                            if let index = self.myMatchups.firstIndex(where: { $0.id == matchup.id }) {
-                                self.myMatchups[index] = UnifiedMatchup(
-                                    id: matchup.id,
-                                    league: matchup.league,
-                                    fantasyMatchup: updatedMatchup,
-                                    choppedSummary: nil,
-                                    lastUpdated: Date()
-                                )
+                    do {
+                        let matchups = try await provider.fetchMatchups()
+                        
+                        if let updatedMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
+                            await MainActor.run {
+                                if let index = self.myMatchups.firstIndex(where: { $0.id == matchup.id }) {
+                                    self.myMatchups[index] = UnifiedMatchup(
+                                        id: matchup.id,
+                                        league: matchup.league,
+                                        fantasyMatchup: updatedMatchup,
+                                        choppedSummary: nil,
+                                        lastUpdated: Date()
+                                    )
+                                }
                             }
                         }
+                    } catch {
+                        print("⚠️ REFRESH: Failed to refresh \(matchup.league.league.name): \(error)")
                     }
                 }
             }
@@ -594,6 +451,18 @@ final class MatchupsHubViewModel: ObservableObject {
         loadingLock.unlock()
         
         await loadAllMatchups()
+    }
+    
+    // MARK: -> Helper Methods
+    
+    /// Get current NFL week
+    private func getCurrentWeek() -> Int {
+        return NFLWeekService.shared.currentWeek
+    }
+    
+    /// Get current year
+    private func getCurrentYear() -> String {
+        return String(Calendar.current.component(.year, from: Date()))
     }
 }
 

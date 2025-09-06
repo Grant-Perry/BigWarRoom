@@ -32,6 +32,11 @@ final class FantasyViewModel: ObservableObject {
     // Flag to disable auto-refresh when MatchupsHub is managing refreshes
     var isControlledByMatchupsHub: Bool = false
 
+    // MARK: -> Team Identification
+    /// The authenticated user's team ID for the currently selected league
+    /// This ensures Mission Control shows the correct matchup every damn time
+    var myTeamID: String?
+
     // Make nflWeekService publicly accessible for UI
     private let nflWeekService = NFLWeekService.shared
     
@@ -148,6 +153,25 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
+    /// Set the connected league with explicit team ID for reliable identification
+    /// This method ensures Mission Control shows YOUR fucking matchup, not some random one
+    func selectLeague(_ league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String?) {
+        // Only update if it's a new league or we are refreshing the same league with team ID
+        guard selectedLeague?.id != league.id || myTeamID != nil else {
+            return
+        }
+        
+        selectedLeague = league
+        self.myTeamID = myTeamID
+        clearAllData()
+        
+        print("🎯 LEAGUE SELECTION: Selected league \(league.league.name) with myTeamID: \(myTeamID ?? "nil")")
+        
+        Task {
+            await fetchMatchups()
+        }
+    }
+    
     /// Available leagues from UnifiedLeagueManager
     var availableLeagues: [UnifiedLeagueManager.LeagueWrapper] {
         return unifiedLeagueManager.allLeagues
@@ -161,6 +185,7 @@ final class FantasyViewModel: ObservableObject {
         detectedAsChoppedLeague = false
         hasActiveRosters = false
         currentChoppedSummary = nil
+        // Don't clear myTeamID here - it's needed for reliable identification
         
         // Clear ESPN-specific data
         espnTeamRecords.removeAll()
