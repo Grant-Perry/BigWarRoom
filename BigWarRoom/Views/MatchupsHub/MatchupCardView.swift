@@ -2,7 +2,7 @@
 //  MatchupCardView.swift
 //  BigWarRoom
 //
-//  Beautiful animated matchup cards for the hub
+//  Beautiful animated matchup cards for the hub - COMPACT DESIGN
 //
 
 import SwiftUI
@@ -35,44 +35,47 @@ struct MatchupCardView: View {
     }
     
     private var cardContent: some View {
-        VStack(spacing: 0) {
-            // Header with league info and live status
+        VStack(spacing: 8) {
+            // Compact header with league and status
             cardHeader
             
-            // Main matchup content
+            // Main content
             if matchup.isChoppedLeague {
-                choppedLeagueContent
+                compactChoppedContent
             } else {
-                standardMatchupContent
+                compactMatchupContent
             }
             
-            // Footer with additional info
-            cardFooter
+            // Compact footer
+            compactFooter
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 14) // INCREASED from 12 to 14 for more breathing room
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
+            RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
-                        colors: borderColors,
+                        colors: overlayBorderColors, // UPDATED: Use dynamic colors based on chopped status
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: isLiveGame ? 2 : 1
+                    lineWidth: overlayBorderWidth // UPDATED: Use dynamic border width
                 )
-                .opacity(isLiveGame ? (glowIntensity * 0.8 + 0.2) : 0.3)
+                .opacity(overlayBorderOpacity) // UPDATED: Use dynamic opacity
         )
         .shadow(
-            color: isLiveGame ? .gpGreen.opacity(glowIntensity * 0.5) : .black.opacity(0.3),
-            radius: isLiveGame ? 8 : 4,
+            color: shadowColor, // UPDATED: Use dynamic shadow color
+            radius: shadowRadius, // UPDATED: Use dynamic shadow radius
             x: 0,
-            y: isLiveGame ? 4 : 2
+            y: 2
         )
+        .frame(height: 142) // REDUCED from 145 to 142 to work better with increased row spacing
     }
     
     private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 20)
+        RoundedRectangle(cornerRadius: 16)
             .fill(
                 LinearGradient(
                     colors: backgroundColors,
@@ -84,419 +87,254 @@ struct MatchupCardView: View {
     
     private var cardHeader: some View {
         HStack {
-            // League platform badge
-            leaguePlatformBadge
+            // League name with platform logo
+            HStack(spacing: 6) {
+                Group {
+                    switch matchup.league.source {
+                    case .espn:
+                        AppConstants.espnLogo
+                            .scaleEffect(0.4)
+                    case .sleeper:
+                        AppConstants.sleeperLogo
+                            .scaleEffect(0.4)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                
+                Text(matchup.league.league.name)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
             
             Spacer()
-            
-            // Live status indicator
-            if isLiveGame {
-                liveStatusBadge
-            } else if let status = matchup.fantasyMatchup?.status {
-                gameStatusBadge(status)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
-    }
-    
-    private var leaguePlatformBadge: some View {
-        HStack(spacing: 6) {
-            // Platform icon
-            Image(systemName: platformIcon)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.white)
-            
-            // League name
-            Text(matchup.league.league.name)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.white)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(platformColor.opacity(0.8))
-        )
-    }
-    
-    private var liveStatusBadge: some View {
-        HStack(spacing: 6) {
-            // Platform logo
-            platformLogo
-            
-            HStack(spacing: 4) {
-                Circle()
-                    .fill(Color.red)
-                    .frame(width: 8, height: 8)
-                    .opacity(glowIntensity * 0.5 + 0.5)
-                
-                Text("LIVE")
-                    .font(.system(size: 11, weight: .black))
-                    .foregroundColor(.red)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.red.opacity(0.2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.red.opacity(0.5), lineWidth: 1)
-                )
-        )
-    }
-    
-    private func gameStatusBadge(_ status: MatchupStatus) -> some View {
-        HStack(spacing: 6) {
-            // Platform logo
-            platformLogo
-            
-            HStack(spacing: 4) {
-                Text(status.emoji)
-                    .font(.system(size: 10))
-                
-                Text(status.displayName.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(statusColor(status))
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(statusColor(status).opacity(0.2))
-        )
-    }
-    
-    private var platformLogo: some View {
-        Group {
-            switch matchup.league.source {
-            case .espn:
-                AppConstants.espnLogo
-                    .frame(width: 16, height: 16)
-                    .scaleEffect(0.5)  // Scale down the logo
-            case .sleeper:
-                AppConstants.sleeperLogo
-                    .frame(width: 16, height: 16)
-                    .scaleEffect(0.5)  // Scale down the logo
-            }
         }
     }
     
-    private var standardMatchupContent: some View {
-        VStack(spacing: 20) {
-            // Teams and scores
-            HStack(spacing: 0) {
-                // My team (left side)
+    private var compactMatchupContent: some View {
+        VStack(spacing: 12) {
+            // Teams row - HORIZONTAL layout
+            HStack(spacing: 8) {
+                // My team
                 if let myTeam = matchup.myTeam {
-                    teamSection(myTeam, isMyTeam: true)
+                    compactTeamSection(myTeam, isMyTeam: true)
                 }
                 
-                // VS separator with win probability
-                vsSeparator
+                // VS separator
+                Text("VS")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundColor(.white.opacity(0.6))
+                    .frame(width: 24)
                 
-                // Opponent team (right side)
+                // Opponent team
                 if let opponentTeam = matchup.opponentTeam {
-                    teamSection(opponentTeam, isMyTeam: false)
+                    compactTeamSection(opponentTeam, isMyTeam: false)
                 }
             }
             
-            // Win probability bar
+            // Win probability - COMPACT
             if let winProb = matchup.myWinProbability {
-                winProbabilityBar(winProb)
+                compactWinProbability(winProb)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
     }
     
-    private var choppedLeagueContent: some View {
-        VStack(spacing: 16) {
-            // Chopped league header
+    private var compactChoppedContent: some View {
+        VStack(spacing: 8) {
+            // Chopped status
             HStack {
-                Text("🔥 CHOPPED LEAGUE")
-                    .font(.system(size: 14, weight: .black))
+                Text("🔥 CHOPPED")
+                    .font(.system(size: 12, weight: .black))
                     .foregroundColor(.orange)
                 
                 Spacer()
                 
                 if let summary = matchup.choppedSummary {
                     Text("Week \(summary.week)")
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
                 }
             }
             
-            // MY chopped status - use the same design as ChoppedLeaderboardView
+            // My status
             if let ranking = matchup.myTeamRanking {
-                ChoppedPlayerCard(ranking: ranking)
+                HStack {
+                    // Rank
+                    VStack(spacing: 2) {
+                        Text("#\(ranking.rank)")
+                            .font(.system(size: 16, weight: .black))
+                            .foregroundColor(ranking.eliminationStatus.color)
+                        
+                        Text(ranking.eliminationStatus.emoji)
+                            .font(.system(size: 12))
+                    }
+                    
+                    Spacer()
+                    
+                    // Score
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(ranking.weeklyPointsString)
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text(ranking.safetyMarginDisplay)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(ranking.pointsFromSafety >= 0 ? .green : .red)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(ranking.eliminationStatus.color.opacity(0.1))
+                )
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 16)
     }
     
-    private func teamSection(_ team: FantasyTeam, isMyTeam: Bool) -> some View {
-        VStack(spacing: 8) {
-            // Team avatar/logo
-            teamAvatar(team, isMyTeam: isMyTeam)
-            
-            // Team name
-            Text(team.name)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(height: 36)
-            
-            // Owner name
-            Text(team.ownerName)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.gray)
-                .lineLimit(1)
-            
-            // Score
-            VStack(spacing: 2) {
-                Text(team.currentScoreString)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
-                    .foregroundColor(isMyTeam ? .gpGreen : .white)
-                    .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
+    private func compactTeamSection(_ team: FantasyTeam, isMyTeam: Bool) -> some View {
+        // Determine if this team is winning the matchup
+        let isWinning: Bool = {
+            if let myTeam = matchup.myTeam, let opponentTeam = matchup.opponentTeam {
+                let myScore = myTeam.currentScore ?? 0
+                let opponentScore = opponentTeam.currentScore ?? 0
                 
-                Text("(\(team.projectedScoreString))")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gray)
+                if isMyTeam {
+                    return myScore > opponentScore // I'm winning if my score > opponent score
+                } else {
+                    return opponentScore > myScore // Opponent is winning if their score > my score
+                }
             }
+            return false
+        }()
+        
+        return VStack(spacing: 6) {
+            // Avatar - BIGGER
+            Group {
+                if let avatarURL = team.avatarURL {
+                    AsyncImage(url: avatarURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        compactTeamInitials(team, isWinning: isWinning)
+                    }
+                } else {
+                    compactTeamInitials(team, isWinning: isWinning)
+                }
+            }
+            .frame(width: 45, height: 45)
+            .clipShape(Circle())
+            .overlay(
+                Circle()
+                    .stroke(
+                        isWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
+                        lineWidth: isWinning ? 2 : 1
+                    )
+            )
             
-            // Record
+            // Team name - COMPACT - Pink for losers
+            Text(team.ownerName)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                .lineLimit(1)
+                .frame(maxWidth: 60)
+            
+            // Score - PROMINENT - Pink for losers
+            Text(team.currentScoreString)
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
+            
+            // Record - TINY
             if let record = team.record {
                 Text(record.displayString)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.gray)
             }
         }
         .frame(maxWidth: .infinity)
     }
     
-    private func teamAvatar(_ team: FantasyTeam, isMyTeam: Bool) -> some View {
-        Group {
-            if let avatarURL = team.avatarURL {
-                AsyncImage(url: avatarURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    teamInitialsBadge(team, isMyTeam: isMyTeam)
-                }
-            } else {
-                teamInitialsBadge(team, isMyTeam: isMyTeam)
-            }
-        }
-        .frame(width: 50, height: 50)
-        .clipShape(Circle())
-        .overlay(
-            Circle()
-                .stroke(
-                    isMyTeam ? Color.gpGreen : Color.white.opacity(0.3),
-                    lineWidth: isMyTeam ? 3 : 2
-                )
-        )
-    }
-    
-    private func teamInitialsBadge(_ team: FantasyTeam, isMyTeam: Bool) -> some View {
+    private func compactTeamInitials(_ team: FantasyTeam, isWinning: Bool) -> some View {
         ZStack {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: isMyTeam ? [.gpGreen.opacity(0.8), .gpGreen] : [team.espnTeamColor.opacity(0.8), team.espnTeamColor],
+                        colors: isWinning ? [.gpGreen.opacity(0.8), .gpGreen] : [team.espnTeamColor.opacity(0.8), team.espnTeamColor],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
             
             Text(team.teamInitials)
-                .font(.system(size: 16, weight: .black))
+                .font(.system(size: 12, weight: .black))
                 .foregroundColor(.white)
         }
     }
     
-    private var vsSeparator: some View {
+    private func compactWinProbability(_ winProb: Double) -> some View {
         VStack(spacing: 4) {
-            Text("VS")
-                .font(.system(size: 12, weight: .black))
-                .foregroundColor(.white.opacity(0.7))
-            
-            // Score differential
-            if let differential = matchup.scoreDifferential {
-                Text(differential > 0 ? "+\(String(format: "%.1f", differential))" : String(format: "%.1f", differential))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(differential > 0 ? .green : .red)
-            }
-        }
-        .frame(width: 40)
-    }
-    
-    private func winProbabilityBar(_ winProb: Double) -> some View {
-        VStack(spacing: 8) {
+            // Probability text
             HStack {
-                Text("Win Probability")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.gray)
+                Text("\(Int(winProb * 100))%")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.gpGreen)
                 
                 Spacer()
                 
-                Text("\(Int(winProb * 100))% - \(Int((1 - winProb) * 100))%")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                Text("\(Int((1 - winProb) * 100))%")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white.opacity(0.7))
             }
             
+            // Probability bar - THIN
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Background
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: 2)
                         .fill(Color.gray.opacity(0.3))
-                        .frame(height: 8)
+                        .frame(height: 4)
                     
-                    // Win probability fill
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(
-                            LinearGradient(
-                                colors: [.gpGreen, .gpGreen.opacity(0.7)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: geometry.size.width * winProb, height: 8)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.gpGreen)
+                        .frame(width: geometry.size.width * winProb, height: 4)
                         .animation(.easeInOut(duration: 1.0), value: winProb)
                 }
             }
-            .frame(height: 8)
+            .frame(height: 4)
         }
     }
     
-    private func choppedStatusSection(_ ranking: FantasyTeamRanking) -> some View {
-        HStack(spacing: 16) {
-            // Rank and status
-            VStack(spacing: 4) {
-                Text(ranking.rankDisplay)
-                    .font(.system(size: 24, weight: .black))
-                    .foregroundColor(ranking.eliminationStatus.color)
-                
-                Text(ranking.eliminationStatus.displayName)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(ranking.eliminationStatus.color)
-            }
-            
-            // Score and safety margin
-            VStack(spacing: 4) {
-                Text(ranking.weeklyPointsString)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                
-                Text("Points This Week")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-            
-            // Safety margin
-            VStack(spacing: 4) {
-                Text(ranking.safetyMarginDisplay)
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(ranking.pointsFromSafety >= 0 ? .green : .red)
-                
-                Text("From Safety")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(ranking.eliminationStatus.color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(ranking.eliminationStatus.color.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-    
-    private func choppedLeaderboardPreview(_ summary: ChoppedWeekSummary) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("Leaderboard")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Text("\(summary.totalSurvivors) Survivors")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            LazyVStack(spacing: 4) {
-                ForEach(Array(summary.rankings.prefix(3).enumerated()), id: \.offset) { index, ranking in
-                    HStack {
-                        Text("\(index + 1).")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(width: 20, alignment: .leading)
-                        
-                        Text(ranking.team.name)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        Text(ranking.weeklyPointsString)
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .foregroundColor(ranking.eliminationStatus.color)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.3))
-        )
-    }
-    
-    private var cardFooter: some View {
+    private var compactFooter: some View {
         HStack {
-            // Last updated
-            HStack(spacing: 4) {
+            // Time ago - SMALLER
+            HStack(spacing: 2) {
                 Image(systemName: "clock")
-                    .font(.system(size: 10))
+                    .font(.system(size: 8))
                     .foregroundColor(.gray)
                 
                 Text(timeAgo(matchup.lastUpdated))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.gray)
             }
             
             Spacer()
             
-            // Tap hint
-            HStack(spacing: 4) {
-                Text("Tap for details")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.gray)
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.gray)
+            // Score differential - if available
+            if let differential = matchup.scoreDifferential {
+                Text(differential > 0 ? "+\(String(format: "%.1f", differential))" : String(format: "%.1f", differential))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(differential > 0 ? .green : .red)
             }
+            
+            Spacer()
+            
+            // Tap hint - MINIMAL
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.gray.opacity(0.6))
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
     }
     
     // MARK: -> Computed Properties
@@ -505,66 +343,126 @@ struct MatchupCardView: View {
         matchup.fantasyMatchup?.status == .live
     }
     
-    private var platformIcon: String {
-        switch matchup.league.source {
-        case .espn: return "tv"
-        case .sleeper: return "moon.zzz"
+    // UPDATED: Dynamic border colors based on chopped danger level or live game status
+    private var overlayBorderColors: [Color] {
+        if matchup.isChoppedLeague {
+            // Use chopped danger level colors
+            if let ranking = matchup.myTeamRanking {
+                let dangerColor = ranking.eliminationStatus.color
+                return [dangerColor, dangerColor.opacity(0.7), dangerColor]
+            }
+            return [.orange, .orange.opacity(0.7), .orange] // Fallback chopped color
+        } else if isLiveGame {
+            // Live game colors
+            return [.gpGreen, .blue, .gpGreen]
+        } else {
+            // Regular game colors
+            return [.gray.opacity(0.3), .gray.opacity(0.1), .gray.opacity(0.3)]
         }
     }
     
-    private var platformColor: Color {
-        switch matchup.league.source {
-        case .espn: return .red
-        case .sleeper: return .blue
+    // UPDATED: Dynamic border width
+    private var overlayBorderWidth: CGFloat {
+        if matchup.isChoppedLeague {
+            // Thicker borders for chopped leagues to emphasize danger
+            return 2.5
+        } else if isLiveGame {
+            return 2
+        } else {
+            return 1
+        }
+    }
+    
+    // UPDATED: Dynamic border opacity
+    private var overlayBorderOpacity: Double {
+        if matchup.isChoppedLeague {
+            return 0.9 // High opacity for chopped borders
+        } else if isLiveGame {
+            return (glowIntensity * 0.8 + 0.2)
+        } else {
+            return 0.3
+        }
+    }
+    
+    // UPDATED: Dynamic shadow color
+    private var shadowColor: Color {
+        if matchup.isChoppedLeague {
+            // Shadow matches the danger level
+            if let ranking = matchup.myTeamRanking {
+                return ranking.eliminationStatus.color.opacity(0.4)
+            }
+            return .orange.opacity(0.4)
+        } else if isLiveGame {
+            return .gpGreen.opacity(glowIntensity * 0.3)
+        } else {
+            return .black.opacity(0.2)
+        }
+    }
+    
+    // UPDATED: Dynamic shadow radius
+    private var shadowRadius: CGFloat {
+        if matchup.isChoppedLeague {
+            // Bigger shadow for chopped leagues - more dramatic
+            return 8
+        } else if isLiveGame {
+            return 6
+        } else {
+            return 3
         }
     }
     
     private var backgroundColors: [Color] {
-        if isLiveGame {
+        if matchup.isChoppedLeague {
+            // Chopped leagues get subtle danger-level tinted backgrounds
+            if let ranking = matchup.myTeamRanking {
+                let dangerColor = ranking.eliminationStatus.color
+                return [
+                    Color.black.opacity(0.9),
+                    dangerColor.opacity(0.03), // Very subtle tint
+                    Color.black.opacity(0.9)
+                ]
+            }
             return [
                 Color.black.opacity(0.9),
-                Color.gpGreen.opacity(0.1),
+                Color.orange.opacity(0.03),
+                Color.black.opacity(0.9)
+            ]
+        } else if isLiveGame {
+            return [
+                Color.black.opacity(0.9),
+                Color.gpGreen.opacity(0.05),
                 Color.black.opacity(0.9)
             ]
         } else {
             return [
                 Color.black.opacity(0.8),
-                Color.gray.opacity(0.1),
+                Color.gray.opacity(0.05),
                 Color.black.opacity(0.8)
             ]
         }
     }
     
     private var borderColors: [Color] {
+        // This is now replaced by overlayBorderColors above, but keeping for compatibility
         if isLiveGame {
             return [.gpGreen, .blue, .gpGreen]
         } else {
             return [.gray.opacity(0.3), .gray.opacity(0.1), .gray.opacity(0.3)]
         }
     }
-    
-    private func statusColor(_ status: MatchupStatus) -> Color {
-        switch status {
-        case .upcoming: return .blue
-        case .live: return .red
-        case .complete: return .green
-        }
-    }
-    
+
     // MARK: -> Animation & Interaction
     
     private func handleTap() {
-        // Haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        // Scale animation
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+        withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
             cardScale = 0.95
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                 cardScale = 1.0
             }
             onTap()
@@ -572,14 +470,12 @@ struct MatchupCardView: View {
     }
     
     private func startLiveAnimations() {
-        // Pulsing glow for live games
         withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-            glowIntensity = 1.0
+            glowIntensity = 0.8
         }
         
-        // Score pulsing animation
         Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 scoreAnimation.toggle()
             }
         }
@@ -651,8 +547,12 @@ struct MatchupCardView: View {
         lastUpdated: Date()
     )
     
-    MatchupCardView(matchup: sampleMatchup) {
-        print("Card tapped!")
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+        ForEach(0..<4, id: \.self) { _ in
+            MatchupCardView(matchup: sampleMatchup) {
+                print("Card tapped!")
+            }
+        }
     }
     .padding()
     .background(Color.black)

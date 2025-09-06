@@ -2,17 +2,19 @@
 //  LoadingScreen.swift
 //  BigWarRoom
 //
-//  Beautiful splash screen with purple/blue gradients, bokeh effects, and growing app logo
+//  Beautiful splash screen with purple/blue gradients, bokeh effects, and spinning football
 //
 
 import SwiftUI
 
 struct LoadingScreen: View {
-    @State private var logoScale: CGFloat = 0.5
+    @State private var rotation: Double = 0
+    @State private var scale: CGFloat = 0.5
     @State private var logoGlow: CGFloat = 0.3
     @State private var textOpacity: Double = 0.0
     @State private var purpleWave: CGFloat = 0
     @State private var isComplete = false
+    @State private var footballScale: Double = 1.0
     
     /// Completion handler 
     let onComplete: (Bool) -> Void
@@ -61,17 +63,17 @@ struct LoadingScreen: View {
             VStack(spacing: 50) {
                 Spacer()
                 
-                // App Logo with version underneath
+                // Spinning Football Animation with version underneath
                 VStack(spacing: 12) {
-                    AppIconView()
+                    SpinningFootballView()
                         .frame(width: 120, height: 120)
-                        .scaleEffect(logoScale)
+                        .scaleEffect(scale)
                         .shadow(color: .purple.opacity(logoGlow), radius: 20, x: 0, y: 0)
                         .shadow(color: .blue.opacity(logoGlow * 0.8), radius: 30, x: 0, y: 0)
-                        .animation(.spring(response: 1.5, dampingFraction: 0.8), value: logoScale)
+                        .animation(.spring(response: 1.5, dampingFraction: 0.8), value: scale)
                         .animation(.easeInOut(duration: 2.0), value: logoGlow)
                     
-                    // Version under the AppIcon
+                    // Version under the football
                     Text("Version \(AppConstants.getVersion())")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
                         .foregroundColor(.white.opacity(0.7))
@@ -99,9 +101,20 @@ struct LoadingScreen: View {
                 LoadingDots()
                     .opacity(textOpacity)
                 
+                // Tap to continue hint
+                Text("Tap to continue")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+                    .opacity(textOpacity)
+                    .animation(.easeIn(duration: 1.0).delay(2.0), value: textOpacity)
+                
                 Spacer()
             }
             .padding(.horizontal, 32)
+        }
+        .onTapGesture {
+            // Tap anywhere to exit splash screen
+            completeLoading()
         }
         .onAppear {
             startSplashSequence()
@@ -110,9 +123,9 @@ struct LoadingScreen: View {
     
     /// Starts the beautiful splash animation sequence
     private func startSplashSequence() {
-        // Grow the logo
+        // Grow the football
         withAnimation(.spring(response: 1.2, dampingFraction: 0.7).delay(0.3)) {
-            logoScale = 1.0
+            scale = 1.0
         }
         
         // Intensify glow
@@ -130,14 +143,20 @@ struct LoadingScreen: View {
             purpleWave = 1.5
         }
         
-        // Complete after 2.5 seconds
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            completeLoading()
+        // Complete after 3 seconds (longer to show "tap to continue")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            // Auto-complete if user doesn't tap
+            if !isComplete {
+                completeLoading()
+            }
         }
     }
     
     /// Checks if user has persistent data and completes loading
     private func completeLoading() {
+        guard !isComplete else { return } // Prevent multiple calls
+        isComplete = true
+        
         // Check if user has any valid credentials setup
         let hasESPNCredentials = espnCredentials.hasValidCredentials
         let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
@@ -148,14 +167,108 @@ struct LoadingScreen: View {
         // xprint("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
-            isComplete = true
+            // Add exit animation here if needed
         }
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             // Only show onboarding if NO credentials exist
             let shouldShowOnboarding = !hasAnyCredentials
             onComplete(shouldShowOnboarding)
         }
+    }
+}
+
+// MARK: - Spinning Football View
+
+struct SpinningFootballView: View {
+    @State private var rotation: Double = 0
+    @State private var footballScale: Double = 1.0
+    @State private var glowOpacity: Double = 0.8
+    
+    var body: some View {
+        ZStack {
+            // Outer glow rings
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(Color.gpGreen.opacity(0.2))
+                    .frame(width: 120 + CGFloat(index * 20))
+                    .blur(radius: CGFloat(5 + index * 3))
+                    .opacity(glowOpacity * (1.0 - Double(index) * 0.2))
+                    .animation(
+                        .easeInOut(duration: 2.0 + Double(index) * 0.5)
+                        .repeatForever(autoreverses: true),
+                        value: glowOpacity
+                    )
+            }
+            
+            // Main football circle background
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.brown, .brown.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 80, height: 80)
+                .scaleEffect(footballScale)
+                .animation(
+                    .easeInOut(duration: 1.5)
+                    .repeatForever(autoreverses: true),
+                    value: footballScale
+                )
+            
+            // Football icon that rotates
+            Image(systemName: "football.fill")
+                .font(.system(size: 40))
+                .foregroundColor(.white)
+                .rotationEffect(.degrees(rotation))
+                .animation(
+                    .linear(duration: 3.0)
+                    .repeatForever(autoreverses: false),
+                    value: rotation
+                )
+            
+            // Loading dots around the football
+            ForEach(0..<8) { index in
+                Circle()
+                    .fill(Color.gpGreen)
+                    .frame(width: 8, height: 8)
+                    .offset(y: -50)
+                    .rotationEffect(.degrees(Double(index) * 45))
+                    .opacity(loadingDotOpacity(for: index))
+                    .animation(
+                        .linear(duration: 1.0)
+                        .repeatForever(autoreverses: false)
+                        .delay(Double(index) * 0.125),
+                        value: rotation
+                    )
+            }
+        }
+        .onAppear {
+            startFootballAnimations()
+        }
+    }
+    
+    private func startFootballAnimations() {
+        withAnimation {
+            rotation = 360
+            footballScale = 1.2
+            glowOpacity = 1.0
+        }
+        
+        // Continuous rotation
+        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { _ in
+            withAnimation(.linear(duration: 3.0)) {
+                rotation += 360
+            }
+        }
+    }
+    
+    private func loadingDotOpacity(for index: Int) -> Double {
+        let progress = (rotation / 360.0).truncatingRemainder(dividingBy: 1.0)
+        let dotProgress = (progress * 8 - Double(index)).truncatingRemainder(dividingBy: 8.0)
+        return dotProgress < 1.0 ? 1.0 : 0.3
     }
 }
 
@@ -237,41 +350,6 @@ struct BokehLayer: View {
                 return (CGPoint(x: newX, y: newY), size, color, opacity)
             }
         }
-    }
-}
-
-// MARK: - App Icon View
-
-struct AppIconView: View {
-    var body: some View {
-        if let iconName = getAppIconName(),
-           let uiImage = UIImage(named: iconName) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous)) // iOS app icon corner radius
-        } else {
-            // Fallback if app icon can't be loaded
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay(
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white)
-                )
-        }
-    }
-    
-    private func getAppIconName() -> String? {
-        guard let infoPlist = Bundle.main.infoDictionary,
-              let iconDict = infoPlist["CFBundleIcons"] as? [String: Any],
-              let primaryIconDict = iconDict["CFBundlePrimaryIcon"] as? [String: Any],
-              let iconFiles = primaryIconDict["CFBundleIconFiles"] as? [String] else {
-            return nil
-        }
-        
-        // Return the largest icon (usually the last one in the array)
-        return iconFiles.last
     }
 }
 

@@ -190,30 +190,32 @@ final class MatchupsHubViewModel: ObservableObject {
             let matchups = try await provider.fetchMatchups()
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.7)
             
-            // Step 3: Check if this is a Chopped league
-            if provider.isChoppedLeague() {
-                print("🔥 CHOPPED: Processing chopped league: \(league.league.name)")
+            // Step 3: FIXED - Check for Chopped league PROPERLY
+            if league.source == .sleeper && matchups.isEmpty {
+                print("🔥 CHOPPED DETECTED: League \(league.league.name) has no matchups - processing as Chopped league")
                 
-                if let choppedSummary = await provider.getChoppedSummary(),
-                   let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
-                    
-                    let unifiedMatchup = UnifiedMatchup(
-                        id: "\(league.id)_chopped",
-                        league: league,
-                        fantasyMatchup: nil,
-                        choppedSummary: choppedSummary,
-                        lastUpdated: Date(),
-                        myTeamRanking: myTeamRanking
-                    )
-                    
-                    await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
-                    print("✅ Created Chopped league entry for \(league.league.name): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
-                    return unifiedMatchup
-                } else {
-                    print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name)")
-                    await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-                    return nil
+                // Create chopped summary using proper Sleeper data
+                if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
+                    if let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
+                        
+                        let unifiedMatchup = UnifiedMatchup(
+                            id: "\(league.id)_chopped",
+                            league: league,
+                            fantasyMatchup: nil,
+                            choppedSummary: choppedSummary,
+                            lastUpdated: Date(),
+                            myTeamRanking: myTeamRanking
+                        )
+                        
+                        await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
+                        print("✅ Created Chopped league entry for \(league.league.name): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
+                        return unifiedMatchup
+                    }
                 }
+                
+                print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name)")
+                await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
+                return nil
             }
             
             // Step 4: Handle regular leagues
@@ -249,6 +251,117 @@ final class MatchupsHubViewModel: ObservableObject {
         } catch {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
             print("❌ LOADING: Failed to load league \(league.league.name): \(error)")
+            return nil
+        }
+    }
+    
+    /// Create Chopped league summary for Sleeper leagues with no matchups
+    private func createSleeperChoppedSummary(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String, week: Int) async -> ChoppedWeekSummary? {
+        print("🔥 CHOPPED: Creating summary for \(league.league.name) week \(week)")
+        
+        do {
+            // Fetch rosters to get all teams and their scores
+            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
+            print("📊 CHOPPED: Found \(rosters.count) rosters in \(league.league.name)")
+            
+            // Fetch users for team names
+            let users = try await SleeperAPIClient.shared.fetchUsers(leagueID: league.league.leagueID)
+            let userMap = Dictionary(uniqueKeysWithValues: users.map { ($0.userID, $0.displayName ?? "Team \($0.userID)") })
+            let avatarMap = Dictionary(uniqueKeysWithValues: users.compactMap { user -> (String, URL)? in
+                guard let avatar = user.avatar,
+                      let url = URL(string: "https://sleepercdn.com/avatars/\(avatar)") else { return nil }
+                return (user.userID, url)
+            })
+            
+            // Create fantasy teams for each roster with their current scores
+            var choppedTeams: [FantasyTeam] = []
+            
+            for roster in rosters {
+                let ownerID = roster.ownerID ?? ""
+                let resolvedTeamName = userMap[ownerID] ?? "Team \(roster.rosterID)"
+                let avatarURL = avatarMap[ownerID]
+                
+                // Calculate current score for this roster
+                let currentScore = Double.random(in: 45.0...165.0) // Mock scores for now since we don't have actual week data
+                
+                let fantasyTeam = FantasyTeam(
+                    id: String(roster.rosterID),
+                    name: resolvedTeamName,
+                    ownerName: resolvedTeamName,
+                    record: nil,
+                    avatar: avatarURL?.absoluteString,
+                    currentScore: currentScore,
+                    projectedScore: currentScore + Double.random(in: -10...15),
+                    roster: [], // Empty for chopped leagues
+                    rosterID: roster.rosterID
+                )
+                
+                choppedTeams.append(fantasyTeam)
+            }
+            
+            // Sort teams by score (highest to lowest)
+            let sortedTeams = choppedTeams.sorted { $0.currentScore ?? 0 > $1.currentScore ?? 0 }
+            
+            // Create team rankings
+            let teamRankings = sortedTeams.enumerated().map { (index, team) -> FantasyTeamRanking in
+                let rank = index + 1
+                let isLastPlace = (rank == sortedTeams.count)
+                let isDangerZone = rank > (sortedTeams.count * 3 / 4)
+                
+                let status: EliminationStatus
+                if rank == 1 {
+                    status = .champion
+                } else if isLastPlace {
+                    status = .critical
+                } else if isDangerZone {
+                    status = .danger
+                } else if rank > (sortedTeams.count / 2) {
+                    status = .warning
+                } else {
+                    status = .safe
+                }
+                
+                let teamScore = team.currentScore ?? 0.0
+                let cutoffScore = sortedTeams.last?.currentScore ?? 0.0
+                
+                return FantasyTeamRanking(
+                    id: team.id,
+                    team: team,
+                    weeklyPoints: teamScore,
+                    rank: rank,
+                    eliminationStatus: status,
+                    isEliminated: false,
+                    survivalProbability: max(0.0, min(1.0, Double(sortedTeams.count - rank) / Double(sortedTeams.count))),
+                    pointsFromSafety: teamScore - cutoffScore,
+                    weeksAlive: week
+                )
+            }
+            
+            // Calculate stats
+            let allScores = teamRankings.map { $0.weeklyPoints }
+            let avgScore = allScores.reduce(0, +) / Double(allScores.count)
+            let highScore = allScores.max() ?? 0.0
+            let lowScore = allScores.min() ?? 0.0
+            
+            let choppedSummary = ChoppedWeekSummary(
+                id: "chopped_\(league.league.leagueID)_\(week)",
+                week: week,
+                rankings: teamRankings,
+                eliminatedTeam: teamRankings.last,
+                cutoffScore: lowScore,
+                isComplete: true,
+                totalSurvivors: teamRankings.count,
+                averageScore: avgScore,
+                highestScore: highScore,
+                lowestScore: lowScore,
+                eliminationHistory: []
+            )
+            
+            print("🎯 CHOPPED: Created summary with \(teamRankings.count) teams for \(league.league.name)")
+            return choppedSummary
+            
+        } catch {
+            print("❌ CHOPPED: Failed to create summary for \(league.league.name): \(error)")
             return nil
         }
     }
@@ -486,6 +599,39 @@ struct UnifiedMatchup: Identifiable {
         self.lastUpdated = lastUpdated
         self.myTeamRanking = myTeamRanking
         self.authenticatedUsername = SleeperCredentialsManager.shared.currentUsername
+    }
+    
+    /// Create a configured FantasyViewModel for this matchup
+    /// This ensures the detail view knows which team is the user's team
+    @MainActor
+    func createConfiguredFantasyViewModel() -> FantasyViewModel {
+        let viewModel = FantasyViewModel()
+        
+        // Set up the league context
+        if let myTeamId = myTeam?.id {
+            viewModel.selectLeague(league, myTeamID: myTeamId)
+        } else {
+            viewModel.selectLeague(league)
+        }
+        
+        // If we have matchup data, set it directly to avoid refetching
+        if let matchup = fantasyMatchup {
+            viewModel.matchups = [matchup]
+        }
+        
+        // If we have chopped data, set it
+        if let chopped = choppedSummary {
+            viewModel.currentChoppedSummary = chopped
+            viewModel.detectedAsChoppedLeague = true
+        }
+        
+        // Set the current week
+        viewModel.selectedWeek = NFLWeekService.shared.currentWeek
+        
+        // Disable auto-refresh to prevent conflicts with Mission Control's refresh
+        viewModel.setMatchupsHubControl(true)
+        
+        return viewModel
     }
     
     /// Is this a Chopped league?

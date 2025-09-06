@@ -34,15 +34,30 @@ struct MatchupsHubView: View {
             .navigationBarHidden(true)
             .onAppear {
                 loadInitialData()
+                startPeriodicRefresh()
+            }
+            .onDisappear {
+                stopPeriodicRefresh()
             }
             .refreshable {
                 await handlePullToRefresh()
             }
         }
         .sheet(item: $showingMatchupDetail) { matchup in
-            if let fantasyMatchup = matchup.fantasyMatchup {
+            if matchup.isChoppedLeague {
+                // Show chopped league detail view
+                if let choppedSummary = matchup.choppedSummary {
+                    ChoppedLeaderboardView(
+                        choppedSummary: choppedSummary,
+                        leagueName: matchup.league.league.name
+                    )
+                }
+            } else if let fantasyMatchup = matchup.fantasyMatchup {
+                // Show regular matchup detail view
+                let configuredViewModel = matchup.createConfiguredFantasyViewModel()
                 FantasyMatchupDetailView(
                     matchup: fantasyMatchup,
+                    fantasyViewModel: configuredViewModel,
                     leagueName: matchup.league.league.name
                 )
             }
@@ -216,12 +231,6 @@ struct MatchupsHubView: View {
             )
             
             statCard(
-                value: "\(liveMatchupsCount)",
-                label: "LIVE",
-                color: .red
-            )
-            
-            statCard(
                 value: "WEEK \(currentNFLWeek)",
                 label: "ACTIVE",
                 color: .blue
@@ -326,13 +335,19 @@ struct MatchupsHubView: View {
             // Powered by branding
             poweredByBranding
             
-            // Matchup cards
-            LazyVStack(spacing: 16) {
+            // Matchup cards in 2-column grid - MASSIVE ROW SPACING 🔥
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 16),
+                    GridItem(.flexible(), spacing: 16)
+                ],
+                spacing: 16
+            ) {
                 ForEach(Array(viewModel.myMatchups.enumerated()), id: \.element.id) { index, matchup in
                     MatchupCardView(matchup: matchup) {
                         showingMatchupDetail = matchup
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.bottom, 44) // INCREASED from 33 to 48 for even more massive row separation - space between rows
                     .transition(
                         .asymmetric(
                             insertion: .move(edge: .bottom).combined(with: .opacity),
@@ -341,14 +356,15 @@ struct MatchupsHubView: View {
                     )
                     .onAppear {
                         // Staggered animation for cards
-                        if cardAnimationStagger < Double(index) * 0.1 {
-                            withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(Double(index) * 0.1)) {
-                                cardAnimationStagger = Double(index) * 0.1
+                        if cardAnimationStagger < Double(index) * 0.05 {
+                            withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
+                                cardAnimationStagger = Double(index) * 0.05
                             }
                         }
                     }
                 }
             }
+            .padding(.horizontal, 20)
         }
     }
     
@@ -423,12 +439,43 @@ struct MatchupsHubView: View {
         refreshing = true
         await viewModel.manualRefresh()
         refreshing = false
+        
+        // Force UI update after refresh
+        await MainActor.run {
+            // This will trigger view refresh
+        }
     }
     
     private func timeAgo(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
+    // MARK: -> Auto-refresh timer for Mission Control
+    @State private var refreshTimer: Timer?
+    
+    private func startPeriodicRefresh() {
+        // Stop any existing timer first
+        stopPeriodicRefresh()
+        
+        // Start new timer - refresh every 30 seconds when view is active
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+            Task { @MainActor in
+                if UIApplication.shared.applicationState == .active && !viewModel.isLoading {
+                    print("🔄 AUTO-REFRESH: Refreshing Mission Control data...")
+                    await viewModel.manualRefresh()
+                }
+            }
+        }
+        
+        print("🚀 TIMER: Started Mission Control auto-refresh (30s intervals)")
+    }
+    
+    private func stopPeriodicRefresh() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        print("🛑 TIMER: Stopped Mission Control auto-refresh")
     }
 }
 
