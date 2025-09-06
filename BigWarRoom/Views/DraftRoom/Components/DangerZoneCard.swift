@@ -50,6 +50,8 @@ struct DangerZoneCard: View {
                 Text(ranking.team.ownerName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 HStack {
                     Text("⚠️")
@@ -59,23 +61,32 @@ struct DangerZoneCard: View {
                         .tracking(1)
                 }
                 
-                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY FOR DANGER ZONE
-                HStack(spacing: 12) {
-                    Text("SAFE \(ranking.survivalPercentage)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(Color.orange.opacity(0.3))
-                        )
-                        .scaleEffect(warningPulse ? 1.05 : 1.0)
-                        .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
+                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY FOR DANGER ZONE - FIXED LAYOUT
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("SAFE")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.orange)
+                            .fixedSize()
+                        
+                        Text(ranking.survivalPercentage)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.orange)
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.orange.opacity(0.3))
+                    )
+                    .scaleEffect(warningPulse ? 1.05 : 1.0)
+                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
                     
                     Text("From Safety: \(ranking.safetyMarginDisplay)")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.orange)
+                        .fixedSize()
                 }
             }
             

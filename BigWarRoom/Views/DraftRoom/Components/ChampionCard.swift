@@ -56,29 +56,29 @@ struct ChampionCard: View {
                             .shadow(color: .yellow.opacity(0.6), radius: 6)
                     )
                 
-                // Team status info
+                // Team status info - FIXED NO WRAP
                 VStack(alignment: .leading, spacing: 4) {
                     Text("REIGNING SUPREME")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.yellow)
                         .tracking(1)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                        .fixedSize()
                     
-                    HStack {
+                    HStack(spacing: 4) {
                         Text("Survival: \(ranking.survivalPercentage)")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.green)
+                            .fixedSize()
                         
                         Text("•")
                             .foregroundColor(.gray)
+                            .fixedSize()
                         
-                        Text("Weeks Alive: \(ranking.weeksAlive)")
-                            .font(.system(size: 10, weight: .medium))
+                        Text("Weeks: \(ranking.weeksAlive)")
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.gray)
+                            .fixedSize()
                     }
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
                 }
                 
                 Spacer()

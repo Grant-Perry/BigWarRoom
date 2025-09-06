@@ -55,45 +55,77 @@ struct CriticalCard: View {
                 Text(ranking.team.ownerName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
-                HStack {
+                HStack(spacing: 4) {
                     Text("💀")
                         .scaleEffect(heartbeat ? 1.2 : 1.0)
                         .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartbeat)
                     
-                    Text("ELIMINATION IMMINENT")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundColor(.red)
-                        .tracking(1)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("ELIMI")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.red)
+                            .tracking(1)
+                            .fixedSize()
+                        
+                        Text("NATION")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.red)
+                            .tracking(1)
+                            .fixedSize()
+                        
+                        Text("IMMIN")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.red)
+                            .tracking(1)
+                            .fixedSize()
+                        
+                        Text("ENT")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.red)
+                            .tracking(1)
+                            .fixedSize()
+                    }
                 }
                 
-                // 🎯 ULTRA-DRAMATIC SAFE % DISPLAY FOR DEATH ROW
+                // 🎯 ULTRA-DRAMATIC SAFE % DISPLAY FOR DEATH ROW - FIXED NO WRAP
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("SAFE \(ranking.survivalPercentage)")
-                            .font(.system(size: 14, weight: .black))
-                            .foregroundColor(.red)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.red.opacity(0.3))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 8)
-                                            .stroke(Color.red, lineWidth: 2)
-                                    )
-                            )
-                            .scaleEffect(heartbeat ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartbeat)
+                    HStack(spacing: 6) {
+                        HStack(spacing: 4) {
+                            Text("SAFE")
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundColor(.red)
+                                .fixedSize()
+                            
+                            Text(ranking.survivalPercentage)
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundColor(.red)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.red.opacity(0.3))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.red, lineWidth: 2)
+                                )
+                        )
+                        .scaleEffect(heartbeat ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: heartbeat)
                         
                         Text("💔")
                             .scaleEffect(heartbeat ? 1.3 : 1.0)
                             .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true).delay(0.2), value: heartbeat)
                     }
                     
-                    Text("⚰️ From Elimination: \(ranking.safetyMarginDisplay)")
-                        .font(.system(size: 10, weight: .medium))
+                    Text("From Elimination: \(ranking.safetyMarginDisplay)")
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.red)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
             

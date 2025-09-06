@@ -204,7 +204,8 @@ final class MatchupsHubViewModel: ObservableObject {
                             fantasyMatchup: nil,
                             choppedSummary: choppedSummary,
                             lastUpdated: Date(),
-                            myTeamRanking: myTeamRanking
+                            myTeamRanking: myTeamRanking,
+                            myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the identified team ID
                         )
                         
                         await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
@@ -236,7 +237,8 @@ final class MatchupsHubViewModel: ObservableObject {
                     fantasyMatchup: myMatchup,
                     choppedSummary: nil,
                     lastUpdated: Date(),
-                    myTeamRanking: nil
+                    myTeamRanking: nil,
+                    myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the identified team ID
                 )
                 
                 await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
@@ -515,7 +517,8 @@ final class MatchupsHubViewModel: ObservableObject {
                                     fantasyMatchup: nil,
                                     choppedSummary: choppedSummary,
                                     lastUpdated: Date(),
-                                    myTeamRanking: myTeamRanking
+                                    myTeamRanking: myTeamRanking,
+                                    myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the team ID during refresh
                                 )
                             }
                         }
@@ -533,7 +536,9 @@ final class MatchupsHubViewModel: ObservableObject {
                                         league: matchup.league,
                                         fantasyMatchup: updatedMatchup,
                                         choppedSummary: nil,
-                                        lastUpdated: Date()
+                                        lastUpdated: Date(),
+                                        myTeamRanking: nil,
+                                        myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the team ID during refresh
                                     )
                                 }
                             }
@@ -556,14 +561,153 @@ final class MatchupsHubViewModel: ObservableObject {
         setupAutoRefresh()
     }
     
-    /// Manual refresh trigger
+    /// Manual refresh trigger - BACKGROUND REFRESH (no loading screen)
     func manualRefresh() async {
-        // 🔥 FIX: Clear loading guards before starting fresh
+        // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
+        guard !isLoading else { return }
+        
+        // Clear loading guards before starting fresh refresh
         loadingLock.lock()
         currentlyLoadingLeagues.removeAll()
         loadingLock.unlock()
         
-        await loadAllMatchups()
+        // BACKGROUND REFRESH: Update data without showing loading screen
+        await refreshMatchupsInBackground()
+    }
+    
+    /// Background refresh that doesn't disrupt the UI
+    private func refreshMatchupsInBackground() async {
+        await MainActor.run {
+            // Only update timestamp, don't change isLoading or show loading screen
+            lastUpdateTime = Date()
+        }
+        
+        do {
+            // Step 1: Refresh available leagues quietly
+            await unifiedLeagueManager.fetchAllLeagues(
+                sleeperUserID: AppConstants.GpSleeperID,
+                season: String(Calendar.current.component(.year, from: Date()))
+            )
+            
+            let availableLeagues = unifiedLeagueManager.allLeagues
+            guard !availableLeagues.isEmpty else { return }
+            
+            // Step 2: Refresh all league data in parallel
+            await loadMatchupsFromAllLeaguesBackground(availableLeagues)
+            
+        } catch {
+            print("⚠️ BACKGROUND REFRESH: Failed to refresh leagues: \(error)")
+        }
+    }
+    
+    /// Background version of loadMatchupsFromAllLeagues that doesn't update loading UI
+    private func loadMatchupsFromAllLeaguesBackground(_ leagues: [UnifiedLeagueManager.LeagueWrapper]) async {
+        // Load leagues in parallel for maximum speed
+        await withTaskGroup(of: UnifiedMatchup?.self) { group in
+            for league in leagues {
+                group.addTask {
+                    await self.loadSingleLeagueMatchupBackground(league)
+                }
+            }
+            
+            var refreshedMatchups: [UnifiedMatchup] = []
+            
+            for await matchup in group {
+                if let matchup = matchup {
+                    refreshedMatchups.append(matchup)
+                }
+            }
+            
+            // Update the UI with fresh data
+            await MainActor.run {
+                self.myMatchups = refreshedMatchups.sorted { $0.priority > $1.priority }
+                self.lastUpdateTime = Date()
+            }
+        }
+    }
+    
+    /// Background version that doesn't update loading states
+    private func loadSingleLeagueMatchupBackground(_ league: UnifiedLeagueManager.LeagueWrapper) async -> UnifiedMatchup? {
+        let leagueKey = "\(league.id)_\(getCurrentWeek())_\(getCurrentYear())"
+        
+        // Race condition prevention
+        loadingLock.lock()
+        if currentlyLoadingLeagues.contains(leagueKey) {
+            loadingLock.unlock()
+            return nil
+        }
+        currentlyLoadingLeagues.insert(leagueKey)
+        loadingLock.unlock()
+        
+        defer { 
+            loadingLock.lock()
+            currentlyLoadingLeagues.remove(leagueKey)
+            loadingLock.unlock()
+        }
+        
+        do {
+            // Create isolated provider for this league (no UI updates)
+            let provider = LeagueMatchupProvider(
+                league: league, 
+                week: getCurrentWeek(), 
+                year: getCurrentYear()
+            )
+            
+            // Step 1: Identify user's team ID
+            guard let myTeamID = await provider.identifyMyTeamID() else {
+                return nil
+            }
+            
+            // Step 2: Fetch matchups using isolated provider
+            let matchups = try await provider.fetchMatchups()
+            
+            // Step 3: Check for Chopped league
+            if league.source == .sleeper && matchups.isEmpty {
+                // Create chopped summary using proper Sleeper data
+                if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
+                    if let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
+                        
+                        let unifiedMatchup = UnifiedMatchup(
+                            id: "\(league.id)_chopped",
+                            league: league,
+                            fantasyMatchup: nil,
+                            choppedSummary: choppedSummary,
+                            lastUpdated: Date(),
+                            myTeamRanking: myTeamRanking,
+                            myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the team ID in background refresh
+                        )
+                        
+                        return unifiedMatchup
+                    }
+                }
+                return nil
+            }
+            
+            // Step 4: Handle regular leagues
+            if matchups.isEmpty {
+                return nil
+            }
+            
+            // Step 5: Find user's matchup using provider
+            if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
+                let unifiedMatchup = UnifiedMatchup(
+                    id: "\(league.id)_\(myMatchup.id)",
+                    league: league,
+                    fantasyMatchup: myMatchup,
+                    choppedSummary: nil,
+                    lastUpdated: Date(),
+                    myTeamRanking: nil,
+                    myIdentifiedTeamID: myTeamID // 🔥 FIXED: Pass the team ID in background refresh
+                )
+                
+                return unifiedMatchup
+            } else {
+                return nil
+            }
+            
+        } catch {
+            return nil
+        }
     }
     
     // MARK: -> Helper Methods
@@ -589,15 +733,17 @@ struct UnifiedMatchup: Identifiable {
     let choppedSummary: ChoppedWeekSummary?
     let lastUpdated: Date
     let myTeamRanking: FantasyTeamRanking? // For Chopped leagues
+    let myIdentifiedTeamID: String? // 🔥 NEW: Store the correctly identified team ID
     private let authenticatedUsername: String
     
-    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil) {
+    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil) {
         self.id = id
         self.league = league
         self.fantasyMatchup = fantasyMatchup
         self.choppedSummary = choppedSummary
         self.lastUpdated = lastUpdated
         self.myTeamRanking = myTeamRanking
+        self.myIdentifiedTeamID = myIdentifiedTeamID // 🔥 NEW: Store the team ID
         self.authenticatedUsername = SleeperCredentialsManager.shared.currentUsername
     }
     
@@ -664,45 +810,48 @@ struct UnifiedMatchup: Identifiable {
         return basePriority
     }
     
-    /// My team in this matchup (properly identified by authenticated username)
+    /// My team in this matchup (FIXED to use reliable ID-based matching)
     var myTeam: FantasyTeam? {
         // For Chopped leagues, get team from myTeamRanking
         if isChoppedLeague, let ranking = myTeamRanking {
             return ranking.team
         }
         
-        // For regular matchups
-        guard let matchup = fantasyMatchup else { return nil }
-        
-        // For Sleeper leagues, match by authenticated username
-        if league.source == .sleeper && !authenticatedUsername.isEmpty {
-            if matchup.homeTeam.ownerName.lowercased() == authenticatedUsername.lowercased() {
-                return matchup.homeTeam
-            }
-            if matchup.awayTeam.ownerName.lowercased() == authenticatedUsername.lowercased() {
-                return matchup.awayTeam
-            }
+        // For regular matchups - use the stored team ID for reliable matching
+        guard let matchup = fantasyMatchup, let myID = myIdentifiedTeamID else {
+            return nil
         }
         
-        // Fallback for ESPN or unidentified users
-        return matchup.homeTeam
+        // Match by the reliable team ID that was correctly identified during loading
+        if matchup.homeTeam.id == myID {
+            return matchup.homeTeam
+        }
+        if matchup.awayTeam.id == myID {
+            return matchup.awayTeam
+        }
+        
+        return nil
     }
     
-    /// Opponent team in this matchup (nil for Chopped leagues since there's no opponent)
+    /// Opponent team in this matchup (FIXED to use reliable ID-based matching)
     var opponentTeam: FantasyTeam? {
         // Chopped leagues have NO opponent - everyone vs everyone
         if isChoppedLeague {
             return nil
         }
         
-        guard let matchup = fantasyMatchup, let myTeam = myTeam else { return nil }
+        guard let matchup = fantasyMatchup, let myID = myIdentifiedTeamID else { 
+            return nil 
+        }
         
-        // Return the team that's NOT my team
-        if matchup.homeTeam.id == myTeam.id {
+        // Return the team that's NOT my team (using reliable ID matching)
+        if matchup.homeTeam.id == myID {
             return matchup.awayTeam
-        } else {
+        } else if matchup.awayTeam.id == myID {
             return matchup.homeTeam
         }
+        
+        return nil
     }
     
     /// Current score difference (nil for Chopped leagues)

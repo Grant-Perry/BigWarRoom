@@ -13,11 +13,11 @@ struct ChoppedPlayerCard: View {
     let ranking: FantasyTeamRanking
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             // Rank badge with elimination status color
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 Text(ranking.rankDisplay)
-                    .font(.system(size: 18, weight: .black))
+                    .font(.system(size: 16, weight: .black))
                     .foregroundColor(ranking.eliminationStatus.color)
                 
                 Text("RANK")
@@ -25,67 +25,80 @@ struct ChoppedPlayerCard: View {
                     .foregroundColor(.gray)
                     .tracking(0.5)
             }
-            .frame(width: 50)
+            .frame(width: 45)
             
             // Team avatar
             teamAvatar
             
-            // Team info with elimination status
-            VStack(alignment: .leading, spacing: 6) {
+            // Team info - COMPLETELY HORIZONTAL LAYOUT
+            VStack(alignment: .leading, spacing: 4) {
+                // Name
                 Text(ranking.team.ownerName)
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
-                // Elimination status with emoji and dramatic message
-                HStack(spacing: 6) {
-                    Text(ranking.eliminationStatus.emoji)
-                        .font(.system(size: 14))
+                // Status + Safe % + Proj - ALL HORIZONTAL
+                HStack(spacing: 8) {
+                    // Status emoji + text
+                    HStack(spacing: 3) {
+                        Text(ranking.eliminationStatus.emoji)
+                            .font(.system(size: 12))
+                        
+                        Text(ranking.eliminationStatus.displayName)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(ranking.eliminationStatus.color)
+                            .lineLimit(1)
+                    }
                     
-                    Text(ranking.eliminationStatus.displayName)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(ranking.eliminationStatus.color)
-                }
-                
-                // Survival percentage (Sleeper-style)
-                HStack(spacing: 12) {
+                    Spacer()
+                    
+                    // Safe percentage - SINGLE LINE
                     Text("SAFE \(ranking.survivalPercentage)")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(survivalColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 3)
                                 .fill(survivalColor.opacity(0.2))
                         )
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                     
-                    // Safety margin
-                    Text(ranking.pointsFromSafety >= 0 ? "+\(String(format: "%.1f", ranking.pointsFromSafety))" : String(format: "%.1f", ranking.pointsFromSafety))
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(ranking.pointsFromSafety >= 0 ? .green : .red)
+                    // Projected score if available
+                    if let projectedScore = ranking.team.projectedScore {
+                        Text("PROJ: \(String(format: "%.1f", projectedScore))")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundColor(.blue)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             
-            Spacer()
-            
-            // Weekly points
-            VStack(alignment: .trailing, spacing: 4) {
+            // Weekly points - Right aligned
+            VStack(alignment: .trailing, spacing: 2) {
                 Text(ranking.weeklyPointsString)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundColor(.white)
                 
                 Text("PTS")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundColor(.gray)
                     .tracking(1)
             }
+            .frame(width: 60)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(cardBackgroundColor.opacity(0.1))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
+                    RoundedRectangle(cornerRadius: 10)
                         .stroke(ranking.eliminationStatus.color.opacity(strokeIntensity), lineWidth: strokeWidth)
                 )
         )
@@ -150,7 +163,7 @@ struct ChoppedPlayerCard: View {
                 teamInitialsAvatar
             }
         }
-        .frame(width: 50, height: 50)
+        .frame(width: 42, height: 42)
         .clipShape(Circle())
         .overlay(
             Circle()

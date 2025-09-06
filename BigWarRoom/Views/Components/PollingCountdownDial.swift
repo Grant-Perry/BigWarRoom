@@ -18,7 +18,18 @@ struct PollingCountdownDial: View {
     
     private var progress: Double {
         guard maxInterval > 0 else { return 0 }
-        return max(0, min(1, (maxInterval - countdown) / maxInterval))
+        return max(0, min(1, countdown / maxInterval))
+    }
+    
+    private var progressColor: Color {
+        let ratio = progress
+        if ratio > 0.66 {
+            return .gpGreen
+        } else if ratio > 0.33 {
+            return .gpYellow
+        } else {
+            return .gpRedPink
+        }
     }
     
     private var countdownText: String {
@@ -36,31 +47,37 @@ struct PollingCountdownDial: View {
             onRefresh()
         }) {
             ZStack {
+                // Yellow shadow behind the dial
+                Circle()
+                    .stroke(Color.gpYellow.opacity(0.5), lineWidth: 3)
+                    .frame(width: 36, height: 36)
+                    .blur(radius: 2)
+                
                 // Background circle
                 Circle()
                     .stroke(Color.gray.opacity(0.3), lineWidth: 3)
                     .frame(width: 36, height: 36)
                 
-                // Progress circle
+                // Progress circle - starts at 12 and goes counter-clockwise with smooth sweeping
                 Circle()
                     .trim(from: 0, to: progress)
                     .stroke(
-                        isPolling ? Color.blue : Color.gray,
+                        isPolling ? progressColor : Color.gray,
                         style: StrokeStyle(lineWidth: 3, lineCap: .round)
                     )
                     .frame(width: 36, height: 36)
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.1), value: progress)
+                    .animation(.linear(duration: 1.0), value: progress)
                 
                 // Center text
                 Text(countdownText)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(isPolling ? .blue : .gray)
+                    .foregroundColor(isPolling ? progressColor : .gray)
                 
                 // Pulse effect when pressed
                 if isPressed {
                     Circle()
-                        .fill(Color.blue.opacity(0.2))
+                        .fill(progressColor.opacity(0.2))
                         .frame(width: 36, height: 36)
                         .scaleEffect(1.2)
                         .animation(.easeOut(duration: 0.2), value: isPressed)
@@ -80,23 +97,23 @@ struct PollingCountdownDial: View {
 #Preview {
     VStack(spacing: 20) {
         PollingCountdownDial(
-            countdown: 2.3,
-            maxInterval: 5.0,
-            isPolling: true,
-            onRefresh: {}
-        )
-        
-        PollingCountdownDial(
-            countdown: 0.0,
-            maxInterval: 5.0,
-            isPolling: true,
-            onRefresh: {}
-        )
-        
-        PollingCountdownDial(
-            countdown: 15.0,
+            countdown: 12.0,
             maxInterval: 15.0,
-            isPolling: false,
+            isPolling: true,
+            onRefresh: {}
+        )
+        
+        PollingCountdownDial(
+            countdown: 5.0,
+            maxInterval: 15.0,
+            isPolling: true,
+            onRefresh: {}
+        )
+        
+        PollingCountdownDial(
+            countdown: 1.0,
+            maxInterval: 15.0,
+            isPolling: true,
             onRefresh: {}
         )
     }

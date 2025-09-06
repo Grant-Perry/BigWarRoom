@@ -33,27 +33,33 @@ struct HistoricalEliminationCard: View {
             }
             .frame(width: 50)
             
-            // Eliminated team info
+            // Eliminated team info - FIXED NO WRAP
             VStack(alignment: .leading, spacing: 4) {
                 Text(elimination.eliminatedTeam.team.ownerName)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.gray)
                     .strikethrough()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Text("💀 ELIMINATED WEEK \(elimination.week)")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.red)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 if let lastWords = elimination.lastWords {
                     Text("\"\(lastWords)\"")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.gray)
                         .italic()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
                 Text("Margin: \(elimination.marginDisplay) • \(elimination.dramaMeterDisplay)")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer()

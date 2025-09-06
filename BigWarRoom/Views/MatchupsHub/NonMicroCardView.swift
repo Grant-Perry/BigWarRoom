@@ -1,17 +1,18 @@
 //
-//  MatchupCardView.swift
+//  NonMicroCardView.swift
 //  BigWarRoom
 //
-//  Beautiful animated matchup cards for the hub - COMPACT DESIGN
+//  Independent non-micro matchup card view - contains all original MatchupCardView logic
 //
 
 import SwiftUI
 
-struct MatchupCardView: View {
+struct NonMicroCardView: View {
     let matchup: UnifiedMatchup
+    let isWinning: Bool
     let onTap: () -> Void
     
-    @State private var cardScale: CGFloat = 0.95
+   @State private var cardScale: CGFloat = 1.0 //0.95
     @State private var scoreAnimation: Bool = false
     @State private var glowIntensity: Double = 0.0
     
@@ -50,28 +51,28 @@ struct MatchupCardView: View {
             compactFooter
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 14) // INCREASED from 12 to 14 for more breathing room
+        .padding(.vertical, 14)
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
-                        colors: overlayBorderColors, // UPDATED: Use dynamic colors based on chopped status
+                        colors: overlayBorderColors,
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: overlayBorderWidth // UPDATED: Use dynamic border width
+                    lineWidth: overlayBorderWidth
                 )
-                .opacity(overlayBorderOpacity) // UPDATED: Use dynamic opacity
+                .opacity(overlayBorderOpacity)
         )
         .shadow(
-            color: shadowColor, // UPDATED: Use dynamic shadow color
-            radius: shadowRadius, // UPDATED: Use dynamic shadow radius
+            color: shadowColor,
+            radius: shadowRadius,
             x: 0,
             y: 2
         )
-        .frame(height: 142) // REDUCED from 145 to 142 to work better with increased row spacing
+        .frame(height: 142)
     }
     
     private var cardBackground: some View {
@@ -101,7 +102,7 @@ struct MatchupCardView: View {
                 }
                 .frame(width: 16, height: 16)
                 
-                Text(matchup.league.league.name)
+                Text("\(matchup.league.league.name)")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
@@ -109,6 +110,11 @@ struct MatchupCardView: View {
             }
             
             Spacer()
+            
+            // LIVE status badge based on roster analysis
+            if !matchup.isChoppedLeague {
+                liveStatusBadge
+            }
         }
     }
     
@@ -176,7 +182,7 @@ struct MatchupCardView: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(ranking.weeklyPointsString)
                             .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
                         
                         Text(ranking.safetyMarginDisplay)
                             .font(.system(size: 10, weight: .bold))
@@ -194,19 +200,13 @@ struct MatchupCardView: View {
     }
     
     private func compactTeamSection(_ team: FantasyTeam, isMyTeam: Bool) -> some View {
-        // Determine if this team is winning the matchup
-        let isWinning: Bool = {
-            if let myTeam = matchup.myTeam, let opponentTeam = matchup.opponentTeam {
-                let myScore = myTeam.currentScore ?? 0
-                let opponentScore = opponentTeam.currentScore ?? 0
-                
-                if isMyTeam {
-                    return myScore > opponentScore // I'm winning if my score > opponent score
-                } else {
-                    return opponentScore > myScore // Opponent is winning if their score > my score
-                }
+        // Determine if this team is winning the matchup using passed isWinning parameter
+        let isTeamWinning: Bool = {
+            if isMyTeam {
+                return isWinning // Use the passed isWinning for my team
+            } else {
+                return !isWinning // Opponent is winning if I'm not winning
             }
-            return false
         }()
         
         return VStack(spacing: 6) {
@@ -218,10 +218,10 @@ struct MatchupCardView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     } placeholder: {
-                        compactTeamInitials(team, isWinning: isWinning)
+                        compactTeamInitials(team, isWinning: isTeamWinning)
                     }
                 } else {
-                    compactTeamInitials(team, isWinning: isWinning)
+                    compactTeamInitials(team, isWinning: isTeamWinning)
                 }
             }
             .frame(width: 45, height: 45)
@@ -229,22 +229,22 @@ struct MatchupCardView: View {
             .overlay(
                 Circle()
                     .stroke(
-                        isWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
-                        lineWidth: isWinning ? 2 : 1
+                        isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
+                        lineWidth: isTeamWinning ? 2 : 1
                     )
             )
             
             // Team name - COMPACT - Pink for losers
             Text(team.ownerName)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .lineLimit(1)
                 .frame(maxWidth: 60)
             
             // Score - PROMINENT - Pink for losers
             Text(team.currentScoreString)
                 .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
             
             // Record - TINY
@@ -340,31 +340,25 @@ struct MatchupCardView: View {
     // MARK: -> Computed Properties
     
     private var isLiveGame: Bool {
-        matchup.fantasyMatchup?.status == .live
+        return isRosterBasedLive
     }
     
-    // UPDATED: Dynamic border colors based on chopped danger level or live game status
     private var overlayBorderColors: [Color] {
         if matchup.isChoppedLeague {
-            // Use chopped danger level colors
             if let ranking = matchup.myTeamRanking {
                 let dangerColor = ranking.eliminationStatus.color
                 return [dangerColor, dangerColor.opacity(0.7), dangerColor]
             }
-            return [.orange, .orange.opacity(0.7), .orange] // Fallback chopped color
+            return [.orange, .orange.opacity(0.7), .orange]
         } else if isLiveGame {
-            // Live game colors
             return [.gpGreen, .blue, .gpGreen]
         } else {
-            // Regular game colors
             return [.gray.opacity(0.3), .gray.opacity(0.1), .gray.opacity(0.3)]
         }
     }
     
-    // UPDATED: Dynamic border width
     private var overlayBorderWidth: CGFloat {
         if matchup.isChoppedLeague {
-            // Thicker borders for chopped leagues to emphasize danger
             return 2.5
         } else if isLiveGame {
             return 2
@@ -373,10 +367,9 @@ struct MatchupCardView: View {
         }
     }
     
-    // UPDATED: Dynamic border opacity
     private var overlayBorderOpacity: Double {
         if matchup.isChoppedLeague {
-            return 0.9 // High opacity for chopped borders
+            return 0.9
         } else if isLiveGame {
             return (glowIntensity * 0.8 + 0.2)
         } else {
@@ -384,10 +377,8 @@ struct MatchupCardView: View {
         }
     }
     
-    // UPDATED: Dynamic shadow color
     private var shadowColor: Color {
         if matchup.isChoppedLeague {
-            // Shadow matches the danger level
             if let ranking = matchup.myTeamRanking {
                 return ranking.eliminationStatus.color.opacity(0.4)
             }
@@ -399,10 +390,8 @@ struct MatchupCardView: View {
         }
     }
     
-    // UPDATED: Dynamic shadow radius
     private var shadowRadius: CGFloat {
         if matchup.isChoppedLeague {
-            // Bigger shadow for chopped leagues - more dramatic
             return 8
         } else if isLiveGame {
             return 6
@@ -413,12 +402,11 @@ struct MatchupCardView: View {
     
     private var backgroundColors: [Color] {
         if matchup.isChoppedLeague {
-            // Chopped leagues get subtle danger-level tinted backgrounds
             if let ranking = matchup.myTeamRanking {
                 let dangerColor = ranking.eliminationStatus.color
                 return [
                     Color.black.opacity(0.9),
-                    dangerColor.opacity(0.03), // Very subtle tint
+                    dangerColor.opacity(0.03),
                     Color.black.opacity(0.9)
                 ]
             }
@@ -439,15 +427,6 @@ struct MatchupCardView: View {
                 Color.gray.opacity(0.05),
                 Color.black.opacity(0.8)
             ]
-        }
-    }
-    
-    private var borderColors: [Color] {
-        // This is now replaced by overlayBorderColors above, but keeping for compatibility
-        if isLiveGame {
-            return [.gpGreen, .blue, .gpGreen]
-        } else {
-            return [.gray.opacity(0.3), .gray.opacity(0.1), .gray.opacity(0.3)]
         }
     }
 
@@ -486,74 +465,62 @@ struct MatchupCardView: View {
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
     }
-}
-
-// MARK: -> Preview
-#Preview {
-    let sampleLeague = SleeperLeague(
-        leagueID: "123456", 
-        name: "Championship League", 
-        status: .complete, 
-        sport: "nfl", 
-        season: "2024", 
-        seasonType: "regular", 
-        totalRosters: 12, 
-        draftID: nil, 
-        avatar: nil, 
-        settings: nil, 
-        scoringSettings: nil, 
-        rosterPositions: nil
-    )
     
-    let sampleMatchup = UnifiedMatchup(
-        id: "sample_1",
-        league: UnifiedLeagueManager.LeagueWrapper(
-            id: "sleeper_123",
-            league: sampleLeague,
-            source: .sleeper,
-            client: SleeperAPIClient.shared
-        ),
-        fantasyMatchup: FantasyMatchup(
-            id: "matchup_1",
-            leagueID: "sleeper_123",
-            week: NFLWeekService.shared.currentWeek,
-            year: "2024",
-            homeTeam: FantasyTeam(
-                id: "team_1",
-                name: "Gp's Gladiators",
-                ownerName: "Gp",
-                record: TeamRecord(wins: 10, losses: 4, ties: nil),
-                avatar: nil,
-                currentScore: 127.5,
-                projectedScore: 142.8,
-                roster: [],
-                rosterID: 1
-            ),
-            awayTeam: FantasyTeam(
-                id: "team_2",
-                name: "Thunder Bolts",
-                ownerName: "Opponent",
-                record: TeamRecord(wins: 8, losses: 6, ties: nil),
-                avatar: nil,
-                currentScore: 98.2,
-                projectedScore: 115.6,
-                roster: [],
-                rosterID: 2
-            ),
-            status: .live,
-            winProbability: 0.75
-        ),
-        choppedSummary: nil,
-        lastUpdated: Date()
-    )
+    // MARK: -> Live Status Badge
     
-    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-        ForEach(0..<4, id: \.self) { _ in
-            MatchupCardView(matchup: sampleMatchup) {
-                print("Card tapped!")
-            }
+    private var liveStatusBadge: some View {
+        Text("LIVE")
+            .font(.system(size: isRosterBasedLive ? 10 : 8, weight: .black))
+            .foregroundColor(isRosterBasedLive ? .gpGreen : .gpRedPink.opacity(0.4))
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill((isRosterBasedLive ? Color.gpGreen : Color.gpRedPink).opacity(isRosterBasedLive ? 0.2 : 0.1))
+            )
+            .scaleEffect(isRosterBasedLive ? 1.0 : 0.9)
+            .opacity(isRosterBasedLive ? 1.0 : 0.6)
+    }
+    
+    // MARK: -> Roster-Based Live Detection
+    
+    private var isRosterBasedLive: Bool {
+        guard let myTeam = matchup.myTeam else { return false }
+        
+        let starters = myTeam.roster.filter { $0.isStarter }
+        
+        return starters.contains { player in
+            isPlayerInLiveGame(player)
         }
     }
-    .padding()
-    .background(Color.black)
+    
+    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
+        guard let gameStatus = player.gameStatus else { return false }
+        
+        let timeString = gameStatus.timeString.lowercased()
+        
+        let quarterPatterns = [
+            "1st ", "2nd ", "3rd ", "4th ", "ot ", "overtime"
+        ]
+        
+        for pattern in quarterPatterns {
+            if timeString.contains(pattern) {
+                if timeString.contains(":") && timeString.contains(pattern) {
+                    return true
+                }
+            }
+        }
+        
+        let liveStatusIndicators = [
+            "live", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"
+        ]
+        
+        for indicator in liveStatusIndicators {
+            if timeString.contains(indicator) {
+                return true
+            }
+        }
+        
+        return false
+    }
 }

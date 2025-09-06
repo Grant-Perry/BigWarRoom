@@ -1,486 +1,835 @@
-//
-//  MatchupsHubView.swift
-//  BigWarRoom
-//
-//  The ultimate fantasy football command center - your personal war room
-//
+   //
+   //  MatchupsHubView.swift
+   //  BigWarRoom
+   //
+   //  The ultimate fantasy football command center - your personal war room
+   //
 
 import SwiftUI
 
 struct MatchupsHubView: View {
-    @StateObject private var viewModel = MatchupsHubViewModel()
-    @State private var showingMatchupDetail: UnifiedMatchup?
-    @State private var refreshing = false
-    @State private var cardAnimationStagger: Double = 0
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                // Background gradient
-                backgroundGradient
-                
-                if viewModel.isLoading && viewModel.myMatchups.isEmpty {
-                    // Initial loading state
-                    loadingState
-                } else if viewModel.myMatchups.isEmpty && !viewModel.isLoading {
-                    // Empty state
-                    emptyState
-                } else {
-                    // Matchups content
-                    matchupsContent
-                }
-            }
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .onAppear {
-                loadInitialData()
-                startPeriodicRefresh()
-            }
-            .onDisappear {
-                stopPeriodicRefresh()
-            }
-            .refreshable {
-                await handlePullToRefresh()
-            }
-        }
-        .sheet(item: $showingMatchupDetail) { matchup in
-            if matchup.isChoppedLeague {
-                // Show chopped league detail view
-                if let choppedSummary = matchup.choppedSummary {
-                    ChoppedLeaderboardView(
-                        choppedSummary: choppedSummary,
-                        leagueName: matchup.league.league.name
-                    )
-                }
-            } else if let fantasyMatchup = matchup.fantasyMatchup {
-                // Show regular matchup detail view
-                let configuredViewModel = matchup.createConfiguredFantasyViewModel()
-                FantasyMatchupDetailView(
-                    matchup: fantasyMatchup,
-                    fantasyViewModel: configuredViewModel,
-                    leagueName: matchup.league.league.name
-                )
-            }
-        }
-    }
-    
-    // MARK: -> Background
-    
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color.black,
-                Color.black.opacity(0.9),
-                Color.gpGreen.opacity(0.1),
-                Color.black.opacity(0.9),
-                Color.black
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
-    
-    // MARK: -> Loading State
-    
-    private var loadingState: some View {
-        VStack {
-            Spacer()
-            
-            MatchupsHubLoadingIndicator(
-                currentLeague: viewModel.currentLoadingLeague,
-                progress: viewModel.loadingProgress,
-                loadingStates: viewModel.loadingStates
-            )
-            
-            Spacer()
-        }
-    }
-    
-    // MARK: -> Empty State
-    
-    private var emptyState: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            // Animated empty illustration
-            VStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [.gpGreen.opacity(0.3), .clear],
-                                center: .center,
-                                startRadius: 10,
-                                endRadius: 50
-                            )
-                        )
-                        .frame(width: 100, height: 100)
-                    
-                    Image(systemName: "football")
-                        .font(.system(size: 40, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                }
-                
-                VStack(spacing: 8) {
-                    Text("No Active Matchups")
-                        .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("Connect your fantasy leagues to see your battles here")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
-                }
-            }
-            
-            // Setup button
-            Button(action: {
-                // TODO: Navigate to settings/setup
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(.system(size: 16, weight: .bold))
-                    
-                    Text("Connect Leagues")
-                        .font(.system(size: 16, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 25)
-                        .fill(
-                            LinearGradient(
-                                colors: [.gpGreen, .blue],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                )
-            }
-            
-            Spacer()
-        }
-    }
-    
-    // MARK: -> Matchups Content
-    
-    private var matchupsContent: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            LazyVStack(spacing: 0) {
-                // Hero header
-                heroHeader
-                
-                // Matchups section
-                matchupsSection
-                
-                // Bottom padding for tab bar
-                Color.clear.frame(height: 100)
-            }
-        }
-    }
-    
-    private var heroHeader: some View {
-        VStack(spacing: 16) {
-            // Mission Control title
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "target")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                    
-                    Text("MISSION CONTROL")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.white, .gpGreen.opacity(0.8)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                    
-                    Image(systemName: "rocket")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                }
-                
-                Text("Fantasy Football Command Center")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            // Stats overview
-            statsOverview
-            
-            // Last update info
-            lastUpdateInfo
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 24)
-    }
-    
-    private var statsOverview: some View {
-        HStack(spacing: 0) {
-            statCard(
-                value: "\(viewModel.myMatchups.count)",
-                label: "MATCHUPS",
-                color: .gpGreen
-            )
-            
-            statCard(
-                value: "WEEK \(currentNFLWeek)",
-                label: "ACTIVE",
-                color: .blue
-            )
-            
-            statCard(
-                value: "\(connectedLeaguesCount)",
-                label: "LEAGUES",
-                color: .purple
-            )
-        }
-        .padding(.horizontal, 8)
-    }
-    
-    private func statCard(value: String, label: String, color: Color) -> some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.gray)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-    
-    private var lastUpdateInfo: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.gpGreen)
-            
-            if let lastUpdate = viewModel.lastUpdateTime {
-                Text("Last Update: \(timeAgo(lastUpdate))")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            } else {
-                Text("Ready to load your battles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-            
-            // Auto refresh indicator
-            if viewModel.autoRefreshEnabled {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                        .opacity(0.8)
-                    
-                    Text("Auto-refresh ON")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.green)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.3))
-        )
-    }
-    
-    private var matchupsSection: some View {
-        VStack(spacing: 20) {
-            // Section header
-            HStack {
-                HStack(spacing: 8) {
-                    Image(systemName: "sword.crossed")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("ALL YOUR BATTLES")
-                        .font(.system(size: 18, weight: .black))
-                        .foregroundColor(.white)
-                }
-                
-                Spacer()
-                
-                Text("TOTAL: \(viewModel.myMatchups.count)")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.gray)
-            }
-            .padding(.horizontal, 20)
-            
-            // Powered by branding
-            poweredByBranding
-            
-            // Matchup cards in 2-column grid - MASSIVE ROW SPACING 🔥
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 16),
-                    GridItem(.flexible(), spacing: 16)
-                ],
-                spacing: 16
-            ) {
-                ForEach(Array(viewModel.myMatchups.enumerated()), id: \.element.id) { index, matchup in
-                    MatchupCardView(matchup: matchup) {
-                        showingMatchupDetail = matchup
-                    }
-                    .padding(.bottom, 44) // INCREASED from 33 to 48 for even more massive row separation - space between rows
-                    .transition(
-                        .asymmetric(
-                            insertion: .move(edge: .bottom).combined(with: .opacity),
-                            removal: .scale.combined(with: .opacity)
-                        )
-                    )
-                    .onAppear {
-                        // Staggered animation for cards
-                        if cardAnimationStagger < Double(index) * 0.05 {
-                            withAnimation(.spring(response: 0.8, dampingFraction: 0.8).delay(Double(index) * 0.05)) {
-                                cardAnimationStagger = Double(index) * 0.05
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-    
-    private var poweredByBranding: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.gpGreen)
-                
-                Text("POWERED BY BIG WAR ROOM")
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.gpGreen, .blue],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(.gpGreen)
-            }
-            
-            Text("The ultimate fantasy football command center")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.gray)
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            LinearGradient(
-                                colors: [.gpGreen.opacity(0.3), .blue.opacity(0.3)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        )
-    }
-    
-    // MARK: -> Computed Properties
-    
-    private var liveMatchupsCount: Int {
-        viewModel.myMatchups.filter { $0.fantasyMatchup?.status == .live }.count
-    }
-    
-    private var currentNFLWeek: Int {
-        return NFLWeekService.shared.currentWeek
-    }
-    
-    private var connectedLeaguesCount: Int {
-        Set(viewModel.myMatchups.map { $0.league.id }).count
-    }
-    
-    // MARK: -> Actions
-    
-    private func loadInitialData() {
-        Task {
-            await viewModel.loadAllMatchups()
-        }
-    }
-    
-    private func handlePullToRefresh() async {
-        refreshing = true
-        await viewModel.manualRefresh()
-        refreshing = false
-        
-        // Force UI update after refresh
-        await MainActor.run {
-            // This will trigger view refresh
-        }
-    }
-    
-    private func timeAgo(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    // MARK: -> Auto-refresh timer for Mission Control
-    @State private var refreshTimer: Timer?
-    
-    private func startPeriodicRefresh() {
-        // Stop any existing timer first
-        stopPeriodicRefresh()
-        
-        // Start new timer - refresh every 30 seconds when view is active
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !viewModel.isLoading {
-                    print("🔄 AUTO-REFRESH: Refreshing Mission Control data...")
-                    await viewModel.manualRefresh()
-                }
-            }
-        }
-        
-        print("🚀 TIMER: Started Mission Control auto-refresh (30s intervals)")
-    }
-    
-    private func stopPeriodicRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        print("🛑 TIMER: Stopped Mission Control auto-refresh")
-    }
+   @StateObject private var viewModel = MatchupsHubViewModel()
+   @State private var showingMatchupDetail: UnifiedMatchup?
+   @State private var refreshing = false
+   @State private var cardAnimationStagger: Double = 0
+   
+	  // MARK: -> Micro Mode States
+   @State private var microMode = false
+   @State private var expandedCardId: String? = nil
+   
+	  // MARK: -> Sorting States
+   @State private var sortByWinning = true // true = Win (highest scores first), false = Lose (lowest scores first)
+   
+	  // MARK: -> Timer States
+   @State private var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
+   @State private var countdownTimer: Timer?
+   
+   var body: some View {
+	  NavigationView {
+		 ZStack {
+			   // Background gradient
+			backgroundGradient
+			
+			if viewModel.isLoading && viewModel.myMatchups.isEmpty {
+				  // Initial loading state
+			   loadingState
+			} else if viewModel.myMatchups.isEmpty && !viewModel.isLoading {
+				  // Empty state
+			   emptyState
+			} else {
+				  // Matchups content
+			   matchupsContent
+			}
+		 }
+		 .navigationTitle("")
+		 .navigationBarHidden(true)
+		 .onAppear {
+			loadInitialData()
+			startPeriodicRefresh()
+		 }
+		 .onDisappear {
+			stopPeriodicRefresh()
+		 }
+		 .refreshable {
+			await handlePullToRefresh()
+		 }
+	  }
+	  .sheet(item: $showingMatchupDetail) { matchup in
+		 if matchup.isChoppedLeague {
+			   // Show chopped league detail view
+			if let choppedSummary = matchup.choppedSummary {
+			   ChoppedLeaderboardView(
+				  choppedSummary: choppedSummary,
+				  leagueName: matchup.league.league.name
+			   )
+			}
+		 } else if let fantasyMatchup = matchup.fantasyMatchup {
+			   // Show regular matchup detail view
+			let configuredViewModel = matchup.createConfiguredFantasyViewModel()
+			FantasyMatchupDetailView(
+			   matchup: fantasyMatchup,
+			   fantasyViewModel: configuredViewModel,
+			   leagueName: matchup.league.league.name
+			)
+		 }
+	  }
+   }
+   
+	  // MARK: -> Background
+   
+   private var backgroundGradient: some View {
+	  LinearGradient(
+		 colors: [
+			Color.black,
+			Color.black.opacity(0.9),
+			Color.gpGreen.opacity(0.1),
+			Color.black.opacity(0.9),
+			Color.black
+		 ],
+		 startPoint: .topLeading,
+		 endPoint: .bottomTrailing
+	  )
+	  .ignoresSafeArea()
+   }
+   
+	  // MARK: -> Loading State
+   
+   private var loadingState: some View {
+	  VStack {
+		 Spacer()
+		 
+		 MatchupsHubLoadingIndicator(
+			currentLeague: viewModel.currentLoadingLeague,
+			progress: viewModel.loadingProgress,
+			loadingStates: viewModel.loadingStates
+		 )
+		 
+		 Spacer()
+	  }
+   }
+   
+	  // MARK: -> Empty State
+   
+   private var emptyState: some View {
+	  VStack(spacing: 24) {
+		 Spacer()
+		 
+			// Animated empty illustration
+		 VStack(spacing: 16) {
+			ZStack {
+			   Circle()
+				  .fill(
+					 RadialGradient(
+						colors: [.gpGreen.opacity(0.3), .clear],
+						center: .center,
+						startRadius: 10,
+						endRadius: 50
+					 )
+				  )
+				  .frame(width: 100, height: 100)
+			   
+			   Image(systemName: "football")
+				  .font(.system(size: 40, weight: .bold))
+				  .foregroundColor(.gpGreen)
+			}
+			
+			VStack(spacing: 8) {
+			   Text("No Active Matchups")
+				  .font(.system(size: 24, weight: .bold))
+				  .foregroundColor(.white)
+			   
+			   Text("Connect your fantasy leagues to see your battles here")
+				  .font(.system(size: 16, weight: .medium))
+				  .foregroundColor(.gray)
+				  .multilineTextAlignment(.center)
+				  .padding(.horizontal, 32)
+			}
+		 }
+		 
+			// Setup button
+		 Button(action: {
+			   // TODO: Navigate to settings/setup
+		 }) {
+			HStack(spacing: 8) {
+			   Image(systemName: "plus.circle.fill")
+				  .font(.system(size: 16, weight: .bold))
+			   
+			   Text("Connect Leagues")
+				  .font(.system(size: 16, weight: .bold))
+			}
+			.foregroundColor(.white)
+			.padding(.horizontal, 24)
+			.padding(.vertical, 12)
+			.background(
+			   RoundedRectangle(cornerRadius: 25)
+				  .fill(
+					 LinearGradient(
+						colors: [.gpGreen, .blue],
+						startPoint: .leading,
+						endPoint: .trailing
+					 )
+				  )
+			)
+		 }
+		 
+		 Spacer()
+	  }
+   }
+   
+	  // MARK: -> Matchups Content
+   
+   private var matchupsContent: some View {
+	  ScrollView(.vertical, showsIndicators: false) {
+		 LazyVStack(spacing: 0) {
+			   // Hero header
+			heroHeader
+			
+			   // Matchups section
+			matchupsSection
+			
+			   // Bottom padding for tab bar
+			Color.clear.frame(height: 100)
+		 }
+	  }
+   }
+   
+   private var heroHeader: some View {
+	  VStack(spacing: 16) {
+			// Mission Control title
+		 VStack(spacing: 8) {
+			HStack {
+			   Image(systemName: "target")
+				  .font(.system(size: 20, weight: .bold))
+				  .foregroundColor(.gpGreen)
+			   
+			   Text("MISSION CONTROL")
+				  .font(.system(size: 28, weight: .black, design: .rounded))
+				  .foregroundStyle(
+					 LinearGradient(
+						colors: [.white, .gpGreen.opacity(0.8)],
+						startPoint: .leading,
+						endPoint: .trailing
+					 )
+				  )
+			   
+			   Image(systemName: "rocket")
+				  .font(.system(size: 20, weight: .bold))
+				  .foregroundColor(.gpGreen)
+			}
+			
+			Text("Fantasy Football Command Center")
+			   .font(.system(size: 14, weight: .medium))
+			   .foregroundColor(.gray)
+		 }
+		 
+			// Stats overview
+		 statsOverview
+		 
+			// Last update info
+		 lastUpdateInfo
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.top, 20)
+	  .padding(.bottom, 24)
+   }
+   
+   private var statsOverview: some View {
+	  HStack(spacing: 0) {
+		 statCard(
+			value: "\(viewModel.myMatchups.count)",
+			label: "MATCHUPS",
+			color: .gpGreen
+		 )
+		 
+		 statCard(
+			value: "WEEK \(currentNFLWeek)",
+			label: "ACTIVE",
+			color: .blue
+		 )
+		 
+		 statCard(
+			value: "\(connectedLeaguesCount)",
+			label: "LEAGUES",
+			color: .purple
+		 )
+	  }
+	  .padding(.horizontal, 8)
+   }
+   
+   private func statCard(value: String, label: String, color: Color) -> some View {
+	  VStack(spacing: 6) {
+		 Text(value)
+			.font(.system(size: 18, weight: .black, design: .rounded))
+			.foregroundColor(color)
+			.lineLimit(1)
+			.minimumScaleFactor(0.8)
+		 
+		 Text(label)
+			.font(.system(size: 10, weight: .bold))
+			.foregroundColor(.gray)
+			.lineLimit(1)
+	  }
+	  .frame(maxWidth: .infinity)
+	  .padding(.vertical, 12)
+	  .background(
+		 RoundedRectangle(cornerRadius: 12)
+			.fill(color.opacity(0.1))
+			.overlay(
+			   RoundedRectangle(cornerRadius: 12)
+				  .stroke(color.opacity(0.3), lineWidth: 1)
+			)
+	  )
+   }
+   
+   private var lastUpdateInfo: some View {
+	  HStack(spacing: 8) {
+		 Image(systemName: "bolt.fill")
+			.font(.system(size: 12))
+			.foregroundColor(.gpGreen)
+		 
+		 if let lastUpdate = viewModel.lastUpdateTime {
+			Text("Last Update: \(timeAgo(lastUpdate))")
+			   .font(.system(size: 12, weight: .medium))
+			   .foregroundColor(.gray)
+		 } else {
+			Text("Ready to load your battles")
+			   .font(.system(size: 12, weight: .medium))
+			   .foregroundColor(.gray)
+		 }
+		 
+		 Spacer()
+		 
+			// Auto refresh indicator
+		 if viewModel.autoRefreshEnabled {
+			HStack(spacing: 4) {
+			   Circle()
+				  .fill(Color.green)
+				  .frame(width: 8, height: 8)
+				  .opacity(0.8)
+			   
+			   Text("Auto-refresh ON")
+				  .font(.system(size: 10, weight: .medium))
+				  .foregroundColor(.green)
+			}
+		 }
+	  }
+	  .padding(.horizontal, 16)
+	  .padding(.vertical, 8)
+	  .background(
+		 RoundedRectangle(cornerRadius: 8)
+			.fill(Color.black.opacity(0.3))
+	  )
+   }
+   
+   private var matchupsSection: some View {
+	  VStack(spacing: 20) {
+			// This HStack will contain the title and the micro toggle on the same line
+		 HStack {
+			   // Group the icon and title text
+			HStack(spacing: 8) {
+			   Image(systemName: "sword.crossed")
+				  .font(.system(size: 16, weight: .bold))
+				  .foregroundColor(.white)
+			   
+			   Text("ALL YOUR BATTLES")
+				  .font(.system(size: 18, weight: .black))
+				  .foregroundColor(.white)
+			}
+			
+			Spacer() // This pushes the next element to the right edge
+			
+			   // This HStack holds the "Micro:" text and the toggle.
+			   // By placing it after the Spacer, it will align to the trailing edge.
+			HStack(spacing: 4) {
+			   Text("Micro:")
+				  .font(.system(size: 14, weight: .bold))
+				  .foregroundColor(.gray)
+			   
+			   Toggle("", isOn: $microMode)
+				  .labelsHidden()
+				  .toggleStyle(SwitchToggleStyle(tint: .gpGreen))
+				  .scaleEffect(0.9)
+				  .onChange(of: microMode) { oldValue, newValue in
+					 withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
+						expandedCardId = nil
+					 }
+				  }
+			}
+		 }
+		 .padding(.horizontal, 20)
+		 
+			// The poweredByBranding view should be placed here,
+			// directly below the main header HStack.
+		 poweredByBranding
+		 
+			// Sort by toggle and matchup cards grid follow
+		 sortByToggle
+		 
+		 matchupCardsGrid
+	  }
+   }
+   
+   @ViewBuilder
+   private var matchupCardsGrid: some View {
+	  LazyVGrid(
+		 columns: microMode ? 
+		 [
+			GridItem(.flexible(), spacing: 8),
+			GridItem(.flexible(), spacing: 8),
+			GridItem(.flexible(), spacing: 8),
+			GridItem(.flexible(), spacing: 8)
+		 ] :
+			[
+			   GridItem(.flexible(), spacing: 16),
+			   GridItem(.flexible(), spacing: 16)
+			],
+		 spacing: microMode ? 8 : 16
+	  ) {
+		 ForEach(sortedMatchups, id: \.id) { matchup in
+			microCardView(for: matchup)
+		 }
+	  }
+	  .padding(.horizontal, 20)
+	  .animation(.spring(response: 1.0, dampingFraction: 0.8), value: microMode)
+	  .animation(.spring(response: 0.8, dampingFraction: 0.7), value: expandedCardId)
+	  .animation(.spring(response: 0.6, dampingFraction: 0.8), value: sortByWinning)
+	  .overlay(
+		 // OVERLAY: Show expanded card over the entire grid when any card is expanded
+		 Group {
+			if let expandedId = expandedCardId,
+			   let expandedMatchup = sortedMatchups.first(where: { $0.id == expandedId }) {
+			   
+			   Color.black.opacity(0.7) // Background dim
+				  .ignoresSafeArea()
+				  .onTapGesture {
+					 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+						expandedCardId = nil
+					 }
+				  }
+			   
+				  // Full-size expanded card in center
+			   NonMicroCardView(
+				  matchup: expandedMatchup,
+				  isWinning: getWinningStatusForMatchup(expandedMatchup)
+			   ) {
+				  showingMatchupDetail = expandedMatchup
+			   }
+			   .frame(width: UIScreen.main.bounds.width * 0.6, height: 205) // 50% width, 20% taller than normal NM cards
+			   .overlay(
+				  RoundedRectangle(cornerRadius: 16)
+					 .stroke(
+						LinearGradient(
+						   colors: [.gpGreen, .blue, .gpGreen],
+						   startPoint: .topLeading,
+						   endPoint: .bottomTrailing
+						),
+						lineWidth: 3
+					 )
+			   )
+			   .zIndex(1000)
+			   .onTapGesture(count: 2) {
+				  withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+					 expandedCardId = nil
+				  }
+			   }
+			}
+		 }
+	  )
+   }
+   
+   @ViewBuilder
+   private func microCardView(for matchup: UnifiedMatchup) -> some View {
+	  let isExpanded = expandedCardId == matchup.id
+	  let shouldShowMicro = microMode && !isExpanded
+	  let isWinning = getWinningStatusForMatchup(matchup)
+	  
+		 // FIXED LOGIC: Always show micro cards in micro mode, use overlay for expansion
+	  if microMode {
+			// Prepare all data for DUMB micro card
+		 let myTeam = matchup.myTeam
+		 let leagueName = matchup.league.league.name
+		 let avatarURL = myTeam?.avatar
+		 let managerName = myTeam?.ownerName ?? "Unknown"
+		 let score = myTeam?.currentScoreString ?? "0.0"
+		 let scoreColor = isWinning ? Color.gpGreen : Color.gpRedPink
+		 let percentage = calculateWinPercentageString(for: matchup)
+		 let isLive = isMatchupLive(matchup)
+		 let borderColors = isLive ? [Color.gpGreen, Color.blue, Color.gpGreen] : [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
+		 
+		 MicroCardView(
+			leagueName: leagueName,
+			avatarURL: avatarURL,
+			managerName: managerName,
+			score: score,
+			scoreColor: scoreColor,
+			percentage: percentage,
+			borderColors: borderColors,
+			shouldPulse: isLive
+		 ) {
+			if matchup.isChoppedLeague {
+			   showingMatchupDetail = matchup
+			} else {
+			   handleMicroCardTap(matchup.id)
+			}
+		 }
+		 .frame(height: 120)
+		 .padding(.bottom, 8)
+	  } else {
+			// Normal mode - show non-micro card
+		 NonMicroCardView(
+			matchup: matchup,
+			isWinning: isWinning
+		 ) {
+			showingMatchupDetail = matchup
+		 }
+		 .padding(.bottom, 44)
+	  }
+   }
+   
+   private var poweredByBranding: some View {
+	  VStack(spacing: 8) {
+		 HStack(spacing: 8) {
+			Image(systemName: "bolt.fill")
+			   .font(.system(size: 12))
+			   .foregroundColor(.gpGreen)
+			
+			Text("POWERED BY BIG WARROOM")
+			   .font(.system(size: 12, weight: .black))
+			   .foregroundStyle(
+				  LinearGradient(
+					 colors: [.gpGreen, .blue],
+					 startPoint: .leading,
+					 endPoint: .trailing
+				  )
+			   )
+			
+			Image(systemName: "bolt.fill")
+			   .font(.system(size: 12))
+			   .foregroundColor(.gpGreen)
+		 }
+		 
+		 Text("The ultimate fantasy football command center")
+			.font(.system(size: 10, weight: .medium))
+			.foregroundColor(.gray)
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.vertical, 12)
+	  .background(
+		 RoundedRectangle(cornerRadius: 12)
+			.fill(Color.black.opacity(0.2))
+			.overlay(
+			   RoundedRectangle(cornerRadius: 12)
+				  .stroke(
+					 LinearGradient(
+						colors: [.gpGreen.opacity(0.3), .blue.opacity(0.3)],
+						startPoint: .leading,
+						endPoint: .trailing
+					 ),
+					 lineWidth: 1
+				  )
+			)
+	  )
+   }
+   
+   private var sortByToggle: some View {
+	  HStack {
+		 Button(action: {
+			withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+			   sortByWinning.toggle()
+			}
+		 }) {
+			HStack(spacing: 8) {
+			   Text("Sort by:")
+				  .font(.system(size: 12, weight: .medium))
+				  .foregroundColor(.white)
+			   
+			   Text(sortByWinning ? "WIN" : "LOSE")
+				  .font(.system(size: 12, weight: .bold))
+				  .foregroundColor(.white)
+			}
+			.padding(.horizontal, 16)
+			.padding(.vertical, 8)
+			.background(
+			   RoundedRectangle(cornerRadius: 8)
+				  .fill(sortByWinning ? Color.gpGreen : Color.gpRedPink)
+			)
+		 }
+		 
+		 Spacer()
+		 
+			// Use existing PollingCountdownDial component
+		 PollingCountdownDial(
+			countdown: refreshCountdown,
+			maxInterval: Double(AppConstants.MatchupRefresh),
+			isPolling: viewModel.autoRefreshEnabled,
+			onRefresh: {
+			   Task {
+				  await handlePullToRefresh()
+			   }
+			}
+		 )
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.bottom, 8)
+	  .onAppear {
+		 startCountdownTimer()
+	  }
+	  .onDisappear {
+		 stopCountdownTimer()
+	  }
+   }
+   
+	  // MARK: -> Computed Properties
+   
+   private var sortedMatchups: [UnifiedMatchup] {
+	  let matchups = viewModel.myMatchups
+	  
+	  if sortByWinning {
+			// Sort by highest scores first (Win mode)
+		 return matchups.sorted { matchup1, matchup2 in
+			let score1 = matchup1.myTeam?.currentScore ?? 0
+			let score2 = matchup2.myTeam?.currentScore ?? 0
+			return score1 > score2
+		 }
+	  } else {
+			// Sort by lowest scores first (Lose mode)
+		 return matchups.sorted { matchup1, matchup2 in
+			let score1 = matchup1.myTeam?.currentScore ?? 0
+			let score2 = matchup2.myTeam?.currentScore ?? 0
+			return score1 < score2
+		 }
+	  }
+   }
+   
+   private var liveMatchupsCount: Int {
+	  viewModel.myMatchups.filter { $0.fantasyMatchup?.status == .live }.count
+   }
+   
+   private var currentNFLWeek: Int {
+	  return NFLWeekService.shared.currentWeek
+   }
+   
+   private var connectedLeaguesCount: Int {
+	  Set(viewModel.myMatchups.map { $0.league.id }).count
+   }
+   
+	  // MARK: -> Actions
+   
+   private func loadInitialData() {
+	  Task {
+		 await viewModel.loadAllMatchups()
+	  }
+   }
+   
+   private func handlePullToRefresh() async {
+	  refreshing = true
+	  await viewModel.manualRefresh()
+	  refreshing = false
+	  
+		 // Reset countdown timer
+	  refreshCountdown = Double(AppConstants.MatchupRefresh)
+	  
+		 // Force UI update after refresh
+	  await MainActor.run {
+			// This will trigger view refresh
+	  }
+   }
+   
+   private func timeAgo(_ date: Date) -> String {
+	  let formatter = RelativeDateTimeFormatter()
+	  formatter.unitsStyle = .abbreviated
+	  return formatter.localizedString(for: date, relativeTo: Date())
+   }
+   
+	  // MARK: -> Auto-refresh timer for Mission Control
+   @State private var refreshTimer: Timer?
+   
+   private func startPeriodicRefresh() {
+		 // Stop any existing timer first
+	  stopPeriodicRefresh()
+	  
+		 // Start new timer - refresh every AppConstants.MatchupRefresh seconds when view is active
+	  refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
+		 Task { @MainActor in
+			if UIApplication.shared.applicationState == .active && !viewModel.isLoading {
+			   print("🔄 AUTO-REFRESH: Refreshing Mission Control data...")
+			   await viewModel.manualRefresh()
+			}
+		 }
+	  }
+	  
+	  print("🚀 TIMER: Started Mission Control auto-refresh (\(AppConstants.MatchupRefresh)s intervals)")
+   }
+   
+   private func stopPeriodicRefresh() {
+	  refreshTimer?.invalidate()
+	  refreshTimer = nil
+	  print("🛑 TIMER: Stopped Mission Control auto-refresh")
+   }
+   
+	  // MARK: -> Countdown Timer
+   
+   private func startCountdownTimer() {
+	  stopCountdownTimer()
+	  
+	  countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+		 refreshCountdown -= 1.0
+		 
+		 if refreshCountdown <= 0 {
+			refreshCountdown = Double(AppConstants.MatchupRefresh) // Reset countdown
+		 }
+	  }
+   }
+   
+   private func stopCountdownTimer() {
+	  countdownTimer?.invalidate()
+	  countdownTimer = nil
+   }
+   
+	  // MARK: -> Micro Mode Actions
+   
+   private func handleMicroCardTap(_ cardId: String) {
+	  withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
+		 if expandedCardId == cardId {
+			   // Collapse if already expanded
+			expandedCardId = nil
+		 } else {
+			   // Expand this card (collapse any other)
+			expandedCardId = cardId
+		 }
+	  }
+   }
+   
+	  // Helper to get score color using same logic as MatchupCardView
+   private func getScoreColorForMatchup(_ matchup: UnifiedMatchup) -> Color {
+	  if matchup.isChoppedLeague {
+			// For chopped leagues, use elimination status
+		 guard let ranking = matchup.myTeamRanking else { return .white }
+		 
+		 switch ranking.eliminationStatus {
+			case .champion, .safe:
+			   return .gpGreen
+			case .warning:
+			   return .gpYellow
+			case .danger:
+			   return .orange
+			case .critical, .eliminated:
+			   return .gpRedPink
+		 }
+	  } else {
+			// For regular matchups, use exact same logic as MatchupCardView compactTeamSection
+		 guard let myTeam = matchup.myTeam, 
+				  let opponentTeam = matchup.opponentTeam else {
+			return .white
+		 }
+		 
+		 let myScore = myTeam.currentScore ?? 0
+		 let opponentScore = opponentTeam.currentScore ?? 0
+		 
+			// This is the EXACT logic from MatchupCardView
+		 let isWinning = myScore > opponentScore
+		 return isWinning ? .gpGreen : .gpRedPink
+	  }
+   }
+   
+	  // Get winning status using EXACT same logic as MatchupCardView
+   private func getWinningStatusForMatchup(_ matchup: UnifiedMatchup) -> Bool {
+	  if matchup.isChoppedLeague {
+			// For chopped leagues, check if we're in good status
+		 guard let ranking = matchup.myTeamRanking else { return false }
+		 return ranking.eliminationStatus == .champion || ranking.eliminationStatus == .safe
+	  } else {
+			// For regular matchups - EXACT same logic as MatchupCardView
+		 guard let myTeam = matchup.myTeam, 
+				  let opponentTeam = matchup.opponentTeam else {
+			return false
+		 }
+		 
+		 let myScore = myTeam.currentScore ?? 0
+		 let opponentScore = opponentTeam.currentScore ?? 0
+		 
+		 return myScore > opponentScore
+	  }
+   }
+   
+	  // MARK: -> Helper Functions for DUMB Micro Cards
+   
+   private func calculateWinPercentageString(for matchup: UnifiedMatchup) -> String {
+	  if matchup.isChoppedLeague {
+		 guard let teamRanking = matchup.myTeamRanking else { return "0%" }
+		 return "\(Int(teamRanking.survivalProbability * 100))%"
+	  }
+	  
+	  guard let myScore = matchup.myTeam?.currentScore,
+			let opponentScore = matchup.opponentTeam?.currentScore else { return "50%" }
+	  
+	  let totalScore = myScore + opponentScore
+	  if totalScore == 0 { return "50%" }
+	  
+	  let percentage = (myScore / totalScore) * 100.0
+	  return "\(Int(percentage))%"
+   }
+   
+   private func isMatchupLive(_ matchup: UnifiedMatchup) -> Bool {
+	  guard let myTeam = matchup.myTeam else { return false }
+	  let starters = myTeam.roster.filter { $0.isStarter }
+	  return starters.contains { player in
+		 isPlayerInLiveGame(player)
+	  }
+   }
+   
+   private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
+	  guard let gameStatus = player.gameStatus else { return false }
+	  let timeString = gameStatus.timeString.lowercased()
+	  
+	  let quarterPatterns = ["1st ", "2nd ", "3rd ", "4th ", "ot ", "overtime"]
+	  for pattern in quarterPatterns {
+		 if timeString.contains(pattern) && timeString.contains(":") {
+			return true
+		 }
+	  }
+	  
+	  let liveStatusIndicators = ["live", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"]
+	  return liveStatusIndicators.contains { timeString.contains($0) }
+   }
+   
+	  // MARK: -> New Helper Function
+   
+	  /// Identify which team is "me" using the same logic that determines isWinning
+   private func identifyMyTeamInMatchup(_ matchup: UnifiedMatchup) -> (isMyTeamHome: Bool, myTeam: FantasyTeam?, opponentTeam: FantasyTeam?) {
+	  if matchup.isChoppedLeague {
+			// For chopped leagues, use the identified team from myTeamRanking
+		 let myTeam = matchup.myTeam
+		 return (true, myTeam, nil) // No opponent in chopped leagues
+	  }
+	  
+	  guard let fantasyMatchup = matchup.fantasyMatchup else {
+		 return (true, nil, nil)
+	  }
+	  
+	  let homeTeam = fantasyMatchup.homeTeam
+	  let awayTeam = fantasyMatchup.awayTeam
+	  let homeScore = homeTeam.currentScore ?? 0
+	  let awayScore = awayTeam.currentScore ?? 0
+	  
+		 // Use the SAME logic as getWinningStatusForMatchup to determine who's winning
+	  let homeIsWinning = homeScore > awayScore
+	  let isWinning = getWinningStatusForMatchup(matchup)
+	  
+		 // If I'm winning and home is winning, then I'm the home team
+		 // If I'm winning and home is losing, then I'm the away team  
+	  if isWinning == homeIsWinning {
+			// I'm the home team
+		 return (true, homeTeam, awayTeam)
+	  } else {
+			// I'm the away team
+		 return (false, awayTeam, homeTeam)
+	  }
+   }
 }
 
-// MARK: -> Preview
+   // MARK: -> Preview
 #Preview {
-    MatchupsHubView()
-        .preferredColorScheme(.dark)
+   MatchupsHubView()
+	  .preferredColorScheme(.dark)
 }

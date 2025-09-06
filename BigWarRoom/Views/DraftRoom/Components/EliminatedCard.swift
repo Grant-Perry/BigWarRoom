@@ -34,21 +34,26 @@ struct EliminatedCard: View {
             // Faded team avatar
             teamAvatar
             
-            // Memorial info
+            // Memorial info - FIXED NO WRAP
             VStack(alignment: .leading, spacing: 4) {
                 Text(ranking.team.ownerName)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.gray)
                     .strikethrough()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Text("💀 ELIMINATED - WEEK \(ranking.weeksAlive)")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray)
+                    .fixedSize(horizontal: false, vertical: true)
                 
                 Text("\"Fought valiantly but couldn't survive\"")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.gray)
                     .italic()
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             Spacer()

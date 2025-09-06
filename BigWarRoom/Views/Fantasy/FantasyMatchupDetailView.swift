@@ -403,9 +403,11 @@ struct FantasyManagerDetails: View {
             
             // Score with winning color
             Text(String(format: "%.2f", score))
-                .font(.title3)
+                .font(.subheadline)
                 .fontWeight(.bold)
                 .foregroundColor(isWinning ? .gpGreen : .red)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
         .frame(maxWidth: .infinity)
     }
@@ -560,10 +562,11 @@ struct FantasyPlayerCard: View {
                         HStack(alignment: .bottom, spacing: 4) {
                             Spacer()
                             Text(player.currentPointsString)
-                                .font(.system(size: 22, weight: .bold))
+							  .font(.system(size: 18, weight: .bold))
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.95)
+                                .minimumScaleFactor(0.6)
                                 .scaledToFit()
                         }
                         .frame(maxWidth: .infinity, alignment: .trailing)

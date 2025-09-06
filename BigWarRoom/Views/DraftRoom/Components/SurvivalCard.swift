@@ -41,6 +41,8 @@ struct SurvivalCard: View {
                 Text(ranking.team.ownerName)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 HStack(spacing: 8) {
                     Text(ranking.eliminationStatus.emoji)
@@ -49,25 +51,34 @@ struct SurvivalCard: View {
                         .foregroundColor(ranking.eliminationStatus.color)
                 }
                 
-                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY
-                HStack(spacing: 12) {
-                    Text("SAFE \(ranking.survivalPercentage)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(survivalColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(survivalColor.opacity(0.2))
-                        )
+                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY - FIXED NO WRAP
+                HStack(spacing: 8) {
+                    HStack(spacing: 4) {
+                        Text("SAFE")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(survivalColor)
+                            .fixedSize()
+                        
+                        Text(ranking.survivalPercentage)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(survivalColor)
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(survivalColor.opacity(0.2))
+                    )
                     
                     // Show projected score if different from current
                     if let projected = ranking.team.projectedScore, 
                        let current = ranking.team.currentScore,
                        abs(projected - current) > 1.0 {
                         Text("PROJ: \(String(format: "%.1f", projected))")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.cyan)
+                            .fixedSize()
                     }
                 }
             }
