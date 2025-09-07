@@ -57,7 +57,14 @@ final class ESPNCredentialsManager: ObservableObject {
         self.leagueIDs = leagueIDs
         self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
         
-        // xprint("📱 Loaded ESPN credentials - Has valid: \(hasValidCredentials)")
+        // 🔥 DEBUG: Log what we're loading
+        if AppConstants.debug {
+            print("🔍 ESPNCredentialsManager loadCredentials:")
+            print("   SWID: '\(swid.isEmpty ? "EMPTY" : "HAS_VALUE")'")
+            print("   ESPN_S2: '\(espnS2.isEmpty ? "EMPTY" : "HAS_VALUE")'") 
+            print("   League IDs: \(leagueIDs.count)")
+            print("   hasValidCredentials: \(hasValidCredentials)")
+        }
     }
     
     /// Get current ESPN_S2 cookie

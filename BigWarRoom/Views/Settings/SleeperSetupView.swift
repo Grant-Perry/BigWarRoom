@@ -44,7 +44,9 @@ struct SleeperSetupView: View {
                                 Spacer()
                             }
                             
-                            Button("Continue to BigWarRoom") {
+                            Button("Continue to Mission Control") {
+                                // 🔥 FIX: Navigate to Mission Control tab (0) instead of War Room
+                                NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
                                 dismiss()
                             }
                             .frame(maxWidth: .infinity)
@@ -225,6 +227,8 @@ struct SleeperSetupView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if viewModel.isSetupComplete {
                         Button("Continue") {
+                            // 🔥 FIX: Navigate to Mission Control tab (0) instead of War Room
+                            NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
                             dismiss()
                         }
                         .foregroundColor(.green)

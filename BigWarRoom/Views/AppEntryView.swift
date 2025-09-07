@@ -116,6 +116,14 @@ struct BigWarRoomModified: View {
                     .tag(7)
             }
             .preferredColorScheme(.dark)
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
+                // 🔥 FIX: Switch to War Room tab when Continue button is pressed
+                selectedTab = 1
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
+                // 🔥 NEW: Switch to Mission Control tab when Continue button is pressed
+                selectedTab = 0
+            }
             
             // Version display
             VStack {

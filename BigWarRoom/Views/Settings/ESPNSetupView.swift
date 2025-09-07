@@ -44,7 +44,9 @@ struct ESPNSetupView: View {
                                 Spacer()
                             }
                             
-                            Button("Continue to BigWarRoom") {
+                            Button("Continue to Mission Control") {
+                                // 🔥 FIX: Navigate to Mission Control tab (0) instead of just dismissing
+                                NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
                                 dismiss()
                             }
                             .frame(maxWidth: .infinity)

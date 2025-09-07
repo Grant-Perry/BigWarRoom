@@ -242,7 +242,7 @@ class NFLGameDataService: ObservableObject {
     private func processGameData(_ response: NFLScoreboardResponse) {
         var newGameData: [String: NFLGameInfo] = [:]
         
-        // xprint("🏈 Processing \(response.events.count) NFL events from ESPN API")
+        print("🏈 Processing \(response.events.count) NFL events from ESPN API")
         
         for event in response.events {
             guard let competition = event.competitions.first else { continue }
@@ -296,30 +296,42 @@ class NFLGameDataService: ObservableObject {
             )
             
             // Debug logging to see what ESPN is actually returning
-            if UserDefaults.standard.isDebugModeEnabled {
-                NSLog("🏈 DEBUG Game: \(awayTeam) @ \(homeTeam)")
-                NSLog("🏈 DEBUG Status: '\(gameStatus)' | Detail: '\(gameTime)' | Score: \(awayScore)-\(homeScore)")
-                NSLog("🏈 DEBUG Formatted Time: '\(gameInfo.formattedGameTime)'")
-            }
+            print("🏈 GAME FOUND: \(awayTeam) @ \(homeTeam) | Status: '\(gameStatus)' | Score: \(awayScore)-\(homeScore)")
             
             // Map both teams to this game info
             newGameData[homeTeam] = gameInfo
             newGameData[awayTeam] = gameInfo
-            
-            // xprint("🏈 Game: \(awayTeam) @ \(homeTeam) | Status: '\(gameStatus)' | Detail: '\(gameTime)' | Score: \(awayScore)-\(homeScore) | Date: \(competition.date) | Parsed: \(startDate?.description ?? "nil")")
         }
         
         self.gameData = newGameData
-        // xprint("🏈 Processed \(newGameData.count / 2) NFL games, stored \(newGameData.count) team mappings")
+        print("🏈 FINAL TEAMS in game data: \(Array(newGameData.keys).sorted())")
         
-        // Debug: Print all available teams
-        let teams = Array(newGameData.keys).sorted()
-        // xprint("🏈 Available teams in game data: \(teams)")
+        // 🔍 SPECIFIC DEBUG: Check if Washington is missing
+        if newGameData["WAS"] == nil {
+            print("🚨 MISSING: Washington (WAS) NOT found in ESPN NFL API data!")
+            print("🔍 Available teams: \(Array(newGameData.keys).sorted())")
+        } else {
+            print("✅ FOUND: Washington game data exists")
+        }
     }
     
     /// Get game info for a specific team
     func getGameInfo(for team: String) -> NFLGameInfo? {
-        return gameData[team.uppercased()]
+        // 🔥 FIX: Handle ESPN API team abbreviation inconsistencies
+        let normalizedTeam = normalizeTeamAbbreviation(team.uppercased())
+        print("🔧 TEAM LOOKUP: '\(team)' -> '\(normalizedTeam)' | Found: \(gameData[normalizedTeam] != nil)")
+        return gameData[normalizedTeam]
+    }
+    
+    /// Normalize team abbreviations to match ESPN's NFL API
+    private func normalizeTeamAbbreviation(_ team: String) -> String {
+        switch team.uppercased() {
+        case "WAS":
+            print("🔧 NORMALIZING: WAS -> WSH")
+            return "WSH"  // ESPN uses WSH for Washington
+        default:
+            return team.uppercased()
+        }
     }
     
     /// Start auto-refresh for live games using AppConstants timing

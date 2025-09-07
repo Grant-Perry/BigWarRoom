@@ -9,6 +9,8 @@ import SwiftUI
 
 struct AppSettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
+    @State private var showingConnectionSuccess = false
+    @State private var connectionSuccessMessage = ""
     
     var body: some View {
         NavigationView {
@@ -70,6 +72,45 @@ struct AppSettingsView: View {
                             }
                         }
                     }
+                    
+                    // 🔥 NEW: Default Connection Option
+                    Button {
+                        viewModel.connectToDefaultServices()
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(.green.opacity(0.1))
+                                    .frame(width: 28, height: 28)
+                                
+                                HStack(spacing: 2) {
+                                    AppConstants.espnLogo
+                                        .frame(width: 16, height: 16)
+                                    AppConstants.sleeperLogo
+                                        .frame(width: 16, height: 16)
+                                }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Default Connection (use Gp's leagues!)")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.blue)
+                                
+                                Text("Auto-connect to both ESPN and Sleeper")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "bolt.fill")
+                                .foregroundColor(.gpGreen)
+                                .font(.system(size: 16))
+                        }
+                    }
+                    .disabled(viewModel.espnHasCredentials && viewModel.sleeperHasCredentials)
+                    
                 } header: {
                     Text("Fantasy Services")
                 } footer: {
@@ -341,6 +382,10 @@ struct AppSettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .onAppear {
+                // 🔥 FIX: Refresh status when returning from setup views
+                viewModel.refreshConnectionStatus()
+            }
             .alert("Confirm Clear Action", isPresented: $viewModel.showingClearConfirmation) {
                 Button("Clear", role: .destructive) {
                     viewModel.confirmClearAction()

@@ -44,9 +44,14 @@ final class SettingsViewModel: ObservableObject {
     
     var sleeperStatus: String {
         if sleeperCredentials.hasValidCredentials {
-            let identifier = sleeperCredentials.currentUsername.isEmpty ? 
-                sleeperCredentials.currentUserID : sleeperCredentials.currentUsername
-            return "Connected • @\(identifier)"
+            let cachedCount = sleeperCredentials.cachedLeagues.count
+            if cachedCount > 0 {
+                return "Connected • \(cachedCount) leagues"
+            } else {
+                let identifier = sleeperCredentials.currentUsername.isEmpty ? 
+                    sleeperCredentials.currentUserID : sleeperCredentials.currentUsername
+                return "Connected • @\(identifier)"
+            }
         } else {
             return "Not configured"
         }
@@ -225,14 +230,39 @@ final class SettingsViewModel: ObservableObject {
             UserDefaults.standard.synchronize()
         }
         
-        // Clear Keychain data
+        // Clear Keychain data - be more thorough
         espnCredentials.clearCredentials()
         sleeperCredentials.clearCredentials()
         
+        // 🔥 ENHANCED: Clear additional Keychain entries that might exist
+        let additionalKeychainKeys = [
+            "ESPN_SWID_BACKUP", "ESPN_S2_BACKUP", "SLEEPER_USER_BACKUP",
+            "ESPN_LEGACY", "SLEEPER_LEGACY", "BIGWARROOM_ESPN", "BIGWARROOM_SLEEPER"
+        ]
+        
+        for key in additionalKeychainKeys {
+            let query: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "BigWarRoom_ESPN", 
+                kSecAttrAccount as String: key
+            ]
+            SecItemDelete(query as CFDictionary)
+        }
+        
         // Clear any other persisted data
-        let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players", "selectedESPNYear", "debugModeEnabled", "autoRefreshEnabled"]
+        let cacheKeys = ["cached_leagues", "cached_drafts", "cached_players", "selectedESPNYear", "debugModeEnabled", "autoRefreshEnabled", "ESPN_LEAGUE_IDS"]
         for key in cacheKeys {
             UserDefaults.standard.removeObject(forKey: key)
+        }
+        
+        // 🔥 DEBUG: Log the reset action
+        if AppConstants.debug {
+            print("🧹🧹🧹 FACTORY RESET COMPLETE:")
+            print("   - Cleared bundle domain: \(Bundle.main.bundleIdentifier ?? "unknown")")
+            print("   - Cleared ESPN Keychain entries")
+            print("   - Cleared Sleeper Keychain entries") 
+            print("   - Cleared additional Keychain entries")
+            print("   - Cleared UserDefaults cache keys")
         }
         
         clearResultMessage = "✅ Factory reset complete!\n\nALL data has been cleared. The app has been reset to factory defaults."
@@ -258,6 +288,67 @@ final class SettingsViewModel: ObservableObject {
     
     func dismissClearResult() {
         showingClearResult = false
+    }
+    
+    // MARK: - Default Connection
+    
+    func connectToDefaultServices() {
+        Task {
+            var espnSuccess = false
+            var sleeperSuccess = false
+            
+            // Connect ESPN if not already connected
+            if !espnCredentials.hasValidCredentials {
+                espnCredentials.saveCredentials(
+                    swid: AppConstants.SWID,
+                    espnS2: AppConstants.ESPN_S2,
+                    leagueIDs: AppConstants.ESPNLeagueID
+                )
+                espnSuccess = true
+            }
+            
+            // Connect Sleeper if not already connected
+            if !sleeperCredentials.hasValidCredentials {
+                sleeperCredentials.saveCredentials(
+                    username: AppConstants.SleeperUser,
+                    userID: AppConstants.GpSleeperID,
+                    season: "2025"
+                )
+                sleeperSuccess = true
+            }
+            
+            // Show success message
+            await MainActor.run {
+                var messages: [String] = []
+                
+                if espnSuccess {
+                    let leagueCount = AppConstants.ESPNLeagueID.count
+                    messages.append("✅ ESPN Fantasy: Connected • \(leagueCount) leagues")
+                }
+                
+                if sleeperSuccess {
+                    messages.append("✅ Sleeper Fantasy: Connected • @\(AppConstants.SleeperUser)")
+                }
+                
+                if messages.isEmpty {
+                    clearResultMessage = "ℹ️ You're already connected to both services!"
+                } else {
+                    clearResultMessage = "🎉 Default Connection Successful!\n\n" + messages.joined(separator: "\n\n")
+                }
+                
+                showingClearResult = true
+                
+                // Force UI refresh by triggering computed property updates
+                objectWillChange.send()
+            }
+        }
+    }
+    
+    // MARK: - Status Refresh
+    
+    func refreshConnectionStatus() {
+        // Force UI update by triggering objectWillChange
+        objectWillChange.send()
     }
 }
 

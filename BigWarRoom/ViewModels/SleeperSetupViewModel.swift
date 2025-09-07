@@ -59,7 +59,11 @@ final class SleeperSetupViewModel: ObservableObject {
         username = AppConstants.SleeperUser
         userID = AppConstants.GpSleeperID
         selectedSeason = "2025"
-        // xprint("🔧 Auto-filled with default Sleeper credentials")
+        
+        // 🔥 FIX: Auto-save when using default credentials
+        saveCredentials()
+        
+        // xprint("🔧 Auto-filled and saved default Sleeper credentials")
     }
     
     func saveCredentials() {

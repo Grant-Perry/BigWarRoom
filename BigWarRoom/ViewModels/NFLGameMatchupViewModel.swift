@@ -18,10 +18,15 @@ class NFLGameMatchupViewModel: ObservableObject {
     
     /// Configure the view model for a specific team
     func configure(for team: String, week: Int, year: Int = 2024) {
-        // Subscribe to game data updates
+        print("🔧 NFLGameMatchupViewModel: Configuring for team '\(team)'")
+        
+        // Subscribe to game data updates with team normalization
         gameDataService.$gameData
-            .map { gameData in
-                gameData[team.uppercased()]
+            .map { [weak self] gameData in
+                let normalizedTeam = self?.normalizeTeamAbbreviation(team.uppercased()) ?? team.uppercased()
+                let gameInfo = gameData[normalizedTeam]
+                print("🔧 NFLGameMatchupViewModel: '\(team)' -> '\(normalizedTeam)' | Found: \(gameInfo != nil)")
+                return gameInfo
             }
             .receive(on: DispatchQueue.main)
             .assign(to: \.gameInfo, on: self)
@@ -42,5 +47,16 @@ class NFLGameMatchupViewModel: ObservableObject {
     /// Refresh game data
     func refresh(week: Int, year: Int = 2024) {
         gameDataService.fetchGameData(forWeek: week, year: year, forceRefresh: true)
+    }
+    
+    /// Normalize team abbreviations to match ESPN's NFL API
+    private func normalizeTeamAbbreviation(_ team: String) -> String {
+        switch team.uppercased() {
+        case "WAS":
+            print("🔧 NFLGameMatchupViewModel: NORMALIZING WAS -> WSH")
+            return "WSH"  // ESPN uses WSH for Washington
+        default:
+            return team.uppercased()
+        }
     }
 }

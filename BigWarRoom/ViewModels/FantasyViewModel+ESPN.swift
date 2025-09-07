@@ -38,11 +38,11 @@ extension FantasyViewModel {
         URLSession.shared.dataTaskPublisher(for: request)
             .map(\.data)
             .handleEvents(receiveOutput: { data in
-                NSLog("📡 ESPN: Received \(data.count) bytes for \(leagueID)")
+                print("📡 ESPN: Received \(data.count) bytes for \(leagueID)")
                 
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let schedule = json["schedule"] as? [[String: Any]] {
-                    NSLog("📊 ESPN: \(leagueID) has \(schedule.count) total schedule entries")
+                    print("📊 ESPN: \(leagueID) has \(schedule.count) total schedule entries")
                     
                     let currentWeekEntries = schedule.filter { entry in
                         if let matchupPeriodId = entry["matchupPeriodId"] as? Int {
@@ -50,7 +50,23 @@ extension FantasyViewModel {
                         }
                         return false
                     }
-                    NSLog("🏈 ESPN: \(leagueID) has \(currentWeekEntries.count) entries for week \(week)")
+                    print("🏈 ESPN: \(leagueID) has \(currentWeekEntries.count) entries for week \(week)")
+                    
+                    // 🔍 FOCUSED DEBUG: Only show entries with missing/null away teams
+                    let problematicEntries = currentWeekEntries.filter { entry in
+                        if let away = entry["away"] {
+                            return away is NSNull
+                        } else {
+                            return true // missing away key
+                        }
+                    }
+                    
+                    if !problematicEntries.isEmpty {
+                        print("🚨 PROBLEMATIC ENTRIES (missing/null away teams):")
+                        for (index, entry) in problematicEntries.enumerated() {
+                            print("  Problem Entry \(index + 1): \(entry)")
+                        }
+                    }
                 }
             })
             .decode(type: ESPNFantasyLeagueModel.self, decoder: JSONDecoder())
@@ -165,7 +181,27 @@ extension FantasyViewModel {
         for scheduleEntry in weekSchedule {
             // Handle bye weeks
             guard let awayTeamEntry = scheduleEntry.away else {
-                NSLog("🛌 ESPN: Found bye week for team \(scheduleEntry.home.teamId)")
+                let homeTeamName = espnModel.teams.first { $0.id == scheduleEntry.home.teamId }?.name ?? "Unknown"
+                
+                print("🛌 ESPN: Found BYE for team \(scheduleEntry.home.teamId) (\(homeTeamName))")
+                print("🔍 RAW JSON for this BYE entry:")
+                
+                // Convert this specific schedule entry back to JSON for inspection
+                if let jsonData = try? JSONEncoder().encode(scheduleEntry),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print("   \(jsonString)")
+                } else {
+                    print("   Failed to serialize entry to JSON")
+                }
+                
+                // Check if this team appears as an away team in any other matchup
+                let appearsAsAway = weekSchedule.contains { otherEntry in
+                    otherEntry.away?.teamId == scheduleEntry.home.teamId
+                }
+                
+                if appearsAsAway {
+                    print("⚠️ DUPLICATE: Team \(scheduleEntry.home.teamId) ALSO appears as away team in another entry!")
+                }
                 
                 if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
                     let homeScore = homeTeam.activeRosterScore(for: week)
