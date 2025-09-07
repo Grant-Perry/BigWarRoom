@@ -16,10 +16,14 @@ import SwiftUI
 /// - Heartbeat-style scaling animations
 /// - Ultra-dramatic survival percentage display
 /// - Grayscale avatar treatment for impending doom
+/// - 🔥 NEW: Tap to view team roster
 struct CriticalCard: View {
     let ranking: FantasyTeamRanking
+    let leagueID: String? // 🔥 NEW: For roster navigation
+    let week: Int? // 🔥 NEW: For roster navigation
     @State private var deathPulse = false
     @State private var heartbeat = false
+    @State private var showTeamRoster = false // 🔥 NEW: Sheet state
     
     var body: some View {
         HStack(spacing: 16) {
@@ -141,6 +145,12 @@ struct CriticalCard: View {
                 
                 // Dramatic scoring status
                 dramaticScoringStatus
+                
+                // 🔥 NEW: Tap indicator
+                Text("👆 TAP FOR ROSTER")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.red.opacity(0.7))
+                    .tracking(1)
             }
         }
         .padding(.horizontal, 16)
@@ -155,6 +165,22 @@ struct CriticalCard: View {
                         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: deathPulse)
                 )
         )
+        // 🔥 NEW: Make entire card tappable
+        .onTapGesture {
+            if let leagueID = leagueID, let week = week {
+                showTeamRoster = true
+            }
+        }
+        // 🔥 NEW: Show roster sheet
+        .sheet(isPresented: $showTeamRoster) {
+            if let leagueID = leagueID, let week = week {
+                ChoppedTeamRosterView(
+                    teamRanking: ranking,
+                    leagueID: leagueID,
+                    week: week
+                )
+            }
+        }
     }
     
     // MARK: - Computed Properties

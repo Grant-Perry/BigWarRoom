@@ -423,6 +423,10 @@ struct FantasyPlayerCard: View {
     
     @State private var teamColor: Color = .gray
     @State private var nflPlayer: NFLPlayer?
+    @State private var glowIntensity: Double = 0.0
+    @StateObject private var gameViewModel = NFLGameMatchupViewModel()
+    @State private var currentWeek: Int = NFLWeekService.shared.currentWeek
+    @StateObject private var nflWeekService = NFLWeekService.shared
     var isActive: Bool = true
     
     // Computed positional ranking
@@ -433,6 +437,82 @@ struct FantasyPlayerCard: View {
         return fantasyViewModel.getPositionalRanking(for: player, in: matchup, teamIndex: teamIndex, isBench: isBench)
     }
     
+    // Simplified live detection with ESPN support
+    private var isPlayerLive: Bool {
+        // Method 1: Try NFLGameMatchupViewModel (works for some cases)
+        if let gameInfo = gameViewModel.gameInfo, gameInfo.isLive {
+            return true
+        }
+        
+        // Method 2: Check player.gameStatus (works for Sleeper)
+        if let gameStatus = player.gameStatus {
+            let timeString = gameStatus.timeString.lowercased()
+            
+            // Explicit FINAL check
+            if timeString.contains("final") || timeString.contains("bye") {
+                return false
+            }
+            
+            // Live indicators
+            if timeString.contains("live") || 
+               timeString.contains("quarter") || 
+               timeString.contains("halftime") ||
+               (timeString.contains(":") && timeString.count < 15) {
+                return true
+            }
+        }
+        
+        // Method 3: ESPN fallback - assume all non-FINAL games could be live during game time
+        // This is temporary until we figure out ESPN's data structure
+        return false // For now, default to false to see the debug output
+    }
+    
+    // Border colors based on live status
+    private var borderColors: [Color] {
+        if isPlayerLive {
+            // LIVE: Green animated border
+            return [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen]
+        } else {
+            // FINISHED: Team color border
+            return [teamColor]
+        }
+    }
+    
+    // Border width based on live status  
+    private var borderWidth: CGFloat {
+        if isPlayerLive {
+            return 6 // MUCH THICKER for live players
+        } else {
+            return 2 // THIN for finished players
+        }
+    }
+    
+    // Border opacity
+    private var borderOpacity: Double {
+        if isPlayerLive {
+            return max(0.8, glowIntensity * 0.9 + 0.3) // More prominent
+        } else {
+            return 0.7
+        }
+    }
+    
+    // Shadow properties for live players
+    private var shadowColor: Color {
+        if isPlayerLive {
+            return .gpGreen.opacity(0.8) // Dominant green shadow
+        } else {
+            return .clear
+        }
+    }
+    
+    private var shadowRadius: CGFloat {
+        if isPlayerLive {
+            return 15 // Large dominant shadow
+        } else {
+            return 0
+        }
+    }
+
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
@@ -468,7 +548,7 @@ struct FantasyPlayerCard: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 80, height: 80)
                             .offset(x: 20, y: -4)
-                            .opacity(0.6)
+                            .opacity(isPlayerLive ? 0.6 : 0.3) // Fade team logo for FINAL players
                             .shadow(color: obj.primaryColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     } else {
                         // Fallback to online logo
@@ -490,7 +570,7 @@ struct FantasyPlayerCard: View {
                         }
                         .frame(width: 80, height: 80)
                         .offset(x: 20, y: -4)
-                        .opacity(0.6)
+                        .opacity(isPlayerLive ? 0.6 : 0.3) // Fade team logo for FINAL players
                         .shadow(color: teamColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     }
                 }
@@ -508,6 +588,7 @@ struct FantasyPlayerCard: View {
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 95, height: 95)
                                 .clipped()
+                                .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
                         case .failure:
                             // FIXED: Fallback to ESPN headshot for ESPN players
                             if let espnURL = player.espnHeadshotURL {
@@ -519,6 +600,7 @@ struct FantasyPlayerCard: View {
                                             .aspectRatio(contentMode: .fill)
                                             .frame(width: 95, height: 95)
                                             .clipped()
+                                            .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
                                     default:
                                         // Final fallback: player icon with team colors
                                         ZStack {
@@ -530,6 +612,7 @@ struct FantasyPlayerCard: View {
                                                 .font(.system(size: 24, weight: .bold))
                                                 .foregroundColor(.white)
                                         }
+                                        .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
                                     }
                                 }
                             } else {
@@ -543,6 +626,7 @@ struct FantasyPlayerCard: View {
                                         .font(.system(size: 24, weight: .bold))
                                         .foregroundColor(.white)
                                 }
+                                .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
                             }
                         @unknown default:
                             EmptyView()
@@ -562,12 +646,13 @@ struct FantasyPlayerCard: View {
                         HStack(alignment: .bottom, spacing: 4) {
                             Spacer()
                             Text(player.currentPointsString)
-							  .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 18, weight: .bold))
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                                 .scaledToFit()
+                                .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.1 : 1.0) : 1.0)
                         }
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .offset(y: -9)
@@ -605,13 +690,38 @@ struct FantasyPlayerCard: View {
             .background(
                 RoundedRectangle(cornerRadius: 15)
                     .fill(Color.black)
-                    .shadow(color: isActive ? .gpGreen.opacity(0.5) : .clear, radius: 10)
+                    .shadow(
+                        color: shadowColor,
+                        radius: shadowRadius,
+                        x: 0,
+                        y: 0
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
-                    .stroke(teamColor.opacity(0.4), lineWidth: 2)
+                    .stroke(
+                        LinearGradient(
+                            colors: borderColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: borderWidth
+                    )
+                    .opacity(borderOpacity)
+                    .shadow(
+                        color: shadowColor,
+                        radius: shadowRadius * 0.5,
+                        x: 0,
+                        y: 0
+                    )
             )
             .clipShape(RoundedRectangle(cornerRadius: 15))
+            .onAppear {
+                setupGameData()
+                if isPlayerLive {
+                    startLiveAnimations()
+                }
+            }
         }
         .task {
             // FIXED: Set team color based on NFL team (works for ESPN and Sleeper)
@@ -628,6 +738,27 @@ struct FantasyPlayerCard: View {
                 // xprint("⚠️ Player \(player.fullName) has no team assigned")
             }
         }
+    }
+    
+    // MARK: -> Live Animations
+    
+    private func startLiveAnimations() {
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+            glowIntensity = 0.8
+        }
+    }
+    
+    // MARK: -> Game Data Setup (same as FantasyGameMatchupView)
+    
+    private func setupGameData() {
+        guard let team = player.team else { return }
+        
+        // Use NFL Week Service for accurate week
+        currentWeek = nflWeekService.currentWeek
+        let currentYear = nflWeekService.currentYear
+        
+        // Configure view model for this player's team
+        gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
     }
 }
 

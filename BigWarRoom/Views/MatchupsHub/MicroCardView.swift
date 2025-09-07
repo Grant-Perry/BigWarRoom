@@ -16,10 +16,15 @@ struct MicroCardView: View {
     let scoreColor: Color
     let percentage: String
     let borderColors: [Color]
+    let borderWidth: CGFloat
+    let borderOpacity: Double
     let shouldPulse: Bool
+    let shadowColor: Color
+    let shadowRadius: CGFloat
     let onTap: () -> Void
     
     @State private var pulseOpacity: Double = 0.3
+    @State private var glowIntensity: Double = 0.0
     
     var body: some View {
         Button(action: onTap) {
@@ -96,10 +101,16 @@ struct MicroCardView: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: 2
+                                lineWidth: borderWidth
                             )
-                            .opacity(shouldPulse ? pulseOpacity : 0.6)
+                            .opacity(shouldPulse ? pulseOpacity : borderOpacity)
                     )
+            )
+            .shadow(
+                color: shadowColor,
+                radius: shadowRadius,
+                x: 0,
+                y: 2
             )
         }
         .buttonStyle(PlainButtonStyle())
@@ -113,6 +124,7 @@ struct MicroCardView: View {
     private func startPulseAnimation() {
         withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
             pulseOpacity = 0.8
+            glowIntensity = 0.8
         }
     }
 }

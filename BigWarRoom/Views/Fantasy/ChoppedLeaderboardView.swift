@@ -16,15 +16,18 @@ import SwiftUI
 /// - Extracted components in separate files
 /// - Clean separation of business logic and presentation
 /// - DRY principles throughout
+/// - 🔥 NEW: Tappable team cards to view rosters
 struct ChoppedLeaderboardView: View {
     @StateObject private var viewModel: ChoppedLeaderboardViewModel
+    let leagueID: String // 🔥 NEW: Pass league ID for roster navigation
     
     // MARK: - Initialization
-    init(choppedSummary: ChoppedWeekSummary, leagueName: String) {
+    init(choppedSummary: ChoppedWeekSummary, leagueName: String, leagueID: String) {
         self._viewModel = StateObject(wrappedValue: ChoppedLeaderboardViewModel(
             choppedSummary: choppedSummary,
             leagueName: leagueName
         ))
+        self.leagueID = leagueID // 🔥 NEW: Store league ID
     }
     
     var body: some View {
@@ -292,8 +295,12 @@ struct ChoppedLeaderboardView: View {
                     .font(.system(size: 24))
             }
             
-            // Champion card
-            ChampionCard(ranking: champion)
+            // Champion card with tap functionality
+            ChampionCard(
+                ranking: champion,
+                leagueID: leagueID, // 🔥 NEW: Pass league ID
+                week: viewModel.choppedSummary.week // 🔥 NEW: Pass week
+            )
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 20)
@@ -331,9 +338,13 @@ struct ChoppedLeaderboardView: View {
                 .foregroundColor(.gray)
                 .frame(maxWidth: .infinity, alignment: .center)
             
-            // Danger zone teams
+            // Death zone teams with tap functionality
             ForEach(viewModel.choppedSummary.dangerZoneTeams) { ranking in
-                DangerZoneCard(ranking: ranking)
+                DangerZoneCard(
+                    ranking: ranking,
+                    leagueID: leagueID, // 🔥 NEW: Pass league ID
+                    week: viewModel.choppedSummary.week // 🔥 NEW: Pass week
+                )
             }
         }
         .padding(.horizontal, 20)
@@ -378,9 +389,13 @@ struct ChoppedLeaderboardView: View {
                     .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true).delay(0.3), value: viewModel.pulseAnimation)
             }
             
-            // Critical teams
+            // Critical teams with tap functionality
             ForEach(viewModel.choppedSummary.criticalTeams) { ranking in
-                CriticalCard(ranking: ranking)
+                CriticalCard(
+                    ranking: ranking,
+                    leagueID: leagueID, // 🔥 NEW: Pass league ID
+                    week: viewModel.choppedSummary.week // 🔥 NEW: Pass week
+                )
             }
             
             // Elimination ceremony button
@@ -447,8 +462,13 @@ struct ChoppedLeaderboardView: View {
                 .foregroundColor(.gray)
                 .frame(maxWidth: .infinity, alignment: .leading)
             
+            // Teams with tap functionality
             ForEach(teams) { ranking in
-                SurvivalCard(ranking: ranking)
+                SurvivalCard(
+                    ranking: ranking,
+                    leagueID: leagueID, // 🔥 NEW: Pass league ID
+                    week: viewModel.choppedSummary.week // 🔥 NEW: Pass week
+                )
             }
         }
         .padding(.horizontal, 20)

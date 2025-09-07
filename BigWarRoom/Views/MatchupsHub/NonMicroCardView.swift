@@ -29,7 +29,8 @@ struct NonMicroCardView: View {
                 cardScale = 1.0
             }
             
-            if matchup.fantasyMatchup?.status == .live {
+            // FIXED: Use roster-based live detection instead of matchup status
+            if isRosterBasedLive {
                 startLiveAnimations()
             }
         }
@@ -351,9 +352,9 @@ struct NonMicroCardView: View {
             }
             return [.orange, .orange.opacity(0.7), .orange]
         } else if isLiveGame {
-            return [.gpGreen, .blue, .gpGreen]
+            return [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen]
         } else {
-            return [.gray.opacity(0.3), .gray.opacity(0.1), .gray.opacity(0.3)]
+            return [.blue.opacity(0.6), .cyan.opacity(0.4), .blue.opacity(0.6)]
         }
     }
     
@@ -363,7 +364,7 @@ struct NonMicroCardView: View {
         } else if isLiveGame {
             return 2
         } else {
-            return 1
+            return 1.5  // FIXED: Slightly thicker border for regular matchups
         }
     }
     
@@ -371,9 +372,10 @@ struct NonMicroCardView: View {
         if matchup.isChoppedLeague {
             return 0.9
         } else if isLiveGame {
-            return (glowIntensity * 0.8 + 0.2)
+            // FIXED: Ensure live borders are always visible with minimum opacity
+            return max(0.6, glowIntensity * 0.8 + 0.2)
         } else {
-            return 0.3
+            return 0.7
         }
     }
     
@@ -485,40 +487,59 @@ struct NonMicroCardView: View {
     // MARK: -> Roster-Based Live Detection
     
     private var isRosterBasedLive: Bool {
-        guard let myTeam = matchup.myTeam else { return false }
-        
-        let starters = myTeam.roster.filter { $0.isStarter }
-        
-        return starters.contains { player in
-            isPlayerInLiveGame(player)
+        guard let myTeam = matchup.myTeam else { 
+            return false 
         }
+        
+        // Check both my team AND opponent team for live players
+        let allPlayers = myTeam.roster + (matchup.opponentTeam?.roster ?? [])
+        let starters = allPlayers.filter { $0.isStarter }
+        
+        let livePlayersCount = starters.filter { player in
+            isPlayerInLiveGame(player)
+        }.count
+        
+        return livePlayersCount > 0
     }
     
     private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        guard let gameStatus = player.gameStatus else { return false }
+        guard let gameStatus = player.gameStatus else { 
+            return false 
+        }
         
         let timeString = gameStatus.timeString.lowercased()
         
-        let quarterPatterns = [
-            "1st ", "2nd ", "3rd ", "4th ", "ot ", "overtime"
+        // ULTRA PERMISSIVE LIVE DETECTION - if there's ANY indication of activity, consider it live
+        
+        // 1. Direct live indicators
+        let directLivePatterns = [
+            "live", "1st", "2nd", "3rd", "4th", "ot", "overtime", 
+            "quarter", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"
         ]
         
-        for pattern in quarterPatterns {
+        for pattern in directLivePatterns {
             if timeString.contains(pattern) {
-                if timeString.contains(":") && timeString.contains(pattern) {
-                    return true
-                }
+                return true
             }
         }
         
-        let liveStatusIndicators = [
-            "live", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"
-        ]
+        // 2. Time patterns (any colon suggests active timing)
+        if timeString.contains(":") && !timeString.contains("final") && !timeString.contains("bye") {
+            return true
+        }
         
-        for indicator in liveStatusIndicators {
-            if timeString.contains(indicator) {
-                return true
-            }
+        // 3. Score patterns (if there are numbers, might be live)
+        let hasNumbers = timeString.rangeOfCharacter(from: .decimalDigits) != nil
+        if hasNumbers && !timeString.contains("final") && !timeString.contains("bye") && timeString != "" {
+            return true
+        }
+        
+        // 4. Non-conclusive states (anything that's not explicitly finished/bye)
+        let nonLiveIndicators = ["final", "bye", "postponed", "canceled"]
+        let isDefinitelyNotLive = nonLiveIndicators.contains { timeString.contains($0) }
+        
+        if !isDefinitelyNotLive && !timeString.isEmpty {
+            return true
         }
         
         return false

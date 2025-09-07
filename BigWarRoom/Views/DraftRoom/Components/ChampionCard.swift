@@ -15,8 +15,12 @@ import SwiftUI
 /// - Team avatar with golden glow effect
 /// - Survival stats and points display
 /// - Gradient backgrounds and borders
+/// - 🔥 NEW: Tap to view team roster
 struct ChampionCard: View {
     let ranking: FantasyTeamRanking
+    let leagueID: String? // 🔥 NEW: For roster navigation
+    let week: Int? // 🔥 NEW: For roster navigation
+    @State private var showTeamRoster = false // 🔥 NEW: Sheet state
     
     var body: some View {
         VStack(spacing: 12) {
@@ -101,6 +105,12 @@ struct ChampionCard: View {
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.gray)
                         .tracking(1)
+                    
+                    // 🔥 NEW: Tap indicator
+                    Text("👆 TAP")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.yellow.opacity(0.7))
+                        .tracking(1)
                 }
                 .frame(minWidth: 60)
             }
@@ -131,6 +141,22 @@ struct ChampionCard: View {
                         )
                 )
         )
+        // 🔥 NEW: Make entire card tappable
+        .onTapGesture {
+            if let leagueID = leagueID, let week = week {
+                showTeamRoster = true
+            }
+        }
+        // 🔥 NEW: Show roster sheet
+        .sheet(isPresented: $showTeamRoster) {
+            if let leagueID = leagueID, let week = week {
+                ChoppedTeamRosterView(
+                    teamRanking: ranking,
+                    leagueID: leagueID,
+                    week: week
+                )
+            }
+        }
     }
     
     private var teamAvatar: some View {

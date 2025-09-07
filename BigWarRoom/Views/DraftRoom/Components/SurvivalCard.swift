@@ -15,8 +15,12 @@ import SwiftUI
 /// - Elimination status with color coding
 /// - Survival percentage display (Sleeper-style)
 /// - Current vs projected scoring indicators
+/// - 🔥 NEW: Tap to view team roster
 struct SurvivalCard: View {
     let ranking: FantasyTeamRanking
+    let leagueID: String? // 🔥 NEW: For roster navigation
+    let week: Int? // 🔥 NEW: For roster navigation
+    @State private var showTeamRoster = false // 🔥 NEW: Sheet state
     
     var body: some View {
         HStack(spacing: 16) {
@@ -101,6 +105,12 @@ struct SurvivalCard: View {
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.cyan)
                 }
+                
+                // 🔥 NEW: Tap indicator
+                Text("👆 TAP")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.gray.opacity(0.7))
+                    .tracking(1)
             }
         }
         .padding(.horizontal, 16)
@@ -113,6 +123,22 @@ struct SurvivalCard: View {
                         .stroke(ranking.eliminationStatus.color.opacity(0.3), lineWidth: 1)
                 )
         )
+        // 🔥 NEW: Make entire card tappable
+        .onTapGesture {
+            if let leagueID = leagueID, let week = week {
+                showTeamRoster = true
+            }
+        }
+        // 🔥 NEW: Show roster sheet
+        .sheet(isPresented: $showTeamRoster) {
+            if let leagueID = leagueID, let week = week {
+                ChoppedTeamRosterView(
+                    teamRanking: ranking,
+                    leagueID: leagueID,
+                    week: week
+                )
+            }
+        }
     }
     
     // MARK: - Computed Properties

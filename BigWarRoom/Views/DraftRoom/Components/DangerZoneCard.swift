@@ -15,9 +15,13 @@ import SwiftUI
 /// - Orange warning glow effects
 /// - Safety margin indicators
 /// - Animated survival percentage display
+/// - 🔥 NEW: Tap to view team roster
 struct DangerZoneCard: View {
     let ranking: FantasyTeamRanking
+    let leagueID: String? // 🔥 NEW: For roster navigation
+    let week: Int? // 🔥 NEW: For roster navigation
     @State private var warningPulse = false
+    @State private var showTeamRoster = false // 🔥 NEW: Sheet state
     
     var body: some View {
         HStack(spacing: 16) {
@@ -100,6 +104,12 @@ struct DangerZoneCard: View {
                 
                 // Show current vs projected status
                 scoringStatusText
+                
+                // 🔥 NEW: Tap indicator
+                Text("👆 TAP")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.orange.opacity(0.7))
+                    .tracking(1)
             }
         }
         .padding(.horizontal, 16)
@@ -113,6 +123,22 @@ struct DangerZoneCard: View {
                         .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
                 )
         )
+        // 🔥 NEW: Make entire card tappable
+        .onTapGesture {
+            if let leagueID = leagueID, let week = week {
+                showTeamRoster = true
+            }
+        }
+        // 🔥 NEW: Show roster sheet
+        .sheet(isPresented: $showTeamRoster) {
+            if let leagueID = leagueID, let week = week {
+                ChoppedTeamRosterView(
+                    teamRanking: ranking,
+                    leagueID: leagueID,
+                    week: week
+                )
+            }
+        }
     }
     
     // MARK: - Computed Properties

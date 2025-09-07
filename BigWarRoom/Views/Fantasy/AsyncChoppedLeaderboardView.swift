@@ -31,7 +31,8 @@ struct AsyncChoppedLeaderboardView: View {
             } else if let choppedSummary = fantasyViewModel.currentChoppedSummary {
                 ChoppedLeaderboardView(
                     choppedSummary: choppedSummary,
-                    leagueName: leagueWrapper.league.name
+                    leagueName: leagueWrapper.league.name,
+                    leagueID: leagueWrapper.league.leagueID // 🔥 NEW: Pass league ID for roster navigation
                 )
                 
             } else {

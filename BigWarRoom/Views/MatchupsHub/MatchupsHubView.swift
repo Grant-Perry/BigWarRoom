@@ -18,6 +18,9 @@ struct MatchupsHubView: View {
    @State private var microMode = false
    @State private var expandedCardId: String? = nil
    
+   // MARK: -> Battles Section State
+   @State private var battlesMinimized = false
+   
 	  // MARK: -> Sorting States
    @State private var sortByWinning = true // true = Win (highest scores first), false = Lose (lowest scores first)
    
@@ -25,6 +28,10 @@ struct MatchupsHubView: View {
    @State private var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
    @State private var countdownTimer: Timer?
    
+   // MARK: -> Week Picker States
+   @State private var selectedWeek: Int = NFLWeekService.shared.currentWeek
+   @State private var showingWeekPicker = false
+
    var body: some View {
 	  NavigationView {
 		 ZStack {
@@ -61,7 +68,8 @@ struct MatchupsHubView: View {
 			if let choppedSummary = matchup.choppedSummary {
 			   ChoppedLeaderboardView(
 				  choppedSummary: choppedSummary,
-				  leagueName: matchup.league.league.name
+				  leagueName: matchup.league.league.name,
+				  leagueID: matchup.league.league.leagueID // 🔥 NEW: Pass league ID for roster navigation
 			   )
 			}
 		 } else if let fantasyMatchup = matchup.fantasyMatchup {
@@ -76,6 +84,25 @@ struct MatchupsHubView: View {
 	  }
 	  .sheet(isPresented: $showingSettings) {
 		 AppSettingsView()
+	  }
+	  .sheet(isPresented: $showingWeekPicker) {
+		 ESPNDraftPickSelectionSheet.forFantasy(
+			leagueName: "Mission Control",
+			currentWeek: NFLWeekService.shared.currentWeek,
+			selectedWeek: $selectedWeek,
+			onConfirm: { week in
+			   onWeekSelected(week)
+			   showingWeekPicker = false
+			},
+			onCancel: {
+			   showingWeekPicker = false
+			}
+		 )
+	  }
+	  .onChange(of: selectedWeek) { oldValue, newValue in
+		 if oldValue != newValue {
+			onWeekSelected(newValue)
+		 }
 	  }
    }
    
@@ -427,11 +454,17 @@ struct MatchupsHubView: View {
 			color: .gpGreen
 		 )
 		 
-		 statCard(
-			value: "WEEK \(currentNFLWeek)",
-			label: "ACTIVE",
-			color: .blue
-		 )
+		 // Make the week stat card tappable to show week picker
+		 Button(action: {
+			showWeekPicker()
+		 }) {
+			statCard(
+			   value: "WEEK \(selectedWeek)",
+			   label: "ACTIVE",
+			   color: .blue
+			)
+		 }
+		 .buttonStyle(PlainButtonStyle())
 		 
 		 statCard(
 			value: "\(connectedLeaguesCount)",
@@ -511,8 +544,20 @@ struct MatchupsHubView: View {
 	  VStack(spacing: 20) {
 			// This HStack will contain the title and the micro toggle on the same line
 		 HStack {
-			   // Group the icon and title text
+			   // Group the icon and title text with minimize button
 			HStack(spacing: 8) {
+			   Button(action: {
+				  withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+					 battlesMinimized.toggle()
+				  }
+			   }) {
+				  Image(systemName: battlesMinimized ? "chevron.right" : "chevron.down")
+					 .font(.system(size: 14, weight: .bold))
+					 .foregroundColor(.white)
+					 .frame(width: 20, height: 20)
+			   }
+			   .buttonStyle(PlainButtonStyle())
+			   
 			   Image(systemName: "sword.crossed")
 				  .font(.system(size: 16, weight: .bold))
 				  .foregroundColor(.white)
@@ -526,32 +571,98 @@ struct MatchupsHubView: View {
 			
 			   // This HStack holds the "Micro:" text and the toggle.
 			   // By placing it after the Spacer, it will align to the trailing edge.
-			HStack(spacing: 4) {
-			   Text("Just me mode:")
-				  .font(.system(size: 14, weight: .bold))
-				  .foregroundColor(.gray)
-			   
-			   Toggle("", isOn: $microMode)
-				  .labelsHidden()
-				  .toggleStyle(SwitchToggleStyle(tint: .gpGreen))
-				  .scaleEffect(0.9)
-				  .onChange(of: microMode) { oldValue, newValue in
-					 withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
-						expandedCardId = nil
+			if !battlesMinimized {
+			   HStack(spacing: 4) {
+				  Text("Just me mode:")
+					 .font(.system(size: 14, weight: .bold))
+					 .foregroundColor(.gray)
+				  
+				  Toggle("", isOn: $microMode)
+					 .labelsHidden()
+					 .toggleStyle(SwitchToggleStyle(tint: .gpGreen))
+					 .scaleEffect(0.9)
+					 .onChange(of: microMode) { oldValue, newValue in
+						withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
+						   expandedCardId = nil
+						}
 					 }
-				  }
+			   }
 			}
 		 }
 		 .padding(.horizontal, 20)
 		 
-			// The poweredByBranding view should be placed here,
-			// directly below the main header HStack.
-		 poweredByBranding
+		 if !battlesMinimized {
+			   // The poweredByBranding view should be placed here,
+			   // directly below the main header HStack.
+			poweredByBranding
+			
+			   // Sort by toggle and matchup cards grid follow
+			sortByToggle
+			
+			matchupCardsGrid
+		 } else {
+			   // Minimized state - show summary
+			minimizedBattlesSummary
+		 }
+	  }
+   }
+   
+   private var minimizedBattlesSummary: some View {
+	  HStack {
+		 HStack(spacing: 16) {
+			   // Quick stats
+			HStack(spacing: 12) {
+			   VStack(alignment: .leading, spacing: 2) {
+				  Text("\(viewModel.myMatchups.count)")
+					 .font(.system(size: 16, weight: .black))
+					 .foregroundColor(.gpGreen)
+				  Text("Battles")
+					 .font(.system(size: 10, weight: .medium))
+					 .foregroundColor(.gray)
+			   }
+			   
+			   VStack(alignment: .leading, spacing: 2) {
+				  Text("\(liveMatchupsCount)")
+					 .font(.system(size: 16, weight: .black))
+					 .foregroundColor(.blue)
+				  Text("Live")
+					 .font(.system(size: 10, weight: .medium))
+					 .foregroundColor(.gray)
+			   }
+			   
+			   VStack(alignment: .leading, spacing: 2) {
+				  let winningCount = sortedMatchups.filter { getWinningStatusForMatchup($0) }.count
+				  Text("\(winningCount)")
+					 .font(.system(size: 16, weight: .black))
+					 .foregroundColor(.gpGreen)
+				  Text("Winning")
+					 .font(.system(size: 10, weight: .medium))
+					 .foregroundColor(.gray)
+			   }
+			}
 		 
-			// Sort by toggle and matchup cards grid follow
-		 sortByToggle
+		 Spacer()
 		 
-		 matchupCardsGrid
+		 Text("Tap to expand")
+			.font(.system(size: 12, weight: .medium))
+			.foregroundColor(.gray.opacity(0.7))
+		 }
+	  }
+	  .padding(.horizontal, 20)
+	  .padding(.vertical, 12)
+	  .background(
+		 RoundedRectangle(cornerRadius: 8)
+			.fill(Color.black.opacity(0.3))
+			.overlay(
+			   RoundedRectangle(cornerRadius: 8)
+				  .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+			)
+	  )
+	  .padding(.horizontal, 20)
+	  .onTapGesture {
+		 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+			battlesMinimized = false
+		 }
 	  }
    }
    
@@ -572,7 +683,18 @@ struct MatchupsHubView: View {
 		 spacing: microMode ? 8 : 16
 	  ) {
 		 ForEach(sortedMatchups, id: \.id) { matchup in
-			microCardView(for: matchup)
+			MatchupCardViewBuilder(
+			   matchup: matchup,
+			   microMode: microMode,
+			   expandedCardId: expandedCardId,
+			   isWinning: getWinningStatusForMatchup(matchup),
+			   onShowDetail: {
+				  showingMatchupDetail = matchup
+			   },
+			   onMicroCardTap: { cardId in
+				  handleMicroCardTap(cardId)
+			   }
+			)
 		 }
 	  }
 	  .padding(.horizontal, 20)
@@ -621,55 +743,6 @@ struct MatchupsHubView: View {
 			}
 		 }
 	  )
-   }
-   
-   @ViewBuilder
-   private func microCardView(for matchup: UnifiedMatchup) -> some View {
-	  let isExpanded = expandedCardId == matchup.id
-	  let shouldShowMicro = microMode && !isExpanded
-	  let isWinning = getWinningStatusForMatchup(matchup)
-	  
-		 // FIXED LOGIC: Always show micro cards in micro mode, use overlay for expansion
-	  if microMode {
-			// Prepare all data for DUMB micro card
-		 let myTeam = matchup.myTeam
-		 let leagueName = matchup.league.league.name
-		 let avatarURL = myTeam?.avatar
-		 let managerName = myTeam?.ownerName ?? "Unknown"
-		 let score = myTeam?.currentScoreString ?? "0.0"
-		 let scoreColor = isWinning ? Color.gpGreen : Color.gpRedPink
-		 let percentage = calculateWinPercentageString(for: matchup)
-		 let isLive = isMatchupLive(matchup)
-		 let borderColors = isLive ? [Color.gpGreen, Color.blue, Color.gpGreen] : [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
-		 
-		 MicroCardView(
-			leagueName: leagueName,
-			avatarURL: avatarURL,
-			managerName: managerName,
-			score: score,
-			scoreColor: scoreColor,
-			percentage: percentage,
-			borderColors: borderColors,
-			shouldPulse: isLive
-		 ) {
-			if matchup.isChoppedLeague {
-			   showingMatchupDetail = matchup
-			} else {
-			   handleMicroCardTap(matchup.id)
-			}
-		 }
-		 .frame(height: 120)
-		 .padding(.bottom, 8)
-	  } else {
-			// Normal mode - show non-micro card
-		 NonMicroCardView(
-			matchup: matchup,
-			isWinning: isWinning
-		 ) {
-			showingMatchupDetail = matchup
-		 }
-		 .padding(.bottom, 44)
-	  }
    }
    
    private var poweredByBranding: some View {
@@ -788,11 +861,21 @@ struct MatchupsHubView: View {
    }
    
    private var liveMatchupsCount: Int {
-	  viewModel.myMatchups.filter { $0.fantasyMatchup?.status == .live }.count
+	  sortedMatchups.filter { matchup in
+		 if matchup.isChoppedLeague {
+			return false // Chopped leagues aren't "live" in the same sense
+		 }
+		 
+		 guard let myTeam = matchup.myTeam else { return false }
+		 let starters = myTeam.roster.filter { $0.isStarter }
+		 return starters.contains { player in
+			isPlayerInLiveGame(player)
+		 }
+	  }.count
    }
    
    private var currentNFLWeek: Int {
-	  return NFLWeekService.shared.currentWeek
+	  return selectedWeek // Use selected week instead of current NFL week
    }
    
    private var connectedLeaguesCount: Int {
@@ -803,7 +886,14 @@ struct MatchupsHubView: View {
    
    private func loadInitialData() {
 	  Task {
-		 await viewModel.loadAllMatchups()
+		 // Load data for the initially selected week
+		 if selectedWeek != NFLWeekService.shared.currentWeek {
+			// If a different week is selected, load that specific week
+			await viewModel.loadMatchupsForWeek(selectedWeek)
+		 } else {
+			// If current week is selected, use the normal load method
+			await viewModel.loadAllMatchups()
+		 }
 	  }
    }
    
@@ -922,8 +1012,8 @@ struct MatchupsHubView: View {
    private func getWinningStatusForMatchup(_ matchup: UnifiedMatchup) -> Bool {
 	  if matchup.isChoppedLeague {
 			// For chopped leagues, check if we're in good status
-		 guard let ranking = matchup.myTeamRanking else { return false }
-		 return ranking.eliminationStatus == .champion || ranking.eliminationStatus == .safe
+		 guard let teamRanking = matchup.myTeamRanking else { return false }
+		 return teamRanking.eliminationStatus == .champion || teamRanking.eliminationStatus == .safe
 	  } else {
 			// For regular matchups - EXACT same logic as MatchupCardView
 		 guard let myTeam = matchup.myTeam, 
@@ -1010,6 +1100,25 @@ struct MatchupsHubView: View {
 	  } else {
 			// I'm the away team
 		 return (false, awayTeam, homeTeam)
+	  }
+   }
+   
+   // MARK: -> Week Picker Actions
+   
+   private func showWeekPicker() {
+	  // Haptic feedback
+	  let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+	  impactFeedback.impactOccurred()
+	  
+	  showingWeekPicker = true
+   }
+   
+   private func onWeekSelected(_ week: Int) {
+	  selectedWeek = week
+	  
+	  // Refresh data for the new week
+	  Task {
+		 await viewModel.loadMatchupsForWeek(week)
 	  }
    }
 }

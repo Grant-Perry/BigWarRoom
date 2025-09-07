@@ -179,7 +179,8 @@ struct FantasyMatchupListView: View {
             return AnyView(
                 ChoppedLeaderboardView(
                     choppedSummary: choppedSummary,
-                    leagueName: viewModel.selectedLeague?.league.name ?? "Chopped League"
+                    leagueName: viewModel.selectedLeague?.league.name ?? "Chopped League",
+                    leagueID: viewModel.selectedLeague?.league.leagueID ?? "" // 🔥 NEW: Pass league ID
                 )
             )
         }
