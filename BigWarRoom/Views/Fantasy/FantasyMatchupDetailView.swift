@@ -429,7 +429,9 @@ struct FantasyPlayerCard: View {
     @StateObject private var nflWeekService = NFLWeekService.shared
     var isActive: Bool = true
     
-    // Computed positional ranking
+    @State private var showingPlayerDetail = false
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    
     private var positionalRanking: String {
         guard let matchup = matchup, let teamIndex = teamIndex else {
             return player.position.uppercased()
@@ -437,45 +439,37 @@ struct FantasyPlayerCard: View {
         return fantasyViewModel.getPositionalRanking(for: player, in: matchup, teamIndex: teamIndex, isBench: isBench)
     }
     
-    // MARK: -> Simplified live detection using centralized logic
     private var isPlayerLive: Bool {
-        // Use the centralized FantasyPlayer.isLive property
         return player.isLive
     }
     
-    // Border colors based on live status
     private var borderColors: [Color] {
         if isPlayerLive {
-            // LIVE: Green animated border
             return [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen]
         } else {
-            // FINISHED: Team color border
             return [teamColor]
         }
     }
     
-    // Border width based on live status  
     private var borderWidth: CGFloat {
         if isPlayerLive {
-            return 6 // MUCH THICKER for live players
+            return 6
         } else {
-            return 2 // THIN for finished players
+            return 2
         }
     }
     
-    // Border opacity
     private var borderOpacity: Double {
         if isPlayerLive {
-            return max(0.8, glowIntensity * 0.9 + 0.3) // More prominent
+            return max(0.8, glowIntensity * 0.9 + 0.3)
         } else {
             return 0.7
         }
     }
     
-    // Shadow properties for live players
     private var shadowColor: Color {
         if isPlayerLive {
-            return .gpGreen.opacity(0.8) // Dominant green shadow
+            return .gpGreen.opacity(0.8)
         } else {
             return .clear
         }
@@ -483,7 +477,7 @@ struct FantasyPlayerCard: View {
     
     private var shadowRadius: CGFloat {
         if isPlayerLive {
-            return 15 // Large dominant shadow
+            return 15
         } else {
             return 0
         }
@@ -516,7 +510,6 @@ struct FantasyPlayerCard: View {
                         )
                     )
                 
-                // Team logo (local asset if available)
                 if let team = player.team, let obj = NFLTeam.team(for: team) {
                     if let image = UIImage(named: obj.logoAssetName) {
                         Image(uiImage: image)
@@ -524,10 +517,9 @@ struct FantasyPlayerCard: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 80, height: 80)
                             .offset(x: 20, y: -4)
-                            .opacity(isPlayerLive ? 0.6 : 0.3) // Fade team logo for FINAL players
+                            .opacity(isPlayerLive ? 0.6 : 0.3)
                             .shadow(color: obj.primaryColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     } else {
-                        // Fallback to online logo
                         AsyncImage(url: URL(string: "https://a.espncdn.com/i/teamlogos/nfl/500/\(team.lowercased()).png")) { phase in
                             switch phase {
                             case .empty:
@@ -546,13 +538,12 @@ struct FantasyPlayerCard: View {
                         }
                         .frame(width: 80, height: 80)
                         .offset(x: 20, y: -4)
-                        .opacity(isPlayerLive ? 0.6 : 0.3) // Fade team logo for FINAL players
+                        .opacity(isPlayerLive ? 0.6 : 0.3)
                         .shadow(color: teamColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     }
                 }
                 
                 HStack(spacing: 12) {
-                    // FIXED: Player headshot with multiple fallbacks for ESPN players
                     AsyncImage(url: player.headshotURL) { phase in
                         switch phase {
                         case .empty:
@@ -564,9 +555,8 @@ struct FantasyPlayerCard: View {
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 95, height: 95)
                                 .clipped()
-                                .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
+                                .opacity(isPlayerLive ? 1.0 : 0.5)
                         case .failure:
-                            // FIXED: Fallback to ESPN headshot for ESPN players
                             if let espnURL = player.espnHeadshotURL {
                                 AsyncImage(url: espnURL) { phase2 in
                                     switch phase2 {
@@ -576,9 +566,8 @@ struct FantasyPlayerCard: View {
                                             .aspectRatio(contentMode: .fill)
                                             .frame(width: 95, height: 95)
                                             .clipped()
-                                            .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
+                                            .opacity(isPlayerLive ? 1.0 : 0.5)
                                     default:
-                                        // Final fallback: player icon with team colors
                                         ZStack {
                                             Circle()
                                                 .fill(teamColor.opacity(0.8))
@@ -588,11 +577,10 @@ struct FantasyPlayerCard: View {
                                                 .font(.system(size: 24, weight: .bold))
                                                 .foregroundColor(.white)
                                         }
-                                        .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
+                                        .opacity(isPlayerLive ? 1.0 : 0.5)
                                     }
                                 }
                             } else {
-                                // Final fallback: player icon with team colors
                                 ZStack {
                                     Circle()
                                         .fill(teamColor.opacity(0.8))
@@ -602,7 +590,7 @@ struct FantasyPlayerCard: View {
                                         .font(.system(size: 24, weight: .bold))
                                         .foregroundColor(.white)
                                 }
-                                .opacity(isPlayerLive ? 1.0 : 0.5) // Fade out FINAL players
+                                .opacity(isPlayerLive ? 1.0 : 0.5)
                             }
                         @unknown default:
                             EmptyView()
@@ -615,7 +603,7 @@ struct FantasyPlayerCard: View {
                         Text(positionalRanking)
                             .font(.system(size: 15))
                             .foregroundColor(.white.opacity(0.8))
-                            .offset(x: -5, y: 45)
+                            .offset(x: -5, y: 25)
                         
                         Spacer()
                         
@@ -638,7 +626,6 @@ struct FantasyPlayerCard: View {
                     .zIndex(3)
                 }
                 
-                // Player name
                 Text(player.fullName)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
@@ -650,7 +637,6 @@ struct FantasyPlayerCard: View {
                     .padding(.leading, 45)
                     .zIndex(4)
                 
-                // FIXED: Game matchup info with better colors
                 VStack {
                     Spacer()
                     HStack {
@@ -692,6 +678,9 @@ struct FantasyPlayerCard: View {
                     )
             )
             .clipShape(RoundedRectangle(cornerRadius: 15))
+            .onTapGesture {
+                showingPlayerDetail = true
+            }
             .onAppear {
                 setupGameData()
                 if player.isLive {
@@ -699,24 +688,28 @@ struct FantasyPlayerCard: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPlayerDetail) {
+            NavigationView {
+                if let sleeperPlayer = getSleeperPlayerData() {
+                    PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: player.team ?? "")
+                    )
+                } else {
+                    PlayerDetailFallbackView(player: player)
+                }
+            }
+        }
         .task {
-            // FIXED: Set team color based on NFL team (works for ESPN and Sleeper)
             if let team = player.team {
                 if let nflTeam = NFLTeam.team(for: team) {
                     teamColor = nflTeam.primaryColor
-                    // xprint("🎨 Player \(player.fullName) team color set to \(team): \(nflTeam.primaryColor)")
                 } else {
-                    // Fallback to NFLTeamColors lookup
                     teamColor = NFLTeamColors.color(for: team)
-                    // xprint("🎨 Player \(player.fullName) using fallback team color for \(team): \(teamColor)")
                 }
-            } else {
-                // xprint("⚠️ Player \(player.fullName) has no team assigned")
             }
         }
     }
-    
-    // MARK: -> Live Animations
     
     private func startLiveAnimations() {
         withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
@@ -724,21 +717,41 @@ struct FantasyPlayerCard: View {
         }
     }
     
-    // MARK: -> Game Data Setup (same as FantasyGameMatchupView)
-    
     private func setupGameData() {
         guard let team = player.team else { return }
         
-        // Use NFL Week Service for accurate week
         currentWeek = nflWeekService.currentWeek
         let currentYear = nflWeekService.currentYear
         
-        // Configure view model for this player's team
         gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
+    }
+    
+    private func getSleeperPlayerData() -> SleeperPlayer? {
+        let foundPlayer = playerDirectory.players.values.first { sleeperPlayer in
+            if sleeperPlayer.fullName.lowercased() == player.fullName.lowercased() {
+                return true
+            }
+            
+            if sleeperPlayer.shortName.lowercased() == player.shortName.lowercased() &&
+               sleeperPlayer.team?.lowercased() == player.team?.lowercased() {
+                return true
+            }
+            
+            if let firstName = sleeperPlayer.firstName, let lastName = sleeperPlayer.lastName {
+                let fullName = "\(firstName) \(lastName)"
+                if fullName.lowercased() == player.fullName.lowercased() {
+                    return true
+                }
+            }
+            
+            return false
+        }
+        
+        return foundPlayer
     }
 }
 
-// MARK: -> Game Matchup View (Real NFL Data)
+// MARK: -> Fantasy Game Matchup View (Real NFL Data)
 struct FantasyGameMatchupView: View {
     let player: FantasyPlayer
     @StateObject private var gameViewModel = NFLGameMatchupViewModel()
@@ -748,7 +761,6 @@ struct FantasyGameMatchupView: View {
     var body: some View {
         VStack(spacing: 1) {
             if gameViewModel.isLoading {
-                // Loading state
                 HStack {
                     ProgressView()
                         .scaleEffect(0.6)
@@ -763,9 +775,7 @@ struct FantasyGameMatchupView: View {
                         .fill(Color.gray.opacity(0.3))
                 )
             } else if let gameInfo = gameViewModel.gameInfo {
-                // Real NFL matchup data
                 VStack(spacing: 1) {
-                    // Team matchup (e.g., "KC vs LAC")
                     Text(gameInfo.matchupString)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(.white)
@@ -775,9 +785,8 @@ struct FantasyGameMatchupView: View {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(Color.gray.opacity(0.8))
                         )
+                        .id(gameInfo.matchupString)
                     
-                    // Game status and time with team color gradient
-                    let teamColor = NFLTeam.team(for: player.team ?? "")?.primaryColor ?? gameInfo.statusColor
                     Text(gameInfo.formattedGameTime)
                         .font(.system(size: 8, weight: .bold))
                         .foregroundColor(.white)
@@ -787,14 +796,14 @@ struct FantasyGameMatchupView: View {
                             RoundedRectangle(cornerRadius: 3)
                                 .fill(
                                     LinearGradient(
-                                        gradient: Gradient(colors: [teamColor, .clear]),
+                                        gradient: Gradient(colors: [NFLTeam.team(for: player.team ?? "")?.primaryColor ?? gameInfo.statusColor, .clear]),
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )
                                 )
                         )
+                        .id(gameInfo.formattedGameTime)
                     
-                    // Live score if game is active or finished
                     if gameInfo.isLive || gameInfo.gameStatus.lowercased().contains("final") || gameInfo.gameStatus.lowercased().contains("post") {
                         Text(gameInfo.scoreString)
                             .font(.system(size: 7, weight: .semibold))
@@ -805,11 +814,11 @@ struct FantasyGameMatchupView: View {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(Color.black.opacity(0.6))
                             )
+                            .id(gameInfo.scoreString)
                     }
                 }
-                .padding(.trailing, 8) // Added more trailing padding
+                .padding(.trailing, 8)
             } else {
-                // Fallback for no game data (bye week, etc.)
                 if let team = player.team {
                     let teamColor = NFLTeam.team(for: team)?.primaryColor ?? .purple
                     
@@ -854,7 +863,6 @@ struct FantasyGameMatchupView: View {
             setupGameData()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            // Refresh when app becomes active
             gameViewModel.refresh(week: currentWeek)
         }
         .onReceive(nflWeekService.$currentWeek) { newWeek in
@@ -868,13 +876,9 @@ struct FantasyGameMatchupView: View {
     private func setupGameData() {
         guard let team = player.team else { return }
         
-        // Use NFL Week Service for accurate week
         currentWeek = nflWeekService.currentWeek
         let currentYear = nflWeekService.currentYear
         
-        // xprint("🏈 Setting up game data for \(team), Week \(currentWeek), Year \(currentYear)")
-        
-        // Configure view model for this player's team
         gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
     }
 }
@@ -882,4 +886,111 @@ struct FantasyGameMatchupView: View {
 // MARK: -> NFLPlayer Model (Simplified)
 struct NFLPlayer {
     let jersey: String
-    let team: String}
+    let team: String
+}
+
+struct PlayerDetailFallbackView: View {
+    let player: FantasyPlayer
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            AsyncImage(url: player.headshotURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Circle()
+                    .fill(.gray)
+                    .overlay(
+                        Text(player.shortName.prefix(2))
+                            .font(.title)
+                            .foregroundColor(.white)
+                    )
+            }
+            .frame(width: 120, height: 120)
+            .clipShape(Circle())
+            
+            VStack(spacing: 8) {
+                Text(player.fullName)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                HStack(spacing: 12) {
+                    Text(player.position)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(positionColor(player.position))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    
+                    if let team = player.team {
+                        Text(team)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let jersey = player.jerseyNumber {
+                        Text("#\(jersey)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            VStack(spacing: 12) {
+                HStack {
+                    Text("Current Points")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(player.currentPointsString)
+                        .fontWeight(.bold)
+                        .foregroundColor(.gpGreen)
+                }
+                
+                if let projected = player.projectedPoints {
+                    HStack {
+                        Text("Projected Points")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text(String(format: "%.1f", projected))
+                            .fontWeight(.bold)
+                    }
+                }
+            }
+            .padding()
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            
+            Spacer()
+            
+            Text("Detailed stats unavailable")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .navigationTitle(player.shortName)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    dismiss()
+                }
+            }
+        }
+    }
+    
+    private func positionColor(_ position: String) -> Color {
+        switch position {
+        case "QB": return .blue
+        case "RB": return .green
+        case "WR": return .purple
+        case "TE": return .orange
+        case "K": return .yellow
+        case "DEF": return .red
+        default: return .gray
+        }
+    }
+}

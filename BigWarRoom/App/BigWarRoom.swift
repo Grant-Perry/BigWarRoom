@@ -37,13 +37,21 @@ struct BigWarRoom: View {
                     }
                     .tag(2)
                 
-                // Live Draft Picks Tab
+                // All Live Players Tab - MOVED TO TAG 3
+                AllLivePlayersView()
+                    .tabItem {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Live Players")
+                    }
+                    .tag(3)
+                
+                // Live Draft Picks Tab - MOVED TO TAG 7
                 LiveDraftPicksView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "list.bullet.rectangle.portrait")
                         Text("Live Picks")
                     }
-                    .tag(3)
+                    .tag(7)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -69,13 +77,13 @@ struct BigWarRoom: View {
                     }
                     .tag(6)
                 
-                // OnBoarding Tab
+                // OnBoarding Tab (moved to position 8)
                 OnBoardingView()
                     .tabItem {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(7)
+                    .tag(8)
             }
             .preferredColorScheme(.dark)
             

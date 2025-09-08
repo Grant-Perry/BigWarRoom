@@ -106,6 +106,129 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         "\(choppedSummary.eliminationHistory.count)"
     }
     
+    // MARK: - Personal Stats (NEW!) 
+    
+    /// Find the authenticated user's team ranking
+    var myTeamRanking: FantasyTeamRanking? {
+        // Strategy 1: Try to find by authenticated user patterns
+        let authenticatedUsername = SleeperCredentialsManager.shared.currentUsername
+        
+        if !authenticatedUsername.isEmpty {
+            if let myRanking = choppedSummary.rankings.first(where: { 
+                $0.team.ownerName.lowercased() == authenticatedUsername.lowercased() 
+            }) {
+                return myRanking
+            }
+        }
+        
+        // Strategy 2: Look for "Gp" pattern (your specific case)
+        if let gpRanking = choppedSummary.rankings.first(where: { 
+            $0.team.ownerName.lowercased().contains("gp") 
+        }) {
+            return gpRanking
+        }
+        
+        // Strategy 3: Look for patterns like "Lamarvelous" or "King"
+        if let lamarRanking = choppedSummary.rankings.first(where: { 
+            $0.team.ownerName.lowercased().contains("lamar") ||
+            $0.team.ownerName.lowercased().contains("king")
+        }) {
+            return lamarRanking
+        }
+        
+        // Fallback: Return first team
+        return choppedSummary.rankings.first
+    }
+    
+    /// Your rank display (e.g., "1ST", "2ND", "3RD")
+    var myRankDisplay: String {
+        guard let myTeam = myTeamRanking else { return "?" }
+        
+        let rank = myTeam.rank
+        switch rank {
+        case 1:
+            return "1ST"
+        case 2:
+            return "2ND"  
+        case 3:
+            return "3RD"
+        default:
+            return "\(rank)TH"
+        }
+    }
+    
+    /// Your score display with formatting
+    var myScoreDisplay: String {
+        guard let myTeam = myTeamRanking else { return "0.0" }
+        return String(format: "%.1f", myTeam.weeklyPoints)
+    }
+    
+    /// Your status color based on elimination status
+    var myStatusColor: Color {
+        guard let myTeam = myTeamRanking else { return .gray }
+        
+        switch myTeam.eliminationStatus {
+        case .champion:
+            return .yellow
+        case .safe:
+            return .green
+        case .warning:
+            return .blue
+        case .danger:
+            return .orange
+        case .critical:
+            return .red
+        case .eliminated:
+            return .gray
+        }
+    }
+    
+    /// Your status emoji based on elimination status
+    var myStatusEmoji: String {
+        guard let myTeam = myTeamRanking else { return "❓" }
+        
+        switch myTeam.eliminationStatus {
+        case .champion:
+            return "👑"
+        case .safe:
+            return "🛡️"
+        case .warning:
+            return "⚡"
+        case .danger:
+            return "⚠️"
+        case .critical:
+            return "💀"
+        case .eliminated:
+            return "🪦"
+        }
+    }
+    
+    /// Your status text based on elimination status
+    var myStatusText: String {
+        guard let myTeam = myTeamRanking else { return "UNKNOWN" }
+        
+        switch myTeam.eliminationStatus {
+        case .champion:
+            return "CHAMPION"
+        case .safe:
+            return "SAFE"
+        case .warning:
+            return "WARNING"
+        case .danger:
+            return "DANGER"
+        case .critical:
+            return "CRITICAL"
+        case .eliminated:
+            return "ELIMINATED"
+        }
+    }
+    
+    /// Check if your team is in danger (for pulsing animation)
+    var isMyTeamInDanger: Bool {
+        guard let myTeam = myTeamRanking else { return false }
+        return myTeam.eliminationStatus == .critical || myTeam.eliminationStatus == .danger
+    }
+    
     // MARK: - Section Visibility Logic
     
     var hasChampion: Bool {

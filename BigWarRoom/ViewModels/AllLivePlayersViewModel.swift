@@ -1,0 +1,324 @@
+//
+//  AllLivePlayersViewModel.swift
+//  BigWarRoom
+//
+//  ViewModel for aggregating all active players across all leagues
+//
+
+import Foundation
+import SwiftUI
+import Combine
+
+@MainActor
+final class AllLivePlayersViewModel: ObservableObject {
+    @Published var allPlayers: [LivePlayerEntry] = []
+    @Published var filteredPlayers: [LivePlayerEntry] = []
+    @Published var selectedPosition: PlayerPosition = .all
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+    @Published var topScore: Double = 0.0
+    @Published var sortHighToLow = true
+    
+    @Published var medianScore: Double = 0.0
+    @Published var scoreRange: Double = 0.0
+    @Published var useAdaptiveScaling: Bool = false
+    
+    @Published var positionTopScore: Double = 0.0
+    
+    private let matchupsHubViewModel = MatchupsHubViewModel()
+    
+    // MARK: - Player Position Filter
+    enum PlayerPosition: String, CaseIterable, Identifiable {
+        case all = "All"
+        case qb = "QB"
+        case rb = "RB"
+        case wr = "WR"
+        case te = "TE"
+        case k = "K"
+        case def = "DEF"
+        
+        var id: String { rawValue }
+        
+        var displayName: String { rawValue }
+    }
+    
+    // MARK: - Live Player Entry
+    struct LivePlayerEntry: Identifiable {
+        let id: String
+        let player: FantasyPlayer
+        let leagueName: String
+        let leagueSource: String
+        let currentScore: Double
+        let projectedScore: Double
+        let isStarter: Bool
+        let percentageOfTop: Double
+        let matchup: UnifiedMatchup
+        let performanceTier: PerformanceTier
+        
+        var scoreBarWidth: Double {
+            // Reduce minimum to 8%, increase scalable to 92% for steeper decline
+            let minBarWidth: Double = 0.08
+            let scalableWidth: Double = 0.92
+            
+            return minBarWidth + (percentageOfTop * scalableWidth)
+        }
+        
+        var position: String {
+            return player.position
+        }
+        
+        var teamName: String {
+            return player.team ?? ""
+        }
+        
+        var playerName: String {
+            return player.fullName
+        }
+        
+        var currentScoreString: String {
+            return String(format: "%.2f", currentScore)
+        }
+    }
+    
+    enum PerformanceTier: String, CaseIterable {
+        case elite = "Elite"
+        case good = "Good"
+        case average = "Average"
+        case struggling = "Struggling"
+        
+        var color: Color {
+            switch self {
+            case .elite: return .gpGreen
+            case .good: return .blue
+            case .average: return .orange
+            case .struggling: return .red
+            }
+        }
+    }
+    
+    // MARK: - Data Loading
+    
+    func loadAllPlayers() async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Use MatchupsHubViewModel to get current matchups
+            await matchupsHubViewModel.loadAllMatchups()
+            
+            var allPlayerEntries: [LivePlayerEntry] = []
+            
+            // Extract players from each matchup (with temporary values)
+            for matchup in matchupsHubViewModel.myMatchups {
+                let playersFromMatchup = extractPlayersFromMatchup(matchup)
+                allPlayerEntries.append(contentsOf: playersFromMatchup)
+            }
+            
+            // Calculate overall statistics
+            let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
+            topScore = scores.first ?? 1.0
+            let bottomScore = scores.last ?? 0.0
+            scoreRange = topScore - bottomScore
+            
+            // Calculate median
+            if !scores.isEmpty {
+                let mid = scores.count / 2
+                medianScore = scores.count % 2 == 0 ? 
+                    (scores[mid - 1] + scores[mid]) / 2 : 
+                    scores[mid]
+            }
+            
+            // Use adaptive scaling if there's a huge gap (top score is 3x+ median)
+            useAdaptiveScaling = topScore > (medianScore * 3)
+            
+            // Calculate quartiles for tier determination
+            let quartiles = calculateQuartiles(from: scores)
+            
+            // Update all players with proper percentages and tiers
+            allPlayers = allPlayerEntries.map { entry in
+                let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
+                let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+                
+                return LivePlayerEntry(
+                    id: entry.id,
+                    player: entry.player,
+                    leagueName: entry.leagueName,
+                    leagueSource: entry.leagueSource,
+                    currentScore: entry.currentScore,
+                    projectedScore: entry.projectedScore,
+                    isStarter: entry.isStarter,
+                    percentageOfTop: percentage,
+                    matchup: entry.matchup,
+                    performanceTier: tier
+                )
+            }
+            
+            // Apply initial filter
+            applyPositionFilter()
+            
+        } catch {
+            errorMessage = "Failed to load players: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
+        var players: [LivePlayerEntry] = []
+        
+        // For regular matchups, extract from both teams
+        if let fantasyMatchup = matchup.fantasyMatchup {
+            // Extract starters from home team
+            let homeStarters = fantasyMatchup.homeTeam.roster.filter { $0.isStarter }
+            for player in homeStarters {
+                players.append(LivePlayerEntry(
+                    id: "\(matchup.id)_home_\(player.id)",
+                    player: player,
+                    leagueName: matchup.league.league.name,
+                    leagueSource: matchup.league.source.rawValue,
+                    currentScore: player.currentPoints ?? 0.0,
+                    projectedScore: player.projectedPoints ?? 0.0,
+                    isStarter: player.isStarter,
+                    percentageOfTop: 0.0, // Will be calculated later
+                    matchup: matchup,
+                    performanceTier: .average // Temporary, will be calculated later
+                ))
+            }
+            
+            // Extract starters from away team
+            let awayStarters = fantasyMatchup.awayTeam.roster.filter { $0.isStarter }
+            for player in awayStarters {
+                players.append(LivePlayerEntry(
+                    id: "\(matchup.id)_away_\(player.id)",
+                    player: player,
+                    leagueName: matchup.league.league.name,
+                    leagueSource: matchup.league.source.rawValue,
+                    currentScore: player.currentPoints ?? 0.0,
+                    projectedScore: player.projectedPoints ?? 0.0,
+                    isStarter: player.isStarter,
+                    percentageOfTop: 0.0, // Will be calculated later
+                    matchup: matchup,
+                    performanceTier: .average // Temporary, will be calculated later
+                ))
+            }
+        }
+        
+        // For Chopped leagues, extract from my team ranking
+        if let myTeamRanking = matchup.myTeamRanking {
+            let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
+            for player in myTeamStarters {
+                players.append(LivePlayerEntry(
+                    id: "\(matchup.id)_chopped_\(player.id)",
+                    player: player,
+                    leagueName: matchup.league.league.name,
+                    leagueSource: matchup.league.source.rawValue,
+                    currentScore: player.currentPoints ?? 0.0,
+                    projectedScore: player.projectedPoints ?? 0.0,
+                    isStarter: player.isStarter,
+                    percentageOfTop: 0.0, // Will be calculated later
+                    matchup: matchup,
+                    performanceTier: .average // Temporary, will be calculated later
+                ))
+            }
+        }
+        
+        return players
+    }
+    
+    // MARK: - Filtering and Sorting
+    
+    func setPositionFilter(_ position: PlayerPosition) {
+        selectedPosition = position
+        applyPositionFilter()
+    }
+    
+    func setSortDirection(highToLow: Bool) {
+        sortHighToLow = highToLow
+        applyPositionFilter() // Re-apply filter with new sort direction
+    }
+    
+    private func applyPositionFilter() {
+        let players = selectedPosition == .all ? 
+            allPlayers : 
+            allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
+        
+        let positionScores = players.map { $0.currentScore }.sorted(by: >)
+        positionTopScore = positionScores.first ?? 1.0
+        
+        // Calculate position-specific quartiles for tier determination
+        let positionQuartiles = calculateQuartiles(from: positionScores)
+        
+        // Update players with position-relative percentages and tiers
+        let updatedPlayers = players.map { entry in
+            let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: positionTopScore)
+            let tier = determinePerformanceTier(score: entry.currentScore, quartiles: positionQuartiles)
+            
+            return LivePlayerEntry(
+                id: entry.id,
+                player: entry.player,
+                leagueName: entry.leagueName,
+                leagueSource: entry.leagueSource,
+                currentScore: entry.currentScore,
+                projectedScore: entry.projectedScore,
+                isStarter: entry.isStarter,
+                percentageOfTop: percentage,
+                matchup: entry.matchup,
+                performanceTier: tier
+            )
+        }
+        
+        // Apply sorting based on direction
+        if sortHighToLow {
+            filteredPlayers = updatedPlayers.sorted { $0.currentScore > $1.currentScore }
+        } else {
+            filteredPlayers = updatedPlayers.sorted { $0.currentScore < $1.currentScore }
+        }
+    }
+    
+    // MARK: - Refresh
+    
+    func refresh() async {
+        await loadAllPlayers()
+    }
+    
+    private func calculateScaledPercentage(score: Double, topScore: Double) -> Double {
+        guard topScore > 0 else { return 0.0 }
+        
+        if useAdaptiveScaling {
+            // Logarithmic scaling for extreme distributions
+            let logTop = log(max(topScore, 1.0))
+            let logScore = log(max(score, 1.0))
+            return logScore / logTop
+        } else {
+            // Standard linear scaling
+            return score / topScore
+        }
+    }
+
+    private func calculateQuartiles(from sortedScores: [Double]) -> (q1: Double, q2: Double, q3: Double) {
+        guard !sortedScores.isEmpty else { return (0, 0, 0) }
+        
+        let count = sortedScores.count
+        let q1Index = count / 4
+        let q2Index = count / 2
+        let q3Index = (3 * count) / 4
+        
+        let q1 = q1Index < count ? sortedScores[q1Index] : sortedScores.last!
+        let q2 = q2Index < count ? sortedScores[q2Index] : sortedScores.last!
+        let q3 = q3Index < count ? sortedScores[q3Index] : sortedScores.last!
+        
+        return (q1, q2, q3)
+    }
+    
+    private func determinePerformanceTier(score: Double, quartiles: (q1: Double, q2: Double, q3: Double)) -> PerformanceTier {
+        if score >= quartiles.q3 {
+            return .elite
+        } else if score >= quartiles.q2 {
+            return .good
+        } else if score >= quartiles.q1 {
+            return .average
+        } else {
+            return .struggling
+        }
+    }
+}

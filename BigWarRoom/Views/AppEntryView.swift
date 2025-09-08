@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AppEntryView: View {
-    @State private var showingLoading = true
+    @State private var showingLoading = false
     @State private var shouldShowOnboarding = false
     
     var body: some View {
@@ -19,7 +19,7 @@ struct AppEntryView: View {
                     showingLoading = false
                 }
             } else {
-                // Show main app - start on appropriate tab based on onboarding status
+                // BYPASS: Go directly to Mission Control (tab 0)
                 BigWarRoomWithConditionalStart(shouldShowOnboarding: shouldShowOnboarding)
             }
         }
@@ -43,9 +43,9 @@ struct BigWarRoomModified: View {
     
     // Initialize with conditional starting tab
     init(startOnSettings: Bool) {
-        // If user needs onboarding → start on Settings (7)
+        // If user needs onboarding → start on Settings (8)
         // If user has credentials → start on Mission Control (0)
-        _selectedTab = State(initialValue: startOnSettings ? 7 : 0)
+        _selectedTab = State(initialValue: startOnSettings ? 8 : 0)
     }
     
     var body: some View {
@@ -75,13 +75,21 @@ struct BigWarRoomModified: View {
                     }
                     .tag(2)
                 
-                // Live Draft Picks Tab
+                // All Live Players Tab - MOVED TO TAG 3
+                AllLivePlayersView()
+                    .tabItem {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Live Players")
+                    }
+                    .tag(3)
+                
+                // Live Draft Picks Tab - MOVED TO TAG 7
                 LiveDraftPicksView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "list.bullet.rectangle.portrait")
                         Text("Live Picks")
                     }
-                    .tag(3)
+                    .tag(7)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -107,13 +115,13 @@ struct BigWarRoomModified: View {
                     }
                     .tag(6)
                 
-                // Settings Tab - New proper Settings view
+                // Settings Tab - New proper Settings view (moved to position 8)
                 AppSettingsView()
                     .tabItem {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(7)
+                    .tag(8)
             }
             .preferredColorScheme(.dark)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in

@@ -184,11 +184,10 @@ struct NFLGameInfo {
 // MARK: -> NFL Game Data Service
 class NFLGameDataService: ObservableObject {
     static let shared = NFLGameDataService()
-    
     @Published var gameData: [String: NFLGameInfo] = [:] // Team -> GameInfo mapping
     @Published var isLoading = false
     @Published var errorMessage: String?
-    
+
     private var cancellable: AnyCancellable?
     private var cache: NFLScoreboardResponse?
     private var cacheTimestamp: Date?
@@ -241,49 +240,34 @@ class NFLGameDataService: ObservableObject {
     /// Process ESPN API response into game info
     private func processGameData(_ response: NFLScoreboardResponse) {
         var newGameData: [String: NFLGameInfo] = [:]
-        
-        print("🏈 Processing \(response.events.count) NFL events from ESPN API")
-        
         for event in response.events {
             guard let competition = event.competitions.first else { continue }
-            
             let competitors = competition.competitors
             guard competitors.count == 2,
                   let awayComp = competitors.first(where: { $0.homeAway == "away" }),
-                  let homeComp = competitors.first(where: { $0.homeAway == "home" }) else {
-                continue
-            }
-            
+                  let homeComp = competitors.first(where: { $0.homeAway == "home" }) else { continue }
             let homeTeam = homeComp.team.abbreviation
             let awayTeam = awayComp.team.abbreviation
             let homeScore = Int(homeComp.score) ?? 0
             let awayScore = Int(awayComp.score) ?? 0
-            
             let status = competition.status.type
             let gameStatus = status.state
             let gameTime = status.detail
             let isLive = gameStatus == "in"
-            
-            // Parse start date with better error handling
             var startDate: Date?
             let isoFormatter = ISO8601DateFormatter()
             isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             startDate = isoFormatter.date(from: competition.date)
-            
-            // Try alternative format if ISO failed
             if startDate == nil {
                 let fallbackFormatter = DateFormatter()
                 fallbackFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'"
                 startDate = fallbackFormatter.date(from: competition.date)
             }
-            
-            // Try another common format
             if startDate == nil {
                 let fallbackFormatter2 = DateFormatter()
                 fallbackFormatter2.dateFormat = "yyyy-MM-dd'T'HH:mmZ"
                 startDate = fallbackFormatter2.date(from: competition.date)
             }
-            
             let gameInfo = NFLGameInfo(
                 homeTeam: homeTeam,
                 awayTeam: awayTeam,
@@ -294,41 +278,21 @@ class NFLGameDataService: ObservableObject {
                 isLive: isLive,
                 startDate: startDate
             )
-            
-            // Debug logging to see what ESPN is actually returning
-            print("🏈 GAME FOUND: \(awayTeam) @ \(homeTeam) | Status: '\(gameStatus)' | Score: \(awayScore)-\(homeScore)")
-            
-            // Map both teams to this game info
             newGameData[homeTeam] = gameInfo
             newGameData[awayTeam] = gameInfo
         }
-        
         self.gameData = newGameData
-        print("🏈 FINAL TEAMS in game data: \(Array(newGameData.keys).sorted())")
-        
-        // 🔍 SPECIFIC DEBUG: Check if Washington is missing
-        if newGameData["WAS"] == nil {
-            print("🚨 MISSING: Washington (WAS) NOT found in ESPN NFL API data!")
-            print("🔍 Available teams: \(Array(newGameData.keys).sorted())")
-        } else {
-            print("✅ FOUND: Washington game data exists")
-        }
     }
-    
-    /// Get game info for a specific team
+
     func getGameInfo(for team: String) -> NFLGameInfo? {
-        // 🔥 FIX: Handle ESPN API team abbreviation inconsistencies
         let normalizedTeam = normalizeTeamAbbreviation(team.uppercased())
-        print("🔧 TEAM LOOKUP: '\(team)' -> '\(normalizedTeam)' | Found: \(gameData[normalizedTeam] != nil)")
         return gameData[normalizedTeam]
     }
-    
-    /// Normalize team abbreviations to match ESPN's NFL API
+
     private func normalizeTeamAbbreviation(_ team: String) -> String {
         switch team.uppercased() {
         case "WAS":
-            print("🔧 NORMALIZING: WAS -> WSH")
-            return "WSH"  // ESPN uses WSH for Washington
+            return "WSH"
         default:
             return team.uppercased()
         }

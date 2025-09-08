@@ -21,6 +21,9 @@ struct ChoppedLeaderboardView: View {
     @StateObject private var viewModel: ChoppedLeaderboardViewModel
     let leagueID: String // 🔥 NEW: Pass league ID for roster navigation
     
+    // MARK: - Navigation State (NEW!)
+    @State private var showingMyRoster = false
+    
     // MARK: - Initialization
     init(choppedSummary: ChoppedWeekSummary, leagueName: String, leagueID: String) {
         self._viewModel = StateObject(wrappedValue: ChoppedLeaderboardViewModel(
@@ -94,6 +97,16 @@ struct ChoppedLeaderboardView: View {
                 eliminatedTeam: viewModel.choppedSummary.eliminatedTeam,
                 week: viewModel.choppedSummary.week
             )
+        }
+        .sheet(isPresented: $showingMyRoster) {
+            // NEW: Your roster sheet
+            if let myTeam = viewModel.myTeamRanking {
+                ChoppedTeamRosterView(
+                    teamRanking: myTeam,
+                    leagueID: leagueID,
+                    week: viewModel.choppedSummary.week
+                )
+            }
         }
     }
     
@@ -218,69 +231,147 @@ struct ChoppedLeaderboardView: View {
     
     // MARK: -> SURVIVAL STATS
     private var survivalStats: some View {
-        HStack(spacing: 16) {
-            statCard(
-                title: "ELIMINATION LINE",
+        // Single row with all 5 compact stat cards
+        HStack(spacing: 6) {
+            // Your personal stats card (COMPACT!)
+            compactPersonalStatCard
+            
+            compactStatCard(
+                title: "ALIVE",
+                value: viewModel.survivorsCount,
+                subtitle: "TEAMS",
+                color: .green
+            )
+            
+            compactStatCard(
+                title: "CUTOFF",
                 value: viewModel.eliminationLineDisplay,
-                subtitle: "DEATH THRESHOLD",
+                subtitle: "LINE",
                 color: .red
             )
             
-            statCard(
-                title: "AVERAGE SCORE",
+            compactStatCard(
+                title: "AVG",
                 value: viewModel.averageScoreDisplay,
-                subtitle: "SURVIVOR MEAN",
+                subtitle: "MEAN",
                 color: .blue
             )
             
-            statCard(
-                title: "TOP SCORE",
+            compactStatCard(
+                title: "HIGH",
                 value: viewModel.topScoreDisplay,
-                subtitle: "WEEK CHAMPION",
+                subtitle: "WEEK",
                 color: .yellow
             )
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 24) // Increased from 20 to 24 to prevent border clipping
+        .padding(.vertical, 8)
     }
     
-    private func statCard(title: String, value: String, subtitle: String, color: Color) -> some View {
-        VStack(spacing: 8) {
+    // MARK: -> COMPACT STAT CARD
+    private func compactStatCard(title: String, value: String, subtitle: String, color: Color) -> some View {
+        VStack(spacing: 4) {
             Text(title)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.gray)
-                .tracking(1)
-            
-            Text(value)
-                .font(.system(size: 20, weight: .black))
-                .foregroundColor(color)
-            
-            Text(subtitle)
-                .font(.system(size: 8, weight: .medium))
+                .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.gray)
                 .tracking(0.5)
+            
+            Text(value)
+                .font(.system(size: 16, weight: .black))
+                .foregroundColor(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            
+            Text(subtitle)
+                .font(.system(size: 7, weight: .medium))
+                .foregroundColor(.gray)
+                .tracking(0.3)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
+        .padding(.vertical, 6) // Reduced from 8 to 6
+        .padding(.horizontal, 6)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.08))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color.opacity(0.2), lineWidth: 1)
                 )
         )
+    }
+    
+    // MARK: -> COMPACT PERSONAL STAT CARD
+    private var compactPersonalStatCard: some View {
+        Button(action: {
+            // Show your roster using SwiftUI sheet navigation
+            showingMyRoster = true
+        }) {
+            VStack(spacing: 4) {
+                // Your rank badge (smaller)
+                HStack(spacing: 2) {
+                    Text(viewModel.myRankDisplay)
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(viewModel.myStatusColor)
+                        )
+                    
+                    Text("YOU")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(.gray)
+                        .tracking(0.3)
+                }
+                
+                // Your score (smaller)
+                Text(viewModel.myScoreDisplay)
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundColor(viewModel.myStatusColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                
+                // Your status (compact)
+                HStack(spacing: 2) {
+                    Text(viewModel.myStatusEmoji)
+                        .font(.system(size: 8))
+                    
+                    Text(viewModel.myStatusText)
+                        .font(.system(size: 7, weight: .medium))
+                        .foregroundColor(viewModel.myStatusColor)
+                        .tracking(0.3)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(viewModel.myStatusColor.opacity(0.08))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(viewModel.myStatusColor.opacity(0.3), lineWidth: 1.5)
+                            .shadow(color: viewModel.myStatusColor.opacity(0.2), radius: 2)
+                    )
+            )
+            .scaleEffect(viewModel.pulseAnimation && viewModel.isMyTeamInDanger ? 1.03 : 1.0)
+            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: viewModel.pulseAnimation)
+        }
+        .buttonStyle(PlainButtonStyle()) // Prevents default button styling
     }
     
     // MARK: -> CHAMPION SECTION
     private func championSection(_ champion: FantasyTeamRanking) -> some View {
         VStack(spacing: 16) {
-            // Crown header
+            // Crown header with dynamic week
             HStack {
                 Text("👑")
                     .font(.system(size: 24))
                 
-                Text("REIGNING CHAMPION")
+                Text("\(viewModel.weekDisplay) LEADER")
                     .font(.system(size: 18, weight: .black))
                     .foregroundStyle(
                         LinearGradient(
@@ -303,7 +394,8 @@ struct ChoppedLeaderboardView: View {
             )
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 20)
+        .padding(.top, 4) // Reduced top padding to tighten gap
+        .padding(.bottom, 20)
     }
     
     // MARK: -> DANGER ZONE SECTION (PULSING)
