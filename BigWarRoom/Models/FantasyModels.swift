@@ -165,6 +165,20 @@ struct FantasyPlayer: Identifiable, Codable {
     let isStarter: Bool
     let lineupSlot: String?
     
+    // MARK: -> CENTRALIZED LIVE DETECTION - CLEAN & RELIABLE 🔥
+    
+    /// Single source of truth for live status using NFLGameDataService
+    var isLive: Bool {
+        guard let team = self.team else { return false }
+        
+        // Use NFLGameDataService as the authoritative source
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            return gameInfo.isLive
+        }
+        
+        return false
+    }
+    
     /// Full player name
     var fullName: String {
         let first = firstName ?? ""

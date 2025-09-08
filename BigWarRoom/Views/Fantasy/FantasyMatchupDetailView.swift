@@ -437,34 +437,10 @@ struct FantasyPlayerCard: View {
         return fantasyViewModel.getPositionalRanking(for: player, in: matchup, teamIndex: teamIndex, isBench: isBench)
     }
     
-    // Simplified live detection with ESPN support
+    // MARK: -> Simplified live detection using centralized logic
     private var isPlayerLive: Bool {
-        // Method 1: Try NFLGameMatchupViewModel (works for some cases)
-        if let gameInfo = gameViewModel.gameInfo, gameInfo.isLive {
-            return true
-        }
-        
-        // Method 2: Check player.gameStatus (works for Sleeper)
-        if let gameStatus = player.gameStatus {
-            let timeString = gameStatus.timeString.lowercased()
-            
-            // Explicit FINAL check
-            if timeString.contains("final") || timeString.contains("bye") {
-                return false
-            }
-            
-            // Live indicators
-            if timeString.contains("live") || 
-               timeString.contains("quarter") || 
-               timeString.contains("halftime") ||
-               (timeString.contains(":") && timeString.count < 15) {
-                return true
-            }
-        }
-        
-        // Method 3: ESPN fallback - assume all non-FINAL games could be live during game time
-        // This is temporary until we figure out ESPN's data structure
-        return false // For now, default to false to see the debug output
+        // Use the centralized FantasyPlayer.isLive property
+        return player.isLive
     }
     
     // Border colors based on live status
@@ -718,7 +694,7 @@ struct FantasyPlayerCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 15))
             .onAppear {
                 setupGameData()
-                if isPlayerLive {
+                if player.isLive {
                     startLiveAnimations()
                 }
             }

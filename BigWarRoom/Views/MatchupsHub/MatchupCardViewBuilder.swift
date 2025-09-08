@@ -153,51 +153,8 @@ struct MatchupCardViewBuilder: View {
     }
     
     private func isMatchupLive() -> Bool {
-        guard let myTeam = matchup.myTeam else { return false }
-        let starters = myTeam.roster.filter { $0.isStarter }
-        return starters.contains { player in
-            isPlayerInLiveGame(player)
-        }
-    }
-    
-    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        guard let gameStatus = player.gameStatus else { return false }
-        let timeString = gameStatus.timeString.lowercased()
-        
-        // ULTRA PERMISSIVE LIVE DETECTION - if there's ANY indication of activity, consider it live
-        
-        // 1. Direct live indicators
-        let directLivePatterns = [
-            "live", "1st", "2nd", "3rd", "4th", "ot", "overtime", 
-            "quarter", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"
-        ]
-        
-        for pattern in directLivePatterns {
-            if timeString.contains(pattern) {
-                return true
-            }
-        }
-        
-        // 2. Time patterns (any colon suggests active timing)
-        if timeString.contains(":") && !timeString.contains("final") && !timeString.contains("bye") {
-            return true
-        }
-        
-        // 3. Score patterns (if there are numbers, might be live)
-        let hasNumbers = timeString.rangeOfCharacter(from: .decimalDigits) != nil
-        if hasNumbers && !timeString.contains("final") && !timeString.contains("bye") && timeString != "" {
-            return true
-        }
-        
-        // 4. Non-conclusive states (anything that's not explicitly finished/bye)
-        let nonLiveIndicators = ["final", "bye", "postponed", "canceled"]
-        let isDefinitelyNotLive = nonLiveIndicators.contains { timeString.contains($0) }
-        
-        if !isDefinitelyNotLive && !timeString.isEmpty {
-            return true
-        }
-        
-        return false
+        // Use the centralized UnifiedMatchup.isLive property
+        return matchup.isLive
     }
 }
 

@@ -29,8 +29,8 @@ struct NonMicroCardView: View {
                 cardScale = 1.0
             }
             
-            // FIXED: Use roster-based live detection instead of matchup status
-            if isRosterBasedLive {
+            // FIXED: Use centralized live detection instead of roster-based custom logic
+            if matchup.isLive {
                 startLiveAnimations()
             }
         }
@@ -341,7 +341,8 @@ struct NonMicroCardView: View {
     // MARK: -> Computed Properties
     
     private var isLiveGame: Bool {
-        return isRosterBasedLive
+        // Use the centralized UnifiedMatchup.isLive property
+        return matchup.isLive
     }
     
     private var overlayBorderColors: [Color] {
@@ -472,76 +473,15 @@ struct NonMicroCardView: View {
     
     private var liveStatusBadge: some View {
         Text("LIVE")
-            .font(.system(size: isRosterBasedLive ? 10 : 8, weight: .black))
-            .foregroundColor(isRosterBasedLive ? .gpGreen : .gpRedPink.opacity(0.4))
+            .font(.system(size: matchup.isLive ? 10 : 8, weight: .black))
+            .foregroundColor(matchup.isLive ? .gpGreen : .gpRedPink.opacity(0.4))
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill((isRosterBasedLive ? Color.gpGreen : Color.gpRedPink).opacity(isRosterBasedLive ? 0.2 : 0.1))
+                    .fill((matchup.isLive ? Color.gpGreen : Color.gpRedPink).opacity(matchup.isLive ? 0.2 : 0.1))
             )
-            .scaleEffect(isRosterBasedLive ? 1.0 : 0.9)
-            .opacity(isRosterBasedLive ? 1.0 : 0.6)
-    }
-    
-    // MARK: -> Roster-Based Live Detection
-    
-    private var isRosterBasedLive: Bool {
-        guard let myTeam = matchup.myTeam else { 
-            return false 
-        }
-        
-        // Check both my team AND opponent team for live players
-        let allPlayers = myTeam.roster + (matchup.opponentTeam?.roster ?? [])
-        let starters = allPlayers.filter { $0.isStarter }
-        
-        let livePlayersCount = starters.filter { player in
-            isPlayerInLiveGame(player)
-        }.count
-        
-        return livePlayersCount > 0
-    }
-    
-    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        guard let gameStatus = player.gameStatus else { 
-            return false 
-        }
-        
-        let timeString = gameStatus.timeString.lowercased()
-        
-        // ULTRA PERMISSIVE LIVE DETECTION - if there's ANY indication of activity, consider it live
-        
-        // 1. Direct live indicators
-        let directLivePatterns = [
-            "live", "1st", "2nd", "3rd", "4th", "ot", "overtime", 
-            "quarter", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"
-        ]
-        
-        for pattern in directLivePatterns {
-            if timeString.contains(pattern) {
-                return true
-            }
-        }
-        
-        // 2. Time patterns (any colon suggests active timing)
-        if timeString.contains(":") && !timeString.contains("final") && !timeString.contains("bye") {
-            return true
-        }
-        
-        // 3. Score patterns (if there are numbers, might be live)
-        let hasNumbers = timeString.rangeOfCharacter(from: .decimalDigits) != nil
-        if hasNumbers && !timeString.contains("final") && !timeString.contains("bye") && timeString != "" {
-            return true
-        }
-        
-        // 4. Non-conclusive states (anything that's not explicitly finished/bye)
-        let nonLiveIndicators = ["final", "bye", "postponed", "canceled"]
-        let isDefinitelyNotLive = nonLiveIndicators.contains { timeString.contains($0) }
-        
-        if !isDefinitelyNotLive && !timeString.isEmpty {
-            return true
-        }
-        
-        return false
+            .scaleEffect(matchup.isLive ? 1.0 : 0.9)
+            .opacity(matchup.isLive ? 1.0 : 0.6)
     }
 }

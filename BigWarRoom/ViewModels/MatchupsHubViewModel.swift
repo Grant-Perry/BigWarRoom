@@ -66,6 +66,11 @@ final class MatchupsHubViewModel: ObservableObject {
         }
         
         do {
+            // Step 0: Fetch NFL game data for live detection
+            let currentWeek = NFLWeekService.shared.currentWeek
+            let currentYear = Calendar.current.component(.year, from: Date())
+            NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, year: currentYear)
+            
             // Step 1: Load all available leagues
             await updateLoadingState("Loading available leagues...")
             await unifiedLeagueManager.fetchAllLeagues(
@@ -625,6 +630,11 @@ final class MatchupsHubViewModel: ObservableObject {
         }
         
         do {
+            // Step 0: Refresh NFL game data for live detection
+            let currentWeek = NFLWeekService.shared.currentWeek
+            let currentYear = Calendar.current.component(.year, from: Date())
+            NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, year: currentYear, forceRefresh: true)
+            
             // Step 1: Refresh available leagues quietly
             await unifiedLeagueManager.fetchAllLeagues(
                 sleeperUserID: AppConstants.GpSleeperID,
@@ -1133,6 +1143,25 @@ struct UnifiedMatchup: Identifiable {
             // If I'm the away team, return 1 - home team win probability
             return matchup.winProbability.map { 1.0 - $0 }
         }
+    }
+    
+    /// Single source of truth for matchup live status
+    var isLive: Bool {
+        // Chopped leagues are never "live" in this context
+        if isChoppedLeague {
+            return false
+        }
+        
+        // Check if any starter on either team is in a live game
+        if let myTeam = myTeam, myTeam.roster.filter({ $0.isStarter && $0.isLive }).count > 0 {
+            return true
+        }
+        
+        if let opponentTeam = opponentTeam, opponentTeam.roster.filter({ $0.isStarter && $0.isLive }).count > 0 {
+            return true
+        }
+        
+        return false
     }
 }
 
