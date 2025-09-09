@@ -44,7 +44,7 @@ final class UnifiedLeagueManager: ObservableObject {
     
     /// Fetch leagues from both Sleeper and ESPN
     func fetchAllLeagues(sleeperUserID: String? = nil, season: String = "2025") async {
-        // xprint("🔍 UnifiedLeagueManager: fetchAllLeagues - Sleeper ID: \(sleeperUserID ?? "nil"), Season: \(season)")
+        // x// x Print("🔍 UnifiedLeagueManager: fetchAllLeagues - Sleeper ID: \(sleeperUserID ?? "nil"), Season: \(season)")
         
         await withTaskGroup(of: Void.self) { group in
             // Fetch Sleeper leagues if user ID provided
@@ -60,7 +60,7 @@ final class UnifiedLeagueManager: ObservableObject {
                     await self?.fetchESPNLeagues()
                 }
             } else {
-                // xprint("🚫 UnifiedLeagueManager: Skipping ESPN - no valid credentials")
+                // x// x Print("🚫 UnifiedLeagueManager: Skipping ESPN - no valid credentials")
             }
         }
         
@@ -74,9 +74,9 @@ final class UnifiedLeagueManager: ObservableObject {
             return first.league.name < second.league.name
         }
         
-        // xprint("✅ UnifiedLeagueManager: Final result - \(allLeagues.count) leagues total")
+        // x// x Print("✅ UnifiedLeagueManager: Final result - \(allLeagues.count) leagues total")
         for (index, wrapper) in allLeagues.enumerated() {
-            // xprint("   \(index + 1). [\(wrapper.source.rawValue)] \(wrapper.league.name) - \(wrapper.league.totalRosters) teams")
+            // x// x Print("   \(index + 1). [\(wrapper.source.rawValue)] \(wrapper.league.name) - \(wrapper.league.totalRosters) teams")
         }
     }
     
@@ -85,16 +85,16 @@ final class UnifiedLeagueManager: ObservableObject {
         isLoadingSleeperLeagues = true
         defer { isLoadingSleeperLeagues = false }
         
-        // xprint("🔵 UnifiedLeagueManager: Fetching Sleeper leagues for user \(userID), season \(season)")
+        // x// x Print("🔵 UnifiedLeagueManager: Fetching Sleeper leagues for user \(userID), season \(season)")
         
         do {
             let leagues = try await sleeperClient.fetchLeagues(userID: userID, season: season)
-            // xprint("🔵 UnifiedLeagueManager: Sleeper API returned \(leagues.count) leagues")
+            // x// x Print("🔵 UnifiedLeagueManager: Sleeper API returned \(leagues.count) leagues")
             
             // Show ALL leagues, not just ones with active drafts
             // Users might want to see completed leagues too
             let sleeperWrappers = leagues.map { league in
-                // xprint("   • Sleeper League: \(league.name) (Draft ID: \(league.draftID ?? "none"), Status: \(league.status.displayName))")
+                // x// x Print("   • Sleeper League: \(league.name) (Draft ID: \(league.draftID ?? "none"), Status: \(league.status.displayName))")
                 return LeagueWrapper(
                     id: "sleeper_\(league.id)",
                     league: league,
@@ -107,10 +107,10 @@ final class UnifiedLeagueManager: ObservableObject {
             allLeagues.removeAll { $0.source == .sleeper }
             allLeagues.append(contentsOf: sleeperWrappers)
             
-            // xprint("✅ UnifiedLeagueManager: Added \(sleeperWrappers.count) Sleeper leagues")
+            // x// x Print("✅ UnifiedLeagueManager: Added \(sleeperWrappers.count) Sleeper leagues")
             
         } catch {
-            // xprint("❌ UnifiedLeagueManager: Failed to fetch Sleeper leagues for \(season): \(error)")
+            // x// x Print("❌ UnifiedLeagueManager: Failed to fetch Sleeper leagues for \(season): \(error)")
         }
     }
     
@@ -119,11 +119,11 @@ final class UnifiedLeagueManager: ObservableObject {
         isLoadingESPNLeagues = true
         defer { isLoadingESPNLeagues = false }
         
-        // xprint("🔴 UnifiedLeagueManager: Fetching ESPN leagues...")
+        // x// x Print("🔴 UnifiedLeagueManager: Fetching ESPN leagues...")
         
         // Use saved credentials instead of hardcoded ones
         guard let swid = espnCredentials.getSWID() else {
-            // xprint("❌ UnifiedLeagueManager: No ESPN SWID available")
+            // x// x Print("❌ UnifiedLeagueManager: No ESPN SWID available")
             return
         }
         
@@ -134,10 +134,10 @@ final class UnifiedLeagueManager: ObservableObject {
                 season: AppConstants.ESPNLeagueYear
             )
             
-            // xprint("🔴 UnifiedLeagueManager: ESPN API returned \(leagues.count) leagues")
+            // x// x Print("🔴 UnifiedLeagueManager: ESPN API returned \(leagues.count) leagues")
             
             let espnWrappers = leagues.map { league in
-                // xprint("   • ESPN League: \(league.name) (\(league.totalRosters) teams, Status: \(league.status.displayName))")
+                // x// x Print("   • ESPN League: \(league.name) (\(league.totalRosters) teams, Status: \(league.status.displayName))")
                 return LeagueWrapper(
                     id: "espn_\(league.id)",
                     league: league,
@@ -150,19 +150,19 @@ final class UnifiedLeagueManager: ObservableObject {
             allLeagues.removeAll { $0.source == .espn }
             allLeagues.append(contentsOf: espnWrappers)
             
-            // xprint("✅ UnifiedLeagueManager: Added \(espnWrappers.count) ESPN leagues")
+            // x// x Print("✅ UnifiedLeagueManager: Added \(espnWrappers.count) ESPN leagues")
             
         } catch ESPNAPIError.authenticationFailed {
-            // xprint("🔐 UnifiedLeagueManager: ESPN authentication failed - credentials may be expired")
+            // x// x Print("🔐 UnifiedLeagueManager: ESPN authentication failed - credentials may be expired")
             if let swid = espnCredentials.getSWID() {
-                // xprint("💡 Using SWID: \(String(swid.prefix(20)))...")
+                // x// x Print("💡 Using SWID: \(String(swid.prefix(20)))...")
             }
         } catch ESPNAPIError.decodingError(let error) {
-            // xprint("📄 UnifiedLeagueManager: ESPN data format error: \(error)")
+            // x// x Print("📄 UnifiedLeagueManager: ESPN data format error: \(error)")
         } catch {
-            // xprint("❌ UnifiedLeagueManager: Failed to fetch ESPN leagues: \(error)")
-            // xprint("🔍 Error type: \(type(of: error))")
-            // xprint("🔍 Error description: \(error.localizedDescription)")
+            // x// x Print("❌ UnifiedLeagueManager: Failed to fetch ESPN leagues: \(error)")
+            // x// x Print("🔍 Error type: \(type(of: error))")
+            // x// x Print("🔍 Error description: \(error.localizedDescription)")
         }
     }
     

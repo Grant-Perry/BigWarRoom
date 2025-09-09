@@ -165,7 +165,7 @@ final class FantasyViewModel: ObservableObject {
         self.myTeamID = myTeamID
         clearAllData()
         
-        print("🎯 LEAGUE SELECTION: Selected league \(league.league.name) with myTeamID: \(myTeamID ?? "nil")")
+        // x Print("🎯 LEAGUE SELECTION: Selected league \(league.league.name) with myTeamID: \(myTeamID ?? "nil")")
         
         Task {
             await fetchMatchups()

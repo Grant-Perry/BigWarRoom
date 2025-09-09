@@ -105,7 +105,7 @@ extension MatchupsHubViewModel {
         loadingLock.lock()
         if currentlyLoadingLeagues.contains(leagueKey) {
             loadingLock.unlock()
-            print("⚠️ LOADING: Already loading league \(league.league.name), skipping duplicate request")
+            // x Print("⚠️ LOADING: Already loading league \(league.league.name), skipping duplicate request")
             return nil
         }
         currentlyLoadingLeagues.insert(leagueKey)
@@ -132,12 +132,12 @@ extension MatchupsHubViewModel {
             
             // Step 1: Identify user's team ID
             guard let myTeamID = await provider.identifyMyTeamID() else {
-                print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
+                // x Print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil
             }
             
-            print("🎯 PROVIDER: Identified myTeamID = '\(myTeamID)' for \(league.league.name)")
+            // x Print("🎯 PROVIDER: Identified myTeamID = '\(myTeamID)' for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.4)
             
             // Step 2: Fetch matchups using isolated provider
@@ -154,7 +154,7 @@ extension MatchupsHubViewModel {
             
         } catch {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-            print("❌ LOADING: Failed to load league \(league.league.name): \(error)")
+            // x Print("❌ LOADING: Failed to load league \(league.league.name): \(error)")
             return nil
         }
     }
@@ -166,11 +166,11 @@ extension MatchupsHubViewModel {
         myTeamID: String, 
         provider: LeagueMatchupProvider
     ) async -> UnifiedMatchup? {
-        print("🏈 REGULAR: Processing regular league: \(league.league.name)")
+        // x Print("🏈 REGULAR: Processing regular league: \(league.league.name)")
         await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
         
         if matchups.isEmpty {
-            print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(getCurrentWeek())")
+            // x Print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(getCurrentWeek())")
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
             return nil
         }
@@ -188,11 +188,11 @@ extension MatchupsHubViewModel {
             )
             
             await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
-            print("✅ Created regular matchup for \(league.league.name): \(myMatchup.homeTeam.ownerName) vs \(myMatchup.awayTeam.ownerName)")
+            // x Print("✅ Created regular matchup for \(league.league.name): \(myMatchup.homeTeam.ownerName) vs \(myMatchup.awayTeam.ownerName)")
             return unifiedMatchup
         } else {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-            print("❌ REGULAR: No matchup found for team ID '\(myTeamID)' in \(league.league.name)")
+            // x Print("❌ REGULAR: No matchup found for team ID '\(myTeamID)' in \(league.league.name)")
             return nil
         }
     }

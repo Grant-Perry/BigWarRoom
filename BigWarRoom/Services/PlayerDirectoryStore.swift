@@ -83,13 +83,13 @@ final class PlayerDirectoryStore: ObservableObject {
     
     /// Refresh the player directory from Sleeper API
     func refreshPlayers() async {
-        // xprint("🔄 Refreshing player directory from Sleeper API...")
+        // x// x Print("🔄 Refreshing player directory from Sleeper API...")
         isLoading = true
         error = nil
         
         do {
             let fetchedPlayers = try await apiClient.fetchAllPlayers() // Returns [String: SleeperPlayer]
-            // xprint("✅ Fetched \(fetchedPlayers.count) players from Sleeper")
+            // x// x Print("✅ Fetched \(fetchedPlayers.count) players from Sleeper")
             
             players = fetchedPlayers
             lastUpdated = Date()
@@ -100,10 +100,10 @@ final class PlayerDirectoryStore: ObservableObject {
             // Cache the results
             cachePlayers()
             
-            // xprint("🎯 Player directory updated with \(players.count) players")
+            // x// x Print("🎯 Player directory updated with \(players.count) players")
             
         } catch {
-            // xprint("❌ Failed to refresh players: \(error)")
+            // x// x Print("❌ Failed to refresh players: \(error)")
             self.error = error
         }
         
@@ -113,7 +113,7 @@ final class PlayerDirectoryStore: ObservableObject {
     // MARK: -> Positional Rankings Calculation
     
     private func calculatePositionalRankings() {
-        // xprint("📊 Calculating NFL team positional rankings...")
+        // x// x Print("📊 Calculating NFL team positional rankings...")
         
         var rankings: [String: [String: Int]] = [:]
         
@@ -161,17 +161,17 @@ final class PlayerDirectoryStore: ObservableObject {
                     if index < 3 {
                         let name = player.shortName
                         let depthOrder = player.depthChartOrder ?? 99
-                        // xprint("     \(team) \(position)\(index + 1): \(name) (Depth: \(depthOrder))")
+                        // x// x Print("     \(team) \(position)\(index + 1): \(name) (Depth: \(depthOrder))")
                     }
                 }
             }
             
             rankings[position] = positionRankings
-            // xprint("   \(position): \(positionRankings.count) players ranked across all teams")
+            // x// x Print("   \(position): \(positionRankings.count) players ranked across all teams")
         }
         
         positionalRankings = rankings
-        // xprint("✅ NFL team positional rankings calculated for \(rankings.keys.count) positions")
+        // x// x Print("✅ NFL team positional rankings calculated for \(rankings.keys.count) positions")
     }
     
     // MARK: -> Player Conversion
@@ -240,16 +240,16 @@ final class PlayerDirectoryStore: ObservableObject {
             let data = try JSONEncoder().encode(Array(players.values))
             userDefaults.set(data, forKey: cacheKey)
             userDefaults.set(Date(), forKey: lastUpdatedKey)
-            // xprint("💾 Cached \(players.count) players")
+            // x// x Print("💾 Cached \(players.count) players")
         } catch {
-            // xprint("❌ Failed to cache players: \(error)")
+            // x// x Print("❌ Failed to cache players: \(error)")
         }
     }
     
     private func loadCachedPlayers() {
         guard let data = userDefaults.data(forKey: cacheKey),
               let cachedPlayers = try? JSONDecoder().decode([SleeperPlayer].self, from: data) else {
-            // xprint("📭 No cached players found")
+            // x// x Print("📭 No cached players found")
             return
         }
         
@@ -261,9 +261,9 @@ final class PlayerDirectoryStore: ObservableObject {
         players = playerDict
         lastUpdated = userDefaults.object(forKey: lastUpdatedKey) as? Date
         
-        // xprint("💾 Loaded \(players.count) cached players")
+        // x// x Print("💾 Loaded \(players.count) cached players")
         if let lastUpdated = lastUpdated {
-            // xprint("📅 Cache from: \(lastUpdated)")
+            // x// x Print("📅 Cache from: \(lastUpdated)")
         }
         
         // Calculate positional rankings for cached data

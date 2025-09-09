@@ -41,7 +41,7 @@ final class ESPNFantasyViewModel: ObservableObject {
         nflWeekService.$currentWeek
             .sink { [weak self] newWeek in
                 if self?.selectedWeek != newWeek {
-                    // xprint("🏈 ESPN: NFL Week Service updated week to \(newWeek)")
+                    // x// x Print("🏈 ESPN: NFL Week Service updated week to \(newWeek)")
                     self?.selectedWeek = newWeek
                 }
             }
@@ -51,7 +51,7 @@ final class ESPNFantasyViewModel: ObservableObject {
         nflWeekService.$currentYear
             .sink { [weak self] newYear in
                 if self?.selectedYear != newYear {
-                    // xprint("🏈 ESPN: NFL Week Service updated year to \(newYear)")
+                    // x// x Print("🏈 ESPN: NFL Week Service updated year to \(newYear)")
                     self?.selectedYear = newYear
                 }
             }
@@ -88,8 +88,8 @@ final class ESPNFantasyViewModel: ObservableObject {
         let espnToken = selectedYear == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
         
-        // xprint("🏈 ESPN API Request: \(url)")
-        // xprint("🔑 Using ESPN year: \(selectedYear)")
+        // x// x Print("🏈 ESPN API Request: \(url)")
+        // x// x Print("🔑 Using ESPN year: \(selectedYear)")
         
         URLSession.shared.dataTaskPublisher(for: request)
             .map(\.data)
@@ -100,13 +100,13 @@ final class ESPNFantasyViewModel: ObservableObject {
                 switch completion {
                 case .failure(let error):
                     self?.errorMessage = "Error fetching ESPN data: \(error.localizedDescription)"
-                    // xprint("❌ ESPN API Error: \(error)")
+                    // x// x Print("❌ ESPN API Error: \(error)")
                 case .finished:
                     break
                 }
             }, receiveValue: { [weak self] model in
                 self?.espnFantasyModel = model
-                // xprint("✅ ESPN data fetched: \(model.teams.count) teams, \(model.schedule.count) schedule entries")
+                // x// x Print("✅ ESPN data fetched: \(model.teams.count) teams, \(model.schedule.count) schedule entries")
             })
             .store(in: &cancellables)
     }
@@ -163,7 +163,7 @@ final class ESPNFantasyViewModel: ObservableObject {
     /// Fetch ESPN leagues for the manager
     private func fetchESPNManagerLeagues() {
         guard let url = URL(string: "https://fan.api.espn.com/apis/v2/fans/\(AppConstants.GpESPNID)?configuration=SITE_DEFAULT&displayEvents=true&displayNow=true&displayRecs=true&displayHiddenPrefs=true&featureFlags=expandAthlete&featureFlags=isolateEvents&featureFlags=challengeEntries&platform=web&recLimit=5&coreData=logos&showAirings=buy%2Clive%2Creplay&authorizedNetworks=espn3&entitlements=ESPN_PLUS&zipcode=23607") else {
-            // xprint("❌ Invalid ESPN manager leagues URL")
+            // x// x Print("❌ Invalid ESPN manager leagues URL")
             return
         }
         
@@ -177,12 +177,12 @@ final class ESPNFantasyViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink(receiveCompletion: { completion in
                 if case .failure(let error) = completion {
-                    // xprint("❌ Error fetching ESPN manager leagues: \(error)")
+                    // x// x Print("❌ Error fetching ESPN manager leagues: \(error)")
                 }
             }, receiveValue: { [weak self] data in
                 let leagues = self?.parseESPNLeagues(from: data) ?? []
                 self?.availableLeagues = leagues
-                // xprint("✅ Fetched \(leagues.count) ESPN leagues")
+                // x// x Print("✅ Fetched \(leagues.count) ESPN leagues")
             })
             .store(in: &cancellables)
     }
@@ -211,7 +211,7 @@ final class ESPNFantasyViewModel: ObservableObject {
                                         teamName: teamName
                                     )
                                     leagues.append(league)
-                                    // xprint("📺 Found ESPN league: \(teamName) (ID: \(groupId))")
+                                    // x// x Print("📺 Found ESPN league: \(teamName) (ID: \(groupId))")
                                 }
                             }
                         }
@@ -219,7 +219,7 @@ final class ESPNFantasyViewModel: ObservableObject {
                 }
             }
         } catch {
-            // xprint("❌ Error parsing ESPN leagues: \(error)")
+            // x// x Print("❌ Error parsing ESPN leagues: \(error)")
         }
         
         return leagues

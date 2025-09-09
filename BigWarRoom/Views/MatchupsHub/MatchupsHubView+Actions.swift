@@ -44,19 +44,19 @@ extension MatchupsHubView {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
                 if UIApplication.shared.applicationState == .active && !viewModel.isLoading {
-                    print("🔄 AUTO-REFRESH: Refreshing Mission Control data...")
+                    // x Print("🔄 AUTO-REFRESH: Refreshing Mission Control data...")
                     await viewModel.manualRefresh()
                 }
             }
         }
         
-        print("🚀 TIMER: Started Mission Control auto-refresh (\(AppConstants.MatchupRefresh)s intervals)")
+        // x Print("🚀 TIMER: Started Mission Control auto-refresh (\(AppConstants.MatchupRefresh)s intervals)")
     }
     
     func stopPeriodicRefresh() {
         refreshTimer?.invalidate()
         refreshTimer = nil
-        print("🛑 TIMER: Stopped Mission Control auto-refresh")
+        // x Print("🛑 TIMER: Stopped Mission Control auto-refresh")
     }
     
     func startCountdownTimer() {

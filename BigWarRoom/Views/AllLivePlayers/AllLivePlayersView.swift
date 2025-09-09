@@ -48,21 +48,20 @@ struct AllLivePlayersView: View {
     
     private var headerView: some View {
         VStack(spacing: 12) {
-            // Top row: Position filter and Sort toggle
-            HStack(spacing: 16) {
-                // Position filter (tight spacing) - Make it clickable!
+            // Manager info as full width header
+            if let firstManager = getFirstAvailableManager() {
+                fullWidthManagerHeader(firstManager)
+            }
+            
+            // Controls row with All selector, Sort controls
+            HStack {
                 HStack(spacing: 4) {
-                    Text("Position:")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    
                     Menu {
                         ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                             Button(action: {
                                 withAnimation(.easeInOut(duration: 0.3)) {
                                     viewModel.setPositionFilter(position)
-                                    animatedPlayers.removeAll() // Reset animations
+                                    animatedPlayers.removeAll()
                                 }
                             }) {
                                 HStack {
@@ -89,27 +88,34 @@ struct AllLivePlayersView: View {
                     }
                 }
                 
-                Spacer()
-                
-                // Sort toggle (like Mission Control)
                 HStack(spacing: 4) {
-                    Text("Sorted:")
+                    Text("Sort by:")
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
                     
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            sortHighToLow.toggle()
-                            applySorting()
-                            animatedPlayers.removeAll() // Reset animations
+                    Menu {
+                        ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    viewModel.setSortingMethod(method)
+                                    animatedPlayers.removeAll()
+                                }
+                            }) {
+                                HStack {
+                                    Text(method.displayName)
+                                    if viewModel.sortingMethod == method {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
                         }
-                    }) {
+                    } label: {
                         HStack(spacing: 6) {
-                            Text(sortHighToLow ? "Highest" : "Lowest")
+                            Text(viewModel.sortingMethod.displayName)
                                 .fontWeight(.semibold)
                             
-                            Image(systemName: sortHighToLow ? "arrow.down" : "arrow.up")
+                            Image(systemName: "chevron.down")
                                 .font(.caption)
                         }
                         .padding(.horizontal, 12)
@@ -119,6 +125,25 @@ struct AllLivePlayersView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
+                
+                // Sort direction toggle
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        sortHighToLow.toggle()
+                        applySorting()
+                        animatedPlayers.removeAll()
+                    }
+                }) {
+                    Text(sortDirectionText)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.orange.opacity(0.1))
+                        .foregroundColor(.orange)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+                
+                Spacer()
             }
             
             // Stats Summary
@@ -127,7 +152,7 @@ struct AllLivePlayersView: View {
             }
         }
         .padding(.horizontal)
-        .padding(.top, 8) // Minimal top padding
+        .padding(.top, 8)
         .padding(.bottom, 12)
         .background(Color(.systemGray6).opacity(0.3))
     }
@@ -223,7 +248,8 @@ struct AllLivePlayersView: View {
                             // Open matchup detail
                             selectedMatchup = playerEntry.matchup
                             showingMatchupDetail = true
-                        }
+                        },
+                        viewModel: viewModel
                     )
                     .onAppear {
                         // Staggered animation timing
@@ -244,6 +270,162 @@ struct AllLivePlayersView: View {
     // Helper function to apply sorting
     private func applySorting() {
         viewModel.setSortDirection(highToLow: sortHighToLow)
+    }
+    
+    // Dynamic text for sort direction based on sorting method
+    private var sortDirectionText: String {
+        switch viewModel.sortingMethod {
+        case .score:
+            return sortHighToLow ? "Highest" : "Lowest"
+        case .name:
+            return sortHighToLow ? "A to Z" : "Z to A"
+        }
+    }
+    
+    // MARK: - Full Width Manager Header
+    
+    private func fullWidthManagerHeader(_ manager: ManagerInfo) -> some View {
+        HStack(spacing: 12) {
+            // Manager avatar
+            Group {
+                if let avatarURL = manager.avatarURL {
+                    AsyncImage(url: avatarURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay(
+                                Text(manager.initials)
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            )
+                    }
+                } else {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            Text(manager.initials)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        )
+                }
+            }
+            .frame(width: 32, height: 32)
+            .clipShape(Circle())
+            
+            // Manager name and score
+            VStack(alignment: .leading, spacing: 2) {
+                Text(manager.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                Text(String(format: "%.1f", manager.score))
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(manager.scoreColor)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6).opacity(0.5))
+        )
+    }
+
+    // MARK: - Manager Info View
+    
+    private func managerInfoView(_ manager: ManagerInfo) -> some View {
+        HStack(spacing: 8) {
+            // Manager avatar
+            Group {
+                if let avatarURL = manager.avatarURL {
+                    AsyncImage(url: avatarURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                            .overlay(
+                                Text(manager.initials)
+                                    .font(.caption2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                            )
+                    }
+                } else {
+                    Circle()
+                        .fill(Color.gray.opacity(0.3))
+                        .overlay(
+                            Text(manager.initials)
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                        )
+                }
+            }
+            .frame(width: 24, height: 24)
+            .clipShape(Circle())
+            
+            // Manager name and score
+            VStack(alignment: .leading, spacing: 2) {
+                Text(manager.name)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                Text(String(format: "%.1f", manager.score))
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(manager.scoreColor)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemGray6).opacity(0.5))
+        )
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func getFirstAvailableManager() -> ManagerInfo? {
+        // Get the first available manager from the loaded matchups
+        for matchup in viewModel.matchupsHubViewModel.myMatchups {
+            if let myTeam = matchup.myTeam {
+                let isWinning = determineIfWinning(matchup: matchup, team: myTeam)
+                return ManagerInfo(
+                    name: myTeam.ownerName,
+                    score: myTeam.currentScore ?? 0.0,
+                    avatarURL: myTeam.avatarURL,
+                    scoreColor: isWinning ? .green : .red,
+                    initials: String(myTeam.ownerName.prefix(2)).uppercased()
+                )
+            }
+        }
+        return nil
+    }
+    
+    private func determineIfWinning(matchup: UnifiedMatchup, team: FantasyTeam) -> Bool {
+        // For chopped leagues, use ranking logic
+        if matchup.isChoppedLeague {
+            return true // Default to green for chopped leagues since there's no direct opponent
+        }
+        
+        // For regular matchups, compare against opponent
+        guard let opponent = matchup.opponentTeam else { return true }
+        return (team.currentScore ?? 0.0) > (opponent.currentScore ?? 0.0)
     }
 }
 
@@ -305,6 +487,16 @@ struct StatBlock: View {
                 .foregroundColor(.secondary)
         }
     }
+}
+
+// MARK: - Supporting Models
+
+struct ManagerInfo {
+    let name: String
+    let score: Double
+    let avatarURL: URL?
+    let scoreColor: Color
+    let initials: String
 }
 
 // MARK: - Preview

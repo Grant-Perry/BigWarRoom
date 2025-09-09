@@ -18,6 +18,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var topScore: Double = 0.0
     @Published var sortHighToLow = true
+    @Published var sortingMethod: SortingMethod = .score
     
     @Published var medianScore: Double = 0.0
     @Published var scoreRange: Double = 0.0
@@ -25,7 +26,11 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     @Published var positionTopScore: Double = 0.0
     
-    private let matchupsHubViewModel = MatchupsHubViewModel()
+    // 🔥 NEW: Centralized player stats
+    @Published var playerStats: [String: [String: Double]] = [:]
+    @Published var statsLoaded: Bool = false
+    
+    let matchupsHubViewModel = MatchupsHubViewModel()
     
     // MARK: - Player Position Filter
     enum PlayerPosition: String, CaseIterable, Identifiable {
@@ -96,6 +101,16 @@ final class AllLivePlayersViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Sorting Method
+    enum SortingMethod: String, CaseIterable, Identifiable {
+        case score = "Score"
+        case name = "Name"
+        
+        var id: String { rawValue }
+        
+        var displayName: String { rawValue }
+    }
+    
     // MARK: - Data Loading
     
     func loadAllPlayers() async {
@@ -153,6 +168,9 @@ final class AllLivePlayersViewModel: ObservableObject {
                 )
             }
             
+            // 🔥 Load player stats BEFORE applying filters
+            await loadPlayerStats()
+            
             // Apply initial filter
             applyPositionFilter()
             
@@ -163,6 +181,26 @@ final class AllLivePlayersViewModel: ObservableObject {
         isLoading = false
     }
     
+    // 🔥 NEW: Load player stats at view model level
+    private func loadPlayerStats() async {
+        let currentYear = "2024"
+        let currentWeek = NFLWeekService.shared.currentWeek
+        
+        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(currentWeek)") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+            
+            await MainActor.run {
+                self.playerStats = statsData
+                self.statsLoaded = true
+            }
+        } catch {
+            // Silent fail
+        }
+    }
+
     private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
         
@@ -237,6 +275,11 @@ final class AllLivePlayersViewModel: ObservableObject {
         applyPositionFilter() // Re-apply filter with new sort direction
     }
     
+    func setSortingMethod(_ method: SortingMethod) {
+        sortingMethod = method
+        applyPositionFilter() // Re-apply filter with new sorting method
+    }
+    
     private func applyPositionFilter() {
         let players = selectedPosition == .all ? 
             allPlayers : 
@@ -267,11 +310,22 @@ final class AllLivePlayersViewModel: ObservableObject {
             )
         }
         
-        // Apply sorting based on direction
-        if sortHighToLow {
-            filteredPlayers = updatedPlayers.sorted { $0.currentScore > $1.currentScore }
-        } else {
-            filteredPlayers = updatedPlayers.sorted { $0.currentScore < $1.currentScore }
+        // Apply sorting based on method and direction
+        switch sortingMethod {
+        case .score:
+            if sortHighToLow {
+                filteredPlayers = updatedPlayers.sorted { $0.currentScore > $1.currentScore }
+            } else {
+                filteredPlayers = updatedPlayers.sorted { $0.currentScore < $1.currentScore }
+            }
+        case .name:
+            if sortHighToLow {
+                // A to Z (ascending alphabetically, but we call it "high to low" for consistency)
+                filteredPlayers = updatedPlayers.sorted { $0.playerName < $1.playerName }
+            } else {
+                // Z to A (descending alphabetically)
+                filteredPlayers = updatedPlayers.sorted { $0.playerName > $1.playerName }
+            }
         }
     }
     

@@ -164,7 +164,7 @@ struct LoadingScreen: View {
         // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
-        // xprint("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
+        // x// x Print("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
             // Add exit animation here if needed
@@ -357,6 +357,6 @@ struct BokehLayer: View {
 
 #Preview {
     LoadingScreen { _ in
-        // xprint("Splash complete!")
+        // x// x Print("Splash complete!")
     }
 }

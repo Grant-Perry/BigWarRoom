@@ -51,7 +51,7 @@ extension DraftRoomViewModel {
                     confirmationAlertMessage = "🎉 PICK CONFIRMED!\n\n\(player.fullName)\n\(player.position ?? "") • \(player.team ?? "")\n\nRound \(pick.round), Pick \(pick.pickNo)"
                     showingConfirmationAlert = true
                     
-                    // xprint("🏈 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
+                    // x// x Print("🏈 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
                 }
             }
         }
@@ -138,25 +138,25 @@ extension DraftRoomViewModel {
     
     /// Public Team Name Helper with Debugging
     func teamDisplayName(for draftSlot: Int) -> String {
-        // xprint("🔍 DEBUG teamDisplayName for draftSlot \(draftSlot):")
-        // xprint("   draftRosters count: \(draftRosters.count)")
+        // x// x Print("🔍 DEBUG teamDisplayName for draftSlot \(draftSlot):")
+        // x// x Print("   draftRosters count: \(draftRosters.count)")
         
         // Strategy 1: Find the rosterID that corresponds to this draft slot
         // Look through picks to find which roster ID is associated with this draft slot
         let picksForSlot = allDraftPicks.filter { $0.draftSlot == draftSlot }
-        // xprint("   Picks for slot \(draftSlot): \(picksForSlot.count)")
+        // x// x Print("   Picks for slot \(draftSlot): \(picksForSlot.count)")
         
         // Get the roster ID from any pick in this draft slot
         var rosterIDForSlot: Int? = nil
         if let firstPick = picksForSlot.first {
             rosterIDForSlot = firstPick.rosterInfo?.rosterID
-            // xprint("   Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)")
+            // x// x Print("   Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)")
         }
         
         // Strategy 2: If we found a roster ID, lookup its display name
         if let rosterID = rosterIDForSlot,
            let rosterInfo = draftRosters[rosterID] {
-            // xprint("   Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'")
+            // x// x Print("   Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'")
             
             // Check if this is a real name (not generic "Team X")
             if !rosterInfo.displayName.isEmpty,
@@ -164,10 +164,10 @@ extension DraftRoomViewModel {
                rosterInfo.displayName != "Team \(draftSlot)",
                rosterInfo.displayName != "Team \(rosterID)",
                rosterInfo.displayName.count > 4 {
-                // xprint("   ✅ Using real name: '\(rosterInfo.displayName)'")
+                // x// x Print("   ✅ Using real name: '\(rosterInfo.displayName)'")
                 return rosterInfo.displayName
             } else {
-                // xprint("   ❌ Name '\(rosterInfo.displayName)' appears to be generic")
+                // x// x Print("   ❌ Name '\(rosterInfo.displayName)' appears to be generic")
             }
         }
         
@@ -180,7 +180,7 @@ extension DraftRoomViewModel {
             return directRoster.displayName
         }
         
-        // xprint("   ❌ No real name found, using fallback")
+        // x// x Print("   ❌ No real name found, using fallback")
         return "Team \(draftSlot)"
     }
 }

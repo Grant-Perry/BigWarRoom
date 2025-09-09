@@ -79,7 +79,7 @@ final class SuggestionEngine {
             
             return Array(suggestions.prefix(limit))
         } catch {
-            // xprint("❌ AI suggestion failed: \(error)")
+            // x// x Print("❌ AI suggestion failed: \(error)")
             return Array(hardcodedTop5(from: available, roster: roster).prefix(limit))
         }
     }
@@ -99,7 +99,7 @@ final class SuggestionEngine {
             )
             return result
         } catch {
-            // xprint("❌ AI suggestion failed: \(error)")
+            // x// x Print("❌ AI suggestion failed: \(error)")
             return hardcodedTop5(from: available, roster: roster)
         }
     }

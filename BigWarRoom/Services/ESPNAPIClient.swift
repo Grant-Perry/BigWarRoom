@@ -22,11 +22,11 @@ final class ESPNAPIClient: DraftAPIClient {
     private func authHeaders() -> [String: String] {
         // Use dynamic credentials instead of hardcoded ones
         guard let headers = credentialsManager.generateAuthHeaders() else {
-            // xprint("❌ No ESPN credentials configured")
+            // x// x Print("❌ No ESPN credentials configured")
             return [:]
         }
         
-        // xprint("🔐 ESPN Auth Cookie: \(String(headers["Cookie"]?.prefix(50) ?? ""))...")
+        // x// x Print("🔐 ESPN Auth Cookie: \(String(headers["Cookie"]?.prefix(50) ?? ""))...")
         return headers
     }
     
@@ -56,7 +56,7 @@ final class ESPNAPIClient: DraftAPIClient {
                 let league = try await fetchLeague(leagueID: leagueID)
                 leagues.append(league)
             } catch {
-                // xprint("❌ Failed to fetch ESPN league \(leagueID): \(error)")
+                // x// x Print("❌ Failed to fetch ESPN league \(leagueID): \(error)")
                 // Continue with other leagues even if one fails
             }
         }
@@ -72,7 +72,7 @@ final class ESPNAPIClient: DraftAPIClient {
         do {
             return try await fetchLeagueWithToken(leagueID: leagueID, token: primaryToken)
         } catch ESPNAPIError.authenticationFailed {
-            print("🔄 ESPN: Primary token failed for league \(leagueID), trying alternate token...")
+            // x Print("🔄 ESPN: Primary token failed for league \(leagueID), trying alternate token...")
             
             // Try with the alternate token
             let alternateToken = leagueID == "1241361400" ? 
@@ -87,8 +87,8 @@ final class ESPNAPIClient: DraftAPIClient {
     private func fetchLeagueWithToken(leagueID: String, token: String) async throws -> SleeperLeague {
         // Updated view parameters to include members data for manager name mapping
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
-        print("🌐 ESPN API Request: \(urlString)")
-        print("🔑 Using token: \(String(token.prefix(50)))...")
+        // x Print("🌐 ESPN API Request: \(urlString)")
+        // x Print("🔑 Using token: \(String(token.prefix(50)))...")
     
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -107,90 +107,90 @@ final class ESPNAPIClient: DraftAPIClient {
                 throw ESPNAPIError.invalidResponse
             }
     
-            print("📡 ESPN Response Status: \(httpResponse.statusCode)")
+            // x Print("📡 ESPN Response Status: \(httpResponse.statusCode)")
     
             if httpResponse.statusCode == 401 {
-                print("❌ ESPN Authentication failed - check espn_s2 and SWID cookies")
+                // x Print("❌ ESPN Authentication failed - check espn_s2 and SWID cookies")
                 throw ESPNAPIError.authenticationFailed
             }
     
             if httpResponse.statusCode == 403 {
-                print("❌ ESPN Access forbidden - league may be private or cookies expired")
+                // x Print("❌ ESPN Access forbidden - league may be private or cookies expired")
                 throw ESPNAPIError.authenticationFailed
             }
     
             guard httpResponse.statusCode == 200 else {
-                print("❌ ESPN API returned status: \(httpResponse.statusCode)")
+                // x Print("❌ ESPN API returned status: \(httpResponse.statusCode)")
     
                 // Try to log response for debugging
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("📄 ESPN Response: \(String(responseString.prefix(500)))...")
+                    // x Print("📄 ESPN Response: \(String(responseString.prefix(500)))...")
                 }
     
                 throw ESPNAPIError.invalidResponse
             }
     
             // Log successful response
-            print("✅ ESPN API Success - received \(data.count) bytes")
+            // x Print("✅ ESPN API Success - received \(data.count) bytes")
     
             // Check if response looks like JSON
             if let responseString = String(data: data, encoding: .utf8) {
                 if responseString.starts(with: "<") {
-                    print("❌ ESPN returned HTML instead of JSON")
-                    print("📄 HTML Response: \(String(responseString.prefix(300)))...")
+                    // x Print("❌ ESPN returned HTML instead of JSON")
+                    // x Print("📄 HTML Response: \(String(responseString.prefix(300)))...")
                     throw ESPNAPIError.invalidResponse
                 }
                 
                 // Log first bit of JSON for debugging
-                print("📄 JSON Response: \(String(responseString.prefix(500)))...")
+                // x Print("📄 JSON Response: \(String(responseString.prefix(500)))...")
             }
     
             let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
-            print("✅ Fetched ESPN league: \(espnLeague.displayName)")
-            print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
-            print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
+            // x Print("✅ Fetched ESPN league: \(espnLeague.displayName)")
+            // x Print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
+            // x Print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
             
             // NEW: Log members data for debugging
             if let members = espnLeague.members {
-                print("👥 Found \(members.count) league members:")
+                // x Print("👥 Found \(members.count) league members:")
                 for member in members {
                     let displayName = member.displayName ?? "No Display Name"
                     let firstName = member.firstName ?? ""
                     let lastName = member.lastName ?? ""
                     let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-                    print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
+                    // x Print("   ID: \(member.id) - Display: \(displayName) - Full: \(fullName)")
                 }
             } else {
-                print("⚠️ No members data found in league response")
+                // x Print("⚠️ No members data found in league response")
             }
             
             // NEW: Log team owners for debugging
             if let teams = espnLeague.teams {
-                print("🏈 Team owner mapping:")
+                // x Print("🏈 Team owner mapping:")
                 for team in teams {
                     let owners = team.owners ?? []
                     let managerName = espnLeague.getManagerName(for: team.owners)
-                    print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
+                    // x Print("   Team \(team.id) (\(team.displayName)): Owners=\(owners) -> Manager: \(managerName)")
                 }
             }
             
-            print("🔢 ESPN League Team Count Debug:")
-            print("   Raw size field: \(espnLeague.size ?? -1)")
-            print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
-            print("   Calculated totalRosters: \(espnLeague.totalRosters)")
+            // x Print("🔢 ESPN League Team Count Debug:")
+            // x Print("   Raw size field: \(espnLeague.size ?? -1)")
+            // x Print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
+            // x Print("   Calculated totalRosters: \(espnLeague.totalRosters)")
 
             return espnLeague.toSleeperLeague()
     
         } catch DecodingError.keyNotFound(let key, let context) {
-            print("❌ ESPN JSON Decode Error - Missing key: \(key)")
-            print("📄 Context: \(context)")
+            // x Print("❌ ESPN JSON Decode Error - Missing key: \(key)")
+            // x Print("📄 Context: \(context)")
             throw ESPNAPIError.decodingError(DecodingError.keyNotFound(key, context))
         } catch DecodingError.typeMismatch(let type, let context) {
-            print("❌ ESPN JSON Decode Error - Type mismatch: \(type)")
-            print("📄 Context: \(context)")
+            // x Print("❌ ESPN JSON Decode Error - Type mismatch: \(type)")
+            // x Print("📄 Context: \(context)")
             throw ESPNAPIError.decodingError(DecodingError.typeMismatch(type, context))
         } catch {
-            print("❌ ESPN Network Error: \(error)")
+            // x Print("❌ ESPN Network Error: \(error)")
             throw ESPNAPIError.networkError(error)
         }
     }
@@ -204,7 +204,7 @@ final class ESPNAPIClient: DraftAPIClient {
         
         // Updated with working view parameters
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mSettings&view=mTeam"
-        // xprint("🌐 ESPN Draft API Request: \(urlString)")
+        // x// x Print("🌐 ESPN Draft API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -231,17 +231,17 @@ final class ESPNAPIClient: DraftAPIClient {
         }
         
         // DEBUG: Log draft completion information
-        // xprint("🗓️ ESPN Draft Detail Info:")
-        // xprint("   Draft ID: \(draftDetail.id ?? -1)")
-        // xprint("   In Progress: \(draftDetail.inProgress ?? false)")
-        // xprint("   Complete Date (raw): \(draftDetail.completeDate ?? 0)")
+        // x// x Print("🗓️ ESPN Draft Detail Info:")
+        // x// x Print("   Draft ID: \(draftDetail.id ?? -1)")
+        // x// x Print("   In Progress: \(draftDetail.inProgress ?? false)")
+        // x// x Print("   Complete Date (raw): \(draftDetail.completeDate ?? 0)")
         if let completionDate = draftDetail.completionDate {
-            // xprint("   Complete Date (formatted): \(completionDate)")
+            // x// x Print("   Complete Date (formatted): \(completionDate)")
         }
         if let completionString = draftDetail.completionDateString {
-            // xprint("   Complete Date (string): \(completionString)")
+            // x// x Print("   Complete Date (string): \(completionString)")
         }
-        // xprint("   Order Type: \(draftDetail.orderType ?? "unknown")")
+        // x// x Print("   Order Type: \(draftDetail.orderType ?? "unknown")")
         
         return draftDetail.toSleeperDraft(leagueID: leagueID)
     }
@@ -254,7 +254,7 @@ final class ESPNAPIClient: DraftAPIClient {
         
         // Use comprehensive view parameters to get draft data and picks
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mTeam&view=mRoster&view=mMatchup&view=mSettings"
-        // xprint("🌐 ESPN Draft Picks API Request: \(urlString)")
+        // x// x Print("🌐 ESPN Draft Picks API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -271,11 +271,11 @@ final class ESPNAPIClient: DraftAPIClient {
         
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
-            // xprint("❌ ESPN Draft Picks API failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
+            // x// x Print("❌ ESPN Draft Picks API failed with status: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
             throw ESPNAPIError.invalidResponse
         }
         
-        // xprint("✅ ESPN Draft Picks API Success - received \(data.count) bytes")
+        // x// x Print("✅ ESPN Draft Picks API Success - received \(data.count) bytes")
         
         do {
             // First try to decode as a complete league response with draft data
@@ -283,17 +283,17 @@ final class ESPNAPIClient: DraftAPIClient {
             
             // DEBUG: Log draft information if available
             if let draftDetail = leagueResponse.draftDetail {
-                // xprint("🗓️ ESPN Draft Information:")
-                // xprint("   Draft Complete: \(draftDetail.completeDate != nil)")
+                // x// x Print("🗓️ ESPN Draft Information:")
+                // x// x Print("   Draft Complete: \(draftDetail.completeDate != nil)")
                 if let completionString = draftDetail.completionDateString {
-                    // xprint("   Completion Date: \(completionString)")
+                    // x// x Print("   Completion Date: \(completionString)")
                 }
-                // xprint("   In Progress: \(draftDetail.inProgress ?? false)")
-                // xprint("   Draft Type: \(draftDetail.orderType ?? "unknown")")
+                // x// x Print("   In Progress: \(draftDetail.inProgress ?? false)")
+                // x// x Print("   Draft Type: \(draftDetail.orderType ?? "unknown")")
                 
                 // PRIORITY: Use actual draft picks if available
                 if let espnPicks = draftDetail.picks {
-                    // xprint("🎯 Found \(espnPicks.count) actual ESPN draft picks! Using real draft data.")
+                    // x// x Print("🎯 Found \(espnPicks.count) actual ESPN draft picks! Using real draft data.")
                     
                     // Build player directory from teams for conversion
                     var playerDirectory: [Int: ESPNPlayer] = [:]
@@ -312,7 +312,7 @@ final class ESPNAPIClient: DraftAPIClient {
                     // Convert ESPN picks to Sleeper picks with embedded ESPN data
                     let sleeperPicks = espnPicks.compactMap { espnPick -> SleeperPick? in
                         guard let player = playerDirectory[espnPick.playerId] else { 
-                            // xprint("⚠️ No player data for pick \(espnPick.overallPickNumber ?? espnPick.id): ESPN ID \(espnPick.playerId)")
+                            // x// x Print("⚠️ No player data for pick \(espnPick.overallPickNumber ?? espnPick.id): ESPN ID \(espnPick.playerId)")
                             return nil
                         }
                         
@@ -334,7 +334,7 @@ final class ESPNAPIClient: DraftAPIClient {
                         // NEW: Get the manager name for this team
                         let managerName = leagueResponse.getManagerName(for: leagueResponse.teams?.first { $0.id == espnPick.teamId }?.owners)
                         
-                        // xprint("🔧 ESPN Pick \(pickNumber): TeamId=\(espnPick.teamId), CalculatedSlot=\(calculatedDraftSlot), Manager=\(managerName)")
+                        // x// x Print("🔧 ESPN Pick \(pickNumber): TeamId=\(espnPick.teamId), CalculatedSlot=\(calculatedDraftSlot), Manager=\(managerName)")
                         
                         return SleeperPick(
                             draftID: draftID,
@@ -364,25 +364,25 @@ final class ESPNAPIClient: DraftAPIClient {
                     // Sort picks by pick number to maintain order
                     let sortedPicks = sleeperPicks.sorted { $0.pickNo < $1.pickNo }
                     
-                    // xprint("✅ Using \(sortedPicks.count) ACTUAL ESPN draft picks with CALCULATED draft slots")
+                    // x// x Print("✅ Using \(sortedPicks.count) ACTUAL ESPN draft picks with CALCULATED draft slots")
                     return sortedPicks
                 } else {
                     // NO FALLBACK - If there are no actual draft picks, return empty array
-                    // xprint("❌ No actual ESPN draft picks found and roster reconstruction is disabled")
-                    // xprint("   This prevents incorrect pick order calculations from team roster data")
+                    // x// x Print("❌ No actual ESPN draft picks found and roster reconstruction is disabled")
+                    // x// x Print("   This prevents incorrect pick order calculations from team roster data")
                     return []
                 }
             }
             
             // FALLBACK: If no actual draft picks, reconstruct from rosters (only as last resort)
-            // xprint("⚠️ No actual ESPN draft picks found, falling back to roster reconstruction...")
+            // x// x Print("⚠️ No actual ESPN draft picks found, falling back to roster reconstruction...")
             
             // Extract draft picks from the teams' rosters
             var draftPicks: [SleeperPick] = []
             
             if let teams = leagueResponse.teams {
                 let teamCount = teams.count
-                // xprint("🔍 Processing \(teamCount) teams for draft reconstruction")
+                // x// x Print("🔍 Processing \(teamCount) teams for draft reconstruction")
                 
                 // For completed drafts, we need to reconstruct picks from rosters using PROPER snake draft logic
                 // Create a map of team ID to roster position (1-based)
@@ -390,7 +390,7 @@ final class ESPNAPIClient: DraftAPIClient {
                 
                 for (teamIndex, team) in sortedTeams.enumerated() {
                     if let roster = team.roster?.entries {
-                        // xprint("🔍 Team \(team.id) has \(roster.count) roster entries")
+                        // x// x Print("🔍 Team \(team.id) has \(roster.count) roster entries")
                         
                         // Calculate this team's pick numbers using snake draft logic
                         let draftPosition = teamIndex + 1 // 1-based position (1, 2, 3, etc.)
@@ -443,7 +443,7 @@ final class ESPNAPIClient: DraftAPIClient {
                             
                             draftPicks.append(pick)
                             
-                            // xprint("✅ Created pick \(pickNumber): \(player.fullName ?? "Unknown") (ESPN ID: \(player.id)) - Round \(round), Pos \(draftPosition), Manager: \(leagueResponse.getManagerName(for: team.owners))")
+                            // x// x Print("✅ Created pick \(pickNumber): \(player.fullName ?? "Unknown") (ESPN ID: \(player.id)) - Round \(round), Pos \(draftPosition), Manager: \(leagueResponse.getManagerName(for: team.owners))")
                         }
                     }
                 }
@@ -452,11 +452,11 @@ final class ESPNAPIClient: DraftAPIClient {
             // Sort picks by pick number to maintain order
             draftPicks.sort { $0.pickNo < $1.pickNo }
             
-            // xprint("✅ Reconstructed \(draftPicks.count) draft picks from ESPN rosters with embedded ESPN data")
+            // x// x Print("✅ Reconstructed \(draftPicks.count) draft picks from ESPN rosters with embedded ESPN data")
             return draftPicks
             
         } catch {
-            // xprint("❌ Failed to decode ESPN draft picks response: \(error)")
+            // x// x Print("❌ Failed to decode ESPN draft picks response: \(error)")
             throw ESPNAPIError.decodingError(error)
         }
     }
@@ -465,7 +465,7 @@ final class ESPNAPIClient: DraftAPIClient {
     func fetchRosters(leagueID: String) async throws -> [SleeperRoster] {
         // ENHANCED: Fetch both team and member data with comprehensive view parameters
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster&view=mSettings"
-        // xprint("🌐 ESPN Rosters API Request: \(urlString)")
+        // x// x Print("🌐 ESPN Rosters API Request: \(urlString)")
     
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -487,9 +487,9 @@ final class ESPNAPIClient: DraftAPIClient {
         
         // COMPLETE JSON DUMP for debugging - this will be HUGE
         if let responseString = String(data: data, encoding: .utf8) {
-            // xprint("🔍 COMPLETE ESPN JSON RESPONSE:")
-            // xprint("=====================================")
-            // xprint("=====================================")
+            // x// x Print("🔍 COMPLETE ESPN JSON RESPONSE:")
+            // x// x Print("=====================================")
+            // x// x Print("=====================================")
         }
     
         let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
@@ -499,35 +499,35 @@ final class ESPNAPIClient: DraftAPIClient {
         }
         
         // CRITICAL: Build member lookup dictionary and log everything
-        // xprint("🔍 ESPN League Members Mapping:")
+        // x// x Print("🔍 ESPN League Members Mapping:")
         var memberLookup: [String: ESPNMember] = [:]
         if let members = espnLeague.members {
-            // xprint("   Found \(members.count) league members:")
+            // x// x Print("   Found \(members.count) league members:")
             for member in members {
                 memberLookup[member.id] = member
                 let displayName = member.displayName ?? "No Display Name"
                 let firstName = member.firstName ?? ""
                 let lastName = member.lastName ?? ""
                 let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-                // xprint("   👤 Member \(member.id): Display=\"\(displayName)\", First=\"\(firstName)\", Last=\"\(lastName)\", Full=\"\(fullName)\"")
+                // x// x Print("   👤 Member \(member.id): Display=\"\(displayName)\", First=\"\(firstName)\", Last=\"\(lastName)\", Full=\"\(fullName)\"")
             }
         } else {
-            // xprint("   ⚠️ No members array found in ESPN response - this is the problem!")
+            // x// x Print("   ⚠️ No members array found in ESPN response - this is the problem!")
         }
         
         // ENHANCED: Convert teams to rosters with proper owner name mapping
-        // xprint("🔍 ESPN Team to Roster Mapping:")
+        // x// x Print("🔍 ESPN Team to Roster Mapping:")
         let rosters = teams.map { team in
-            // xprint("   Team \(team.id): '\(team.displayName)'")
-            // xprint("     Owners: \(team.owners ?? [])")
+            // x// x Print("   Team \(team.id): '\(team.displayName)'")
+            // x// x Print("     Owners: \(team.owners ?? [])")
             
             let managerName = espnLeague.getManagerName(for: team.owners)
-            // xprint("     ✅ Final Manager Name: '\(managerName)'")
+            // x// x Print("     ✅ Final Manager Name: '\(managerName)'")
             
             return team.toSleeperRoster(leagueID: leagueID, league: espnLeague)
         }
     
-        // xprint("✅ Fetched \(rosters.count) ESPN rosters for league \(leagueID) with enhanced owner mapping")
+        // x// x Print("✅ Fetched \(rosters.count) ESPN rosters for league \(leagueID) with enhanced owner mapping")
         return rosters
     }
     
@@ -580,7 +580,7 @@ final class ESPNAPIClient: DraftAPIClient {
     func fetchLeagueMembers(leagueID: String) async throws -> [ESPNMember] {
         // Updated with working view parameters
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
-        // xprint("🌐 ESPN Members API Request: \(urlString)")
+        // x// x Print("🌐 ESPN Members API Request: \(urlString)")
     
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -628,7 +628,7 @@ final class ESPNAPIClient: DraftAPIClient {
         do {
             return try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: primaryToken)
         } catch ESPNAPIError.authenticationFailed {
-            print("🔄 ESPN: Primary token failed for league ownership \(leagueID), trying alternate token...")
+            // x Print("🔄 ESPN: Primary token failed for league ownership \(leagueID), trying alternate token...")
             
             // Try with the alternate token
             let alternateToken = leagueID == "1241361400" ? 
@@ -675,10 +675,10 @@ final class ESPNAPIClient: DraftAPIClient {
     func debugESPNConnection(leagueID: String) async {
         // Updated with working API URL and view parameters
         let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam"
-        // xprint("🔧 DEBUG ESPN API Request: \(urlString)")
+        // x// x Print("🔧 DEBUG ESPN API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {
-            // xprint("❌ Invalid URL")
+            // x// x Print("❌ Invalid URL")
             return
         }
         
@@ -690,13 +690,13 @@ final class ESPNAPIClient: DraftAPIClient {
         }
         
         // Log all headers
-        // xprint("🔐 Request Headers:")
+        // x// x Print("🔐 Request Headers:")
         if let headers = request.allHTTPHeaderFields {
             for (key, value) in headers {
                 if key == "Cookie" {
-                    // xprint("  \(key): \(String(value.prefix(100)))...")
+                    // x// x Print("  \(key): \(String(value.prefix(100)))...")
                 } else {
-                    // xprint("  \(key): \(value)")
+                    // x// x Print("  \(key): \(value)")
                 }
             }
         }
@@ -705,26 +705,26 @@ final class ESPNAPIClient: DraftAPIClient {
             let (data, response) = try await session.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse {
-                // xprint("📡 Response Status: \(httpResponse.statusCode)")
-                // xprint("📡 Response Headers:")
+                // x// x Print("📡 Response Status: \(httpResponse.statusCode)")
+                // x// x Print("📡 Response Headers:")
                 for (key, value) in httpResponse.allHeaderFields {
-                    // xprint("  \(String(describing: key)): \(String(describing: value))")
+                    // x// x Print("  \(String(describing: key)): \(String(describing: value))")
                 }
             }
             
             // Log raw response
             if let responseString = String(data: data, encoding: .utf8) {
-                // xprint("📄 Raw Response (\(data.count) bytes):")
+                // x// x Print("📄 Raw Response (\(data.count) bytes):")
                 
                 if responseString.starts(with: "{") {
-                    // xprint("✅ Response looks like JSON!")
+                    // x// x Print("✅ Response looks like JSON!")
                 } else {
-                    // xprint("❌ Response is NOT JSON - likely HTML error page")
+                    // x// x Print("❌ Response is NOT JSON - likely HTML error page")
                 }
             }
             
         } catch {
-            // xprint("❌ Network Error: \(error)")
+            // x// x Print("❌ Network Error: \(error)")
         }
     }
 }

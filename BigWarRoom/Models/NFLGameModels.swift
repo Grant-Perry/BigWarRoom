@@ -225,14 +225,14 @@ class NFLGameDataService: ObservableObject {
                     self?.isLoading = false
                     if case .failure(let error) = completion {
                         self?.errorMessage = "Failed to fetch NFL data: \(error.localizedDescription)"
-                        // xprint("🏈 NFLGameDataService Error: \(error)")
+                        // x// x Print("🏈 NFLGameDataService Error: \(error)")
                     }
                 },
                 receiveValue: { [weak self] response in
                     self?.cache = response
                     self?.cacheTimestamp = Date()
                     self?.processGameData(response)
-                    // xprint("🏈 Successfully fetched NFL data for Week \(week)")
+                    // x// x Print("🏈 Successfully fetched NFL data for Week \(week)")
                 }
             )
     }
@@ -305,7 +305,7 @@ class NFLGameDataService: ObservableObject {
             // Only refresh if we have live games
             let hasLiveGames = self?.gameData.values.contains { $0.isLive } ?? false
             if hasLiveGames {
-                // xprint("🏈 NFL Live Update: Refreshing game data (every \(AppConstants.MatchupRefresh)s)")
+                // x// x Print("🏈 NFL Live Update: Refreshing game data (every \(AppConstants.MatchupRefresh)s)")
                 self?.fetchGameData(forWeek: week, year: year, forceRefresh: true)
             }
         }

@@ -51,37 +51,29 @@ final class LeagueMatchupProvider {
         self.league = league
         self.week = week
         self.year = year
-        
-        print("🆕 PROVIDER: Created isolated provider for \(league.league.name) week \(week)")
     }
     
     // MARK: -> Team Identification
     
     /// Identify the authenticated user's team ID in this league
     func identifyMyTeamID() async -> String? {
-        print("🔍 PROVIDER: Identifying user team in \(league.league.name)")
-        
         if league.source == .sleeper {
             if let rosterID = await getCurrentUserRosterID() {
                 let teamID = String(rosterID)
-                print("🎯 SLEEPER: Identified myTeamID = \(teamID) (rosterID: \(rosterID))")
                 return teamID
             }
         } else if league.source == .espn {
             if let teamID = await getESPNUserTeamID() {
-                print("🎯 ESPN: Identified myTeamID = \(teamID)")
                 return teamID
             }
         }
         
-        print("❌ PROVIDER: Failed to identify user team in \(league.league.name)")
         return nil
     }
     
     /// Get current user's roster ID for Sleeper leagues
     private func getCurrentUserRosterID() async -> Int? {
         guard !sleeperCredentials.currentUserID.isEmpty else {
-            print("❌ SLEEPER: No user ID available for roster identification")
             return nil
         }
         
@@ -90,14 +82,11 @@ final class LeagueMatchupProvider {
             let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
             
             if let userRoster = userRoster {
-                print("🎯 SLEEPER: Found user roster ID \(userRoster.rosterID) for user \(sleeperCredentials.currentUserID)")
                 return userRoster.rosterID
             } else {
-                print("⚠️ SLEEPER: No roster found for user \(sleeperCredentials.currentUserID) in league \(league.league.leagueID)")
                 return nil
             }
         } catch {
-            print("❌ SLEEPER: Failed to fetch rosters for league \(league.league.leagueID): \(error)")
             return nil
         }
     }
@@ -116,10 +105,8 @@ final class LeagueMatchupProvider {
                 }
             }
             
-            print("❌ ESPN: Could not find team for SWID '\(myESPNID)' in league \(league.league.name)")
             return nil
         } catch {
-            print("❌ ESPN: Failed to fetch team ownership for league \(league.league.leagueID): \(error)")
             return nil
         }
     }
@@ -128,8 +115,6 @@ final class LeagueMatchupProvider {
     
     /// Fetch all matchup data for this league
     func fetchMatchups() async throws -> [FantasyMatchup] {
-        print("🔍 PROVIDER: Fetching matchups for \(league.league.name) week \(week)")
-        
         // Clear previous state
         matchups = []
         byeWeekTeams = []
@@ -142,7 +127,6 @@ final class LeagueMatchupProvider {
             await fetchSleeperData()
         }
         
-        print("🎯 PROVIDER: Fetch complete - \(matchups.count) matchups for \(league.league.name)")
         return matchups
     }
     
@@ -164,23 +148,11 @@ final class LeagueMatchupProvider {
     
     /// Find user's matchup by team ID
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
-        print("🔍 PROVIDER: Looking for team ID '\(myTeamID)' in \(matchups.count) matchups")
-        
-        for (index, matchup) in matchups.enumerated() {
-            print("   Matchup \(index + 1): Home=\(matchup.homeTeam.id) vs Away=\(matchup.awayTeam.id)")
-            
-            if matchup.homeTeam.id == myTeamID {
-                print("🎯 PROVIDER: Found user as HOME team in matchup \(index + 1)")
-                return matchup
-            }
-            
-            if matchup.awayTeam.id == myTeamID {
-                print("🎯 PROVIDER: Found user as AWAY team in matchup \(index + 1)")
+        for matchup in matchups {
+            if matchup.homeTeam.id == myTeamID || matchup.awayTeam.id == myTeamID {
                 return matchup
             }
         }
-        
-        print("❌ PROVIDER: No matchup found for team ID '\(myTeamID)'")
         return nil
     }
     
@@ -188,18 +160,13 @@ final class LeagueMatchupProvider {
     
     private func fetchESPNData() async {
         guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(week)") else {
-            print("❌ ESPN: Invalid API URL")
             return
         }
-        
-        print("🔍 ESPN: Fetching \(league.league.leagueID) week \(week)")
         
         // First fetch league data for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            print("✅ ESPN: Got league member data for name resolution")
         } catch {
-            print("⚠️ ESPN: Failed to get league member data, using fallback names")
             currentESPNLeague = nil
         }
         
@@ -214,11 +181,10 @@ final class LeagueMatchupProvider {
             let (data, _) = try await URLSession.shared.data(for: request)
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
             
-            print("📊 ESPN: \(model.teams.count) teams, \(model.schedule.count) schedule entries")
             await processESPNData(model)
             
         } catch {
-            print("❌ ESPN: Failed to fetch/decode data: \(error)")
+            // Silent fail
         }
     }
     
@@ -239,7 +205,6 @@ final class LeagueMatchupProvider {
         var byeTeams: [FantasyTeam] = []
         
         let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
-        print("🏈 ESPN: Week \(week) has \(weekSchedule.count) matchups")
         
         for scheduleEntry in weekSchedule {
             // Handle bye weeks
@@ -284,8 +249,6 @@ final class LeagueMatchupProvider {
         
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
         byeWeekTeams = byeTeams
-        
-        print("🎯 ESPN: Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams")
     }
     
     private func createESPNFantasyTeam(espnTeam: ESPNFantasyTeamModel, score: Double) -> FantasyTeam {
@@ -363,8 +326,6 @@ final class LeagueMatchupProvider {
     // MARK: -> Sleeper Data Fetching
     
     private func fetchSleeperData() async {
-        print("🔍 SLEEPER: Fetching data for \(league.league.leagueID) week \(week)")
-        
         await fetchSleeperScoringSettings()
         await fetchSleeperWeeklyStats()
         await fetchSleeperUsersAndRosters()
@@ -381,7 +342,7 @@ final class LeagueMatchupProvider {
                 sleeperLeagueSettings = settings
             }
         } catch {
-            print("❌ SLEEPER: Failed to fetch scoring settings: \(error)")
+            // Silent fail
         }
     }
     
@@ -393,14 +354,13 @@ final class LeagueMatchupProvider {
             let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
             playerStats = statsData
         } catch {
-            print("❌ SLEEPER: Failed to fetch weekly stats: \(error)")
+            // Silent fail
         }
     }
     
     private func fetchSleeperUsersAndRosters() async {
         // Fetch rosters
         guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters") else { 
-            print("❌ SLEEPER: Invalid rosters URL")
             return 
         }
         
@@ -420,13 +380,12 @@ final class LeagueMatchupProvider {
             await fetchSleeperUsers()
             
         } catch {
-            print("❌ SLEEPER: Failed to fetch rosters: \(error)")
+            // Silent fail
         }
     }
     
     private func fetchSleeperUsers() async {
         guard let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users") else { 
-            print("❌ SLEEPER: Invalid users URL")
             return 
         }
         
@@ -450,13 +409,12 @@ final class LeagueMatchupProvider {
             userAvatars = newUserAvatars
             
         } catch {
-            print("❌ SLEEPER: Failed to fetch users: \(error)")
+            // Silent fail
         }
     }
     
     private func fetchSleeperMatchups() async {
         guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)") else {
-            print("❌ SLEEPER: Invalid matchups URL")
             return
         }
         
@@ -464,10 +422,7 @@ final class LeagueMatchupProvider {
             let (data, _) = try await URLSession.shared.data(from: url)
             let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
             
-            print("📊 SLEEPER: Received \(sleeperMatchups.count) matchups")
-            
             if sleeperMatchups.isEmpty {
-                print("🔥 CHOPPED: No matchups found - this might be a chopped league")
                 detectedAsChoppedLeague = true
                 return
             }
@@ -475,7 +430,7 @@ final class LeagueMatchupProvider {
             await processSleeperMatchups(sleeperMatchups)
             
         } catch {
-            print("❌ SLEEPER: Failed to fetch matchups: \(error)")
+            // Silent fail
         }
     }
     
@@ -525,7 +480,6 @@ final class LeagueMatchupProvider {
         }
         
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
-        print("🎯 SLEEPER: Processed \(processedMatchups.count) matchups")
     }
     
     private func createSleeperFantasyTeam(
@@ -580,7 +534,6 @@ final class LeagueMatchupProvider {
     private func createChoppedSummary() async -> ChoppedWeekSummary? {
         // This would use the existing Chopped logic from FantasyViewModel+Chopped
         // For now, returning nil as this is complex and may not be needed immediately
-        print("🔥 CHOPPED: Creating chopped summary for \(league.league.name)")
         return nil
     }
     

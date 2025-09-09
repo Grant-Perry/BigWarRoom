@@ -25,6 +25,7 @@ struct ChoppedTeamRosterView: View {
     @State private var rosterData: ChoppedTeamRoster?
     @State private var isLoading = true
     @State private var errorMessage: String?
+    @State private var playerStats: [String: [String: Double]] = [:]
     
     // Collapsible section states
     @State private var showStartingLineup = true
@@ -271,6 +272,28 @@ struct ChoppedTeamRosterView: View {
     
     private func startingLineupSection(_ starters: [FantasyPlayer]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
+            // 🔥 NOTICE: Always show for Chopped leagues about score accuracy
+            HStack {
+                Image(systemName: "info.circle")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+                
+                Text("NOTICE: Individual scores are estimates. Team total is accurate.")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.orange)
+                    .italic()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.orange.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
             // Collapsible Header
             Button {
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -374,75 +397,100 @@ struct ChoppedTeamRosterView: View {
     // MARK: - Enhanced Player Card (Same as MyRosterView)
     
     private func enhancedPlayerCard(_ player: FantasyPlayer, isStarter: Bool) -> some View {
-        HStack(spacing: 12) {
-            // Player headshot
-            playerImageForPlayer(player)
-            
-            // Player info
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    // Player name and position
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(player.fullName)
-                            .font(.callout)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        
-                        Text(player.position)
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    // Starter/Bench badge
-                    Text(isStarter ? "STARTER" : "BENCH")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(isStarter ? Color.green : Color.gray)
-                        )
-                    
-                    // Team logo
-                    TeamAssetManager.shared.logoOrFallback(for: player.team ?? "")
-                        .frame(width: 32, height: 32)
-                }
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                // Player headshot
+                playerImageForPlayer(player)
                 
-                // Points and projections
-                HStack(spacing: 16) {
-                    if let points = player.currentPoints, points > 0 {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Points")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            Text(String(format: "%.1f", points))
+                // Player info
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        // Player name and position
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(player.fullName)
                                 .font(.callout)
                                 .fontWeight(.bold)
-                                .foregroundColor(.green)
-                        }
-                    }
-                    
-                    if let projected = player.projectedPoints, projected > 0 {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("Projected")
+                                .foregroundColor(.white)
+                            
+                            Text(player.position)
                                 .font(.caption2)
+                                .fontWeight(.medium)
                                 .foregroundColor(.secondary)
-                            Text(String(format: "%.1f", projected))
-                                .font(.callout)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
                         }
+                        
+                        Spacer()
+                        
+                        // Starter/Bench badge
+                        Text(isStarter ? "STARTER" : "BENCH")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(isStarter ? Color.green : Color.gray)
+                            )
+                        
+                        // Team logo
+                        TeamAssetManager.shared.logoOrFallback(for: player.team ?? "")
+                            .frame(width: 32, height: 32)
                     }
                     
-                    Spacer()
+                    // Points and projections
+                    HStack(spacing: 16) {
+                        if let points = player.currentPoints, points > 0 {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Points")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f", points))
+                                    .font(.callout)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                                    .offset(y: -20)
+                            }
+                        }
+                        
+                        if let projected = player.projectedPoints, projected > 0 {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Projected")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(String(format: "%.1f", projected))
+                                    .font(.callout)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
                 }
             }
+            
+            // 🔥 NEW: Stat breakdown for starters
+            if isStarter, let statLine = formatPlayerStatBreakdown(player) {
+                HStack {
+                    Text(statLine)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.black.opacity(0.4))
+                        )
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+            }
         }
-        .padding(12)
+        .padding(8)
+        .frame(height: 85)
         .background(
             TeamAssetManager.shared.teamBackground(for: player.team ?? "")
         )
@@ -507,6 +555,8 @@ struct ChoppedTeamRosterView: View {
         isLoading = true
         errorMessage = nil
         
+        // x Print("🔍 DP: Loading roster for team \(teamRanking.team.ownerName), rosterID: \(teamRanking.team.rosterID)")
+        
         do {
             // Fetch matchup data for this week to get roster info
             let matchupData = try await SleeperAPIClient.shared.fetchMatchups(
@@ -514,13 +564,25 @@ struct ChoppedTeamRosterView: View {
                 week: week
             )
             
+            // x Print("🔍 DP: Fetched \(matchupData.count) matchups for week \(week)")
+            // x Print("🔍 DP: Looking for rosterID: \(teamRanking.team.rosterID)")
+            
+            // Debug: Show all roster IDs in matchup data
+            let allRosterIDs = matchupData.compactMap { $0.rosterID }
+            // x Print("🔍 DP: Available roster IDs: \(allRosterIDs)")
+            
             // Find this team's matchup data
             guard let teamMatchup = matchupData.first(where: { $0.rosterID == teamRanking.team.rosterID }) else {
+                // x Print("❌ DP: Team not found in matchup data!")
                 throw ChoppedRosterError.teamNotFound
             }
             
+            // x Print("🔍 DP: Found team matchup with \(teamMatchup.starters?.count ?? 0) starters and \(teamMatchup.players?.count ?? 0) total players")
+            
             // Create roster from matchup data
             let roster = try await createChoppedTeamRoster(from: teamMatchup)
+            
+            // x Print("✅ DP: Created roster with \(roster.starters.count) starters and \(roster.bench.count) bench players")
             
             await MainActor.run {
                 self.rosterData = roster
@@ -528,11 +590,15 @@ struct ChoppedTeamRosterView: View {
             }
             
         } catch {
+            // x Print("❌ DP: Roster loading failed: \(error)")
             await MainActor.run {
                 self.errorMessage = "Failed to load roster: \(error.localizedDescription)"
                 self.isLoading = false
             }
         }
+        
+        // Also load stats for breakdown display
+        await loadPlayerStats()
     }
     
     private func createChoppedTeamRoster(from matchup: SleeperMatchupResponse) async throws -> ChoppedTeamRoster {
@@ -594,11 +660,179 @@ struct ChoppedTeamRosterView: View {
         
         return ChoppedTeamRoster(starters: starters, bench: bench)
     }
+
+    // MARK: - Helper Methods (All methods placed here to avoid scope issues)
+        
+    /// Format player stat breakdown based on position - same method as FantasyMatchupDetailView
+    private func formatPlayerStatBreakdown(_ player: FantasyPlayer) -> String? {
+        guard let sleeperPlayer = findSleeperPlayer(for: player) else {
+            return nil
+        }
+        
+        guard let stats = playerStats[sleeperPlayer.playerID] else {
+            return nil
+        }
+        
+        let position = player.position
+        var breakdown: [String] = []
+        
+        switch position {
+        case "QB":
+            // Passing stats: completions/attempts, yards, TDs
+            if let attempts = stats["pass_att"], attempts > 0 {
+                let completions = stats["pass_cmp"] ?? 0
+                let yards = stats["pass_yd"] ?? 0
+                let tds = stats["pass_td"] ?? 0
+                breakdown.append("\(Int(completions))/\(Int(attempts)) CMP")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) PASS TD") }
+                
+                // Add pass first downs and completions 40+
+                if let passFd = stats["pass_fd"], passFd > 0 {
+                    breakdown.append("\(Int(passFd)) PASS FD")
+                }
+                if let pass40 = stats["pass_40"], pass40 > 0 {
+                    breakdown.append("\(Int(pass40)) CMP (40+)")
+                }
+            }
+            
+            // Rushing stats if significant for QBs
+            if let carries = stats["rush_att"], carries > 0 {
+                let rushYards = stats["rush_yd"] ?? 0
+                let rushTds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if rushYards > 0 { breakdown.append("\(Int(rushYards)) RUSH YD") }
+                if rushTds > 0 { breakdown.append("\(Int(rushTds)) RUSH TD") }
+                
+                // Add rush first downs for QBs
+                if let rushFd = stats["rush_fd"], rushFd > 0 {
+                    breakdown.append("\(Int(rushFd)) RUSH FD")
+                }
+            }
+            
+            // Sacks taken
+            if let sacks = stats["pass_sack"], sacks > 0 {
+                breakdown.append("\(Int(sacks)) SACK")
+            }
+            
+        case "RB":
+            // Rushing stats: carries, yards, TDs
+            if let carries = stats["rush_att"], carries > 0 {
+                let yards = stats["rush_yd"] ?? 0
+                let tds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+                
+                // Add rush first downs
+                if let rushFd = stats["rush_fd"], rushFd > 0 {
+                    breakdown.append("\(Int(rushFd)) RUSH FD")
+                }
+            }
+            // Receiving if significant
+            if let receptions = stats["rec"], receptions > 0 {
+                let recYards = stats["rec_yd"] ?? 0
+                let recTds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions)) REC")
+                if recYards > 0 { breakdown.append("\(Int(recYards)) REC YD") }
+                if recTds > 0 { breakdown.append("\(Int(recTds)) REC TD") }
+            }
+            
+        case "WR", "TE":
+            // Receiving stats: receptions/targets, yards, TDs
+            if let receptions = stats["rec"], receptions > 0 {
+                let targets = stats["rec_tgt"] ?? receptions
+                let yards = stats["rec_yd"] ?? 0
+                let tds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions))/\(Int(targets)) REC")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+                
+                // Add pass first downs
+                if let passFd = stats["rec_fd"], passFd > 0 {
+                    breakdown.append("\(Int(passFd)) PASS FD")
+                }
+            }
+            // Rushing if significant for WRs
+            if position == "WR", let rushYards = stats["rush_yd"], rushYards > 0 {
+                breakdown.append("\(Int(rushYards)) RUSH YD")
+            }
+            
+        case "K":
+            // Field goals and extra points
+            if let fgMade = stats["fgm"], fgMade > 0 {
+                let fgAtt = stats["fga"] ?? fgMade
+                breakdown.append("\(Int(fgMade))/\(Int(fgAtt)) FG")
+            }
+            if let xpMade = stats["xpm"], xpMade > 0 {
+                breakdown.append("\(Int(xpMade)) XP")
+            }
+            
+        case "DEF", "DST":
+            // Defense stats: sacks, interceptions, fumble recoveries
+            if let sacks = stats["def_sack"], sacks > 0 {
+                breakdown.append("\(Int(sacks)) SACK")
+            }
+            if let ints = stats["def_int"], ints > 0 {
+                breakdown.append("\(Int(ints)) INT")
+            }
+            if let fumRec = stats["def_fum_rec"], fumRec > 0 {
+                breakdown.append("\(Int(fumRec)) FUM REC")
+            }
+            
+        default:
+            return nil
+        }
+        
+        return breakdown.isEmpty ? nil : breakdown.joined(separator: ", ")
+    }
     
-    // MARK: - Helpers
+    /// Load weekly player stats for detailed breakdown display only
+    private func loadPlayerStats() async {
+        guard playerStats.isEmpty else { return }
+        
+        let currentYear = "2024"
+        
+        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+            
+            await MainActor.run {
+                self.playerStats = statsData
+            }
+            // x Print("🔥 DP: Loaded \(statsData.count) player stat records for breakdown display")
+            
+            // Debug print specific players for investigation
+            for (playerID, stats) in statsData {
+                if let player = PlayerDirectoryStore.shared.player(for: playerID) {
+                    let playerName = player.fullName
+                    if playerName.lowercased().contains("mccarthy") || 
+                       playerName.lowercased().contains("j.j.") ||
+                       playerName.lowercased() == "j. j. mccarthy" {
+                        // x Print("🔍 DP: Found J.J. McCarthy stats - ID: \(playerID), Name: \(playerName), Stats: \(stats)")
+                    }
+                }
+            }
+            
+        } catch {
+            // x Print("❌ DP: Failed to load player stats: \(error)")
+        }
+    }
     
     private func calculatePlayerPoints(playerID: String) -> Double? {
-        // TODO: Implement real player scoring calculation
+        // Use cached stats if available
+        if let stats = PlayerStatsCache.shared.getPlayerStats(playerID: playerID, week: week) {
+            // Use PPR points from Sleeper
+            if let pprPoints = stats["pts_ppr"] {
+                return pprPoints
+            } else if let halfPprPoints = stats["pts_half_ppr"] {
+                return halfPprPoints
+            } else if let stdPoints = stats["pts_std"] {
+                return stdPoints
+            }
+        }
         return Double.random(in: 0...25)
     }
     

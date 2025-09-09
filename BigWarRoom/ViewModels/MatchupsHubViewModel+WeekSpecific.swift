@@ -108,7 +108,7 @@ extension MatchupsHubViewModel {
         loadingLock.lock()
         if currentlyLoadingLeagues.contains(leagueKey) {
             loadingLock.unlock()
-            print("⚠️ LOADING: Already loading league \(league.league.name) for week \(week), skipping duplicate request")
+            // x Print("⚠️ LOADING: Already loading league \(league.league.name) for week \(week), skipping duplicate request")
             return nil
         }
         currentlyLoadingLeagues.insert(leagueKey)
@@ -135,12 +135,12 @@ extension MatchupsHubViewModel {
             
             // Step 1: Identify user's team ID
             guard let myTeamID = await provider.identifyMyTeamID() else {
-                print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
+                // x Print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil
             }
             
-            print("🎯 PROVIDER: Identified myTeamID = '\(myTeamID)' for \(league.league.name) Week \(week)")
+            // x Print("🎯 PROVIDER: Identified myTeamID = '\(myTeamID)' for \(league.league.name) Week \(week)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.4)
             
             // Step 2: Fetch matchups using isolated provider
@@ -157,14 +157,14 @@ extension MatchupsHubViewModel {
             
         } catch {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-            print("❌ LOADING: Failed to load league \(league.league.name) Week \(week): \(error)")
+            // x Print("❌ LOADING: Failed to load league \(league.league.name) Week \(week): \(error)")
             return nil
         }
     }
     
     /// Handle chopped league for specific week
     private func handleChoppedLeagueForWeek(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String, week: Int) async -> UnifiedMatchup? {
-        print("🔥 CHOPPED DETECTED: League \(league.league.name) has no matchups for week \(week) - processing as Chopped league")
+        // x Print("🔥 CHOPPED DETECTED: League \(league.league.name) has no matchups for week \(week) - processing as Chopped league")
         
         // Create chopped summary using proper Sleeper data for specific week
         if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: week) {
@@ -181,23 +181,23 @@ extension MatchupsHubViewModel {
                 )
                 
                 await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
-                print("✅ Created Chopped league entry for \(league.league.name) Week \(week): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
+                // x Print("✅ Created Chopped league entry for \(league.league.name) Week \(week): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
                 return unifiedMatchup
             }
         }
         
-        print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name) Week \(week)")
+        // x Print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name) Week \(week)")
         await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
         return nil
     }
     
     /// Handle regular league for specific week
     private func handleRegularLeagueForWeek(league: UnifiedLeagueManager.LeagueWrapper, matchups: [FantasyMatchup], myTeamID: String, provider: LeagueMatchupProvider, week: Int) async -> UnifiedMatchup? {
-        print("🏈 REGULAR: Processing regular league: \(league.league.name) Week \(week)")
+        // x Print("🏈 REGULAR: Processing regular league: \(league.league.name) Week \(week)")
         await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
         
         if matchups.isEmpty {
-            print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(week)")
+            // x Print("⚠️ EMPTY MATCHUPS: No matchups found for \(league.league.name) week \(week)")
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
             return nil
         }
@@ -215,11 +215,11 @@ extension MatchupsHubViewModel {
             )
             
             await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
-            print("✅ Created regular matchup for \(league.league.name) Week \(week): \(myMatchup.homeTeam.ownerName) vs \(myMatchup.awayTeam.ownerName)")
+            // x Print("✅ Created regular matchup for \(league.league.name) Week \(week): \(myMatchup.homeTeam.ownerName) vs \(myMatchup.awayTeam.ownerName)")
             return unifiedMatchup
         } else {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
-            print("❌ REGULAR: No matchup found for team ID '\(myTeamID)' in \(league.league.name) Week \(week)")
+            // x Print("❌ REGULAR: No matchup found for team ID '\(myTeamID)' in \(league.league.name) Week \(week)")
             return nil
         }
     }

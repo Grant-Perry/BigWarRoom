@@ -58,15 +58,15 @@ extension FantasyViewModel {
     
     /// Active roster section view
     func activeRosterSection(matchup: FantasyMatchup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) { // 🔥 EVEN MORE spacing: 16 → 20
             Text("Active Roster")
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal)
             
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: 24) { // 🔥 MORE horizontal spacing: 20 → 24
                 // Away Team Active Roster (Left column - teamIndex 0)
-                VStack(spacing: 8) {
+                VStack(spacing: 16) { // 🔥 MUCH MORE spacing between cards: 12 → 16
                     let awayActiveRoster = getRoster(for: matchup, teamIndex: 0, isBench: false)
                     ForEach(awayActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -87,18 +87,24 @@ extension FantasyViewModel {
                         .fontWeight(.semibold)
                         .foregroundColor(awayWinning ? .gpGreen : .white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16) // 🔥 MORE padding: 12 → 16
                         .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            RoundedRectangle(cornerRadius: 12) // 🔥 ROUNDED corners
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(.secondarySystemBackground), 
+                                            awayWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                         )
                 }
                 
                 // Home Team Active Roster (Right column - teamIndex 1)
-                VStack(spacing: 8) {
+                VStack(spacing: 16) { // 🔥 MUCH MORE spacing between cards: 12 → 16
                     let homeActiveRoster = getRoster(for: matchup, teamIndex: 1, isBench: false)
                     ForEach(homeActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -119,13 +125,19 @@ extension FantasyViewModel {
                         .fontWeight(.semibold)
                         .foregroundColor(homeWinning ? .gpGreen : .white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16) // 🔥 MORE padding: 12 → 16
                         .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            RoundedRectangle(cornerRadius: 12) // 🔥 ROUNDED corners
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(.secondarySystemBackground), 
+                                            homeWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                         )
                 }
             }
@@ -135,15 +147,15 @@ extension FantasyViewModel {
     
     /// Bench section view
     func benchSection(matchup: FantasyMatchup) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 20) { // 🔥 MORE spacing: 16 → 20
             Text("Bench")
                 .font(.headline)
                 .foregroundColor(.white)
                 .padding(.horizontal)
             
-            HStack(alignment: .top, spacing: 16) {
+            HStack(alignment: .top, spacing: 24) { // 🔥 MORE horizontal spacing: 20 → 24
                 // Away Team Bench (Left column - teamIndex 0)
-                VStack(spacing: 8) {
+                VStack(spacing: 16) { // 🔥 MORE spacing between cards: 12 → 16
                     let awayBenchRoster = getRoster(for: matchup, teamIndex: 0, isBench: true)
                     ForEach(awayBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -161,18 +173,21 @@ extension FantasyViewModel {
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16) // 🔥 MORE padding: 12 → 16
                         .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            RoundedRectangle(cornerRadius: 12) // 🔥 ROUNDED corners
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                         )
                 }
                 
                 // Home Team Bench (Right column - teamIndex 1)
-                VStack(spacing: 8) {
+                VStack(spacing: 16) { // 🔥 MORE spacing between cards: 12 → 16
                     let homeBenchRoster = getRoster(for: matchup, teamIndex: 1, isBench: true)
                     ForEach(homeBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -190,13 +205,16 @@ extension FantasyViewModel {
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 16) // 🔥 MORE padding: 12 → 16
                         .background(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            RoundedRectangle(cornerRadius: 12) // 🔥 ROUNDED corners
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
                         )
                 }
             }

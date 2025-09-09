@@ -8,6 +8,12 @@
 
 import SwiftUI
 
+// MARK: -> NFLPlayer Model (Simplified) - MOVED TO TOP
+struct NFLPlayer {
+    let jersey: String
+    let team: String
+}
+
 struct FantasyMatchupDetailView: View {
     let matchup: FantasyMatchup
     let leagueName: String
@@ -422,15 +428,16 @@ struct FantasyPlayerCard: View {
     let isBench: Bool
     
     @State private var teamColor: Color = .gray
-    @State private var nflPlayer: NFLPlayer?
+    @State private var nflPlayer: NFLPlayer? // 
     @State private var glowIntensity: Double = 0.0
     @StateObject private var gameViewModel = NFLGameMatchupViewModel()
     @State private var currentWeek: Int = NFLWeekService.shared.currentWeek
     @StateObject private var nflWeekService = NFLWeekService.shared
-    var isActive: Bool = true
     
     @State private var showingPlayerDetail = false
     @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var playerStats: [String: [String: Double]] = [:]
+    @State private var hasLoadedStats = false // Prevent loading stats multiple times
     
     private var positionalRanking: String {
         guard let matchup = matchup, let teamIndex = teamIndex else {
@@ -486,15 +493,17 @@ struct FantasyPlayerCard: View {
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
+                // Background jersey number, pushed to top-trailing
                 VStack {
                     HStack {
                         Spacer()
                         ZStack(alignment: .topTrailing) {
                             Text(nflPlayer?.jersey ?? player.jerseyNumber ?? "")
-                                .font(.system(size: 85, weight: .bold))
+                                .font(.system(size: 90, weight: .black))
                                 .italic()
                                 .foregroundColor(teamColor)
-                                .opacity(0.7)
+                                .opacity(0.55) // 🔥 MORE VISIBLE: Was 0.25, now 0.4
+                                .shadow(color: .black.opacity(0.4), radius: 2, x: 1, y: 1)
                         }
                     }
                     .padding(.trailing, 8)
@@ -509,7 +518,7 @@ struct FantasyPlayerCard: View {
                             endPoint: .bottom
                         )
                     )
-                
+
                 if let team = player.team, let obj = NFLTeam.team(for: team) {
                     if let image = UIImage(named: obj.logoAssetName) {
                         Image(uiImage: image)
@@ -517,7 +526,7 @@ struct FantasyPlayerCard: View {
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 80, height: 80)
                             .offset(x: 20, y: -4)
-                            .opacity(isPlayerLive ? 0.6 : 0.3)
+                            .opacity(isPlayerLive ? 0.6 : 0.35)
                             .shadow(color: obj.primaryColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     } else {
                         AsyncImage(url: URL(string: "https://a.espncdn.com/i/teamlogos/nfl/500/\(team.lowercased()).png")) { phase in
@@ -538,7 +547,7 @@ struct FantasyPlayerCard: View {
                         }
                         .frame(width: 80, height: 80)
                         .offset(x: 20, y: -4)
-                        .opacity(isPlayerLive ? 0.6 : 0.3)
+                        .opacity(isPlayerLive ? 0.6 : 0.35)
                         .shadow(color: teamColor.opacity(0.5), radius: 10, x: 0, y: 0)
                     }
                 }
@@ -555,7 +564,7 @@ struct FantasyPlayerCard: View {
                                 .aspectRatio(contentMode: .fill)
                                 .frame(width: 95, height: 95)
                                 .clipped()
-                                .opacity(isPlayerLive ? 1.0 : 0.5)
+                                .opacity(isPlayerLive ? 1.0 : 0.85)
                         case .failure:
                             if let espnURL = player.espnHeadshotURL {
                                 AsyncImage(url: espnURL) { phase2 in
@@ -566,7 +575,7 @@ struct FantasyPlayerCard: View {
                                             .aspectRatio(contentMode: .fill)
                                             .frame(width: 95, height: 95)
                                             .clipped()
-                                            .opacity(isPlayerLive ? 1.0 : 0.5)
+                                            .opacity(isPlayerLive ? 1.0 : 0.85)
                                     default:
                                         ZStack {
                                             Circle()
@@ -577,7 +586,7 @@ struct FantasyPlayerCard: View {
                                                 .font(.system(size: 24, weight: .bold))
                                                 .foregroundColor(.white)
                                         }
-                                        .opacity(isPlayerLive ? 1.0 : 0.5)
+                                        .opacity(isPlayerLive ? 1.0 : 0.85)
                                     }
                                 }
                             } else {
@@ -590,68 +599,113 @@ struct FantasyPlayerCard: View {
                                         .font(.system(size: 24, weight: .bold))
                                         .foregroundColor(.white)
                                 }
-                                .opacity(isPlayerLive ? 1.0 : 0.5)
+                                .opacity(isPlayerLive ? 1.0 : 0.85)
                             }
                         @unknown default:
                             EmptyView()
                         }
                     }
-                    .offset(x: -20, y: -5)
+                    .offset(x: -20, y: -8)
                     .zIndex(2)
                     
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(positionalRanking)
-                            .font(.system(size: 15))
-                            .foregroundColor(.white.opacity(0.8))
-                            .offset(x: -5, y: 25)
-                        
+                    VStack(alignment: .trailing, spacing: 4) {
                         Spacer()
                         
+                        // 🔥 RESTORED: Original score positioning
                         HStack(alignment: .bottom, spacing: 4) {
                             Spacer()
                             Text(player.currentPointsString)
-                                .font(.system(size: 18, weight: .bold))
-                                .fontWeight(.bold)
+                                .font(.system(size: 22, weight: .black))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
-                                .scaledToFit()
-                                .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.1 : 1.0) : 1.0)
+                                .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
+                                .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
                         }
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                        .offset(y: -9)
+                        .padding(.bottom, 30) // 🔥 ADJUSTED: More space for stats
+                        .padding(.trailing, 12)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.trailing, 8)
                     .zIndex(3)
                 }
                 
-                Text(player.fullName)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.9)
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .padding(.top, 16)
-                    .padding(.trailing, 14)
-                    .padding(.leading, 45)
-                    .zIndex(4)
+                // 🔥 FIXED: RIGHT JUSTIFIED player name and position - ALL THE WAY RIGHT
+                HStack {
+                    Spacer() // 🔥 PUSH EVERYTHING TO THE RIGHT
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text(player.fullName)
+						  .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
+                        
+                        Text(positionalRanking)
+                            .font(.system(size: 12, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.black.opacity(0.8))
+                                    .stroke(teamColor.opacity(0.6), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.trailing, 8)
+                .zIndex(4)
                 
+                // 🔥 FIXED: Game matchup CENTERED
                 VStack {
                     Spacer()
                     HStack {
-                        Spacer()
+                        Spacer() // 🔥 CENTER THE MATCHUP INFO
                         FantasyGameMatchupView(player: player)
-                            .padding(EdgeInsets(top: 8, leading: 0, bottom: 22, trailing: 42))
+                        Spacer()
                     }
+                    .padding(.bottom, 50)
                 }
-                .offset(x: -12, y: -2)
                 .zIndex(5)
+                
+                // 🔥 NEW: Stats section ONLY at bottom, doesn't interfere with anything else
+                VStack {
+                    Spacer()
+                    HStack {
+                        if let statLine = formatPlayerStatBreakdown() {
+                            Text(statLine)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .multilineTextAlignment(.leading)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.black.opacity(0.7))
+                                        .stroke(teamColor.opacity(0.4), lineWidth: 1)
+                                )
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 6)
+                }
+                .zIndex(6)
             }
-            .frame(height: 90)
+            .frame(height: 140) // 🔥 EXPANDED: From 125 to 140 for stats space
             .background(
                 RoundedRectangle(cornerRadius: 15)
-                    .fill(Color.black)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.black, teamColor.opacity(0.1), Color.black],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .shadow(
                         color: shadowColor,
                         radius: shadowRadius,
@@ -683,6 +737,10 @@ struct FantasyPlayerCard: View {
             }
             .onAppear {
                 setupGameData()
+                if !hasLoadedStats {
+                    loadPlayerStats()
+                    hasLoadedStats = true
+                }
                 if player.isLive {
                     startLiveAnimations()
                 }
@@ -711,6 +769,121 @@ struct FantasyPlayerCard: View {
         }
     }
     
+    private func loadPlayerStats() {
+        Task {
+            let currentYear = "2024"
+            let week = currentWeek
+            
+            guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }
+            
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+                
+                await MainActor.run {
+                    self.playerStats = statsData
+                }
+            } catch {
+                // Silent fail - no debug spam
+            }
+        }
+    }
+    
+    private func formatPlayerStatBreakdown() -> String? {
+        guard let sleeperPlayer = getSleeperPlayerData() else {
+            return nil
+        }
+        
+        guard let stats = playerStats[sleeperPlayer.playerID] else {
+            return nil
+        }
+        
+        let position = player.position
+        var breakdown: [String] = []
+        
+        switch position {
+        case "QB":
+            if let attempts = stats["pass_att"], attempts > 0 {
+                let completions = stats["pass_cmp"] ?? 0
+                let yards = stats["pass_yd"] ?? 0
+                let tds = stats["pass_td"] ?? 0
+                breakdown.append("\(Int(completions))/\(Int(attempts)) CMP")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) PASS TD") }
+                
+                if let passFd = stats["pass_fd"], passFd > 0 {
+                    breakdown.append("\(Int(passFd)) PASS FD")
+                }
+            }
+            
+            if let carries = stats["rush_att"], carries > 0 {
+                let rushYards = stats["rush_yd"] ?? 0
+                let rushTds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if rushYards > 0 { breakdown.append("\(Int(rushYards)) RUSH YD") }
+                if rushTds > 0 { breakdown.append("\(Int(rushTds)) RUSH TD") }
+                
+                if let rushFd = stats["rush_fd"], rushFd > 0 {
+                    breakdown.append("\(Int(rushFd)) RUSH FD")
+                }
+            }
+            
+        case "RB":
+            if let carries = stats["rush_att"], carries > 0 {
+                let yards = stats["rush_yd"] ?? 0
+                let tds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+            }
+            if let receptions = stats["rec"], receptions > 0 {
+                let recYards = stats["rec_yd"] ?? 0
+                let recTds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions)) REC")
+                if recYards > 0 { breakdown.append("\(Int(recYards)) REC YD") }
+                if recTds > 0 { breakdown.append("\(Int(recTds)) REC TD") }
+            }
+            
+        case "WR", "TE":
+            if let receptions = stats["rec"], receptions > 0 {
+                let targets = stats["rec_tgt"] ?? receptions
+                let yards = stats["rec_yd"] ?? 0
+                let tds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions))/\(Int(targets)) REC")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+            }
+            if position == "WR", let rushYards = stats["rush_yd"], rushYards > 0 {
+                breakdown.append("\(Int(rushYards)) RUSH YD")
+            }
+            
+        case "K":
+            if let fgMade = stats["fgm"], fgMade > 0 {
+                let fgAtt = stats["fga"] ?? fgMade
+                breakdown.append("\(Int(fgMade))/\(Int(fgAtt)) FG")
+            }
+            if let xpMade = stats["xpm"], xpMade > 0 {
+                breakdown.append("\(Int(xpMade)) XP")
+            }
+            
+        case "DEF", "DST":
+            if let sacks = stats["def_sack"], sacks > 0 {
+                breakdown.append("\(Int(sacks)) SACK")
+            }
+            if let ints = stats["def_int"], ints > 0 {
+                breakdown.append("\(Int(ints)) INT")
+            }
+            if let fumRec = stats["def_fum_rec"], fumRec > 0 {
+                breakdown.append("\(Int(fumRec)) FUM REC")
+            }
+            
+        default:
+            return nil
+        }
+        
+        return breakdown.isEmpty ? nil : breakdown.joined(separator: ", ")
+    }
+    
     private func startLiveAnimations() {
         withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
             glowIntensity = 0.8
@@ -727,8 +900,11 @@ struct FantasyPlayerCard: View {
     }
     
     private func getSleeperPlayerData() -> SleeperPlayer? {
-        let foundPlayer = playerDirectory.players.values.first { sleeperPlayer in
-            if sleeperPlayer.fullName.lowercased() == player.fullName.lowercased() {
+        let playerName = player.fullName
+        
+        // Find all potential matches first
+        let potentialMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            if sleeperPlayer.fullName.lowercased() == playerName.lowercased() {
                 return true
             }
             
@@ -739,7 +915,7 @@ struct FantasyPlayerCard: View {
             
             if let firstName = sleeperPlayer.firstName, let lastName = sleeperPlayer.lastName {
                 let fullName = "\(firstName) \(lastName)"
-                if fullName.lowercased() == player.fullName.lowercased() {
+                if fullName.lowercased() == playerName.lowercased() {
                     return true
                 }
             }
@@ -747,7 +923,54 @@ struct FantasyPlayerCard: View {
             return false
         }
         
-        return foundPlayer
+        // If only one match, use it
+        if potentialMatches.count == 1 {
+            return potentialMatches.first
+        }
+        
+        // 🔥 RESTORED: Robust prioritization system for multiple matches
+        if potentialMatches.count > 1 {            
+            // Priority 1: Player with detailed game stats (passing, rushing, receiving, etc.)
+            let detailedStatsMatches = potentialMatches.filter { player in
+                if let stats = playerStats[player.playerID] {
+                    let hasDetailedStats = stats.keys.contains { key in
+                        key.contains("pass_att") || key.contains("rush_att") || 
+                        key.contains("rec") || key.contains("fgm") || 
+                        key.contains("def_sack") || key.contains("pass_cmp") ||
+                        key.contains("rush_yd") || key.contains("rec_yd")
+                    }
+                    return hasDetailedStats
+                }
+                return false
+            }
+            
+            if !detailedStatsMatches.isEmpty {
+                return detailedStatsMatches.first
+            }
+            
+            // Priority 2: Player with any stats (even if just fantasy points)
+            let anyStatsMatches = potentialMatches.filter { player in
+                return playerStats[player.playerID] != nil
+            }
+            
+            if !anyStatsMatches.isEmpty {
+                return anyStatsMatches.first
+            }
+            
+            // Priority 3: Player with most recent/current team match
+            let teamMatches = potentialMatches.filter { player in
+                return player.team?.lowercased() == self.player.team?.lowercased()
+            }
+            
+            if !teamMatches.isEmpty {
+                return teamMatches.first
+            }
+            
+            // Priority 4: Fallback to first match
+            return potentialMatches.first
+        }
+        
+        return nil
     }
 }
 
@@ -881,12 +1104,6 @@ struct FantasyGameMatchupView: View {
         
         gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
     }
-}
-
-// MARK: -> NFLPlayer Model (Simplified)
-struct NFLPlayer {
-    let jersey: String
-    let team: String
 }
 
 struct PlayerDetailFallbackView: View {

@@ -70,7 +70,7 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         let leagues = try JSONDecoder().decode([SleeperLeague].self, from: data)
-        // xprint("✅ Fetched \(leagues.count) leagues for user \(userID)")
+        // x// x Print("✅ Fetched \(leagues.count) leagues for user \(userID)")
         return leagues
     }
     
@@ -90,7 +90,7 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         let league = try JSONDecoder().decode(SleeperLeague.self, from: data)
-        // xprint("✅ Fetched league: \(league.name)")
+        // x// x Print("✅ Fetched league: \(league.name)")
         return league
     }
     
@@ -105,7 +105,7 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: data)
-        // print("✅ Fetched \(users.count) users for league \(leagueID)")
+        // // x Print("✅ Fetched \(users.count) users for league \(leagueID)")
         return users
     }
     
@@ -120,7 +120,7 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         let matchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
-        // print("✅ Fetched \(matchups.count) matchups for league \(leagueID), week \(week)")
+        // // x Print("✅ Fetched \(matchups.count) matchups for league \(leagueID), week \(week)")
         return matchups
     }
     
@@ -135,7 +135,7 @@ final class SleeperAPIClient: DraftAPIClient {
         }
         
         let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
-        // xprint("✅ Fetched \(rosters.count) rosters for league \(leagueID)")
+        // x// x Print("✅ Fetched \(rosters.count) rosters for league \(leagueID)")
         return rosters
     }
     

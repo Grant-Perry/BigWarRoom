@@ -44,7 +44,7 @@ final class ESPNCredentialsManager: ObservableObject {
         self.leagueIDs = leagueIDs
         self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
         
-        // xprint("✅ ESPN credentials saved successfully")
+        // x// x Print("✅ ESPN credentials saved successfully")
     }
     
     /// Load saved ESPN credentials
@@ -59,11 +59,11 @@ final class ESPNCredentialsManager: ObservableObject {
         
         // 🔥 DEBUG: Log what we're loading
         if AppConstants.debug {
-            print("🔍 ESPNCredentialsManager loadCredentials:")
-            print("   SWID: '\(swid.isEmpty ? "EMPTY" : "HAS_VALUE")'")
-            print("   ESPN_S2: '\(espnS2.isEmpty ? "EMPTY" : "HAS_VALUE")'") 
-            print("   League IDs: \(leagueIDs.count)")
-            print("   hasValidCredentials: \(hasValidCredentials)")
+            // x Print("🔍 ESPNCredentialsManager loadCredentials:")
+            // x Print("   SWID: '\(swid.isEmpty ? "EMPTY" : "HAS_VALUE")'")
+            // x Print("   ESPN_S2: '\(espnS2.isEmpty ? "EMPTY" : "HAS_VALUE")'") 
+            // x Print("   League IDs: \(leagueIDs.count)")
+            // x Print("   hasValidCredentials: \(hasValidCredentials)")
         }
     }
     
@@ -88,7 +88,7 @@ final class ESPNCredentialsManager: ObservableObject {
         leagueIDs = []
         hasValidCredentials = false
         
-        // xprint("🗑️ ESPN credentials cleared")
+        // x// x Print("🗑️ ESPN credentials cleared")
     }
     
     /// Validate credentials by attempting a test API call
@@ -100,10 +100,10 @@ final class ESPNCredentialsManager: ObservableObject {
         do {
             // Use the updated API client to test credentials
             let league = try await ESPNAPIClient.shared.fetchLeague(leagueID: firstLeagueID)
-            // xprint("✅ ESPN credentials validation successful: \(league.name)")
+            // x// x Print("✅ ESPN credentials validation successful: \(league.name)")
             return true
         } catch {
-            // xprint("❌ ESPN credentials validation failed: \(error)")
+            // x// x Print("❌ ESPN credentials validation failed: \(error)")
             return false
         }
     }
@@ -115,7 +115,7 @@ final class ESPNCredentialsManager: ObservableObject {
         leagueIDs.append(leagueID)
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
         
-        // xprint("➕ Added ESPN league ID: \(leagueID)")
+        // x// x Print("➕ Added ESPN league ID: \(leagueID)")
     }
     
     /// Remove a league ID from the saved list
@@ -123,7 +123,7 @@ final class ESPNCredentialsManager: ObservableObject {
         leagueIDs.removeAll { $0 == leagueID }
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
         
-        // xprint("➖ Removed ESPN league ID: \(leagueID)")
+        // x// x Print("➖ Removed ESPN league ID: \(leagueID)")
     }
     
     // MARK: - Keychain Helpers
@@ -145,7 +145,7 @@ final class ESPNCredentialsManager: ObservableObject {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         if status != errSecSuccess {
-            // xprint("❌ Failed to save \(key) to Keychain: \(status)")
+            // x// x Print("❌ Failed to save \(key) to Keychain: \(status)")
         }
     }
     

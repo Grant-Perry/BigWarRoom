@@ -12,7 +12,7 @@ extension MatchupsHubViewModel {
     
     /// Handle chopped league processing
     internal func handleChoppedLeague(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String) async -> UnifiedMatchup? {
-        print("🔥 CHOPPED DETECTED: League \(league.league.name) has no matchups - processing as Chopped league")
+        // x Print("🔥 CHOPPED DETECTED: League \(league.league.name) has no matchups - processing as Chopped league")
         
         // Create chopped summary using proper Sleeper data
         if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
@@ -29,19 +29,19 @@ extension MatchupsHubViewModel {
                 )
                 
                 await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
-                print("✅ Created Chopped league entry for \(league.league.name): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
+                // x Print("✅ Created Chopped league entry for \(league.league.name): \(myTeamRanking.team.ownerName) ranked \(myTeamRanking.rank)")
                 return unifiedMatchup
             }
         }
         
-        print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name)")
+        // x Print("❌ CHOPPED: Failed to create chopped summary for \(league.league.name)")
         await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
         return nil
     }
     
     /// Create Chopped league summary for Sleeper leagues with no matchups
     internal func createSleeperChoppedSummary(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String, week: Int) async -> ChoppedWeekSummary? {
-        print("🔥 CHOPPED: Creating REAL summary for \(league.league.name) week \(week)")
+        // x Print("🔥 CHOPPED: Creating REAL summary for \(league.league.name) week \(week)")
         
         do {
             // Step 1: Fetch REAL matchup data for this week to get actual starter scores
@@ -49,7 +49,7 @@ extension MatchupsHubViewModel {
                 leagueID: league.league.leagueID, 
                 week: week
             )
-            print("📊 CHOPPED: Found \(matchupData.count) team scores in \(league.league.name)")
+            // x Print("📊 CHOPPED: Found \(matchupData.count) team scores in \(league.league.name)")
             
             // Step 2-3: Fetch rosters and users data
             let (rosters, users) = try await fetchRostersAndUsers(for: league.league.leagueID)
@@ -62,7 +62,7 @@ extension MatchupsHubViewModel {
             return await processChoppedTeamRankings(teams: choppedTeams, league: league, week: week)
             
         } catch {
-            print("❌ CHOPPED: Failed to create REAL summary for \(league.league.name): \(error)")
+            // x Print("❌ CHOPPED: Failed to create REAL summary for \(league.league.name): \(error)")
             return nil
         }
     }
@@ -75,7 +75,7 @@ extension MatchupsHubViewModel {
         let rostersResult = try await rosters
         let usersResult = try await users
         
-        print("📊 CHOPPED: Found \(rostersResult.count) rosters and \(usersResult.count) users")
+        // x Print("📊 CHOPPED: Found \(rostersResult.count) rosters and \(usersResult.count) users")
         
         return (rostersResult, usersResult)
     }
@@ -117,7 +117,7 @@ extension MatchupsHubViewModel {
             let realTeamScore = matchup.points ?? 0.0
             let projectedScore = matchup.projectedPoints ?? (realTeamScore * 1.05)
             
-            print("🎯 CHOPPED TEAM: \(resolvedTeamName) = \(String(format: "%.2f", realTeamScore)) pts (Projected: \(String(format: "%.2f", projectedScore)))")
+            // x Print("🎯 CHOPPED TEAM: \(resolvedTeamName) = \(String(format: "%.2f", realTeamScore)) pts (Projected: \(String(format: "%.2f", projectedScore)))")
             
             let fantasyTeam = FantasyTeam(
                 id: String(rosterID),
@@ -149,7 +149,7 @@ extension MatchupsHubViewModel {
         // Dynamic elimination count based on league size
         let totalTeams = sortedTeams.count
         let eliminationCount = totalTeams >= 18 ? 2 : 1
-        print("🔥 ELIMINATION LOGIC: \(totalTeams) teams = \(eliminationCount) eliminations per week")
+        // x Print("🔥 ELIMINATION LOGIC: \(totalTeams) teams = \(eliminationCount) eliminations per week")
         
         // Create team rankings with proper elimination zones
         let teamRankings = createTeamRankings(sortedTeams: sortedTeams, eliminationCount: eliminationCount, totalTeams: totalTeams, week: week)
@@ -204,7 +204,7 @@ extension MatchupsHubViewModel {
             let cutoffScore = eliminationCutoffTeams.first?.currentScore ?? 0.0
             let safetyMargin = teamScore - cutoffScore
             
-            print("🎯 RANKING: #\(rank) \(team.ownerName) - \(String(format: "%.2f", teamScore)) pts (\(status.displayName)) - Safety: +\(String(format: "%.2f", safetyMargin))")
+            // x Print("🎯 RANKING: #\(rank) \(team.ownerName) - \(String(format: "%.2f", teamScore)) pts (\(status.displayName)) - Safety: +\(String(format: "%.2f", safetyMargin))")
             
             return FantasyTeamRanking(
                 id: team.id,
@@ -232,10 +232,10 @@ extension MatchupsHubViewModel {
     
     /// Log chopped summary details
     private func logChoppedSummary(totalTeams: Int, eliminationCount: Int, eliminatedTeams: [FantasyTeamRanking], highScore: Double, lowScore: Double, avgScore: Double, leagueName: String) {
-        print("🔥 CHOPPED SUMMARY: \(totalTeams) teams, \(eliminationCount) eliminations")
-        print("   💀 DEATH ROW: \(eliminatedTeams.map { $0.team.ownerName }.joined(separator: ", "))")
-        print("   📊 Scores: High=\(String(format: "%.2f", highScore)), Low=\(String(format: "%.2f", lowScore)), Avg=\(String(format: "%.2f", avgScore))")
-        print("🎯 CHOPPED: Created REAL summary with \(totalTeams) teams for \(leagueName)")
+        // x Print("🔥 CHOPPED SUMMARY: \(totalTeams) teams, \(eliminationCount) eliminations")
+        // x Print("   💀 DEATH ROW: \(eliminatedTeams.map { $0.team.ownerName }.joined(separator: ", "))")
+        // x Print("   📊 Scores: High=\(String(format: "%.2f", highScore)), Low=\(String(format: "%.2f", lowScore)), Avg=\(String(format: "%.2f", avgScore))")
+        // x Print("🎯 CHOPPED: Created REAL summary with \(totalTeams) teams for \(leagueName)")
     }
     
     /// Find the authenticated user's team in the Chopped leaderboard using proper Sleeper user identification
@@ -247,7 +247,7 @@ extension MatchupsHubViewModel {
             }
             
             if let myRanking = myRanking {
-                print("🎯 CHOPPED: Found MY team by roster ID \(userRosterID): \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
+                // x Print("🎯 CHOPPED: Found MY team by roster ID \(userRosterID): \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
                 return myRanking
             }
         }
@@ -260,7 +260,7 @@ extension MatchupsHubViewModel {
             }
             
             if let myRanking = myRanking {
-                print("🎯 CHOPPED: Found MY team by username '\(authenticatedUsername)': \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
+                // x Print("🎯 CHOPPED: Found MY team by username '\(authenticatedUsername)': \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
                 return myRanking
             }
         }
@@ -271,12 +271,12 @@ extension MatchupsHubViewModel {
         }
         
         if let gpRanking = gpRanking {
-            print("🎯 CHOPPED: Found MY team by 'Gp' match: \(gpRanking.team.ownerName) (\(gpRanking.eliminationStatus.displayName))")
+            // x Print("🎯 CHOPPED: Found MY team by 'Gp' match: \(gpRanking.team.ownerName) (\(gpRanking.eliminationStatus.displayName))")
             return gpRanking
         }
         
-        print("⚠️ CHOPPED: Could not identify user team in league \(leagueID)")
-        print("   Available teams: \(choppedSummary.rankings.map { $0.team.ownerName }.joined(separator: ", "))")
+        // x Print("⚠️ CHOPPED: Could not identify user team in league \(leagueID)")
+        // x Print("   Available teams: \(choppedSummary.rankings.map { $0.team.ownerName }.joined(separator: ", "))")
         
         // Return first team as fallback
         return choppedSummary.rankings.first
@@ -285,7 +285,7 @@ extension MatchupsHubViewModel {
     /// Get the current user's roster ID in a Sleeper league (helper for Chopped leagues)
     private func getCurrentUserRosterID(leagueID: String) async -> Int? {
         guard !sleeperCredentials.currentUserID.isEmpty else {
-            print("❌ SLEEPER: No user ID available for roster identification")
+            // x Print("❌ SLEEPER: No user ID available for roster identification")
             return nil
         }
         
@@ -294,14 +294,14 @@ extension MatchupsHubViewModel {
             let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
             
             if let userRoster = userRoster {
-                print("🎯 SLEEPER: Found user roster ID \(userRoster.rosterID) for user \(sleeperCredentials.currentUserID)")
+                // x Print("🎯 SLEEPER: Found user roster ID \(userRoster.rosterID) for user \(sleeperCredentials.currentUserID)")
                 return userRoster.rosterID
             } else {
-                print("⚠️ SLEEPER: No roster found for user \(sleeperCredentials.currentUserID) in league \(leagueID)")
+                // x Print("⚠️ SLEEPER: No roster found for user \(sleeperCredentials.currentUserID) in league \(leagueID)")
                 return nil
             }
         } catch {
-            print("❌ SLEEPER: Failed to fetch rosters for league \(leagueID): \(error)")
+            // x Print("❌ SLEEPER: Failed to fetch rosters for league \(leagueID): \(error)")
             return nil
         }
     }

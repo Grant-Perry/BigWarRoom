@@ -24,35 +24,35 @@ struct FantasyMatchupListView: View {
                     
                     // Matchups content
                     if viewModel.isLoading || shouldShowLoadingState {
-                        let _ = print("⏳ UI CONDITION: Loading state - showing spinning football")
+//                        let _ = print("⏳ UI CONDITION: Loading state - showing spinning football")
                         loadingView
                     } else if viewModel.detectedAsChoppedLeague || isChoppedLeague || forceChoppedMode {
                         // CHOPPED LEAGUE: Detected via empty matchups + rosters OR settings
-                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard!")
-                        let _ = print("   - viewModel.detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
-                        let _ = print("   - isChoppedLeague (computed): \(isChoppedLeague)")
-                        let _ = print("   - forceChoppedMode: \(forceChoppedMode)")
-                        let _ = print("   - viewModel.matchups.count: \(viewModel.matchups.count)")
-                        let _ = print("   - viewModel.hasActiveRosters: \(viewModel.hasActiveRosters)")
+//                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard!")
+//                        let _ = print("   - viewModel.detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
+//                        let _ = print("   - isChoppedLeague (computed): \(isChoppedLeague)")
+//                        let _ = print("   - forceChoppedMode: \(forceChoppedMode)")
+//                        let _ = print("   - viewModel.matchups.count: \(viewModel.matchups.count)")
+//                        let _ = print("   - viewModel.hasActiveRosters: \(viewModel.hasActiveRosters)")
                         choppedLeaderboardView
                     } else if viewModel.matchups.isEmpty && viewModel.hasActiveRosters {
                         // CHOPPED LEAGUE: No matchups but has rosters (safety net)
-                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard (safety net)!")
-                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
-                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
+//                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard (safety net)!")
+//                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
+//                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
                         choppedLeaderboardView
                     } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
                         // TRUE EMPTY STATE: Only after we've confirmed data loading is complete
-                        let _ = print("❌ UI CONDITION: Confirmed empty state (not loading)")
-                        let _ = print("   - shouldShowLoadingState: \(shouldShowLoadingState)")
-                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
-                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
-                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
+//                        let _ = print("❌ UI CONDITION: Confirmed empty state (not loading)")
+//                        let _ = print("   - shouldShowLoadingState: \(shouldShowLoadingState)")
+//                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
+//                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
+//                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
                         emptyStateView
                     } else {
                         // NORMAL LEAGUE: Has matchups
-                        let _ = print("✅ UI CONDITION: Showing normal matchups")
-                        let _ = print("   - matchups.count: \(viewModel.matchups.count)")
+//                        let _ = print("✅ UI CONDITION: Showing normal matchups")
+//                        let _ = print("   - matchups.count: \(viewModel.matchups.count)")
                         matchupsList
                     }
                 }

@@ -34,7 +34,7 @@ extension FantasyViewModel {
         Self.fetchingLock.unlock()
         
         if isAlreadyFetching {
-            print("🚫 FETCH GUARD: Already fetching \(league.league.name) week \(selectedWeek), skipping duplicate request")
+            // x Print("🚫 FETCH GUARD: Already fetching \(league.league.name) week \(selectedWeek), skipping duplicate request")
             return
         }
         
@@ -44,7 +44,7 @@ extension FantasyViewModel {
             Self.fetchingLock.unlock()
         }
         
-        print("🔍 FETCH MATCHUPS: Starting for league \(league.league.leagueID) source: \(league.source)")
+        // x Print("🔍 FETCH MATCHUPS: Starting for league \(league.league.leagueID) source: \(league.source)")
         
         isLoading = true
         errorMessage = nil
@@ -58,21 +58,21 @@ extension FantasyViewModel {
         
         do {
             if league.source == .espn {
-                print("🏈 ESPN LEAGUE: Fetching ESPN data for \(league.league.leagueID)")
+                // x Print("🏈 ESPN LEAGUE: Fetching ESPN data for \(league.league.leagueID)")
                 await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
             } else {
-                print("😴 SLEEPER LEAGUE: Fetching Sleeper data for \(league.league.leagueID)")
+                // x Print("😴 SLEEPER LEAGUE: Fetching Sleeper data for \(league.league.leagueID)")
                 await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
                 await fetchSleeperWeeklyStats()
                 await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
                 await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
             }
             
-            print("🎯 FETCH COMPLETE: matchups.count = \(matchups.count)")
+            // x Print("🎯 FETCH COMPLETE: matchups.count = \(matchups.count)")
             
             // 🔥 FIX: Better handling when matchups are empty
             if matchups.isEmpty && league.source == .sleeper {
-                print("🔥 CHOPPED DETECTION: 0 processed matchups for Sleeper league - MAKING IT CHOPPED!")
+                // x Print("🔥 CHOPPED DETECTION: 0 processed matchups for Sleeper league - MAKING IT CHOPPED!")
                 detectedAsChoppedLeague = true
                 hasActiveRosters = true
                 
@@ -80,13 +80,13 @@ extension FantasyViewModel {
                     self.objectWillChange.send()
                 }
             } else if matchups.isEmpty && league.source == .espn {
-                print("⚠️ ESPN: No matchups found for league \(league.league.leagueID) week \(selectedWeek)")
+                // x Print("⚠️ ESPN: No matchups found for league \(league.league.leagueID) week \(selectedWeek)")
                 // Don't immediately mark as chopped, ESPN leagues shouldn't be chopped
                 errorMessage = "No matchups found for week \(selectedWeek). Check if this week has started."
             }
             
             if isChoppedLeague(selectedLeague) {
-                print("🔥 CHOPPED DETECTION: League detected as Chopped, loading summary...")
+                // x Print("🔥 CHOPPED DETECTION: League detected as Chopped, loading summary...")
                 isLoadingChoppedData = true
                 currentChoppedSummary = await createRealChoppedSummaryWithHistory(
                     leagueID: league.league.leagueID, 
@@ -94,10 +94,10 @@ extension FantasyViewModel {
                 )
                 isLoadingChoppedData = false
             } else {
-                print("❌ CHOPPED DETECTION: League NOT detected as Chopped")
-                print("   - detectedAsChoppedLeague: \(detectedAsChoppedLeague)")
-                print("   - hasActiveRosters: \(hasActiveRosters)")
-                print("   - league.source: \(league.source)")
+                // x Print("❌ CHOPPED DETECTION: League NOT detected as Chopped")
+                // x Print("   - detectedAsChoppedLeague: \(detectedAsChoppedLeague)")
+                // x Print("   - hasActiveRosters: \(hasActiveRosters)")
+                // x Print("   - league.source: \(league.source)")
             }
             
         } catch {
@@ -105,7 +105,7 @@ extension FantasyViewModel {
             if matchups.isEmpty {
                 matchups = []
             }
-            print("❌ FETCH ERROR: \(error.localizedDescription)")
+            // x Print("❌ FETCH ERROR: \(error.localizedDescription)")
         }
         
         let elapsedTime = Date().timeIntervalSince(startTime)
@@ -118,7 +118,7 @@ extension FantasyViewModel {
         
         isLoading = false
         
-        print("🎯 FINAL STATE: matchups.count = \(matchups.count), detectedAsChoppedLeague = \(detectedAsChoppedLeague)")
+        // x Print("🎯 FINAL STATE: matchups.count = \(matchups.count), detectedAsChoppedLeague = \(detectedAsChoppedLeague)")
         
         if isChoppedLeague(selectedLeague) {
             choppedWeekSummary = await createRealChoppedSummaryWithHistory(leagueID: selectedLeague?.league.leagueID ?? "", week: selectedWeek)
@@ -142,7 +142,7 @@ extension FantasyViewModel {
         Self.fetchingLock.unlock()
         
         if isAlreadyRefreshing {
-            print("🚫 REFRESH GUARD: Already refreshing \(league.league.name), skipping")
+            // x Print("🚫 REFRESH GUARD: Already refreshing \(league.league.name), skipping")
             return
         }
         
@@ -152,17 +152,17 @@ extension FantasyViewModel {
             Self.fetchingLock.unlock()
         }
         
-        print("🔄 REFRESH: Starting auto-refresh for \(league.league.name)")
+        // x Print("🔄 REFRESH: Starting auto-refresh for \(league.league.name)")
         
         do {
             if league.source == .espn {
-                print("🔄 ESPN REFRESH: Using proper authentication...")
+                // x Print("🔄 ESPN REFRESH: Using proper authentication...")
                 await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
             } else {
-                print("🔄 SLEEPER REFRESH: Refreshing Sleeper data with proper user names...")
+                // x Print("🔄 SLEEPER REFRESH: Refreshing Sleeper data with proper user names...")
                 // 🔥 FIX: Ensure user data is available before refreshing matchups
                 if userIDs.isEmpty {
-                    print("⚠️ SLEEPER REFRESH: User data missing, fetching user names first...")
+                    // x Print("⚠️ SLEEPER REFRESH: User data missing, fetching user names first...")
                     await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
                 }
                 await refreshSleeperData(leagueID: league.league.leagueID, week: selectedWeek)
@@ -172,10 +172,10 @@ extension FantasyViewModel {
                 await refreshChoppedData(leagueID: league.league.leagueID, week: selectedWeek)
             }
             
-            print("✅ REFRESH: Completed auto-refresh, matchups.count = \(matchups.count)")
+            // x Print("✅ REFRESH: Completed auto-refresh, matchups.count = \(matchups.count)")
             
         } catch {
-            print("❌ REFRESH: Auto-refresh failed: \(error)")
+            // x Print("❌ REFRESH: Auto-refresh failed: \(error)")
         }
     }
 
@@ -183,7 +183,7 @@ extension FantasyViewModel {
     private func refreshChoppedData(leagueID: String, week: Int) async {
         if let updatedSummary = await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week) {
             currentChoppedSummary = updatedSummary
-            print("🔥 CHOPPED REFRESH: Updated rankings for week \(week)")
+            // x Print("🔥 CHOPPED REFRESH: Updated rankings for week \(week)")
         }
     }
 
@@ -197,19 +197,19 @@ extension FantasyViewModel {
             let (data, _) = try await URLSession.shared.data(from: url)
             let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
             
-            print("📊 REFRESH SLEEPER: Received \(sleeperMatchups.count) matchups")
-            print("👥 REFRESH DEBUG: userIDs.count = \(userIDs.count), rosterIDToManagerID.count = \(rosterIDToManagerID.count)")
+            // x Print("📊 REFRESH SLEEPER: Received \(sleeperMatchups.count) matchups")
+            // x Print("👥 REFRESH DEBUG: userIDs.count = \(userIDs.count), rosterIDToManagerID.count = \(rosterIDToManagerID.count)")
             
             // 🔥 FIX: Use the proper Sleeper matchup processing instead of legacy method
             if !sleeperMatchups.isEmpty {
                 await processSleeperMatchupsWithProjections(sleeperMatchups, leagueID: leagueID)
-                print("✅ REFRESH SLEEPER: Updated matchups with proper names")
+                // x Print("✅ REFRESH SLEEPER: Updated matchups with proper names")
             } else {
-                print("⚠️ REFRESH SLEEPER: No matchups found (possibly Chopped league)")
+                // x Print("⚠️ REFRESH SLEEPER: No matchups found (possibly Chopped league)")
             }
             
         } catch {
-            print("❌ REFRESH SLEEPER: Failed to refresh - \(error)")
+            // x Print("❌ REFRESH SLEEPER: Failed to refresh - \(error)")
         }
     }
 }

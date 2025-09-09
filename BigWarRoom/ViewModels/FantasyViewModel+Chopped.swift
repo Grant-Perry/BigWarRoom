@@ -13,20 +13,20 @@ extension FantasyViewModel {
     /// Check if a league is a Chopped format - NOW USES CENTRALIZED DETECTION
     func isChoppedLeague(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper?) -> Bool {
         guard let leagueWrapper = leagueWrapper else {
-            print("❌ CHOPPED CHECK: Nil league wrapper")
+            // x Print("❌ CHOPPED CHECK: Nil league wrapper")
             return false
         }
         
-        print("🔍 CHOPPED CHECK: Checking league \(leagueWrapper.league.leagueID)")
-        print("   - League name: '\(leagueWrapper.league.name)'")
+        // x Print("🔍 CHOPPED CHECK: Checking league \(leagueWrapper.league.leagueID)")
+        // x Print("   - League name: '\(leagueWrapper.league.name)'")
         
         // USE THE CENTRALIZED DETECTION METHOD - DRY PRINCIPLE
         let isChopped = leagueWrapper.isChoppedLeague
         
         if isChopped {
-            print("🔥 CHOPPED CHECK: ✅ Detected via centralized method (settings.type == 3)")
+            // x Print("🔥 CHOPPED CHECK: ✅ Detected via centralized method (settings.type == 3)")
         } else {
-            print("❌ CHOPPED CHECK: NOT detected as Chopped league")
+            // x Print("❌ CHOPPED CHECK: NOT detected as Chopped league")
         }
         
         return isChopped
@@ -90,9 +90,9 @@ extension FantasyViewModel {
         )
         
         if !eliminationHistory.isEmpty {
-            print("💀 ELIMINATION HISTORY:")
+            // x Print("💀 ELIMINATION HISTORY:")
             for elimination in eliminationHistory {
-                print("   Week \(elimination.week): \(elimination.eliminatedTeam.team.ownerName) - \(elimination.eliminationScore) pts (margin: \(elimination.margin))")
+                // x Print("   Week \(elimination.week): \(elimination.eliminatedTeam.team.ownerName) - \(elimination.eliminationScore) pts (margin: \(elimination.margin))")
             }
         }
         
@@ -101,7 +101,7 @@ extension FantasyViewModel {
     
     /// Fetch Chopped league standings with real projected points and elimination probabilities
     func fetchChoppedLeagueStandings(leagueID: String, week: Int) async -> [FantasyTeamRanking] {
-        print("🔍 CHOPPED STANDINGS: Starting fetch for league \(leagueID)")
+        // x Print("🔍 CHOPPED STANDINGS: Starting fetch for league \(leagueID)")
         
         // FIRST: Ensure all user data is loaded and populated
         await fetchSleeperLeagueUsersAndRosters(leagueID: leagueID)
@@ -109,16 +109,16 @@ extension FantasyViewModel {
         await fetchSleeperWeeklyStats()
         
         // DEBUG: Check if user data was populated
-        print("📊 USER DATA CHECK:")
-        print("   - rosterIDToManagerID count: \(rosterIDToManagerID.count)")
-        print("   - userIDs count: \(userIDs.count)")
-        print("   - userAvatars count: \(userAvatars.count)")
+        // x Print("📊 USER DATA CHECK:")
+        // x Print("   - rosterIDToManagerID count: \(rosterIDToManagerID.count)")
+        // x Print("   - userIDs count: \(userIDs.count)")
+        // x Print("   - userAvatars count: \(userAvatars.count)")
         
         if !rosterIDToManagerID.isEmpty {
-            print("   - Sample roster mappings:")
+            // x Print("   - Sample roster mappings:")
             for (rosterID, managerID) in rosterIDToManagerID.prefix(3) {
                 let displayName = userIDs[managerID] ?? "NO NAME"
-                print("     Roster \(rosterID) -> Manager \(managerID) -> '\(displayName)'")
+                // x Print("     Roster \(rosterID) -> Manager \(managerID) -> '\(displayName)'")
             }
         }
         
@@ -135,8 +135,8 @@ extension FantasyViewModel {
                 let teamProjected = matchup.projectedPoints ?? (teamScore * 1.05)
                 let managerID = rosterIDToManagerID[matchup.rosterID] ?? ""
                 
-                print("🔍 PROCESSING: Roster \(matchup.rosterID)")
-                print("   - Found managerID: '\(managerID)'")
+                // x Print("🔍 PROCESSING: Roster \(matchup.rosterID)")
+                // x Print("   - Found managerID: '\(managerID)'")
                 
                 // IMPROVED: Better manager name resolution with multiple fallbacks
                 var finalManagerName = "Manager \(matchup.rosterID)" // fallback
@@ -145,12 +145,12 @@ extension FantasyViewModel {
                     if let displayName = userIDs[managerID], !displayName.isEmpty {
                         // Use actual display name if available
                         finalManagerName = displayName
-                        print("👤 MANAGER SUCCESS: Roster \(matchup.rosterID) -> '\(displayName)'")
+                        // x Print("👤 MANAGER SUCCESS: Roster \(matchup.rosterID) -> '\(displayName)'")
                     } else {
-                        print("⚠️ NO DISPLAY NAME: Manager ID '\(managerID)' not found in userIDs")
+                        // x Print("⚠️ NO DISPLAY NAME: Manager ID '\(managerID)' not found in userIDs")
                     }
                 } else {
-                    print("❌ NO MANAGER ID: Roster \(matchup.rosterID) has no mapped manager ID")
+                    // x Print("❌ NO MANAGER ID: Roster \(matchup.rosterID) has no mapped manager ID")
                 }
                 
                 // Try draft room data as additional fallback
@@ -165,14 +165,14 @@ extension FantasyViewModel {
                                !draftSlotBasedName.lowercased().hasPrefix("manager "),
                                draftSlotBasedName.count > 4 {
                                 finalManagerName = draftSlotBasedName
-                                print("🎯 DRAFT FALLBACK: Roster \(matchup.rosterID) -> '\(draftSlotBasedName)'")
+                                // x Print("🎯 DRAFT FALLBACK: Roster \(matchup.rosterID) -> '\(draftSlotBasedName)'")
                             }
                         }
                     }
                 }
                 
                 if finalManagerName.hasPrefix("Manager ") {
-                    print("⚠️ FALLBACK: Roster \(matchup.rosterID) -> \(finalManagerName)")
+                    // x Print("⚠️ FALLBACK: Roster \(matchup.rosterID) -> \(finalManagerName)")
                 }
                 
                 let avatarURL = userAvatars[managerID]
@@ -242,11 +242,11 @@ extension FantasyViewModel {
                 )
             }
             
-            print("🔥 CHOPPED: Created \(rankings.count) real team rankings with Sleeper-style safety percentages for league \(leagueID) week \(week)")
+            // x Print("🔥 CHOPPED: Created \(rankings.count) real team rankings with Sleeper-style safety percentages for league \(leagueID) week \(week)")
             return rankings
             
         } catch {
-            print("❌ CHOPPED: Failed to fetch league standings with projections: \(error)")
+            // x Print("❌ CHOPPED: Failed to fetch league standings with projections: \(error)")
             return []
         }
     }
@@ -261,7 +261,7 @@ extension FantasyViewModel {
             }
         }
         
-        print("💀 ELIMINATION TRACKER: Found \(eliminationHistory.count) eliminations across \(currentWeek-1) weeks")
+        // x Print("💀 ELIMINATION TRACKER: Found \(eliminationHistory.count) eliminations across \(currentWeek-1) weeks")
         return eliminationHistory.sorted { $0.week < $1.week }
     }
 
@@ -336,7 +336,7 @@ extension FantasyViewModel {
             )
         
         } catch {
-            print("❌ ELIMINATION: Failed to fetch week \(week) data: \(error)")
+            // x Print("❌ ELIMINATION: Failed to fetch week \(week) data: \(error)")
             return nil
         }
     }

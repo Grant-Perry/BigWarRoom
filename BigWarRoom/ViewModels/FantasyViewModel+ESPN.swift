@@ -18,14 +18,14 @@ extension FantasyViewModel {
             return
         }
         
-        print("🔍 ESPN: Fetching \(leagueID) week \(week)")
+        // x Print("🔍 ESPN: Fetching \(leagueID) week \(week)")
         
         // 🔥 FIX: First fetch the full league data with member info for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: leagueID)
-            print("✅ ESPN: Got league member data for name resolution")
+            // x Print("✅ ESPN: Got league member data for name resolution")
         } catch {
-            print("⚠️ ESPN: Failed to get league member data, using fallback names")
+            // x Print("⚠️ ESPN: Failed to get league member data, using fallback names")
             currentESPNLeague = nil
         }
         
@@ -38,11 +38,11 @@ extension FantasyViewModel {
         URLSession.shared.dataTaskPublisher(for: request)
             .map(\.data)
             .handleEvents(receiveOutput: { data in
-                print("📡 ESPN: Received \(data.count) bytes for \(leagueID)")
+                // x Print("📡 ESPN: Received \(data.count) bytes for \(leagueID)")
                 
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let schedule = json["schedule"] as? [[String: Any]] {
-                    print("📊 ESPN: \(leagueID) has \(schedule.count) total schedule entries")
+                    // x Print("📊 ESPN: \(leagueID) has \(schedule.count) total schedule entries")
                     
                     let currentWeekEntries = schedule.filter { entry in
                         if let matchupPeriodId = entry["matchupPeriodId"] as? Int {
@@ -50,7 +50,7 @@ extension FantasyViewModel {
                         }
                         return false
                     }
-                    print("🏈 ESPN: \(leagueID) has \(currentWeekEntries.count) entries for week \(week)")
+                    // x Print("🏈 ESPN: \(leagueID) has \(currentWeekEntries.count) entries for week \(week)")
                     
                     // 🔍 FOCUSED DEBUG: Only show entries with missing/null away teams
                     let problematicEntries = currentWeekEntries.filter { entry in
@@ -62,9 +62,9 @@ extension FantasyViewModel {
                     }
                     
                     if !problematicEntries.isEmpty {
-                        print("🚨 PROBLEMATIC ENTRIES (missing/null away teams):")
+                        // x Print("🚨 PROBLEMATIC ENTRIES (missing/null away teams):")
                         for (index, entry) in problematicEntries.enumerated() {
-                            print("  Problem Entry \(index + 1): \(entry)")
+                            // x Print("  Problem Entry \(index + 1): \(entry)")
                         }
                     }
                 }
@@ -176,22 +176,22 @@ extension FantasyViewModel {
         var byeTeams: [FantasyTeam] = []
         
         let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
-        print("🏈 ESPN \(leagueID): Week \(week) has \(weekSchedule.count) matchups")
+        // x Print("🏈 ESPN \(leagueID): Week \(week) has \(weekSchedule.count) matchups")
         
         for scheduleEntry in weekSchedule {
             // Handle bye weeks
             guard let awayTeamEntry = scheduleEntry.away else {
                 let homeTeamName = espnModel.teams.first { $0.id == scheduleEntry.home.teamId }?.name ?? "Unknown"
                 
-                print("🛌 ESPN: Found BYE for team \(scheduleEntry.home.teamId) (\(homeTeamName))")
-                print("🔍 RAW JSON for this BYE entry:")
+                // x Print("🛌 ESPN: Found BYE for team \(scheduleEntry.home.teamId) (\(homeTeamName))")
+                // x Print("🔍 RAW JSON for this BYE entry:")
                 
                 // Convert this specific schedule entry back to JSON for inspection
                 if let jsonData = try? JSONEncoder().encode(scheduleEntry),
                    let jsonString = String(data: jsonData, encoding: .utf8) {
-                    print("   \(jsonString)")
+                    // x Print("   \(jsonString)")
                 } else {
-                    print("   Failed to serialize entry to JSON")
+                    // x Print("   Failed to serialize entry to JSON")
                 }
                 
                 // Check if this team appears as an away team in any other matchup
@@ -200,7 +200,7 @@ extension FantasyViewModel {
                 }
                 
                 if appearsAsAway {
-                    print("⚠️ DUPLICATE: Team \(scheduleEntry.home.teamId) ALSO appears as away team in another entry!")
+                    // x Print("⚠️ DUPLICATE: Team \(scheduleEntry.home.teamId) ALSO appears as away team in another entry!")
                 }
                 
                 if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
@@ -258,7 +258,7 @@ extension FantasyViewModel {
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
         byeWeekTeams = byeTeams
         
-        print("🎯 ESPN \(leagueID): Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams")
+        // x Print("🎯 ESPN \(leagueID): Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams")
     }
 
     /// Create FantasyTeam from ESPN data

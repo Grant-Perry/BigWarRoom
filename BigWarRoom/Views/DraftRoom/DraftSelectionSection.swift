@@ -64,7 +64,7 @@ struct DraftSelectionSection: View {
                                     // Navigate to Fantasy tab after selecting league
                                     await MainActor.run {
                                         selectedTab = 2 // Fantasy tab is now index 2
-                                        print("🏈 Auto-navigated to Fantasy tab after selecting league: \(leagueWrapper.league.name)")
+                                        // x Print("🏈 Auto-navigated to Fantasy tab after selecting league: \(leagueWrapper.league.name)")
                                     }
                                 }
                             }

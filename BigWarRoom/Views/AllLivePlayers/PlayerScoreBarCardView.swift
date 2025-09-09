@@ -12,9 +12,13 @@ struct PlayerScoreBarCardView: View {
     let animateIn: Bool
     let onTap: (() -> Void)?
     
+    // 🔥 NEW: Get stats from parent view model
+    @ObservedObject var viewModel: AllLivePlayersViewModel
+    
     @State private var scoreBarWidth: Double = 0.0
     @State private var cardOffset: Double = 50.0
     @State private var cardOpacity: Double = 0.0
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
     
     private let maxScoreBarWidth: Double = 120.0 // Maximum width in points
     private let cardHeight: Double = 60.0 // Shorter card height (was 70)
@@ -98,14 +102,35 @@ struct PlayerScoreBarCardView: View {
                     
                     // Score and league info
                     HStack(spacing: 8) {
-                        Text(playerEntry.currentScoreString)
-                            .font(.callout)
-                            .fontWeight(.bold)
-                            .foregroundColor(playerScoreColor)
-                        
-                        Text("pts")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 8) {
+                                Text(playerEntry.currentScoreString)
+                                    .font(.callout)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(playerScoreColor)
+                                
+                                Text("pts")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            // 🔥 NEW: Stat breakdown line
+                            if let statLine = formatPlayerStatBreakdown() {
+                                Text(statLine)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.8)
+                            } else {
+                                // 🔥 DEBUG: Show why no stat line
+                                let playerName = playerEntry.player.fullName
+                                if playerName.lowercased().contains("allen") || playerName.lowercased().contains("jackson") {
+                                    Text("DEBUG: No stats for \(playerName)")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        }
                         
                         Spacer()
                         
@@ -344,5 +369,213 @@ struct PlayerScoreBarCardView: View {
         }
         
         return shortName
+    }
+    
+    // MARK: - Stat Breakdown Methods
+    
+    /// Format player stat breakdown based on position using centralized stats
+    private func formatPlayerStatBreakdown() -> String? {
+        let playerName = playerEntry.player.fullName
+        
+        guard viewModel.statsLoaded else {
+            return nil
+        }
+        
+        guard let sleeperPlayer = getSleeperPlayerData() else {
+            return nil
+        }
+        
+        guard let stats = viewModel.playerStats[sleeperPlayer.playerID] else {
+            return nil
+        }
+        
+        let position = playerEntry.position
+        var breakdown: [String] = []
+        
+        switch position {
+        case "QB":
+            // Passing stats: completions/attempts, yards, TDs
+            if let attempts = stats["pass_att"], attempts > 0 {
+                let completions = stats["pass_cmp"] ?? 0
+                let yards = stats["pass_yd"] ?? 0
+                let tds = stats["pass_td"] ?? 0
+                breakdown.append("\(Int(completions))/\(Int(attempts)) CMP")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) PASS TD") }
+            } else {
+                // 🔥 NEW: Fallback for QBs with no detailed stats - show fantasy points breakdown
+                if let pprPoints = stats["pts_ppr"], pprPoints > 0 {
+                    breakdown.append("\(String(format: "%.1f", pprPoints)) PPR PTS")
+                } else if let halfPprPoints = stats["pts_half_ppr"], halfPprPoints > 0 {
+                    breakdown.append("\(String(format: "%.1f", halfPprPoints)) HALF PPR PTS")
+                } else if let stdPoints = stats["pts_std"], stdPoints > 0 {
+                    breakdown.append("\(String(format: "%.1f", stdPoints)) STD PTS")
+                }
+            }
+            
+            // Rushing stats if significant for QBs
+            if let carries = stats["rush_att"], carries > 0 {
+                let rushYards = stats["rush_yd"] ?? 0
+                let rushTds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if rushYards > 0 { breakdown.append("\(Int(rushYards)) RUSH YD") }
+                if rushTds > 0 { breakdown.append("\(Int(rushTds)) RUSH TD") }
+            }
+            
+        case "RB":
+            // Rushing stats: carries, yards, TDs
+            if let carries = stats["rush_att"], carries > 0 {
+                let yards = stats["rush_yd"] ?? 0
+                let tds = stats["rush_td"] ?? 0
+                breakdown.append("\(Int(carries)) CAR")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+            } else {
+                // 🔥 NEW: Fallback for RBs with no detailed stats
+                if let pprPoints = stats["pts_ppr"], pprPoints > 0 {
+                    breakdown.append("\(String(format: "%.1f", pprPoints)) PPR PTS")
+                }
+            }
+            // Receiving if significant
+            if let receptions = stats["rec"], receptions > 0 {
+                let recYards = stats["rec_yd"] ?? 0
+                let recTds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions)) REC")
+                if recYards > 0 { breakdown.append("\(Int(recYards)) REC YD") }
+                if recTds > 0 { breakdown.append("\(Int(recTds)) REC TD") }
+            }
+            
+        case "WR", "TE":
+            // Receiving stats: receptions/targets, yards, TDs
+            if let receptions = stats["rec"], receptions > 0 {
+                let targets = stats["rec_tgt"] ?? receptions
+                let yards = stats["rec_yd"] ?? 0
+                let tds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions))/\(Int(targets)) REC")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) TD") }
+            } else {
+                // 🔥 NEW: Fallback for WR/TE with no detailed stats
+                if let pprPoints = stats["pts_ppr"], pprPoints > 0 {
+                    breakdown.append("\(String(format: "%.1f", pprPoints)) PPR PTS")
+                }
+            }
+            // Rushing if significant for WRs
+            if position == "WR", let rushYards = stats["rush_yd"], rushYards > 0 {
+                breakdown.append("\(Int(rushYards)) RUSH YD")
+            }
+            
+        case "K":
+            // Field goals and extra points
+            if let fgMade = stats["fgm"], fgMade > 0 {
+                let fgAtt = stats["fga"] ?? fgMade
+                breakdown.append("\(Int(fgMade))/\(Int(fgAtt)) FG")
+            }
+            if let xpMade = stats["xpm"], xpMade > 0 {
+                breakdown.append("\(Int(xpMade)) XP")
+            }
+            
+            // 🔥 NEW: Fallback for kickers with no detailed stats
+            if breakdown.isEmpty, let pprPoints = stats["pts_ppr"], pprPoints > 0 {
+                breakdown.append("\(String(format: "%.1f", pprPoints)) PTS")
+            }
+            
+        case "DEF", "DST":
+            // Defense stats: sacks, interceptions, fumble recoveries
+            if let sacks = stats["def_sack"], sacks > 0 {
+                breakdown.append("\(Int(sacks)) SACK")
+            }
+            if let ints = stats["def_int"], ints > 0 {
+                breakdown.append("\(Int(ints)) INT")
+            }
+            if let fumRec = stats["def_fum_rec"], fumRec > 0 {
+                breakdown.append("\(Int(fumRec)) FUM REC")
+            }
+            
+            // 🔥 NEW: Fallback for defense with no detailed stats
+            if breakdown.isEmpty, let pprPoints = stats["pts_ppr"], pprPoints > 0 {
+                breakdown.append("\(String(format: "%.1f", pprPoints)) PTS")
+            }
+            
+        default:
+            return nil
+        }
+        
+        let result = breakdown.isEmpty ? nil : breakdown.joined(separator: ", ")
+        return result
+    }
+    
+    private func getSleeperPlayerData() -> SleeperPlayer? {
+        let playerName = playerEntry.player.fullName
+        
+        // Find all potential matches first
+        let potentialMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            if sleeperPlayer.fullName.lowercased() == playerName.lowercased() {
+                return true
+            }
+            
+            if sleeperPlayer.shortName.lowercased() == playerEntry.player.shortName.lowercased() &&
+               sleeperPlayer.team?.lowercased() == playerEntry.player.team?.lowercased() {
+                return true
+            }
+            
+            if let firstName = sleeperPlayer.firstName, let lastName = sleeperPlayer.lastName {
+                let fullName = "\(firstName) \(lastName)"
+                if fullName.lowercased() == playerName.lowercased() {
+                    return true
+                }
+            }
+            
+            return false
+        }
+        
+        // If only one match, use it
+        if potentialMatches.count == 1 {
+            return potentialMatches.first
+        }
+        
+        // If multiple matches, use a robust prioritization system
+        if potentialMatches.count > 1 {
+            // Priority 1: Player with detailed game stats (passing, rushing, receiving, etc.)
+            let detailedStatsMatches = potentialMatches.filter { player in
+                if let stats = viewModel.playerStats[player.playerID] {
+                    let hasDetailedStats = stats.keys.contains { key in
+                        key.contains("pass_att") || key.contains("rush_att") || 
+                        key.contains("rec") || key.contains("fgm") || 
+                        key.contains("def_sack") || key.contains("pass_cmp") ||
+                        key.contains("rush_yd") || key.contains("rec_yd")
+                    }
+                    return hasDetailedStats
+                }
+                return false
+            }
+            
+            if !detailedStatsMatches.isEmpty {
+                return detailedStatsMatches.first
+            }
+            
+            // Priority 2: Player with any stats (even if just fantasy points)
+            let anyStatsMatches = potentialMatches.filter { player in
+                return viewModel.playerStats[player.playerID] != nil
+            }
+            
+            if !anyStatsMatches.isEmpty {
+                return anyStatsMatches.first
+            }
+            
+            // Priority 3: Player with most recent/current team match
+            let teamMatches = potentialMatches.filter { player in
+                return player.team?.lowercased() == playerEntry.player.team?.lowercased()
+            }
+            
+            if !teamMatches.isEmpty {
+                return teamMatches.first
+            }
+            
+            // Priority 4: Fallback to first match
+            return potentialMatches.first
+        }
+        
+        return nil
     }
 }

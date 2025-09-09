@@ -63,7 +63,7 @@ final class SleeperSetupViewModel: ObservableObject {
         // 🔥 FIX: Auto-save when using default credentials
         saveCredentials()
         
-        // xprint("🔧 Auto-filled and saved default Sleeper credentials")
+        // x// x Print("🔧 Auto-filled and saved default Sleeper credentials")
     }
     
     func saveCredentials() {
@@ -144,7 +144,7 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Sleeper credentials cleared (cache kept)!"
         showingClearResult = true
-        // xprint("🧹 Cleared Sleeper credentials only, kept league cache")
+        // x// x Print("🧹 Cleared Sleeper credentials only, kept league cache")
     }
     
     private func performClearCacheOnly() {
@@ -155,7 +155,7 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Cleared \(clearedCount) cached league(s)!"
         showingClearResult = true
-        // xprint("🧹 Cleared Sleeper league cache only")
+        // x// x Print("🧹 Cleared Sleeper league cache only")
     }
     
     func confirmClearAction() {

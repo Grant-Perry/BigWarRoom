@@ -71,7 +71,7 @@ extension MatchupsHubViewModel {
         
         // Get user's team ID
         guard let myTeamID = await provider.identifyMyTeamID() else {
-            print("⚠️ REFRESH: Could not identify team for \(matchup.league.league.name)")
+            // x Print("⚠️ REFRESH: Could not identify team for \(matchup.league.league.name)")
             return
         }
         
@@ -124,7 +124,7 @@ extension MatchupsHubViewModel {
                 }
             }
         } catch {
-            print("⚠️ REFRESH: Failed to refresh \(matchup.league.league.name): \(error)")
+            // x Print("⚠️ REFRESH: Failed to refresh \(matchup.league.league.name): \(error)")
         }
     }
     
@@ -170,7 +170,7 @@ extension MatchupsHubViewModel {
             await loadMatchupsFromAllLeaguesBackground(availableLeagues)
             
         } catch {
-            print("⚠️ BACKGROUND REFRESH: Failed to refresh leagues: \(error)")
+            // x Print("⚠️ BACKGROUND REFRESH: Failed to refresh leagues: \(error)")
         }
     }
     

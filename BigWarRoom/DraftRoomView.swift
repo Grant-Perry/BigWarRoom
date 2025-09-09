@@ -117,14 +117,14 @@ struct DraftRoomView: View {
     private func autoConnectIfConfigured() {
         // Don't auto-connect if we already have leagues loaded (either service)
         if !viewModel.allAvailableDrafts.isEmpty {
-            // xprint("🔍 Auto-connect skipped - leagues already loaded")
+            // x// x Print("🔍 Auto-connect skipped - leagues already loaded")
             return
         }
 
         let hasESPNCredentials = espnCredentials.hasValidCredentials
         let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
 
-        // xprint("🔍 Auto-connect check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials)")
+        // x// x Print("🔍 Auto-connect check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials)")
 
         Task {
             await connectToAllAvailableServices()
@@ -140,20 +140,20 @@ struct DraftRoomView: View {
         await withTaskGroup(of: Void.self) { group in
             if hasESPNCredentials {
                 group.addTask {
-                    // xprint("🚀 [AutoConnect] Connecting to ESPN leagues…")
+                    // x// x Print("🚀 [AutoConnect] Connecting to ESPN leagues…")
                     await viewModel.connectToESPNOnly()
                 }
             }
             if hasSleeperCredentials {
                 if let sleeperID = sleeperCredentials.getUserIdentifier() {
                     group.addTask {
-                        // xprint("🚀 [AutoConnect] Connecting to Sleeper leagues for user: \(sleeperID)")
+                        // x// x Print("🚀 [AutoConnect] Connecting to Sleeper leagues for user: \(sleeperID)")
                         await viewModel.connectWithUsernameOrID(sleeperID, season: selectedYear)
                     }
                 }
             }
         }
-        // xprint("✅ [AutoConnect] Connected to all services with credentials. Leagues loaded: \(viewModel.allAvailableDrafts.count)")
+        // x// x Print("✅ [AutoConnect] Connected to all services with credentials. Leagues loaded: \(viewModel.allAvailableDrafts.count)")
     }
 }
 
@@ -228,7 +228,7 @@ struct ESPNSetupNoticeCard: View {
     private func quickSetupESPN() {
         // Don't auto-fill with Gp's credentials - let users set their own
         // This was forcing Gp's settings on everyone
-        // xprint("🚀 Navigate to ESPN setup for user to enter their own credentials")
+        // x// x Print("🚀 Navigate to ESPN setup for user to enter their own credentials")
         selectedTab = 7 // Navigate to settings for proper setup
     }
 }
@@ -282,7 +282,7 @@ struct SleeperSetupNoticeCard: View {
     private func quickSetupSleeper() {
         // Don't auto-fill with Gp's credentials - let users set their own  
         // This was forcing Gp's settings on everyone
-        // xprint("🚀 Navigate to Sleeper setup for user to enter their own credentials")
+        // x// x Print("🚀 Navigate to Sleeper setup for user to enter their own credentials")
         selectedTab = 7 // Navigate to settings for proper setup
     }
 }

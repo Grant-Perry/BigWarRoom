@@ -47,7 +47,7 @@ extension DraftRoomViewModel {
             selectedDraft = draftLeague
             
         } catch {
-            // xprint("🏈 Could not fetch draft info: \(error)")
+            // x// x Print("🏈 Could not fetch draft info: \(error)")
             // Create fallback league for display
             selectedDraft = SleeperLeague(
                 leagueID: "manual_\(draftID)",
@@ -99,19 +99,19 @@ extension DraftRoomViewModel {
     private func enhanceManualDraftWithRosterCorrelation(draftID: String, userID: String) async -> Bool {
         do {
             // Step 1: Fetch draft info to get league ID
-            // xprint("🏈 Fetching draft info for manual draft: \(draftID)")
+            // x// x Print("🏈 Fetching draft info for manual draft: \(draftID)")
             let draft = try await sleeperClient.fetchDraft(draftID: draftID)
             
             guard let leagueID = draft.leagueID else {
-                // xprint("🏈 Draft \(draftID) has no league ID - likely a mock draft")
+                // x// x Print("🏈 Draft \(draftID) has no league ID - likely a mock draft")
                 return false
             }
             
-            // xprint("🏈 Found league ID: \(leagueID)")
+            // x// x Print("🏈 Found league ID: \(leagueID)")
             
             // Step 2: Fetch league info to create a SleeperLeague object
             let league = try await sleeperClient.fetchLeague(leagueID: leagueID)
-            // xprint("🏈 Fetched league: \(league.name)")
+            // x// x Print("🏈 Fetched league: \(league.name)")
             
             // Step 3: Fetch league rosters
             let rosters = try await sleeperClient.fetchRosters(leagueID: leagueID)
@@ -122,21 +122,21 @@ extension DraftRoomViewModel {
                 _myRosterID = myRoster.rosterID
                 myDraftSlot = myRoster.draftSlot
                 
-                // xprint("🏈 Found your roster! ID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)")
+                // x// x Print("🏈 Found your roster! ID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)")
                 
                 // Step 5: Set up draft roster info for display
                 var info: [Int: DraftRosterInfo] = [:]
                 
-                // xprint("🔍 DEBUG: Building draftRosters dictionary...")
-                // xprint("   Found \(rosters.count) rosters in league")
+                // x// x Print("🔍 DEBUG: Building draftRosters dictionary...")
+                // x// x Print("   Found \(rosters.count) rosters in league")
                 
                 for roster in rosters {
-                    // xprint("   Processing roster \(roster.rosterID):")
-                    // xprint("     ownerID: \(roster.ownerID ?? "nil")")
-                    // xprint("     draftSlot: \(roster.draftSlot ?? -1)")
-                    // xprint("     ownerDisplayName: \(roster.ownerDisplayName ?? "nil")")
-                    // xprint("     teamName: \(roster.metadata?.teamName ?? "nil")")
-                    // xprint("     ownerName: \(roster.metadata?.ownerName ?? "nil")")
+                    // x// x Print("   Processing roster \(roster.rosterID):")
+                    // x// x Print("     ownerID: \(roster.ownerID ?? "nil")")
+                    // x// x Print("     draftSlot: \(roster.draftSlot ?? -1)")
+                    // x// x Print("     ownerDisplayName: \(roster.ownerDisplayName ?? "nil")")
+                    // x// x Print("     teamName: \(roster.metadata?.teamName ?? "nil")")
+                    // x// x Print("     ownerName: \(roster.metadata?.ownerName ?? "nil")")
                     
                     let displayName = await resolveDisplayNameForManualDraft(roster: roster)
                     
@@ -146,12 +146,12 @@ extension DraftRoomViewModel {
                         displayName: displayName
                     )
                     
-                    // xprint("     Final result: rosterID \(roster.rosterID) → '\(displayName)' (draftSlot: \(roster.draftSlot ?? -1))")
+                    // x// x Print("     Final result: rosterID \(roster.rosterID) → '\(displayName)' (draftSlot: \(roster.draftSlot ?? -1))")
                 }
                 
-                // xprint("🔍 Final draftRosters mapping:")
+                // x// x Print("🔍 Final draftRosters mapping:")
                 for (rosterID, rosterInfo) in info.sorted(by: { $0.key < $1.key }) {
-                    // xprint("   RosterID \(rosterID): '\(rosterInfo.displayName)' (owner: \(rosterInfo.ownerID ?? "nil"))")
+                    // x// x Print("   RosterID \(rosterID): '\(rosterInfo.displayName)' (owner: \(rosterInfo.ownerID ?? "nil"))")
                 }
                 
                 draftRosters = info
@@ -166,18 +166,18 @@ extension DraftRoomViewModel {
                 lastPickCount = polling.allPicks.count
                 lastMyPickCount = polling.allPicks.filter { $0.rosterID == _myRosterID }.count
                 
-                // xprint("🏈 Manual draft enhanced! Pick alerts and roster correlation enabled.")
+                // x// x Print("🏈 Manual draft enhanced! Pick alerts and roster correlation enabled.")
                 return true
                 
             } else {
-                // xprint("🏈 Could not find your roster in league \(leagueID)")
-                // xprint("🏈 Available rosters: \(rosters.map { "\($0.rosterID): \($0.ownerID ?? "no owner")" })")
+                // x// x Print("🏈 Could not find your roster in league \(leagueID)")
+                // x// x Print("🏈 Available rosters: \(rosters.map { "\($0.rosterID): \($0.ownerID ?? "no owner")" })")
                 return false
             }
             
         } catch {
-            // xprint("🏈 Failed to enhance manual draft: \(error)")
-            // xprint("🏈 Manual draft will work but without roster correlation")
+            // x// x Print("🏈 Failed to enhance manual draft: \(error)")
+            // x// x Print("🏈 Manual draft will work but without roster correlation")
             return false
         }
     }
@@ -188,32 +188,32 @@ extension DraftRoomViewModel {
         // Team name from roster metadata (usually blank unless user set it)
         if let name = roster.metadata?.teamName, !name.isEmpty {
             displayName = name
-            // xprint("     Using teamName: \(name)")
+            // x// x Print("     Using teamName: \(name)")
         } else if let ownerName = roster.metadata?.ownerName, !ownerName.isEmpty {
             displayName = ownerName
-            // xprint("     Using ownerName: \(ownerName)")
+            // x// x Print("     Using ownerName: \(ownerName)")
         } else if let ownerDisplayName = roster.ownerDisplayName, !ownerDisplayName.isEmpty {
             displayName = ownerDisplayName
-            // xprint("     Using ownerDisplayName: \(ownerDisplayName)")
+            // x// x Print("     Using ownerDisplayName: \(ownerDisplayName)")
         } else if let ownerID = roster.ownerID, !ownerID.isEmpty {
             // ALWAYS try Sleeper user lookup for both Sleeper AND ESPN leagues
             // ESPN leagues still have Sleeper owner IDs if they're connected via Sleeper
             
-            // xprint("     Trying Sleeper user lookup for ownerID: \(ownerID)")
+            // x// x Print("     Trying Sleeper user lookup for ownerID: \(ownerID)")
             
             // Try cache first
             if let cached = userCache[ownerID] {
                 displayName = cached.displayName ?? cached.username
-                // xprint("     ✅ Using cached user: \(displayName ?? "nil")")
+                // x// x Print("     ✅ Using cached user: \(displayName ?? "nil")")
             } else {
                 // Fetch and store in cache
                 do {
                     let fetched = try await sleeperClient.fetchUserByID(userID: ownerID)
                     userCache[ownerID] = fetched
                     displayName = fetched.displayName ?? fetched.username
-                    // xprint("     ✅ Fetched user: \(displayName ?? "nil") (username: \(fetched.username))")
+                    // x// x Print("     ✅ Fetched user: \(displayName ?? "nil") (username: \(fetched.username))")
                 } catch {
-                    // xprint("     ❌ Could not fetch user for ownerID \(ownerID): \(error)")
+                    // x// x Print("     ❌ Could not fetch user for ownerID \(ownerID): \(error)")
                     displayName = nil
                 }
             }
@@ -221,7 +221,7 @@ extension DraftRoomViewModel {
 
         if displayName == nil || displayName!.isEmpty {
             displayName = "Team \(roster.rosterID)"
-            // xprint("     Using fallback: \(displayName!)")
+            // x// x Print("     Using fallback: \(displayName!)")
         }
         
         return displayName!
@@ -237,14 +237,14 @@ extension DraftRoomViewModel {
             // Find the roster with this roster ID (ESPN roster ID = draft pick number)
             if let matchingRoster = allLeagueRosters.first(where: { $0.rosterID == position }) {
                 _myRosterID = matchingRoster.rosterID
-                // xprint("🏈 ESPN: Set roster ID \(matchingRoster.rosterID) for draft pick \(position)")
+                // x// x Print("🏈 ESPN: Set roster ID \(matchingRoster.rosterID) for draft pick \(position)")
                 
                 // Load the actual roster now that we know which one is mine
                 Task {
                     await loadMyActualRoster()
                 }
             } else {
-                // xprint("🏈 ESPN: Could not find roster with ID \(position)")
+                // x// x Print("🏈 ESPN: Could not find roster with ID \(position)")
             }
         }
         
@@ -258,8 +258,8 @@ extension DraftRoomViewModel {
         let existingMyPicks = polling.allPicks.filter { $0.draftSlot == position }
         lastMyPickCount = existingMyPicks.count
         
-        // xprint("🏈 Draft pick set to: \(position)")
-        // xprint("🏈 Found \(existingMyPicks.count) existing picks for slot \(position)")
+        // x// x Print("🏈 Draft pick set to: \(position)")
+        // x// x Print("🏈 Found \(existingMyPicks.count) existing picks for slot \(position)")
         
         // Update roster immediately with any existing picks for this position
         Task {

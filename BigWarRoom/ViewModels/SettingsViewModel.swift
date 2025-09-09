@@ -257,12 +257,12 @@ final class SettingsViewModel: ObservableObject {
         
         // 🔥 DEBUG: Log the reset action
         if AppConstants.debug {
-            print("🧹🧹🧹 FACTORY RESET COMPLETE:")
-            print("   - Cleared bundle domain: \(Bundle.main.bundleIdentifier ?? "unknown")")
-            print("   - Cleared ESPN Keychain entries")
-            print("   - Cleared Sleeper Keychain entries") 
-            print("   - Cleared additional Keychain entries")
-            print("   - Cleared UserDefaults cache keys")
+            // x Print("🧹🧹🧹 FACTORY RESET COMPLETE:")
+            // x Print("   - Cleared bundle domain: \(Bundle.main.bundleIdentifier ?? "unknown")")
+            // x Print("   - Cleared ESPN Keychain entries")
+            // x Print("   - Cleared Sleeper Keychain entries") 
+            // x Print("   - Cleared additional Keychain entries")
+            // x Print("   - Cleared UserDefaults cache keys")
         }
         
         clearResultMessage = "✅ Factory reset complete!\n\nALL data has been cleared. The app has been reset to factory defaults."
