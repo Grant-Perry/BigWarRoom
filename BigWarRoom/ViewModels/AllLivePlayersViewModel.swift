@@ -11,6 +11,9 @@ import Combine
 
 @MainActor
 final class AllLivePlayersViewModel: ObservableObject {
+    // 🔥 NEW: Shared singleton instance
+    static let shared = AllLivePlayersViewModel()
+    
     @Published var allPlayers: [LivePlayerEntry] = []
     @Published var filteredPlayers: [LivePlayerEntry] = []
     @Published var selectedPosition: PlayerPosition = .all
@@ -31,6 +34,28 @@ final class AllLivePlayersViewModel: ObservableObject {
     @Published var statsLoaded: Bool = false
     
     let matchupsHubViewModel = MatchupsHubViewModel()
+    
+    // 🔥 NEW: Private init for singleton
+    private init() {}
+    
+    // 🔥 NEW: Synchronous stats loading method for immediate access
+    func loadStatsIfNeeded() {
+        guard !statsLoaded else { 
+            print("📊 Stats already loaded, skipping...")
+            return 
+        }
+        
+        print("📊 Starting synchronous stats load...")
+        
+        Task {
+            await loadPlayerStats()
+        }
+    }
+    
+    // 🔥 CLEANED UP: Direct stats loading method
+    func loadStatsOnly() async {
+        await loadPlayerStats()
+    }
     
     // MARK: - Player Position Filter
     enum PlayerPosition: String, CaseIterable, Identifiable {
@@ -113,9 +138,15 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // MARK: - Data Loading
     
+    // 🔥 CLEANED UP: Ensure stats are loaded in loadAllPlayers
     func loadAllPlayers() async {
         isLoading = true
         errorMessage = nil
+        
+        // Load stats first if not already loaded
+        if !statsLoaded {
+            await loadPlayerStats()
+        }
         
         do {
             // Use MatchupsHubViewModel to get current matchups
@@ -158,7 +189,7 @@ final class AllLivePlayersViewModel: ObservableObject {
                     id: entry.id,
                     player: entry.player,
                     leagueName: entry.leagueName,
-                    leagueSource: entry.leagueSource,
+                    leagueSource: entry.leagueName,
                     currentScore: entry.currentScore,
                     projectedScore: entry.projectedScore,
                     isStarter: entry.isStarter,
@@ -167,9 +198,6 @@ final class AllLivePlayersViewModel: ObservableObject {
                     performanceTier: tier
                 )
             }
-            
-            // 🔥 Load player stats BEFORE applying filters
-            await loadPlayerStats()
             
             // Apply initial filter
             applyPositionFilter()
@@ -181,12 +209,25 @@ final class AllLivePlayersViewModel: ObservableObject {
         isLoading = false
     }
     
-    // 🔥 NEW: Load player stats at view model level
+    // 🔥 IMPROVED: Add method to force refresh stats
+    func forceLoadStats() async {
+        print("📊 Force loading stats...")
+        statsLoaded = false
+        await loadPlayerStats()
+    }
+    
+    // 🔥 CLEANED UP: Robust stats loading without debug noise
     private func loadPlayerStats() async {
         let currentYear = "2024"
         let currentWeek = NFLWeekService.shared.currentWeek
+        let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(currentWeek)"
         
-        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(currentWeek)") else { return }
+        guard let url = URL(string: urlString) else { 
+            await MainActor.run {
+                self.statsLoaded = true
+            }
+            return 
+        }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
@@ -195,9 +236,14 @@ final class AllLivePlayersViewModel: ObservableObject {
             await MainActor.run {
                 self.playerStats = statsData
                 self.statsLoaded = true
+                self.objectWillChange.send()
             }
+            
         } catch {
-            // Silent fail
+            await MainActor.run {
+                self.statsLoaded = true // Mark as loaded even on error to prevent infinite loading
+                self.objectWillChange.send()
+            }
         }
     }
 
@@ -331,10 +377,13 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // MARK: - Refresh
     
+    // 🔥 IMPROVED: Enhanced refresh with better error handling
     func refresh() async {
+        print("🔄 Refreshing all player data...")
+        statsLoaded = false  // Reset stats loaded state
         await loadAllPlayers()
     }
-    
+
     private func calculateScaledPercentage(score: Double, topScore: Double) -> Double {
         guard topScore > 0 else { return 0.0 }
         

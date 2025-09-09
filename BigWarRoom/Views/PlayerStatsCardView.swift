@@ -41,8 +41,11 @@ struct PlayerStatsCardView: View {
     
     @StateObject private var teamAssets = TeamAssetManager.shared
     @StateObject private var playerDirectory = PlayerDirectoryStore.shared
-    // 🔥 NEW: Add AllLivePlayersViewModel to get stats
-    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel()
+    // 🔥 FIXED: Use shared instance instead of creating new one each time
+    @ObservedObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    
+    // 🔥 NEW: Track loading state for this specific view
+    @State private var isLoadingStats = false
     
     var body: some View {
         ScrollView {
@@ -75,24 +78,26 @@ struct PlayerStatsCardView: View {
         }
         .background(Color(.systemBackground))
         .task {
-            // Load player stats when view appears
+            // 🔥 IMPROVED: Better loading logic with proper state tracking
             if !livePlayersViewModel.statsLoaded {
+                isLoadingStats = true
                 await livePlayersViewModel.loadAllPlayers()
+                isLoadingStats = false
             }
         }
     }
     
     // 🔥 NEW: Detailed Stats Section
     private var detailedStatsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                HStack(spacing: 8) {
+                HStack(spacing: 5) {
                     Image(systemName: "chart.bar.fill")
-                        .font(.title2)
+                        .font(.subheadline)
                         .foregroundColor(.gpBlue)
                     
                     Text("Live Game Stats")
-                        .font(.title2)
+                        .font(.subheadline)
                         .fontWeight(.bold)
                 }
                 
@@ -100,18 +105,18 @@ struct PlayerStatsCardView: View {
                 
                 // Week indicator
                 Text("Week \(NFLWeekService.shared.currentWeek)")
-                    .font(.caption)
+                    .font(.caption2)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                     .background(
                         Capsule()
                             .fill(LinearGradient(colors: [.gpBlue, .gpGreen], startPoint: .leading, endPoint: .trailing))
                     )
             }
             
-            if livePlayersViewModel.statsLoaded {
+            if livePlayersViewModel.statsLoaded && !isLoadingStats {
                 if let stats = getPlayerStats() {
                     // Stats grid based on position
                     statsGridView(stats: stats)
@@ -124,7 +129,8 @@ struct PlayerStatsCardView: View {
                 loadingStatsView
             }
         }
-        .padding()
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(
             ZStack {
                 // Gradient background
@@ -150,25 +156,25 @@ struct PlayerStatsCardView: View {
                 )
             }
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(
                     LinearGradient(
                         colors: [Color.gpBlue, team?.accentColor ?? Color.gpGreen],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 2
+                    lineWidth: 1.5
                 )
         )
-        .shadow(color: (team?.primaryColor ?? Color.gpBlue).opacity(0.3), radius: 10, x: 0, y: 5)
+        .shadow(color: (team?.primaryColor ?? Color.gpBlue).opacity(0.2), radius: 6, x: 0, y: 3)
     }
     
     private func statsGridView(stats: [String: Double]) -> some View {
         let position = player.position?.uppercased() ?? ""
         
-        return VStack(spacing: 12) {
+        return VStack(spacing: 8) {
             // Fantasy Points Row (Always shown if available)
             if let pprPoints = stats["pts_ppr"] {
                 fantasyPointsRow(pprPoints: pprPoints, stats: stats)
@@ -193,15 +199,16 @@ struct PlayerStatsCardView: View {
     }
     
     private func fantasyPointsRow(pprPoints: Double, stats: [String: Double]) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 5) {
             HStack {
                 Text("Fantasy Points")
-                    .font(.headline)
+                    .font(.caption)
+                    .fontWeight(.semibold)
                     .foregroundColor(.white)
                 Spacer()
             }
             
-            HStack(spacing: 16) {
+            HStack(spacing: 10) {
                 // PPR Points (main)
                 statBubble(
                     value: String(format: "%.1f", pprPoints),
@@ -234,18 +241,19 @@ struct PlayerStatsCardView: View {
     }
     
     private func quarterbackStatsView(stats: [String: Double]) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Passing stats
             if let passAtt = stats["pass_att"], passAtt > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Passing")
-                            .font(.headline)
+                            .font(.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white)
                         Spacer()
                     }
                     
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 6) {
                         statBubble(
                             value: "\(Int(stats["pass_cmp"] ?? 0))/\(Int(passAtt))",
                             label: "CMP/ATT",
@@ -281,15 +289,16 @@ struct PlayerStatsCardView: View {
             
             // Rushing stats (if significant)
             if let rushAtt = stats["rush_att"], rushAtt > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Rushing")
-                            .font(.subheadline)
+                            .font(.caption2)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white.opacity(0.8))
                         Spacer()
                     }
                     
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         statBubble(
                             value: "\(Int(rushAtt))",
                             label: "CARRIES",
@@ -315,18 +324,19 @@ struct PlayerStatsCardView: View {
     }
     
     private func runningBackStatsView(stats: [String: Double]) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Rushing stats
             if let rushAtt = stats["rush_att"], rushAtt > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Rushing")
-                            .font(.headline)
+                            .font(.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white)
                         Spacer()
                     }
                     
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 6) {
                         statBubble(
                             value: "\(Int(rushAtt))",
                             label: "CARRIES",
@@ -355,15 +365,16 @@ struct PlayerStatsCardView: View {
             
             // Receiving stats (if significant)
             if let rec = stats["rec"], rec > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Receiving")
-                            .font(.subheadline)
+                            .font(.caption2)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white.opacity(0.8))
                         Spacer()
                     }
                     
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         statBubble(
                             value: "\(Int(rec))",
                             label: "REC",
@@ -389,18 +400,19 @@ struct PlayerStatsCardView: View {
     }
     
     private func receiverStatsView(stats: [String: Double]) -> some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Receiving stats
             if let rec = stats["rec"], rec > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Receiving")
-                            .font(.headline)
+                            .font(.caption)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white)
                         Spacer()
                     }
                     
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 10) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 6) {
                         statBubble(
                             value: "\(Int(rec))/\(Int(stats["rec_tgt"] ?? rec))",
                             label: "REC/TGT",
@@ -429,15 +441,16 @@ struct PlayerStatsCardView: View {
             
             // Rushing stats (if significant for WRs)
             if player.position?.uppercased() == "WR", let rushYd = stats["rush_yd"], rushYd > 0 {
-                VStack(spacing: 8) {
+                VStack(spacing: 5) {
                     HStack {
                         Text("Rushing")
-                            .font(.subheadline)
+                            .font(.caption2)
+                            .fontWeight(.semibold)
                             .foregroundColor(.white.opacity(0.8))
                         Spacer()
                     }
                     
-                    HStack(spacing: 10) {
+                    HStack(spacing: 6) {
                         statBubble(
                             value: "\(Int(stats["rush_att"] ?? 0))",
                             label: "CARRIES",
@@ -510,9 +523,9 @@ struct PlayerStatsCardView: View {
     }
     
     private func statBubble(value: String, label: String, color: Color, isLarge: Bool = false) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 1) {
             Text(value)
-                .font(isLarge ? .title2 : .headline)
+                .font(isLarge ? .callout : .caption)
                 .fontWeight(.black)
                 .foregroundColor(.white)
                 .minimumScaleFactor(0.7)
@@ -523,17 +536,17 @@ struct PlayerStatsCardView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, isLarge ? 16 : 12)
-        .padding(.vertical, isLarge ? 12 : 8)
+        .padding(.horizontal, isLarge ? 12 : 8)
+        .padding(.vertical, isLarge ? 8 : 6)
         .background(
             ZStack {
                 // Glow effect
-                RoundedRectangle(cornerRadius: isLarge ? 14 : 10)
+                RoundedRectangle(cornerRadius: isLarge ? 10 : 6)
                     .fill(color.opacity(0.8))
-                    .blur(radius: 2)
+                    .blur(radius: 1)
                 
                 // Main background
-                RoundedRectangle(cornerRadius: isLarge ? 12 : 8)
+                RoundedRectangle(cornerRadius: isLarge ? 8 : 5)
                     .fill(
                         LinearGradient(
                             colors: [color, color.opacity(0.7)],
@@ -544,42 +557,44 @@ struct PlayerStatsCardView: View {
             }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: isLarge ? 12 : 8)
-                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: isLarge ? 8 : 5)
+                .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
         )
-        .shadow(color: color.opacity(0.4), radius: 4, x: 0, y: 2)
-        .scaleEffect(isLarge ? 1.1 : 1.0)
+        .shadow(color: color.opacity(0.3), radius: 2, x: 0, y: 1)
+        .scaleEffect(isLarge ? 1.03 : 1.0)
     }
     
     private var noStatsView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 40))
+                .font(.system(size: 24))
                 .foregroundColor(.white.opacity(0.6))
             
             Text("No live stats available")
-                .font(.headline)
+                .font(.caption)
+                .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.8))
             
             Text("Player may not be in an active game this week")
-                .font(.caption)
+                .font(.caption2)
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
     
     private var loadingStatsView: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             ProgressView()
                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                .scaleEffect(1.2)
+                .scaleEffect(1.0)
             
             Text("Loading live stats...")
-                .font(.headline)
+                .font(.caption)
+                .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.8))
         }
-        .padding(.vertical, 20)
+        .padding(.vertical, 12)
     }
     
     private func getPlayerStats() -> [String: Double]? {

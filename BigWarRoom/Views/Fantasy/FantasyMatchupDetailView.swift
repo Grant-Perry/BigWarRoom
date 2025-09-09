@@ -20,6 +20,9 @@ struct FantasyMatchupDetailView: View {
     var fantasyViewModel: FantasyViewModel? = nil
     @Environment(\.dismiss) private var dismiss // Use new dismiss instead of presentationMode
     
+    // 🔥 NEW: Add shared instance to ensure stats are loaded early
+    @ObservedObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    
     // Default initializer for backward compatibility
     init(matchup: FantasyMatchup, leagueName: String) {
         self.matchup = matchup
@@ -118,6 +121,19 @@ struct FantasyMatchupDetailView: View {
         .navigationBarBackButtonHidden(true) // Ensure we use our custom back button
         .preferredColorScheme(.dark)
         .background(Color.black)
+        
+        .onAppear {
+            // Force stats loading as soon as view appears
+            Task {
+                await livePlayersViewModel.forceLoadStats()
+            }
+        }
+        .task {
+            // Backup stats loading in task block
+            if !livePlayersViewModel.statsLoaded {
+                await livePlayersViewModel.loadAllPlayers()
+            }
+        }
     }
     
     // Simplified roster view for when no FantasyViewModel is available
@@ -436,9 +452,13 @@ struct FantasyPlayerCard: View {
     
     @State private var showingPlayerDetail = false
     @StateObject private var playerDirectory = PlayerDirectoryStore.shared
-    @State private var playerStats: [String: [String: Double]] = [:]
-    @State private var hasLoadedStats = false // Prevent loading stats multiple times
+    // 🔥 FIXED: Use shared stats instead of loading individually
+    @ObservedObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
     
+    // 🔥 NEW: Add explicit state tracking for debugging
+    @State private var hasAttemptedStatsLoad = false
+    @State private var debugStatsStatus = "Not Started"
+
     private var positionalRanking: String {
         guard let matchup = matchup, let teamIndex = teamIndex else {
             return player.position.uppercased()
@@ -737,12 +757,17 @@ struct FantasyPlayerCard: View {
             }
             .onAppear {
                 setupGameData()
-                if !hasLoadedStats {
-                    loadPlayerStats()
-                    hasLoadedStats = true
-                }
                 if player.isLive {
                     startLiveAnimations()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                gameViewModel.refresh(week: currentWeek)
+            }
+            .onReceive(nflWeekService.$currentWeek) { newWeek in
+                if currentWeek != newWeek {
+                    currentWeek = newWeek
+                    setupGameData()
                 }
             }
         }
@@ -759,6 +784,24 @@ struct FantasyPlayerCard: View {
             }
         }
         .task {
+            // 🔥 IMPROVED: More aggressive stats loading with debug
+            print("🏈 FantasyPlayerCard task started - Player: \(player.fullName)")
+            
+            if !hasAttemptedStatsLoad {
+                hasAttemptedStatsLoad = true
+                debugStatsStatus = "Loading..."
+                
+                if !livePlayersViewModel.statsLoaded {
+                    print("🏈 Loading stats via shared instance...")
+                    await livePlayersViewModel.loadAllPlayers()
+                    print("🏈 Stats load completed. Stats count: \(livePlayersViewModel.playerStats.keys.count)")
+                } else {
+                    print("🏈 Stats already loaded. Count: \(livePlayersViewModel.playerStats.keys.count)")
+                }
+                
+                debugStatsStatus = "Loaded"
+            }
+            
             if let team = player.team {
                 if let nflTeam = NFLTeam.team(for: team) {
                     teamColor = nflTeam.primaryColor
@@ -769,32 +812,12 @@ struct FantasyPlayerCard: View {
         }
     }
     
-    private func loadPlayerStats() {
-        Task {
-            let currentYear = "2024"
-            let week = currentWeek
-            
-            guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }
-            
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
-                
-                await MainActor.run {
-                    self.playerStats = statsData
-                }
-            } catch {
-                // Silent fail - no debug spam
-            }
-        }
-    }
-    
     private func formatPlayerStatBreakdown() -> String? {
         guard let sleeperPlayer = getSleeperPlayerData() else {
             return nil
         }
         
-        guard let stats = playerStats[sleeperPlayer.playerID] else {
+        guard let stats = livePlayersViewModel.playerStats[sleeperPlayer.playerID] else {
             return nil
         }
         
@@ -932,7 +955,7 @@ struct FantasyPlayerCard: View {
         if potentialMatches.count > 1 {            
             // Priority 1: Player with detailed game stats (passing, rushing, receiving, etc.)
             let detailedStatsMatches = potentialMatches.filter { player in
-                if let stats = playerStats[player.playerID] {
+                if let stats = livePlayersViewModel.playerStats[player.playerID] {
                     let hasDetailedStats = stats.keys.contains { key in
                         key.contains("pass_att") || key.contains("rush_att") || 
                         key.contains("rec") || key.contains("fgm") || 
@@ -950,7 +973,7 @@ struct FantasyPlayerCard: View {
             
             // Priority 2: Player with any stats (even if just fantasy points)
             let anyStatsMatches = potentialMatches.filter { player in
-                return playerStats[player.playerID] != nil
+                return livePlayersViewModel.playerStats[player.playerID] != nil
             }
             
             if !anyStatsMatches.isEmpty {

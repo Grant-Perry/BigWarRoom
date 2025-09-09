@@ -8,7 +8,8 @@
 import SwiftUI
 
 struct AllLivePlayersView: View {
-    @StateObject private var viewModel = AllLivePlayersViewModel()
+    // 🔥 FIXED: Use shared instance instead of creating new one
+    @ObservedObject private var viewModel = AllLivePlayersViewModel.shared
     @State private var animatedPlayers: [String] = []
     @State private var selectedMatchup: UnifiedMatchup?
     @State private var showingMatchupDetail = false
