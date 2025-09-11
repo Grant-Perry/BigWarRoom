@@ -436,7 +436,7 @@ struct ChoppedTeamRosterView: View {
                             .frame(width: 32, height: 32)
                     }
                     
-                    // Points and projections
+                    // Points only (REMOVED fake projections)
                     HStack(spacing: 16) {
                         if let points = player.currentPoints, points > 0 {
                             VStack(alignment: .leading, spacing: 1) {
@@ -447,21 +447,20 @@ struct ChoppedTeamRosterView: View {
                                     .font(.callout)
                                     .fontWeight(.bold)
                                     .foregroundColor(.green)
-                                    .offset(y: -20)
+                            }
+                        } else {
+                            // Show 0.0 points if no points scored yet
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Points")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("0.0")
+                                    .font(.callout)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.gray)
                             }
                         }
                         
-                        if let projected = player.projectedPoints, projected > 0 {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Projected")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text(String(format: "%.1f", projected))
-                                    .font(.callout)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.blue)
-                            }
-                        }
                         
                         Spacer()
                     }
@@ -621,7 +620,7 @@ struct ChoppedTeamRosterView: View {
                         team: sleeperPlayer.team,
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: calculatePlayerPoints(playerID: playerID),
-                        projectedPoints: calculatePlayerProjectedPoints(playerID: playerID),
+                        projectedPoints: nil,
                         gameStatus: createMockGameStatus(),
                         isStarter: true,
                         lineupSlot: sleeperPlayer.position
@@ -648,7 +647,7 @@ struct ChoppedTeamRosterView: View {
                         team: sleeperPlayer.team,
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: calculatePlayerPoints(playerID: playerID),
-                        projectedPoints: calculatePlayerProjectedPoints(playerID: playerID),
+                        projectedPoints: nil,
                         gameStatus: createMockGameStatus(),
                         isStarter: false,
                         lineupSlot: sleeperPlayer.position
@@ -833,12 +832,9 @@ struct ChoppedTeamRosterView: View {
                 return stdPoints
             }
         }
-        return Double.random(in: 0...25)
-    }
-    
-    private func calculatePlayerProjectedPoints(playerID: String) -> Double? {
-        // TODO: Implement real player projection calculation
-        return Double.random(in: 0...25)
+        
+        // If no real stats available, return nil (will show as 0.0)
+        return nil
     }
     
     private func createMockGameStatus() -> GameStatus {
