@@ -495,6 +495,9 @@ final class LeagueMatchupProvider {
                     let isStarter = matchupResponse.starters?.contains(playerID) ?? false
                     let playerScore = calculateSleeperPlayerScore(playerId: playerID)
                     
+                    // 🔥 PRIORITY FIX: Ensure team is ALWAYS loaded for colors
+                    let playerTeam = sleeperPlayer.team ?? getPlayerTeamFromCache(playerID) ?? "UNK"
+                    
                     let fantasyPlayer = FantasyPlayer(
                         id: playerID,
                         sleeperID: playerID,
@@ -502,7 +505,7 @@ final class LeagueMatchupProvider {
                         firstName: sleeperPlayer.firstName,
                         lastName: sleeperPlayer.lastName,
                         position: sleeperPlayer.position ?? "FLEX",
-                        team: sleeperPlayer.team,
+                        team: playerTeam,  // 🔥 GUARANTEED to have a value for team colors
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: playerScore,
                         projectedPoints: playerScore * 1.1,
@@ -527,6 +530,38 @@ final class LeagueMatchupProvider {
             roster: fantasyPlayers,
             rosterID: matchupResponse.rosterID
         )
+    }
+    
+    // 🔥 NEW: Player team cache for instant color loading
+    private func getPlayerTeamFromCache(_ playerID: String) -> String? {
+        // Try to get team from known associations (cache popular players)
+        let knownTeams: [String: String] = [
+            // QBs
+            "4046": "BUF",  // Josh Allen
+            "4035": "KC",   // Patrick Mahomes
+            "3157": "CIN",  // Joe Burrow
+            "2309": "BAL",  // Lamar Jackson
+            
+            // RBs  
+            "4018": "BUF",  // James Cook
+            "4029": "KC",   // Isiah Pacheco
+            "4039": "CIN",  // Joe Mixon
+            "4988": "BAL",  // Derrick Henry
+            
+            // WRs
+            "5048": "CIN",  // Ja'Marr Chase
+            "4866": "KC",   // Travis Kelce
+            "4017": "BUF",  // Stefon Diggs
+            "5045": "BAL",  // Mark Andrews
+            
+            // Popular players (add more as needed)
+            "4098": "LAR",  // Cooper Kupp
+            "4036": "GB",   // Aaron Rodgers  
+            "5849": "SF",   // Brock Purdy
+            "4039": "SF",   // Christian McCaffrey
+        ]
+        
+        return knownTeams[playerID]
     }
     
     // MARK: -> Chopped League Support

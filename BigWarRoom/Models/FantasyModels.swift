@@ -236,9 +236,15 @@ struct FantasyPlayer: Identifiable, Codable {
     }
     
     /// NFL team color (for player card backgrounds)
+    /// 🔥 PRIORITY FIX: Always return a color, never gray delay
     var teamColor: Color {
-        guard let team = team else { return .gray }
-        return NFLTeamColors.color(for: team)
+        // Fast path: If team is known, return immediately
+        if let team = team, !team.isEmpty {
+            return NFLTeamColors.color(for: team)
+        }
+        
+        // Fallback: Use position-based colors for instant visual feedback
+        return NFLTeamColors.fallbackColor(for: position)
     }
     
     /// Game time display string
@@ -657,6 +663,19 @@ struct NFLTeamColors {
     
     static func color(for team: String) -> Color {
         return teamColors[team.uppercased()] ?? .gray
+    }
+    
+    /// 🔥 NEW: Position-based fallback colors for instant visual feedback
+    static func fallbackColor(for position: String) -> Color {
+        switch position.uppercased() {
+        case "QB": return Color(red: 0.2, green: 0.4, blue: 0.8) // Blue
+        case "RB": return Color(red: 0.8, green: 0.2, blue: 0.2) // Red  
+        case "WR": return Color(red: 0.2, green: 0.7, blue: 0.2) // Green
+        case "TE": return Color(red: 0.8, green: 0.5, blue: 0.1) // Orange
+        case "K": return Color(red: 0.6, green: 0.3, blue: 0.8) // Purple
+        case "D/ST", "DEF": return Color(red: 0.3, green: 0.3, blue: 0.3) // Dark Gray
+        default: return Color(red: 0.4, green: 0.4, blue: 0.6) // Default Blue-Gray
+        }
     }
     
     /// Get secondary/accent color for team

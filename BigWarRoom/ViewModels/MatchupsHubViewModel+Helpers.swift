@@ -10,9 +10,10 @@ import Foundation
 // MARK: - Helper Methods
 extension MatchupsHubViewModel {
     
-    /// Get current NFL week
+    /// Get selected week (SSOT from WeekSelectionManager)
+    /// This ensures refresh uses the user's selected week, not always current week
     internal func getCurrentWeek() -> Int {
-        return NFLWeekService.shared.currentWeek
+        return WeekSelectionManager.shared.selectedWeek
     }
     
     /// Get current year as string

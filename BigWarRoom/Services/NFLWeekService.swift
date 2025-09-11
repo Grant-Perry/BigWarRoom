@@ -14,7 +14,7 @@ final class NFLWeekService: ObservableObject {
     static let shared = NFLWeekService()
     
     // MARK: -> Published Properties (Available to all ViewModels)
-    @Published var currentWeek: Int = 1
+    @Published var currentWeek: Int
     @Published var currentYear: String = "2024"
     @Published var seasonType: String = "regular" // "pre", "regular", "post"
     @Published var isLoading: Bool = false
@@ -25,14 +25,41 @@ final class NFLWeekService: ObservableObject {
     private let updateInterval: TimeInterval = 300 // 5 minutes
     
     private init() {
-        // Start with reasonable defaults
+        // Start with reasonable defaults - calculate approximate current week
         currentYear = String(Calendar.current.component(.year, from: Date()))
+        currentWeek = Self.calculateApproximateCurrentWeek()
         
         // Fetch real data immediately
         Task {
             await fetchCurrentNFLWeek()
             setupPeriodicUpdates()
         }
+        
+        print("🏈 NFLWeekService: Initialized with estimated week \(currentWeek)")
+    }
+    
+    // MARK: -> Static Helper
+    /// Calculate approximate current NFL week based on calendar date
+    /// This provides a better starting point than hardcoded 1
+    private static func calculateApproximateCurrentWeek() -> Int {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // NFL season typically starts first Thursday of September
+        // For 2024, let's assume it started around September 5th
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        // Rough approximation - NFL season starts early September
+        guard let seasonStart = dateFormatter.date(from: "\(calendar.component(.year, from: now))-09-05") else {
+            return 1
+        }
+        
+        let daysSinceStart = calendar.dateComponents([.day], from: seasonStart, to: now).day ?? 0
+        let weeksSinceStart = max(1, (daysSinceStart / 7) + 1)
+        
+        // Cap at reasonable bounds
+        return min(18, max(1, weeksSinceStart))
     }
     
     // MARK: -> Public Methods

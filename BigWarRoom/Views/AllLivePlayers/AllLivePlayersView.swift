@@ -55,7 +55,7 @@ struct AllLivePlayersView: View {
             }
             
             // Controls row with All selector, Sort controls
-            HStack {
+            HStack(spacing: 6) {
                 HStack(spacing: 4) {
                     Menu {
                         ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
@@ -77,11 +77,12 @@ struct AllLivePlayersView: View {
                         HStack(spacing: 6) {
                             Text(viewModel.selectedPosition.displayName)
                                 .fontWeight(.semibold)
+                                .font(.subheadline)
                             
                             Image(systemName: "chevron.down")
                                 .font(.caption)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(Color.gpGreen.opacity(0.1))
                         .foregroundColor(.gpGreen)
@@ -89,9 +90,9 @@ struct AllLivePlayersView: View {
                     }
                 }
                 
-                HStack(spacing: 4) {
-                    Text("Sort by:")
-                        .font(.subheadline)
+                HStack(spacing: 2) {
+                    Text("Sort:")
+                        .font(.caption)
                         .fontWeight(.medium)
                         .foregroundColor(.secondary)
                     
@@ -112,15 +113,18 @@ struct AllLivePlayersView: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 4) {
                             Text(viewModel.sortingMethod.displayName)
                                 .fontWeight(.semibold)
+                                .font(.subheadline)
+                                .lineLimit(1)
                             
                             Image(systemName: "chevron.down")
                                 .font(.caption)
                         }
-                        .padding(.horizontal, 12)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 6)
+                        .frame(minWidth: 60)
                         .background(Color.blue.opacity(0.1))
                         .foregroundColor(.blue)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -137,8 +141,11 @@ struct AllLivePlayersView: View {
                 }) {
                     Text(sortDirectionText)
                         .fontWeight(.semibold)
-                        .padding(.horizontal, 12)
+                        .font(.subheadline)
+                        .lineLimit(1)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 6)
+                        .frame(minWidth: 65)
                         .background(Color.orange.opacity(0.1))
                         .foregroundColor(.orange)
                         .clipShape(RoundedRectangle(cornerRadius: 16))

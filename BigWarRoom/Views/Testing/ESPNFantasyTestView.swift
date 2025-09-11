@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ESPNFantasyTestView: View {
     @StateObject private var espnViewModel = ESPNFantasyViewModel()
+    @StateObject private var weekManager = WeekSelectionManager.shared
     @ObservedObject private var nflWeekService = NFLWeekService.shared
     
     var body: some View {
@@ -124,7 +125,7 @@ struct ESPNFantasyTestView: View {
                         .font(.subheadline)
                         .fontWeight(.medium)
                     
-                    Picker("Week", selection: $espnViewModel.selectedWeek) {
+                    Picker("Week", selection: $weekManager.selectedWeek) {
                         ForEach(1...18, id: \.self) { week in
                             HStack {
                                 Text("Week \(week)")
@@ -136,9 +137,6 @@ struct ESPNFantasyTestView: View {
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
-                    .onChange(of: espnViewModel.selectedWeek) { _, newValue in
-                        espnViewModel.selectWeek(newValue)
-                    }
                 }
                 
                 VStack(alignment: .leading) {
@@ -248,8 +246,8 @@ struct ESPNFantasyTestView: View {
             return AnyView(EmptyView())
         }
         
-        let awayScore = awayTeam.activeRosterScore(for: espnViewModel.selectedWeek)
-        let homeScore = homeTeam.activeRosterScore(for: espnViewModel.selectedWeek)
+        let awayScore = awayTeam.activeRosterScore(for: weekManager.selectedWeek)
+        let homeScore = homeTeam.activeRosterScore(for: weekManager.selectedWeek)
         let awayWinning = awayScore > homeScore
         let homeWinning = homeScore > awayScore
         let scoreDiff = abs(awayScore - homeScore)
@@ -313,7 +311,7 @@ struct ESPNFantasyTestView: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
                         
-                        Text("Week \(espnViewModel.selectedWeek)")
+                        Text("Week \(weekManager.selectedWeek)")
                             .font(.system(size: 10))
                             .foregroundColor(.secondary)
                     }
@@ -361,7 +359,7 @@ struct ESPNFantasyTestView: View {
                         // Active Roster counts
                         HStack {
                             VStack {
-                                let awayActive = awayTeam.activePlayers(for: espnViewModel.selectedWeek)
+                                let awayActive = awayTeam.activePlayers(for: weekManager.selectedWeek)
                                 Text("\(awayActive.count)")
                                     .font(.title3)
                                     .fontWeight(.bold)
@@ -380,7 +378,7 @@ struct ESPNFantasyTestView: View {
                             Spacer()
                             
                             VStack {
-                                let homeActive = homeTeam.activePlayers(for: espnViewModel.selectedWeek)
+                                let homeActive = homeTeam.activePlayers(for: weekManager.selectedWeek)
                                 Text("\(homeActive.count)")
                                     .font(.title3)
                                     .fontWeight(.bold)
@@ -394,8 +392,8 @@ struct ESPNFantasyTestView: View {
                         // Bench counts
                         HStack {
                             VStack {
-                                let awayBench = awayTeam.benchPlayers(for: espnViewModel.selectedWeek)
-                                let benchScore = awayBench.reduce(0.0) { $0 + $1.getScore(for: espnViewModel.selectedWeek) }
+                                let awayBench = awayTeam.benchPlayers(for: weekManager.selectedWeek)
+                                let benchScore = awayBench.reduce(0.0) { $0 + $1.getScore(for: weekManager.selectedWeek) }
                                 Text("\(awayBench.count)")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -407,8 +405,8 @@ struct ESPNFantasyTestView: View {
                             Spacer()
                             
                             VStack {
-                                let homeBench = homeTeam.benchPlayers(for: espnViewModel.selectedWeek)
-                                let benchScore = homeBench.reduce(0.0) { $0 + $1.getScore(for: espnViewModel.selectedWeek) }
+                                let homeBench = homeTeam.benchPlayers(for: weekManager.selectedWeek)
+                                let benchScore = homeBench.reduce(0.0) { $0 + $1.getScore(for: weekManager.selectedWeek) }
                                 Text("\(homeBench.count)")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -439,7 +437,7 @@ struct ESPNFantasyTestView: View {
     
     // MARK: - Data View
     private func dataView(_ model: ESPNFantasyLeagueModel) -> some View {
-        let weekMatchups = espnViewModel.getMatchups(for: espnViewModel.selectedWeek)
+        let weekMatchups = espnViewModel.getMatchups(for: weekManager.selectedWeek)
         
         return VStack(alignment: .leading, spacing: 16) {
             // League Summary
@@ -488,7 +486,7 @@ struct ESPNFantasyTestView: View {
             .cornerRadius(12)
             
             // ALL MATCHUPS LIST 🔥
-            Text("🏈 Week \(espnViewModel.selectedWeek) Matchups")
+            Text("🏈 Week \(weekManager.selectedWeek) Matchups")
                 .font(.title2)
                 .fontWeight(.bold)
             

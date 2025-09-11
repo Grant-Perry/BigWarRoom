@@ -119,8 +119,10 @@ struct UnifiedMatchup: Identifiable {
             viewModel.detectedAsChoppedLeague = true
         }
         
-        // Set the current week
-        viewModel.selectedWeek = NFLWeekService.shared.currentWeek
+        // FIXED: Use selected week from WeekSelectionManager (NOT current NFL week)
+        // This ensures detail views show data for the week selected in Mission Control
+        // viewModel.selectedWeek = NFLWeekService.shared.currentWeek // OLD - WRONG!
+        // The FantasyViewModel now automatically uses WeekSelectionManager.shared.selectedWeek
         
         // Disable auto-refresh to prevent conflicts with Mission Control's refresh
         viewModel.setMatchupsHubControl(true)

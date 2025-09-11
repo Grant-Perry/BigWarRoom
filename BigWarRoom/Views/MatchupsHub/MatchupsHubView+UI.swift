@@ -109,7 +109,7 @@ extension MatchupsHubView {
             
             Button(action: { showWeekPicker() }) {
                 statCard(
-                    value: "WEEK \(selectedWeek)",
+                    value: "WEEK \(weekManager.selectedWeek)",
                     label: "ACTIVE",
                     color: .blue
                 )
@@ -201,9 +201,120 @@ extension MatchupsHubView {
                 poweredByBranding
             }
             
+            // Just Me Mode Banner (when microMode is enabled)
+            if microMode {
+                justMeModeBanner
+            }
+            
             // Always show the sort toggle and matchup cards (not controlled by battlesMinimized anymore)
             sortByToggle
             matchupCardsGrid
+        }
+    }
+
+    // MARK: - Just Me Mode Banner
+    private var justMeModeBanner: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Text("🙍")
+                    .font(.system(size: 16))
+                
+                Text("JUST ME MODE")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.gpGreen, .blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                
+                Text("💎")
+                    .font(.system(size: 16))
+            }
+            
+            Text("Focus view - your performance only")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.2))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.gpGreen.opacity(0.4), .blue.opacity(0.4)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .padding(.horizontal, 20)
+        .transition(.asymmetric(
+            insertion: .scale.combined(with: .opacity),
+            removal: .scale.combined(with: .opacity)
+        ))
+    }
+
+    // MARK: - Sort By Toggle (Exact Live Players "All" Button Style)
+    var sortByToggle: some View {
+        HStack {
+            // Sorting control with EXACT Live Players "All" button styling
+            HStack(spacing: 6) {
+                Text("Sorted by:")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+                
+                // Exact same styling as Live Players "All" button
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        sortByWinning.toggle()
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Text(sortByWinning ? "Winning" : "Losing")
+                            .fontWeight(.semibold)
+							.font(.subheadline)
+
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(sortByWinning ? Color.gpGreen.opacity(0.1) : Color.gpRedPink.opacity(0.1))
+                    .foregroundColor(sortByWinning ? .gpGreen : .gpRedPink)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+            }
+            
+            Spacer()
+            
+            PollingCountdownDial(
+                countdown: refreshCountdown,
+                maxInterval: Double(AppConstants.MatchupRefresh),
+                isPolling: viewModel.autoRefreshEnabled,
+                onRefresh: {
+                    Task {
+                        await handlePullToRefresh()
+                    }
+                }
+            )
+            .scaleEffect(0.8)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 4)
+        .onAppear {
+            startCountdownTimer()
+        }
+        .onDisappear {
+            stopCountdownTimer()
         }
     }
     
@@ -354,55 +465,6 @@ extension MatchupsHubView {
         )
     }
     
-    // MARK: - Sort By Toggle
-    var sortByToggle: some View {
-        HStack {
-            Button(action: {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    sortByWinning.toggle()
-                }
-            }) {
-                HStack(spacing: 6) { // Reduced from 8 to 6
-                    Text("Sort by:")
-                        .font(.system(size: 10, weight: .medium)) // Reduced from 12 to 10
-                        .foregroundColor(.white)
-                    
-                    Text(sortByWinning ? "WIN" : "LOSE")
-                        .font(.system(size: 10, weight: .bold)) // Reduced from 12 to 10
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 12) // Reduced from 16 to 12
-                .padding(.vertical, 6) // Reduced from 8 to 6
-                .background(
-                    RoundedRectangle(cornerRadius: 6) // Reduced from 8 to 6
-                        .fill(sortByWinning ? Color.gpGreen : Color.gpRedPink)
-                )
-            }
-            
-            Spacer()
-            
-            PollingCountdownDial(
-                countdown: refreshCountdown,
-                maxInterval: Double(AppConstants.MatchupRefresh),
-                isPolling: viewModel.autoRefreshEnabled,
-                onRefresh: {
-                    Task {
-                        await handlePullToRefresh()
-                    }
-                }
-            )
-            .scaleEffect(0.8) // Scale down the timer to 80% of original size
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 4) // Reduced from 8 to 4
-        .onAppear {
-            startCountdownTimer()
-        }
-        .onDisappear {
-            stopCountdownTimer()
-        }
-    }
-    
     // MARK: - Matchup Cards Grid
     @ViewBuilder
     var matchupCardsGrid: some View {
@@ -436,9 +498,10 @@ extension MatchupsHubView {
             }
         }
         .padding(.horizontal, 20)
-        .animation(.spring(response: 1.0, dampingFraction: 0.8), value: microMode)
-        .animation(.spring(response: 0.8, dampingFraction: 0.7), value: expandedCardId)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8), value: sortByWinning)
+        // FIXED: Much faster animations - no more 1.0 second delays!
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
+        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: sortByWinning)
         .overlay(
             expandedCardOverlay
         )
@@ -505,19 +568,10 @@ extension MatchupsHubView {
             )
         }
     }
-    
+
     var weekPickerSheet: some View {
-        ESPNDraftPickSelectionSheet.forFantasy(
-            leagueName: "Mission Control",
-            currentWeek: NFLWeekService.shared.currentWeek,
-            selectedWeek: $selectedWeek,
-            onConfirm: { week in
-                onWeekSelected(week)
-                showingWeekPicker = false
-            },
-            onCancel: {
-                showingWeekPicker = false
-            }
+        WeekPickerView(
+            isPresented: $showingWeekPicker
         )
     }
 }

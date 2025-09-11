@@ -37,7 +37,7 @@ struct MicroCardView: View {
                     .minimumScaleFactor(0.6)
                     .multilineTextAlignment(.center)
                 
-                // My avatar and manager
+                // My avatar and manager - FIXED: Show initials immediately
                 VStack(spacing: 6) {
                     if let avatarURL = avatarURL, let url = URL(string: avatarURL) {
                         AsyncImage(url: url) { image in
@@ -45,8 +45,9 @@ struct MicroCardView: View {
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
                         } placeholder: {
+                            // SHOW INITIALS IMMEDIATELY - don't wait for avatar
                             Circle()
-                                .fill(Color.gray.opacity(0.3))
+                                .fill(scoreColor.opacity(0.6)) // Use the team's score color for immediate visual feedback
                                 .overlay(
                                     Text(String(managerName.prefix(2)).uppercased())
                                         .font(.system(size: 14, weight: .bold))
@@ -56,9 +57,9 @@ struct MicroCardView: View {
                         .frame(width: 36, height: 36)
                         .clipShape(Circle())
                     } else {
-                        // No avatar URL - show initials
+                        // No avatar URL - show initials with team color
                         Circle()
-                            .fill(Color.gray.opacity(0.3))
+                            .fill(scoreColor.opacity(0.6)) // Use team color for instant visual feedback
                             .overlay(
                                 Text(String(managerName.prefix(2)).uppercased())
                                     .font(.system(size: 14, weight: .bold))
@@ -75,13 +76,13 @@ struct MicroCardView: View {
                         .minimumScaleFactor(0.7)
                 }
                 
-                // Score - use passed color
+                // Score - use passed color (SHOWS IMMEDIATELY)
                 Text(score)
                     .font(.system(size: 12, weight: .black))
                     .foregroundColor(scoreColor)
                     .lineLimit(1)
                 
-                // Percentage - use passed color
+                // Percentage - use passed color (SHOWS IMMEDIATELY)
                 Text(percentage)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(scoreColor)

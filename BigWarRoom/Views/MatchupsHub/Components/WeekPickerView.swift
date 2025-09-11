@@ -12,19 +12,24 @@ import SwiftUI
 /// 
 /// A sleek week selector that appears when the user taps the "WEEK X" stat card.
 /// Features:
-/// - Horizontal scrolling week grid
+/// - Left-to-right week arrangement (1,2,3,4,5...)
+/// - All 18 weeks fit with proper scrolling
+/// - Week dates under PAST/CURRENT/FUTURE labels
 /// - Current week highlighting
 /// - NFL season awareness (1-18 weeks)
 /// - Smooth animations and haptic feedback
 /// - Playoff week indicators
+/// - **USES WeekSelectionManager AS SSOT**
 struct WeekPickerView: View {
-    @Binding var selectedWeek: Int
     @Binding var isPresented: Bool
+    @StateObject private var weekManager = WeekSelectionManager.shared
     @State private var animateIn = false
     
     /// NFL season has 18 weeks (17 regular + playoffs)
     private let maxWeeks = 18
-    private let currentNFLWeek = NFLWeekService.shared.currentWeek
+    
+    /// NFL 2024 season start date (adjust as needed)
+    private let season2024Start = Calendar.current.date(from: DateComponents(year: 2024, month: 9, day: 5))!
     
     var body: some View {
         ZStack {
@@ -121,14 +126,17 @@ struct WeekPickerView: View {
         .padding(.bottom, 16)
     }
     
-    // MARK: - Week Grid
+    // MARK: - Week Grid (Fixed: Left-to-Right Layout + All Weeks Fit)
     private var weekGrid: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            LazyHGrid(
-                rows: [
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12)
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
                 ],
                 spacing: 12
             ) {
@@ -138,52 +146,60 @@ struct WeekPickerView: View {
             }
             .padding(.horizontal, 24)
         }
-        .frame(height: 200)
+        .frame(height: 180)
         .padding(.vertical, 8)
     }
     
     private func weekButton(for week: Int) -> some View {
-        let isSelected = week == selectedWeek
-        let isCurrent = week == currentNFLWeek
+        let isSelected = week == weekManager.selectedWeek
+        let isCurrent = week == weekManager.currentNFLWeek
         let isPlayoffs = week > 17
-        let isPast = week < currentNFLWeek
-        let isFuture = week > currentNFLWeek
+        let isPast = week < weekManager.currentNFLWeek
+        let isFuture = week > weekManager.currentNFLWeek
         
         return Button(action: {
             selectWeek(week)
         }) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 // Week number
                 Text("\(week)")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .font(.system(size: 16, weight: .black, design: .rounded))
                     .foregroundColor(isSelected ? .black : .white)
                 
-                // Week label
-                Text(weekLabel(for: week))
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(isSelected ? .black.opacity(0.7) : .gray)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                // Week label with date
+                VStack(spacing: 1) {
+                    Text(weekLabel(for: week))
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(isSelected ? .black.opacity(0.7) : .gray)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    
+                    // Week start date
+                    Text(weekStartDate(for: week))
+                        .font(.system(size: 6, weight: .medium))
+                        .foregroundColor(isSelected ? .black.opacity(0.5) : .gray.opacity(0.8))
+                        .lineLimit(1)
+                }
                 
                 // Status indicator
                 statusIndicator(for: week, isSelected: isSelected)
             }
-            .frame(width: 60, height: 60)
+            .frame(width: 50, height: 50)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(backgroundGradient(for: week, isSelected: isSelected))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(borderColor(for: week, isSelected: isSelected), lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(borderColor(for: week, isSelected: isSelected), lineWidth: 1.5)
                     )
                     .shadow(
                         color: shadowColor(for: week, isSelected: isSelected),
-                        radius: isSelected ? 8 : 0,
+                        radius: isSelected ? 6 : 0,
                         x: 0,
-                        y: isSelected ? 4 : 0
+                        y: isSelected ? 3 : 0
                     )
             )
-            .scaleEffect(isSelected ? 1.1 : 1.0)
+            .scaleEffect(isSelected ? 1.05 : 1.0)
             .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
         }
     }
@@ -197,7 +213,7 @@ struct WeekPickerView: View {
             HStack(spacing: 20) {
                 // Current Week Quick Select
                 Button(action: {
-                    selectWeek(currentNFLWeek)
+                    selectCurrentWeek()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: "calendar.circle.fill")
@@ -227,7 +243,7 @@ struct WeekPickerView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.white)
-                        Text("Week \(selectedWeek)")
+                        Text("Week \(weekManager.selectedWeek)")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
                     }
@@ -255,20 +271,30 @@ struct WeekPickerView: View {
     private func weekLabel(for week: Int) -> String {
         if week > 17 {
             return "PLAYOFFS"
-        } else if week == currentNFLWeek {
+        } else if week == weekManager.currentNFLWeek {
             return "CURRENT"
-        } else if week < currentNFLWeek {
+        } else if week < weekManager.currentNFLWeek {
             return "PAST"
         } else {
             return "FUTURE"
         }
     }
     
+    /// Calculate the start date for a given NFL week
+    private func weekStartDate(for week: Int) -> String {
+        let calendar = Calendar.current
+        let weekStartDate = calendar.date(byAdding: .day, value: (week - 1) * 7, to: season2024Start)!
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: weekStartDate)
+    }
+    
     @ViewBuilder
     private func statusIndicator(for week: Int, isSelected: Bool) -> some View {
-        let size: CGFloat = 4
+        let size: CGFloat = 3
         
-        if week == currentNFLWeek && !isSelected {
+        if week == weekManager.currentNFLWeek && !isSelected {
             Circle()
                 .fill(Color.gpGreen)
                 .frame(width: size, height: size)
@@ -290,7 +316,7 @@ struct WeekPickerView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        } else if week == currentNFLWeek {
+        } else if week == weekManager.currentNFLWeek {
             return LinearGradient(
                 colors: [Color.gpGreen.opacity(0.2), Color.blue.opacity(0.2)],
                 startPoint: .topLeading,
@@ -314,7 +340,7 @@ struct WeekPickerView: View {
     private func borderColor(for week: Int, isSelected: Bool) -> Color {
         if isSelected {
             return .white.opacity(0.8)
-        } else if week == currentNFLWeek {
+        } else if week == weekManager.currentNFLWeek {
             return .gpGreen.opacity(0.6)
         } else if week > 17 {
             return .purple.opacity(0.4)
@@ -338,8 +364,16 @@ struct WeekPickerView: View {
         impactFeedback.impactOccurred()
         
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            selectedWeek = week
+            weekManager.selectWeek(week)
         }
+    }
+    
+    private func selectCurrentWeek() {
+        // Haptic feedback for current week selection
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        weekManager.resetToCurrentWeek()
     }
     
     private func confirmSelection() {
@@ -367,7 +401,6 @@ struct WeekPickerView: View {
         Color.black.ignoresSafeArea()
         
         WeekPickerView(
-            selectedWeek: .constant(1),
             isPresented: .constant(true)
         )
     }

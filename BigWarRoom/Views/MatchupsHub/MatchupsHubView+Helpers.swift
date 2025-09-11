@@ -44,7 +44,7 @@ extension MatchupsHubView {
     }
     
     var currentNFLWeek: Int {
-        return selectedWeek
+        return weekManager.selectedWeek
     }
     
     var connectedLeaguesCount: Int {

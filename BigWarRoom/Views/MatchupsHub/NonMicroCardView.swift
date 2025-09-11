@@ -12,7 +12,7 @@ struct NonMicroCardView: View {
     let isWinning: Bool
     let onTap: () -> Void
     
-   @State private var cardScale: CGFloat = 1.0 //0.95
+    @State private var cardScale: CGFloat = 1.0 // FIXED: Remove slow scale animation
     @State private var scoreAnimation: Bool = false
     @State private var glowIntensity: Double = 0.0
     
@@ -25,9 +25,7 @@ struct NonMicroCardView: View {
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(cardScale)
         .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                cardScale = 1.0
-            }
+            // Cards should appear instantly with team colors
             
             // FIXED: Use centralized live detection instead of roster-based custom logic
             if matchup.isLive {
@@ -211,7 +209,7 @@ struct NonMicroCardView: View {
         }()
         
         return VStack(spacing: 6) {
-            // Avatar - BIGGER
+            // Avatar - FIXED: Don't let AsyncImage block the team color display
             Group {
                 if let avatarURL = team.avatarURL {
                     AsyncImage(url: avatarURL) { image in
@@ -219,21 +217,30 @@ struct NonMicroCardView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     } placeholder: {
+                        // Show team initials immediately while avatar loads
                         compactTeamInitials(team, isWinning: isTeamWinning)
                     }
+                    .frame(width: 45, height: 45)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
+                                lineWidth: isTeamWinning ? 2 : 1
+                            )
+                    )
                 } else {
                     compactTeamInitials(team, isWinning: isTeamWinning)
+                        .frame(width: 45, height: 45)
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
+                                    lineWidth: isTeamWinning ? 2 : 1
+                                )
+                        )
                 }
             }
-            .frame(width: 45, height: 45)
-            .clipShape(Circle())
-            .overlay(
-                Circle()
-                    .stroke(
-                        isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
-                        lineWidth: isTeamWinning ? 2 : 1
-                    )
-            )
             
             // Team name - COMPACT - Pink for losers
             Text(team.ownerName)

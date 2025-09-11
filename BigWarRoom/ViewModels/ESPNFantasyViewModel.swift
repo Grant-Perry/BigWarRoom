@@ -14,11 +14,19 @@ final class ESPNFantasyViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var espnFantasyModel: ESPNFantasyLeagueModel?
     @Published var selectedLeagueID: String = ""
-    @Published var selectedWeek: Int = 1 // Will be synced with NFLWeekService
     @Published var selectedYear: String = String(Calendar.current.component(.year, from: Date())) // FIXED: Use current year dynamically
     @Published var isLoading: Bool = false
     @Published var errorMessage: String? = nil
     @Published var availableLeagues: [ESPNLeagueResponse] = []
+    
+    // MARK: -> Week Management (SSOT)
+    /// The week selection manager - SINGLE SOURCE OF TRUTH for all week data
+    private let weekManager = WeekSelectionManager.shared
+    
+    /// Public getter for selectedWeek - always use WeekSelectionManager
+    var selectedWeek: Int {
+        return weekManager.selectedWeek
+    }
     
     // MARK: - Dependencies
     private let nflWeekService = NFLWeekService.shared
@@ -31,22 +39,26 @@ final class ESPNFantasyViewModel: ObservableObject {
             selectedLeagueID = firstLeagueID
         }
         
+        subscribeToWeekManager()
         subscribeToNFLWeekService()
         fetchESPNManagerLeagues()
     }
     
-    /// Subscribe to NFL Week Service updates
-    private func subscribeToNFLWeekService() {
-        // Update selectedWeek when NFL week service updates
-        nflWeekService.$currentWeek
+    /// Subscribe to WeekSelectionManager for centralized week management
+    private func subscribeToWeekManager() {
+        weekManager.$selectedWeek
+            .removeDuplicates()
             .sink { [weak self] newWeek in
-                if self?.selectedWeek != newWeek {
-                    // x// x Print("🏈 ESPN: NFL Week Service updated week to \(newWeek)")
-                    self?.selectedWeek = newWeek
-                }
+                guard let self = self else { return }
+                
+                print("📺 ESPNFantasyViewModel: Week changed to \(newWeek), refreshing data...")
+                self.fetchFantasyData(forWeek: newWeek)
             }
             .store(in: &cancellables)
-        
+    }
+    
+    /// Subscribe to NFL Week Service updates (for year changes)
+    private func subscribeToNFLWeekService() {
         // Update selectedYear when NFL week service updates  
         nflWeekService.$currentYear
             .sink { [weak self] newYear in
@@ -140,10 +152,10 @@ final class ESPNFantasyViewModel: ObservableObject {
         return espnFantasyModel?.schedule.filter { $0.matchupPeriodId == week } ?? []
     }
     
-    /// Update selected week and refetch data
+    /// Update selected week - NOW USES WeekSelectionManager
     func selectWeek(_ week: Int) {
-        selectedWeek = week
-        fetchFantasyData(forWeek: week)
+        weekManager.selectWeek(week)
+        // No need to manually refresh - the subscription will handle it
     }
     
     /// Update selected year and refetch data

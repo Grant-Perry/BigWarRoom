@@ -9,6 +9,7 @@ import SwiftUI
 struct FantasyMatchupListView: View {
     let draftRoomViewModel: DraftRoomViewModel  // Accept the shared view model
     @StateObject private var viewModel = FantasyViewModel()
+    @StateObject private var weekManager = WeekSelectionManager.shared
     @State private var forceChoppedMode = false // DEBUG: Force chopped mode
     
     var body: some View {
@@ -61,7 +62,7 @@ struct FantasyMatchupListView: View {
             .navigationBarTitleDisplayMode(shouldHideTitle ? .inline : .large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Week \(viewModel.selectedWeek)") {
+                    Button("Week \(weekManager.selectedWeek)") {
                         viewModel.presentWeekSelector()
                     }
                     .font(.headline)
@@ -70,17 +71,8 @@ struct FantasyMatchupListView: View {
             }
             .preferredColorScheme(.dark)
             .sheet(isPresented: $viewModel.showWeekSelector) {
-                ESPNDraftPickSelectionSheet.forFantasy(
-                    leagueName: viewModel.selectedLeague?.league.name ?? "Fantasy League",
-                    currentWeek: viewModel.currentNFLWeek,
-                    selectedWeek: $viewModel.selectedWeek,
-                    onConfirm: { week in
-                        viewModel.selectWeek(week)
-                        viewModel.dismissWeekSelector()
-                    },
-                    onCancel: {
-                        viewModel.dismissWeekSelector()
-                    }
+                WeekPickerView(
+                    isPresented: $viewModel.showWeekSelector
                 )
             }
             .task {
@@ -169,7 +161,7 @@ struct FantasyMatchupListView: View {
             return AnyView(
                 AsyncChoppedLeaderboardView(
                     leagueWrapper: leagueWrapper,
-                    week: viewModel.selectedWeek,
+                    week: weekManager.selectedWeek,
                     fantasyViewModel: viewModel
                 )
             )
@@ -196,7 +188,7 @@ struct FantasyMatchupListView: View {
             let task = Task {
                 return await viewModel.createRealChoppedSummary(
                     leagueID: leagueWrapper.league.leagueID,
-                    week: viewModel.selectedWeek
+                    week: weekManager.selectedWeek
                 )
             }
             
@@ -260,7 +252,7 @@ struct FantasyMatchupListView: View {
                 isEliminated: false, // No one eliminated yet in this mock
                 survivalProbability: survivalProb,
                 pointsFromSafety: 0.0, // Will calculate below
-                weeksAlive: viewModel.selectedWeek
+                weeksAlive: weekManager.selectedWeek
             )
         }
         
@@ -288,8 +280,8 @@ struct FantasyMatchupListView: View {
         let lowScore = allScores.min() ?? 0.0
         
         return ChoppedWeekSummary(
-            id: "week_\(viewModel.selectedWeek)",
-            week: viewModel.selectedWeek,
+            id: "week_\(weekManager.selectedWeek)",
+            week: weekManager.selectedWeek,
             rankings: finalTeamRankings,
             eliminatedTeam: eliminatedTeam,
             cutoffScore: cutoffScore,

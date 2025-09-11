@@ -13,8 +13,9 @@ extension MatchupsHubView {
     // MARK: - Data Loading Actions
     func loadInitialData() {
         Task {
-            if selectedWeek != NFLWeekService.shared.currentWeek {
-                await viewModel.loadMatchupsForWeek(selectedWeek)
+            // Use the selected week from WeekSelectionManager
+            if weekManager.selectedWeek != weekManager.currentNFLWeek {
+                await viewModel.loadMatchupsForWeek(weekManager.selectedWeek)
             } else {
                 await viewModel.loadAllMatchups()
             }
@@ -96,8 +97,8 @@ extension MatchupsHubView {
     }
     
     func onWeekSelected(_ week: Int) {
-        selectedWeek = week
-        
+        // Week is already updated in WeekSelectionManager
+        // Just reload data for the new week
         Task {
             await viewModel.loadMatchupsForWeek(week)
         }

@@ -16,7 +16,6 @@ final class FantasyViewModel: ObservableObject {
     @Published var matchups: [FantasyMatchup] = []
     @Published var byeWeekTeams: [FantasyTeam] = []
     @Published var selectedLeague: UnifiedLeagueManager.LeagueWrapper?
-    @Published var selectedWeek: Int = 1
     @Published var selectedYear: String = String(Calendar.current.component(.year, from: Date()))
     @Published var autoRefresh: Bool = true
     @Published var isLoading: Bool = false
@@ -28,6 +27,16 @@ final class FantasyViewModel: ObservableObject {
     @Published var hasActiveRosters: Bool = false
     @Published var detectedAsChoppedLeague: Bool = false
     @Published var nflGameService = NFLGameDataService.shared
+    
+    
+    // MARK: -> Week Management (SSOT)
+    /// The week selection manager - SINGLE SOURCE OF TRUTH for all week data
+    private let weekManager = WeekSelectionManager.shared
+    
+    /// Public getter for selectedWeek - always use WeekSelectionManager
+    var selectedWeek: Int {
+        return weekManager.selectedWeek
+    }
     
     // Flag to disable auto-refresh when MatchupsHub is managing refreshes
     var isControlledByMatchupsHub: Bool = false
@@ -71,6 +80,7 @@ final class FantasyViewModel: ObservableObject {
     // MARK: -> Initialization
     init() {
         setupAutoRefresh()
+        subscribeToWeekManager() // NEW: Subscribe to centralized week management
         subscribeToNFLWeekService()
         setupInitialNFLGameData()
     }
@@ -79,17 +89,28 @@ final class FantasyViewModel: ObservableObject {
         refreshTimer?.invalidate()
     }
     
-    /// Subscribe to NFL Week Service updates
-    private func subscribeToNFLWeekService() {
-        nflWeekService.$currentWeek
+    /// Subscribe to WeekSelectionManager for centralized week management
+    private func subscribeToWeekManager() {
+        weekManager.$selectedWeek
+            .removeDuplicates()
             .sink { [weak self] newWeek in
-                if self?.selectedWeek != newWeek {
-                    self?.selectedWeek = newWeek
-                    self?.refreshNFLGameData()
+                guard let self = self else { return }
+                
+                print("📊 FantasyViewModel: Week changed to \(newWeek), refreshing data...")
+                
+                // Update NFL game data for the new week
+                self.refreshNFLGameData()
+                
+                // Refresh matchups for the new week
+                Task { @MainActor in
+                    await self.fetchMatchups()
                 }
             }
             .store(in: &cancellables)
-        
+    }
+    
+    /// Subscribe to NFL Week Service updates
+    private func subscribeToNFLWeekService() {
         nflWeekService.$currentYear
             .sink { [weak self] newYear in
                 if self?.selectedYear != newYear {
@@ -102,7 +123,7 @@ final class FantasyViewModel: ObservableObject {
     
     /// Setup initial NFL game data
     private func setupInitialNFLGameData() {
-        let currentWeek = nflWeekService.currentWeek
+        let currentWeek = selectedWeek
         let currentYear = Int(nflWeekService.currentYear) ?? 2024
         
         nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear)
@@ -223,7 +244,7 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    // MARK: -> Week Selection
+    // MARK: -> Week Selection (DEPRECATED - Now handled by WeekSelectionManager)
     /// Show week selector sheet
     func presentWeekSelector() {
         showWeekSelector = true
@@ -234,14 +255,10 @@ final class FantasyViewModel: ObservableObject {
         showWeekSelector = false
     }
     
-    /// Select a specific week and update matchups
+    /// Select a specific week - NOW USES WeekSelectionManager
     func selectWeek(_ week: Int) {
-        selectedWeek = week
-        refreshNFLGameData()
-        
-        Task {
-            await fetchMatchups()
-        }
+        weekManager.selectWeek(week)
+        // No need to manually refresh - the subscription will handle it
     }
     
     // MARK: -> Load Leagues
@@ -255,7 +272,7 @@ final class FantasyViewModel: ObservableObject {
     
     /// Initialize NFL game data for the current week
     func setupNFLGameData() {
-        let currentWeek = getCurrentWeek()
+        let currentWeek = selectedWeek
         let currentYear = Int(selectedYear) ?? 2024
         
         nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear)
@@ -268,8 +285,8 @@ final class FantasyViewModel: ObservableObject {
         }
     }
     
-    /// Helper to get current NFL week
+    /// Helper to get current NFL week (DEPRECATED - use weekManager.currentNFLWeek)
     private func getCurrentWeek() -> Int {
-        return nflWeekService.currentWeek
+        return selectedWeek // Now always returns selected week from manager
     }
 }

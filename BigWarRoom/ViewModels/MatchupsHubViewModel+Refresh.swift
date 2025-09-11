@@ -27,12 +27,15 @@ extension MatchupsHubViewModel {
     }
     
     /// Refresh existing matchups without full reload
-    /// 🔥 UPDATED: Uses isolated providers to prevent race conditions
+    /// 🔥 FIXED: Uses selected week instead of current week
     private func refreshMatchups() async {
         guard !myMatchups.isEmpty && !isLoading else {
             await performLoadAllMatchups()
             return
         }
+        
+        // Get the currently selected week from WeekSelectionManager
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
         // Limit concurrent refreshes
         let maxConcurrentRefresh = 2
@@ -51,7 +54,7 @@ extension MatchupsHubViewModel {
                     activeRefreshes -= 1
                 }
                 
-                await refreshSingleMatchup(matchup)
+                await refreshSingleMatchup(matchup, forWeek: selectedWeek)
             }
         }
         
@@ -60,12 +63,13 @@ extension MatchupsHubViewModel {
         }
     }
     
-    /// Refresh a single matchup
-    private func refreshSingleMatchup(_ matchup: UnifiedMatchup) async {
-        // 🔥 NEW APPROACH: Create fresh provider for refresh
+    /// Refresh a single matchup for a specific week
+    /// 🔥 FIXED: Now takes week parameter to use selected week
+    private func refreshSingleMatchup(_ matchup: UnifiedMatchup, forWeek week: Int) async {
+        // Create fresh provider for refresh with the correct week
         let provider = LeagueMatchupProvider(
             league: matchup.league,
-            week: getCurrentWeek(),
+            week: week,  // 🔥 FIXED: Use selected week instead of current week
             year: getCurrentYear()
         )
         
@@ -76,15 +80,15 @@ extension MatchupsHubViewModel {
         }
         
         if matchup.isChoppedLeague {
-            await refreshChoppedMatchup(matchup, myTeamID: myTeamID, provider: provider)
+            await refreshChoppedMatchup(matchup, myTeamID: myTeamID, provider: provider, week: week)
         } else {
-            await refreshRegularMatchup(matchup, myTeamID: myTeamID, provider: provider)
+            await refreshRegularMatchup(matchup, myTeamID: myTeamID, provider: provider, week: week)
         }
     }
     
-    /// Refresh chopped league matchup
-    private func refreshChoppedMatchup(_ matchup: UnifiedMatchup, myTeamID: String, provider: LeagueMatchupProvider) async {
-        if let choppedSummary = await provider.getChoppedSummary(),
+    /// Refresh chopped league matchup for specific week
+    private func refreshChoppedMatchup(_ matchup: UnifiedMatchup, myTeamID: String, provider: LeagueMatchupProvider, week: Int) async {
+        if let choppedSummary = await createSleeperChoppedSummary(league: matchup.league, myTeamID: myTeamID, week: week),
            let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: matchup.league.league.leagueID) {
             
             await MainActor.run {
@@ -103,8 +107,8 @@ extension MatchupsHubViewModel {
         }
     }
     
-    /// Refresh regular matchup
-    private func refreshRegularMatchup(_ matchup: UnifiedMatchup, myTeamID: String, provider: LeagueMatchupProvider) async {
+    /// Refresh regular matchup for specific week
+    private func refreshRegularMatchup(_ matchup: UnifiedMatchup, myTeamID: String, provider: LeagueMatchupProvider, week: Int) async {
         do {
             let matchups = try await provider.fetchMatchups()
             
@@ -124,7 +128,7 @@ extension MatchupsHubViewModel {
                 }
             }
         } catch {
-            // x Print("⚠️ REFRESH: Failed to refresh \(matchup.league.league.name): \(error)")
+            // x Print("⚠️ REFRESH: Failed to refresh \(matchup.league.league.name) Week \(week): \(error)")
         }
     }
     
@@ -145,17 +149,19 @@ extension MatchupsHubViewModel {
     }
     
     /// Background refresh that doesn't disrupt the UI
+    /// 🔥 FIXED: Uses selected week instead of current week
     private func refreshMatchupsInBackground() async {
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
         await MainActor.run {
             // Only update timestamp, don't change isLoading or show loading screen
             lastUpdateTime = Date()
         }
         
         do {
-            // Step 0: Refresh NFL game data for live detection
-            let currentWeek = NFLWeekService.shared.currentWeek
+            // Step 0: Refresh NFL game data for the selected week (not just current)
             let currentYear = Calendar.current.component(.year, from: Date())
-            NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, year: currentYear, forceRefresh: true)
+            NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear, forceRefresh: true)
             
             // Step 1: Refresh available leagues quietly
             await unifiedLeagueManager.fetchAllLeagues(
@@ -166,21 +172,21 @@ extension MatchupsHubViewModel {
             let availableLeagues = unifiedLeagueManager.allLeagues
             guard !availableLeagues.isEmpty else { return }
             
-            // Step 2: Refresh all league data in parallel
-            await loadMatchupsFromAllLeaguesBackground(availableLeagues)
+            // Step 2: Refresh all league data for selected week
+            await loadMatchupsFromAllLeaguesBackground(availableLeagues, forWeek: selectedWeek)
             
         } catch {
             // x Print("⚠️ BACKGROUND REFRESH: Failed to refresh leagues: \(error)")
         }
     }
     
-    /// Background version of loadMatchupsFromAllLeagues that doesn't update loading UI
-    private func loadMatchupsFromAllLeaguesBackground(_ leagues: [UnifiedLeagueManager.LeagueWrapper]) async {
+    /// Background version of loadMatchupsFromAllLeagues for specific week
+    private func loadMatchupsFromAllLeaguesBackground(_ leagues: [UnifiedLeagueManager.LeagueWrapper], forWeek week: Int) async {
         // Load leagues in parallel for maximum speed
         await withTaskGroup(of: UnifiedMatchup?.self) { group in
             for league in leagues {
                 group.addTask {
-                    await self.loadSingleLeagueMatchupBackground(league)
+                    await self.loadSingleLeagueMatchupBackground(league, forWeek: week)
                 }
             }
             
@@ -200,9 +206,9 @@ extension MatchupsHubViewModel {
         }
     }
     
-    /// Background version that doesn't update loading states
-    private func loadSingleLeagueMatchupBackground(_ league: UnifiedLeagueManager.LeagueWrapper) async -> UnifiedMatchup? {
-        let leagueKey = "\(league.id)_\(getCurrentWeek())_\(getCurrentYear())"
+    /// Background version for specific week
+    private func loadSingleLeagueMatchupBackground(_ league: UnifiedLeagueManager.LeagueWrapper, forWeek week: Int) async -> UnifiedMatchup? {
+        let leagueKey = "\(league.id)_\(week)_\(getCurrentYear())"
         
         // Race condition prevention
         loadingLock.lock()
@@ -220,10 +226,10 @@ extension MatchupsHubViewModel {
         }
         
         do {
-            // Create isolated provider for this league (no UI updates)
+            // Create isolated provider for this league with specific week
             let provider = LeagueMatchupProvider(
                 league: league, 
-                week: getCurrentWeek(), 
+                week: week,  // 🔥 FIXED: Use specific week
                 year: getCurrentYear()
             )
             
@@ -237,25 +243,25 @@ extension MatchupsHubViewModel {
             
             // Step 3: Check for Chopped league
             if league.source == .sleeper && matchups.isEmpty {
-                return await handleChoppedLeagueBackground(league: league, myTeamID: myTeamID)
+                return await handleChoppedLeagueBackground(league: league, myTeamID: myTeamID, week: week)
             }
             
             // Step 4: Handle regular leagues
-            return await handleRegularLeagueBackground(league: league, matchups: matchups, myTeamID: myTeamID, provider: provider)
+            return await handleRegularLeagueBackground(league: league, matchups: matchups, myTeamID: myTeamID, provider: provider, week: week)
             
         } catch {
             return nil
         }
     }
     
-    /// Background chopped league handling
-    private func handleChoppedLeagueBackground(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String) async -> UnifiedMatchup? {
-        // Create chopped summary using proper Sleeper data
-        if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
+    /// Background chopped league handling for specific week
+    private func handleChoppedLeagueBackground(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String, week: Int) async -> UnifiedMatchup? {
+        // Create chopped summary using proper Sleeper data for specific week
+        if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: week) {
             if let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
                 
                 let unifiedMatchup = UnifiedMatchup(
-                    id: "\(league.id)_chopped",
+                    id: "\(league.id)_chopped_\(week)",
                     league: league,
                     fantasyMatchup: nil,
                     choppedSummary: choppedSummary,
@@ -270,8 +276,8 @@ extension MatchupsHubViewModel {
         return nil
     }
     
-    /// Background regular league handling
-    private func handleRegularLeagueBackground(league: UnifiedLeagueManager.LeagueWrapper, matchups: [FantasyMatchup], myTeamID: String, provider: LeagueMatchupProvider) async -> UnifiedMatchup? {
+    /// Background regular league handling for specific week
+    private func handleRegularLeagueBackground(league: UnifiedLeagueManager.LeagueWrapper, matchups: [FantasyMatchup], myTeamID: String, provider: LeagueMatchupProvider, week: Int) async -> UnifiedMatchup? {
         if matchups.isEmpty {
             return nil
         }
@@ -279,7 +285,7 @@ extension MatchupsHubViewModel {
         // Find user's matchup using provider
         if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
             let unifiedMatchup = UnifiedMatchup(
-                id: "\(league.id)_\(myMatchup.id)",
+                id: "\(league.id)_\(myMatchup.id)_\(week)",
                 league: league,
                 fantasyMatchup: myMatchup,
                 choppedSummary: nil,

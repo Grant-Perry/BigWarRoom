@@ -12,6 +12,9 @@ struct MatchupsHubView: View {
     // MARK: - ViewModels
     @StateObject internal var viewModel = MatchupsHubViewModel()
     
+    // MARK: - Week Selection (SSOT)
+    @StateObject internal var weekManager = WeekSelectionManager.shared
+    
     // MARK: - Navigation State
     @State internal var showingMatchupDetail: UnifiedMatchup?
     @State internal var showingSettings = false
@@ -36,9 +39,6 @@ struct MatchupsHubView: View {
     @State internal var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
     @State internal var countdownTimer: Timer?
     @State internal var refreshTimer: Timer?
-    
-    // MARK: - Week Picker States
-    @State internal var selectedWeek: Int = NFLWeekService.shared.currentWeek
     
     // MARK: - Body
     var body: some View {
@@ -77,7 +77,7 @@ struct MatchupsHubView: View {
         .sheet(isPresented: $showingWeekPicker) {
             weekPickerSheet
         }
-        .onChange(of: selectedWeek) { oldValue, newValue in
+        .onChange(of: weekManager.selectedWeek) { oldValue, newValue in
             if oldValue != newValue {
                 onWeekSelected(newValue)
             }

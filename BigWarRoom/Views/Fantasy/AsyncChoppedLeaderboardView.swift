@@ -12,6 +12,7 @@ struct AsyncChoppedLeaderboardView: View {
     let leagueWrapper: UnifiedLeagueManager.LeagueWrapper
     let week: Int
     @ObservedObject var fantasyViewModel: FantasyViewModel
+    @StateObject private var weekManager = WeekSelectionManager.shared
     
     var body: some View {
         Group {
@@ -56,8 +57,8 @@ struct AsyncChoppedLeaderboardView: View {
         .task {
             await loadInitialChoppedData()
         }
-        .onReceive(fantasyViewModel.$selectedWeek) { newWeek in
-            // Reload data when week changes
+        .onReceive(weekManager.$selectedWeek) { newWeek in
+            // Reload data when week changes from WeekSelectionManager
             if newWeek != week {
                 Task {
                     await loadChoppedData(for: newWeek)
