@@ -16,6 +16,9 @@ struct NonMicroCardView: View {
     @State private var scoreAnimation: Bool = false
     @State private var glowIntensity: Double = 0.0
     
+    // NEW: Customizable card gradient color
+    private let cardGrad: Color = .rockiesPrimary
+    
     var body: some View {
         Button(action: {
             handleTap()
@@ -82,6 +85,21 @@ struct NonMicroCardView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
+            )
+            .background(
+                // TeamAssetManager-style gradient background using cardGrad - REMOVED opacity
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(
+                        LinearGradient(
+                            colors: [cardGrad.opacity(0.8), cardGrad],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(cardGrad.opacity(0.3), lineWidth: 1)
+                    )
             )
     }
     

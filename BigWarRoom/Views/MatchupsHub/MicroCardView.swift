@@ -26,6 +26,9 @@ struct MicroCardView: View {
     @State private var pulseOpacity: Double = 0.3
     @State private var glowIntensity: Double = 0.0
     
+    // NEW: Customizable card gradient color
+    private let cardGrad: Color = .rockiesPrimary
+    
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 8) {
@@ -93,7 +96,30 @@ struct MicroCardView: View {
             .frame(maxWidth: .infinity, minHeight: 120)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.black.opacity(0.6))
+                    .fill(
+                        // Purple gradient base
+                        LinearGradient(
+                            colors: [cardGrad.opacity(0.6), cardGrad.opacity(0.9)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        // Diagonal white gradient highlight - like NonMicro cards
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.white.opacity(0.15), Color.clear, Color.white.opacity(0.05)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        // Black overlay for text readability
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black.opacity(0.3))
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(

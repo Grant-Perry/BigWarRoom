@@ -43,45 +43,56 @@ struct ChoppedLeaderboardView: View {
                     // BATTLE ROYALE HEADER
                     battleRoyaleHeader
                     
-                    // SURVIVAL STATS
-                    survivalStats
+                    // SURVIVAL STATS (only if week started)
+                    if viewModel.shouldShowSurvivalStats {
+                        survivalStats
+                    } else {
+                        preGameMessage
+                    }
                     
-                    // CHAMPION THRONE
+                    // CHAMPION THRONE (only if week started)
                     if viewModel.hasChampion, let champion = viewModel.choppedSummary.champion {
                         championSection(champion)
                     }
                     
-                    // SAFE ZONE
-                    if viewModel.hasSafeTeams {
-                        survivalSection(
-                            title: "🛡️ SAFE ZONE",
-                            subtitle: "Living to fight another week",
-                            teams: viewModel.choppedSummary.safeTeams,
-                            sectionColor: .green
-                        )
+                    // If week hasn't started, show all teams in neutral waiting state
+                    if !viewModel.hasWeekStarted {
+                        allTeamsWaitingSection
+                    } else {
+                        // Normal ranked sections when week has started
+                        
+                        // SAFE ZONE
+                        if viewModel.hasSafeTeams {
+                            survivalSection(
+                                title: "🛡️ SAFE ZONE",
+                                subtitle: "Living to fight another week",
+                                teams: viewModel.choppedSummary.safeTeams,
+                                sectionColor: .green
+                            )
+                        }
+                        
+                        // WARNING ZONE
+                        if viewModel.hasWarningTeams {
+                            survivalSection(
+                                title: "⚡ WARNING ZONE",
+                                subtitle: "Treading dangerous waters",
+                                teams: viewModel.choppedSummary.warningTeams,
+                                sectionColor: .blue
+                            )
+                        }
+                        
+                        // DANGER ZONE - PULSING RED
+                        if viewModel.hasDangerZoneTeams {
+                            dangerZoneSection
+                        }
+                        
+                        // CRITICAL ZONE - DEATH ROW
+                        if viewModel.hasCriticalTeams {
+                            criticalZoneSection
+                        }
                     }
                     
-                    // WARNING ZONE
-                    if viewModel.hasWarningTeams {
-                        survivalSection(
-                            title: "⚡ WARNING ZONE",
-                            subtitle: "Treading dangerous waters",
-                            teams: viewModel.choppedSummary.warningTeams,
-                            sectionColor: .blue
-                        )
-                    }
-                    
-                    // DANGER ZONE - PULSING RED
-                    if viewModel.hasDangerZoneTeams {
-                        dangerZoneSection
-                    }
-                    
-                    // CRITICAL ZONE - DEATH ROW
-                    if viewModel.hasCriticalTeams {
-                        criticalZoneSection
-                    }
-                    
-                    // HALL OF THE DEAD (ENHANCED WITH HISTORICAL ELIMINATIONS)
+                    // HALL OF THE DEAD (always show if there's history)
                     if viewModel.hasEliminationHistory {
                         eliminatedHistorySection
                     }
@@ -164,16 +175,16 @@ struct ChoppedLeaderboardView: View {
                     .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.5), value: viewModel.pulseAnimation)
             }
             
-            // Week and survival info
+            // Week and survival info (updated for pre-game state)
             HStack(spacing: 24) {
                 VStack {
                     Text(viewModel.weekDisplay)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("ELIMINATION ROUND")
+                    Text(viewModel.weekStatusDisplay)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.gray)
+                        .foregroundColor(viewModel.hasWeekStarted ? .gray : .orange)
                         .tracking(1)
                 }
                 
@@ -207,6 +218,32 @@ struct ChoppedLeaderboardView: View {
                         .tracking(1)
                 }
             }
+            
+            // Show pre-game message if week hasn't started
+            if !viewModel.hasWeekStarted {
+                HStack(spacing: 8) {
+                    Text("⏰")
+                        .font(.system(size: 16))
+                    
+                    Text("GAMES HAVEN'T STARTED YET")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.orange)
+                        .tracking(1)
+                    
+                    Text("⏰")
+                        .font(.system(size: 16))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.orange.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 24)
@@ -229,43 +266,71 @@ struct ChoppedLeaderboardView: View {
         .padding(.top, 16)
     }
     
-    // MARK: -> SURVIVAL STATS
+    // MARK: -> SURVIVAL STATS (Only show if week has started)
     private var survivalStats: some View {
-        // Single row with all 5 compact stat cards
-        HStack(spacing: 6) {
-            // Your personal stats card (COMPACT!)
-            compactPersonalStatCard
-            
-            compactStatCard(
-                title: "ALIVE",
-                value: viewModel.survivorsCount,
-                subtitle: "TEAMS",
-                color: .green
-            )
-            
-            compactStatCard(
-                title: "CUTOFF",
-                value: viewModel.eliminationLineDisplay,
-                subtitle: "LINE",
-                color: .red
-            )
-            
-            compactStatCard(
-                title: "AVG",
-                value: viewModel.averageScoreDisplay,
-                subtitle: "MEAN",
-                color: .blue
-            )
-            
-            compactStatCard(
-                title: "HIGH",
-                value: viewModel.topScoreDisplay,
-                subtitle: "WEEK",
-                color: .yellow
-            )
+        Group {
+            if viewModel.shouldShowSurvivalStats {
+                // Single row with all 5 compact stat cards
+                HStack(spacing: 6) {
+                    // Your personal stats card (COMPACT!)
+                    compactPersonalStatCard
+                    
+                    compactStatCard(
+                        title: "ALIVE",
+                        value: viewModel.survivorsCount,
+                        subtitle: "TEAMS",
+                        color: .green
+                    )
+                    
+                    compactStatCard(
+                        title: "CUTOFF",
+                        value: viewModel.eliminationLineDisplay,
+                        subtitle: "LINE",
+                        color: .red
+                    )
+                    
+                    compactStatCard(
+                        title: "AVG",
+                        value: viewModel.averageScoreDisplay,
+                        subtitle: "MEAN",
+                        color: .blue
+                    )
+                    
+                    compactStatCard(
+                        title: "HIGH",
+                        value: viewModel.topScoreDisplay,
+                        subtitle: "WEEK",
+                        color: .yellow
+                    )
+                }
+                .padding(.horizontal, 24) // Increased from 20 to 24 to prevent border clipping
+                .padding(.vertical, 8)
+            } else {
+                // Show pre-game message instead of stats
+                VStack(spacing: 12) {
+                    Text("📊 BATTLE STATS UNAVAILABLE")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.gray)
+                        .tracking(1)
+                    
+                    Text("Rankings and survival percentages will appear once games begin")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
+                }
+                .padding(.vertical, 20)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.gray.opacity(0.05))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                )
+                .padding(.horizontal, 20)
+            }
         }
-        .padding(.horizontal, 24) // Increased from 20 to 24 to prevent border clipping
-        .padding(.vertical, 8)
     }
     
     // MARK: -> COMPACT STAT CARD
@@ -622,5 +687,73 @@ struct ChoppedLeaderboardView: View {
         )
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
+    }
+    
+    // MARK: -> PRE-GAME MESSAGE
+    private var preGameMessage: some View {
+        VStack(spacing: 12) {
+            Text("📊 GAMES HAVEN'T STARTED")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.orange)
+                .tracking(1)
+            
+            Text("Tap any manager below to view their lineup")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.orange.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.orange.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: -> ALL TEAMS WAITING SECTION (PRE-GAME)
+    private var allTeamsWaitingSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                Text("⏰ ALL MANAGERS")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundColor(.gray)
+                    .tracking(1)
+                
+                Spacer()
+                
+                Text("\(viewModel.choppedSummary.rankings.count) TEAMS")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.gray)
+            }
+            
+            Text("Waiting for games to begin...")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.gray)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Show all teams without rankings - just in neutral waiting state
+            ForEach(viewModel.choppedSummary.rankings.sorted(by: { $0.team.ownerName < $1.team.ownerName })) { ranking in
+                WaitingTeamCard(
+                    ranking: ranking,
+                    leagueID: leagueID,
+                    week: viewModel.choppedSummary.week
+                )
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.gray.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, 20)
     }
 }

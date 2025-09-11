@@ -12,17 +12,27 @@ extension MatchupsHubView {
     
     // MARK: - Background & Layout
     var backgroundGradient: some View {
-        LinearGradient(
-            colors: [
-                Color.black,
-                Color.black.opacity(0.9),
-                Color.gpGreen.opacity(0.1),
-                Color.black.opacity(0.9),
-                Color.black
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        ZStack {
+            // Original background
+            LinearGradient(
+                colors: [
+                    Color.black,
+                    Color.black.opacity(0.9),
+                    Color.gpGreen.opacity(0.1),
+                    Color.black.opacity(0.9),
+                    Color.black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            
+            // NEW: Overall nyyDark gradient overlay
+            LinearGradient(
+                colors: [Color.nyyDark.opacity(0.6), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
         .ignoresSafeArea()
     }
     

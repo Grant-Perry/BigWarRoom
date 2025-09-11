@@ -123,13 +123,13 @@ struct FantasyMatchupDetailView: View {
         .background(Color.black)
         
         .onAppear {
-            // Force stats loading as soon as view appears
+            // FIXED: Load stats ONCE at view level, not per card
             Task {
                 await livePlayersViewModel.forceLoadStats()
             }
         }
         .task {
-            // Backup stats loading in task block
+            // FIXED: Ensure stats are loaded early and only once
             if !livePlayersViewModel.statsLoaded {
                 await livePlayersViewModel.loadAllPlayers()
             }
@@ -456,8 +456,8 @@ struct FantasyPlayerCard: View {
     @ObservedObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
     
     // 🔥 NEW: Add explicit state tracking for debugging
-    @State private var hasAttemptedStatsLoad = false
-    @State private var debugStatsStatus = "Not Started"
+    // @State private var hasAttemptedStatsLoad = false
+    // @State private var debugStatsStatus = "Not Started"
 
     private var positionalRanking: String {
         guard let matchup = matchup, let teamIndex = teamIndex else {
@@ -642,7 +642,7 @@ struct FantasyPlayerCard: View {
                                 .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
                                 .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
                         }
-                        .padding(.bottom, 30) // 🔥 ADJUSTED: More space for stats
+                        .padding(.bottom, 36) // 🔥 ADJUSTED: More space for stats
                         .padding(.trailing, 12)
                     }
                     .zIndex(3)
@@ -684,7 +684,7 @@ struct FantasyPlayerCard: View {
                         FantasyGameMatchupView(player: player)
                         Spacer()
                     }
-                    .padding(.bottom, 50)
+                    .padding(.bottom, 55)
                 }
                 .zIndex(5)
                 
@@ -712,11 +712,11 @@ struct FantasyPlayerCard: View {
                         Spacer()
                     }
                     .padding(.horizontal, 8)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 9)
                 }
                 .zIndex(6)
             }
-            .frame(height: 140) // 🔥 EXPANDED: From 125 to 140 for stats space
+            .frame(height: 125) // 🔥 Player Card Height
             .background(
                 RoundedRectangle(cornerRadius: 15)
                     .fill(
@@ -787,20 +787,20 @@ struct FantasyPlayerCard: View {
             // 🔥 IMPROVED: More aggressive stats loading with debug
             print("🏈 FantasyPlayerCard task started - Player: \(player.fullName)")
             
-            if !hasAttemptedStatsLoad {
-                hasAttemptedStatsLoad = true
-                debugStatsStatus = "Loading..."
+            // if !hasAttemptedStatsLoad {
+            //     hasAttemptedStatsLoad = true
+            //     debugStatsStatus = "Loading..."
                 
-                if !livePlayersViewModel.statsLoaded {
-                    print("🏈 Loading stats via shared instance...")
-                    await livePlayersViewModel.loadAllPlayers()
-                    print("🏈 Stats load completed. Stats count: \(livePlayersViewModel.playerStats.keys.count)")
-                } else {
-                    print("🏈 Stats already loaded. Count: \(livePlayersViewModel.playerStats.keys.count)")
-                }
+            //     if !livePlayersViewModel.statsLoaded {
+            //         print("🏈 Loading stats via shared instance...")
+            //         await livePlayersViewModel.loadAllPlayers()
+            //         print("🏈 Stats load completed. Stats count: \(livePlayersViewModel.playerStats.keys.count)")
+            //     } else {
+            //         print("🏈 Stats already loaded. Count: \(livePlayersViewModel.playerStats.keys.count)")
+            //     }
                 
-                debugStatsStatus = "Loaded"
-            }
+            //     debugStatsStatus = "Loaded"
+            // }
             
             if let team = player.team {
                 if let nflTeam = NFLTeam.team(for: team) {

@@ -51,9 +51,19 @@ class ChoppedLeaderboardViewModel: ObservableObject {
     
     // MARK: - Computed Properties for Business Logic
     
+    /// Check if the week has started (any scoring has happened)
+    var hasWeekStarted: Bool {
+        return !choppedSummary.isScheduled
+    }
+    
+    /// Determines if we should show survival stats (only if week has started)
+    var shouldShowSurvivalStats: Bool {
+        return hasWeekStarted
+    }
+    
     /// Determines if we should show the apocalyptic danger background
     var shouldShowDangerBackground: Bool {
-        !choppedSummary.criticalTeams.isEmpty
+        hasWeekStarted && !choppedSummary.criticalTeams.isEmpty
     }
     
     /// Determines if elimination ceremony button should be shown
@@ -61,19 +71,31 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         choppedSummary.isComplete && choppedSummary.eliminatedTeam != nil
     }
     
-    /// Format elimination line score for display
+    /// Format elimination line score for display (only if week started)
     var eliminationLineDisplay: String {
-        String(format: "%.1f", choppedSummary.cutoffScore)
+        guard hasWeekStarted else { return "--" }
+        return String(format: "%.1f", choppedSummary.cutoffScore)
     }
     
-    /// Format average score for display
+    /// Format average score for display (only if week started)
     var averageScoreDisplay: String {
-        String(format: "%.1f", choppedSummary.averageScore)
+        guard hasWeekStarted else { return "--" }
+        return String(format: "%.1f", choppedSummary.averageScore)
     }
     
-    /// Format top score for display
+    /// Format top score for display (only if week started)
     var topScoreDisplay: String {
-        String(format: "%.1f", choppedSummary.highestScore)
+        guard hasWeekStarted else { return "--" }
+        return String(format: "%.1f", choppedSummary.highestScore)
+    }
+    
+    /// Get week status display
+    var weekStatusDisplay: String {
+        if hasWeekStarted {
+            return "ELIMINATION ROUND"
+        } else {
+            return "WAITING FOR GAMES"
+        }
     }
     
     /// Get league name in dramatic uppercase format
@@ -157,15 +179,17 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         }
     }
     
-    /// Your score display with formatting
+    /// Your score display with formatting (handle pre-game state)
     var myScoreDisplay: String {
-        guard let myTeam = myTeamRanking else { return "0.0" }
+        guard let myTeam = myTeamRanking else { return "--" }
+        guard hasWeekStarted else { return "--" }
         return String(format: "%.1f", myTeam.weeklyPoints)
     }
     
-    /// Your status color based on elimination status
+    /// Your status color based on elimination status (gray if week hasn't started)
     var myStatusColor: Color {
         guard let myTeam = myTeamRanking else { return .gray }
+        guard hasWeekStarted else { return .gray }
         
         switch myTeam.eliminationStatus {
         case .champion:
@@ -183,9 +207,10 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         }
     }
     
-    /// Your status emoji based on elimination status
+    /// Your status emoji based on elimination status (waiting if week hasn't started)
     var myStatusEmoji: String {
         guard let myTeam = myTeamRanking else { return "❓" }
+        guard hasWeekStarted else { return "⏰" }
         
         switch myTeam.eliminationStatus {
         case .champion:
@@ -203,9 +228,10 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         }
     }
     
-    /// Your status text based on elimination status
+    /// Your status text based on elimination status (waiting if week hasn't started)
     var myStatusText: String {
         guard let myTeam = myTeamRanking else { return "UNKNOWN" }
+        guard hasWeekStarted else { return "WAITING" }
         
         switch myTeam.eliminationStatus {
         case .champion:
@@ -223,32 +249,33 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         }
     }
     
-    /// Check if your team is in danger (for pulsing animation)
+    /// Check if your team is in danger (for pulsing animation) - only if week started
     var isMyTeamInDanger: Bool {
         guard let myTeam = myTeamRanking else { return false }
+        guard hasWeekStarted else { return false }
         return myTeam.eliminationStatus == .critical || myTeam.eliminationStatus == .danger
     }
     
     // MARK: - Section Visibility Logic
     
     var hasChampion: Bool {
-        choppedSummary.champion != nil
+        hasWeekStarted && choppedSummary.champion != nil
     }
     
     var hasSafeTeams: Bool {
-        !choppedSummary.safeTeams.isEmpty
+        hasWeekStarted && !choppedSummary.safeTeams.isEmpty
     }
     
     var hasWarningTeams: Bool {
-        !choppedSummary.warningTeams.isEmpty
+        hasWeekStarted && !choppedSummary.warningTeams.isEmpty
     }
     
     var hasDangerZoneTeams: Bool {
-        !choppedSummary.dangerZoneTeams.isEmpty
+        hasWeekStarted && !choppedSummary.dangerZoneTeams.isEmpty
     }
     
     var hasCriticalTeams: Bool {
-        !choppedSummary.criticalTeams.isEmpty
+        hasWeekStarted && !choppedSummary.criticalTeams.isEmpty
     }
     
     var hasEliminationHistory: Bool {
