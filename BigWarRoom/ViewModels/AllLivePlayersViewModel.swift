@@ -35,9 +35,47 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     let matchupsHubViewModel = MatchupsHubViewModel()
     
-    // 🔥 NEW: Private init for singleton
-    private init() {}
+    // 🔥 NEW: Week selection subscription with debouncing
+    private var weekSubscription: AnyCancellable?
+    private var debounceTask: Task<Void, Never>?
     
+    // 🔥 NEW: Private init for singleton
+    private init() {
+        // Subscribe to week changes to invalidate stats with debouncing
+        subscribeToWeekChanges()
+    }
+    
+    // 🔥 IMPROVED: Debounced week change subscription
+    private func subscribeToWeekChanges() {
+        weekSubscription = WeekSelectionManager.shared.$selectedWeek
+            .removeDuplicates()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main) // Add 500ms debounce
+            .sink { [weak self] newWeek in
+                print("📊 AllLivePlayersViewModel: Week changed to \(newWeek), invalidating stats (debounced)")
+                
+                // Cancel any existing debounce task
+                self?.debounceTask?.cancel()
+                
+                // Create new debounced task
+                self?.debounceTask = Task { @MainActor in
+                    // When week changes, invalidate stats to force reload
+                    self?.statsLoaded = false
+                    self?.playerStats = [:]
+                    
+                    // Only reload if we have existing players (avoid unnecessary loads)
+                    if !(self?.allPlayers.isEmpty ?? true) {
+                        await self?.loadPlayerStats()
+                    }
+                }
+            }
+    }
+    
+    // 🔥 NEW: Cleanup method
+    deinit {
+        debounceTask?.cancel()
+        weekSubscription?.cancel()
+    }
+
     // 🔥 NEW: Synchronous stats loading method for immediate access
     func loadStatsIfNeeded() {
         guard !statsLoaded else { 
@@ -50,11 +88,6 @@ final class AllLivePlayersViewModel: ObservableObject {
         Task {
             await loadPlayerStats()
         }
-    }
-    
-    // 🔥 CLEANED UP: Direct stats loading method
-    func loadStatsOnly() async {
-        await loadPlayerStats()
     }
     
     // MARK: - Player Position Filter
@@ -130,6 +163,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     enum SortingMethod: String, CaseIterable, Identifiable {
         case score = "Score"
         case name = "Name"
+        case team = "Team"
         
         var id: String { rawValue }
         
@@ -216,13 +250,19 @@ final class AllLivePlayersViewModel: ObservableObject {
         await loadPlayerStats()
     }
     
-    // 🔥 CLEANED UP: Robust stats loading without debug noise
+    // 🔥 IMPROVED: Non-blocking stats loading with better error handling
     private func loadPlayerStats() async {
-        let currentYear = "2024"
-        let currentWeek = NFLWeekService.shared.currentWeek
-        let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(currentWeek)"
+        // Prevent multiple concurrent loads
+        guard !Task.isCancelled else { return }
+        
+        let currentYear = AppConstants.currentSeasonYear
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(selectedWeek)"
+        
+        print("📊 AllLivePlayersViewModel: Loading stats for Week \(selectedWeek) (async)")
         
         guard let url = URL(string: urlString) else { 
+            print("❌ AllLivePlayersViewModel: Invalid URL: \(urlString)")
             await MainActor.run {
                 self.statsLoaded = true
             }
@@ -230,17 +270,31 @@ final class AllLivePlayersViewModel: ObservableObject {
         }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // Use async URLSession with timeout to prevent hanging
+            let request = URLRequest(url: url, timeoutInterval: 10.0)
+            let (data, _) = try await URLSession.shared.data(for: request)
+            
+            // Check if task was cancelled before processing
+            guard !Task.isCancelled else { return }
+            
             let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
             
             await MainActor.run {
+                // Final check before updating UI
+                guard !Task.isCancelled else { return }
+                
                 self.playerStats = statsData
                 self.statsLoaded = true
+                print("✅ AllLivePlayersViewModel: Stats loaded for Week \(selectedWeek). Player count: \(statsData.keys.count)")
+                
+                // Only update UI if we're not cancelled
                 self.objectWillChange.send()
             }
             
         } catch {
+            print("❌ AllLivePlayersViewModel: Stats loading failed for Week \(selectedWeek): \(error)")
             await MainActor.run {
+                guard !Task.isCancelled else { return }
                 self.statsLoaded = true // Mark as loaded even on error to prevent infinite loading
                 self.objectWillChange.send()
             }
@@ -326,10 +380,24 @@ final class AllLivePlayersViewModel: ObservableObject {
         applyPositionFilter() // Re-apply filter with new sorting method
     }
     
+    // 🔥 IMPROVED: Optimized filtering with early returns
     private func applyPositionFilter() {
+        // Early return if no players
+        guard !allPlayers.isEmpty else { 
+            filteredPlayers = []
+            return 
+        }
+        
         let players = selectedPosition == .all ? 
             allPlayers : 
             allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
+        
+        // Early return if no players after filtering
+        guard !players.isEmpty else {
+            filteredPlayers = []
+            positionTopScore = 0.0
+            return
+        }
         
         let positionScores = players.map { $0.currentScore }.sorted(by: >)
         positionTopScore = positionScores.first ?? 1.0
@@ -356,30 +424,63 @@ final class AllLivePlayersViewModel: ObservableObject {
             )
         }
         
-        // Apply sorting based on method and direction
+        // Apply sorting based on method and direction (optimized)
+        filteredPlayers = sortPlayers(updatedPlayers)
+    }
+    
+    // 🔥 NEW: Separated sorting logic for better performance
+    private func sortPlayers(_ players: [LivePlayerEntry]) -> [LivePlayerEntry] {
         switch sortingMethod {
         case .score:
-            if sortHighToLow {
-                filteredPlayers = updatedPlayers.sorted { $0.currentScore > $1.currentScore }
-            } else {
-                filteredPlayers = updatedPlayers.sorted { $0.currentScore < $1.currentScore }
-            }
+            return sortHighToLow ? 
+                players.sorted { $0.currentScore > $1.currentScore } :
+                players.sorted { $0.currentScore < $1.currentScore }
+            
         case .name:
-            if sortHighToLow {
-                // A to Z (ascending alphabetically, but we call it "high to low" for consistency)
-                filteredPlayers = updatedPlayers.sorted { $0.playerName < $1.playerName }
-            } else {
-                // Z to A (descending alphabetically)
-                filteredPlayers = updatedPlayers.sorted { $0.playerName > $1.playerName }
-            }
+            return sortHighToLow ? 
+                players.sorted { $0.playerName < $1.playerName } :
+                players.sorted { $0.playerName > $1.playerName }
+            
+        case .team:
+            return sortHighToLow ? 
+                players.sorted { player1, player2 in
+                    if player1.teamName != player2.teamName {
+                        return player1.teamName < player2.teamName
+                    }
+                    return positionPriority(player1.position) < positionPriority(player2.position)
+                } :
+                players.sorted { player1, player2 in
+                    if player1.teamName != player2.teamName {
+                        return player1.teamName > player2.teamName
+                    }
+                    return positionPriority(player1.position) < positionPriority(player2.position)
+                }
         }
     }
     
+    /// Returns priority order for positions: QB=1, RB=2, WR=3, TE=4, FLEX=5, DEF=6, K=7
+    private func positionPriority(_ position: String) -> Int {
+        switch position.uppercased() {
+        case "QB": return 1
+        case "RB": return 2
+        case "WR": return 3
+        case "TE": return 4
+        case "FLEX": return 5
+        case "DEF", "DST": return 6
+        case "K": return 7
+        default: return 8 // For any unknown positions
+        }
+    }
+
     // MARK: - Refresh
     
-    // 🔥 IMPROVED: Enhanced refresh with better error handling
+    // 🔥 IMPROVED: Enhanced refresh with task cancellation
     func refresh() async {
         print("🔄 Refreshing all player data...")
+        
+        // Cancel any existing tasks
+        debounceTask?.cancel()
+        
         statsLoaded = false  // Reset stats loaded state
         await loadAllPlayers()
     }

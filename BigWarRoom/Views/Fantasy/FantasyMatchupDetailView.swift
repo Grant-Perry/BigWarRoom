@@ -150,7 +150,7 @@ struct FantasyMatchupDetailView: View {
                     ForEach(matchup.homeTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
-                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel(),
+                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
                             matchup: matchup,
                             teamIndex: 1,
                             isBench: false
@@ -171,7 +171,7 @@ struct FantasyMatchupDetailView: View {
                     ForEach(matchup.awayTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
-                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel(),
+                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
                             matchup: matchup,
                             teamIndex: 0,
                             isBench: false
@@ -522,7 +522,7 @@ struct FantasyPlayerCard: View {
                                 .font(.system(size: 90, weight: .black))
                                 .italic()
                                 .foregroundColor(teamColor)
-                                .opacity(0.55) // 🔥 MORE VISIBLE: Was 0.25, now 0.4
+                                .opacity(0.65) // 🔥 jersey number transparency
                                 .shadow(color: .black.opacity(0.4), radius: 2, x: 1, y: 1)
                         }
                     }
@@ -625,7 +625,9 @@ struct FantasyPlayerCard: View {
                             EmptyView()
                         }
                     }
-                    .offset(x: -20, y: -8)
+                    .offset(
+                        x: -20,
+                        y: (player.currentPoints ?? 0.0 > 0 && formatPlayerStatBreakdown() != nil) ? -8 : 4)
                     .zIndex(2)
                     
                     VStack(alignment: .trailing, spacing: 4) {
@@ -684,7 +686,8 @@ struct FantasyPlayerCard: View {
                         FantasyGameMatchupView(player: player)
                         Spacer()
                     }
-                    .padding(.bottom, 55)
+                    .padding(.bottom, 45)
+				   // padding for the center matchup and time section
                 }
                 .zIndex(5)
                 
@@ -692,7 +695,8 @@ struct FantasyPlayerCard: View {
                 VStack {
                     Spacer()
                     HStack {
-                        if let statLine = formatPlayerStatBreakdown() {
+                        // 🔥 GENIUS: Only show stats if player has fantasy points > 0
+                        if player.currentPoints ?? 0.0 > 0, let statLine = formatPlayerStatBreakdown() {
                             Text(statLine)
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white)
@@ -712,11 +716,11 @@ struct FantasyPlayerCard: View {
                         Spacer()
                     }
                     .padding(.horizontal, 8)
-                    .padding(.bottom, 9)
+                    .padding(.bottom, player.currentPoints ?? 0.0 > 0 ? 9 : 0) // 🔥 No bottom padding when no stats
                 }
                 .zIndex(6)
             }
-            .frame(height: 125) // 🔥 Player Card Height
+            .frame(height: (player.currentPoints ?? 0.0 > 0 && formatPlayerStatBreakdown() != nil) ? 125 : 100) // 🔥 Dynamic height: shorter when no stats
             .background(
                 RoundedRectangle(cornerRadius: 15)
                     .fill(

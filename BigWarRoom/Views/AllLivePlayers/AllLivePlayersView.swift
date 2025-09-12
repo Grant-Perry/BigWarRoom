@@ -15,6 +15,9 @@ struct AllLivePlayersView: View {
     @State private var showingMatchupDetail = false
     @State private var sortHighToLow = true // Track sort direction
     
+    // 🔥 NEW: Task management for better performance
+    @State private var loadTask: Task<Void, Never>?
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -36,7 +39,15 @@ struct AllLivePlayersView: View {
             }
         }
         .task {
-            await viewModel.loadAllPlayers()
+            // Cancel any existing task before starting new one
+            loadTask?.cancel()
+            loadTask = Task {
+                await viewModel.loadAllPlayers()
+            }
+        }
+        .onDisappear {
+            // Cancel tasks when view disappears to prevent background work
+            loadTask?.cancel()
         }
         .sheet(isPresented: $showingMatchupDetail) {
             if let matchup = selectedMatchup {
@@ -245,6 +256,7 @@ struct AllLivePlayersView: View {
     
     // MARK: - Players List View
     
+    // 🔥 IMPROVED: Optimized players list view with better scroll performance
     private var playersListView: some View {
         ScrollView {
             LazyVStack(spacing: 8) { // Reduced from 12 to 8 for tighter spacing
@@ -260,10 +272,13 @@ struct AllLivePlayersView: View {
                         viewModel: viewModel
                     )
                     .onAppear {
-                        // Staggered animation timing
+                        // Optimized staggered animation with shorter delays
                         if !animatedPlayers.contains(playerEntry.id) {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.1) {
-                                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                            let delay = min(Double(index) * 0.05, 1.0) // Cap max delay at 1 second
+                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                                // Check if view is still alive before animating
+                                guard !Task.isCancelled else { return }
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     animatedPlayers.append(playerEntry.id)
                                 }
                             }
@@ -273,11 +288,14 @@ struct AllLivePlayersView: View {
             }
             .padding()
         }
+        .clipped() // Prevent scroll view overflow during fast scrolling
     }
-    
-    // Helper function to apply sorting
+
+    // Helper function to apply sorting (optimized)
     private func applySorting() {
-        viewModel.setSortDirection(highToLow: sortHighToLow)
+        withAnimation(.easeInOut(duration: 0.2)) { // Shorter animation
+            viewModel.setSortDirection(highToLow: sortHighToLow)
+        }
     }
     
     // Dynamic text for sort direction based on sorting method
@@ -286,6 +304,8 @@ struct AllLivePlayersView: View {
         case .score:
             return sortHighToLow ? "Highest" : "Lowest"
         case .name:
+            return sortHighToLow ? "A to Z" : "Z to A"
+        case .team:
             return sortHighToLow ? "A to Z" : "Z to A"
         }
     }

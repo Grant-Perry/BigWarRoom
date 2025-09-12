@@ -99,7 +99,8 @@ struct UnifiedMatchup: Identifiable {
     /// This ensures the detail view knows which team is the user's team
     @MainActor
     func createConfiguredFantasyViewModel() -> FantasyViewModel {
-        let viewModel = FantasyViewModel()
+        // Use shared instance instead of creating new ones
+        let viewModel = FantasyViewModel.shared
         
         // Set up the league context
         if let myTeamId = myTeam?.id {

@@ -8,7 +8,7 @@ import SwiftUI
 
 struct FantasyMatchupListView: View {
     let draftRoomViewModel: DraftRoomViewModel  // Accept the shared view model
-    @StateObject private var viewModel = FantasyViewModel()
+    @StateObject private var viewModel = FantasyViewModel.shared
     @StateObject private var weekManager = WeekSelectionManager.shared
     @State private var forceChoppedMode = false // DEBUG: Force chopped mode
     

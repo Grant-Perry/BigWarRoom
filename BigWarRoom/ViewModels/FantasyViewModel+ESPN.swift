@@ -13,7 +13,7 @@ extension FantasyViewModel {
     
     /// Fetch real ESPN fantasy data with proper authentication
     func fetchESPNFantasyData(leagueID: String, week: Int) async {
-        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(selectedYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(week)") else {
+        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(week)") else {
             errorMessage = "Invalid ESPN API URL"
             return
         }
@@ -32,7 +32,7 @@ extension FantasyViewModel {
         var request = URLRequest(url: url)
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         
-        let espnToken = selectedYear == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
+        let espnToken = AppConstants.currentESPNToken
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
         
         URLSession.shared.dataTaskPublisher(for: request)
@@ -90,7 +90,7 @@ extension FantasyViewModel {
     
     /// Try alternate ESPN token synchronously
     private func tryAlternateTokenSync(url: URL, leagueID: String, week: Int) {
-        let alternateToken = selectedYear == "2025" ? AppConstants.ESPN_S2 : AppConstants.ESPN_S2_2025
+        let alternateToken = AppConstants.currentAlternateESPNToken
         
         var request = URLRequest(url: url)
         request.addValue("application/json", forHTTPHeaderField: "Accept")

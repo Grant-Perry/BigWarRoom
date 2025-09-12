@@ -76,7 +76,7 @@ final class SleeperAPIClient: DraftAPIClient {
     
     /// Fetch leagues for a specific user (convenience method with default season)
     func fetchLeagues(userID: String) async throws -> [SleeperLeague] {
-        return try await fetchLeagues(userID: userID, season: "2025")
+        return try await fetchLeagues(userID: userID, season: AppConstants.currentSeasonYear)
     }
     
     /// Fetch a specific league by ID

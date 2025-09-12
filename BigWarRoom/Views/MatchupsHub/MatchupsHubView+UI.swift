@@ -344,7 +344,7 @@ extension MatchupsHubView {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                Image(systemName: "sword.crossed")
+                Image(systemName: "gamecontroller.fill")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -433,8 +433,8 @@ extension MatchupsHubView {
     var poweredByBranding: some View {
         VStack(spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12))
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.gpGreen)
                 
                 Text("POWERED BY BIG WARROOM")
@@ -447,8 +447,8 @@ extension MatchupsHubView {
                         )
                     )
                 
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 12))
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.gpGreen)
             }
             

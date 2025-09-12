@@ -143,14 +143,14 @@ struct PlayerCardView: View {
             }
             
             // Stats preview from PlayerStatsStore
-            if let stats = PlayerStatsStore.shared.stats(for: player.playerID) {
-                if let ppg = stats.pprPointsPerGame {
-                    Text(String(format: "%.1f PPG", ppg))
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .fontWeight(.medium)
-                }
-            }
+            // if let stats = PlayerStatsStore.shared.stats(for: player.playerID) {
+            //     if let ppg = stats.pprPointsPerGame {
+            //         Text(String(format: "%.1f PPG", ppg))
+            //             .font(.caption2)
+            //             .foregroundColor(.blue)
+            //             .fontWeight(.medium)
+            //     }
+            // }
             
             // Injury status
             if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {

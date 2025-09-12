@@ -43,12 +43,14 @@ final class ESPNAPIClient: DraftAPIClient {
     }
     
     /// Fetch leagues for a user (ESPN requires knowing league IDs)
-    func fetchLeagues(userID: String, season: String = "2024") async throws -> [SleeperLeague] {
+    func fetchLeagues(userID: String, season: String) async throws -> [SleeperLeague] {
+        let currentSeason = season.isEmpty ? AppConstants.currentSeasonYear : season
+        
         // Use dynamic league IDs from credentials manager instead of hardcoded ones
         guard !credentialsManager.leagueIDs.isEmpty else {
             throw ESPNAPIError.unsupportedOperation("No ESPN league IDs configured. Please add your league IDs in ESPN Setup.")
         }
-        
+
         var leagues: [SleeperLeague] = []
         
         for leagueID in credentialsManager.leagueIDs {
@@ -67,7 +69,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch a specific league by ID
     func fetchLeague(leagueID: String) async throws -> SleeperLeague {
         // Try with the best token for this league first
-        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.ESPNLeagueYear)
+        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.currentSeasonYear)
         
         do {
             return try await fetchLeagueWithToken(leagueID: leagueID, token: primaryToken)
@@ -76,8 +78,8 @@ final class ESPNAPIClient: DraftAPIClient {
             
             // Try with the alternate token
             let alternateToken = leagueID == "1241361400" ? 
-                AppConstants.getPrimaryESPNToken(for: AppConstants.ESPNLeagueYear) : 
-                AppConstants.getAlternateESPNToken(for: AppConstants.ESPNLeagueYear)
+                AppConstants.getPrimaryESPNToken(for: AppConstants.currentSeasonYear) : 
+                AppConstants.getAlternateESPNToken(for: AppConstants.currentSeasonYear)
             
             return try await fetchLeagueWithToken(leagueID: leagueID, token: alternateToken)
         }
@@ -86,7 +88,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch league with a specific token
     private func fetchLeagueWithToken(leagueID: String, token: String) async throws -> SleeperLeague {
         // Updated view parameters to include members data for manager name mapping
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
         // x Print("🌐 ESPN API Request: \(urlString)")
         // x Print("🔑 Using token: \(String(token.prefix(50)))...")
     
@@ -203,7 +205,7 @@ final class ESPNAPIClient: DraftAPIClient {
         }
         
         // Updated with working view parameters
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mSettings&view=mTeam"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mSettings&view=mTeam"
         // x// x Print("🌐 ESPN Draft API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {
@@ -253,7 +255,7 @@ final class ESPNAPIClient: DraftAPIClient {
         let leagueID = draftID // ESPN uses league ID for draft data
         
         // Use comprehensive view parameters to get draft data and picks
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mTeam&view=mRoster&view=mMatchup&view=mSettings"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mDraftDetail&view=mTeam&view=mRoster&view=mMatchup&view=mSettings"
         // x// x Print("🌐 ESPN Draft Picks API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {
@@ -464,7 +466,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch rosters for a league
     func fetchRosters(leagueID: String) async throws -> [SleeperRoster] {
         // ENHANCED: Fetch both team and member data with comprehensive view parameters
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster&view=mSettings"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster&view=mSettings"
         // x// x Print("🌐 ESPN Rosters API Request: \(urlString)")
     
         guard let url = URL(string: urlString) else {
@@ -579,7 +581,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch league members for user lookup
     func fetchLeagueMembers(leagueID: String) async throws -> [ESPNMember] {
         // Updated with working view parameters
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
         // x// x Print("🌐 ESPN Members API Request: \(urlString)")
     
         guard let url = URL(string: urlString) else {
@@ -623,7 +625,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch ESPN league data for team ownership information
     func fetchESPNLeagueData(leagueID: String) async throws -> ESPNLeague {
         // Try with the best token for this league first
-        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.ESPNLeagueYear)
+        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.currentSeasonYear)
         
         do {
             return try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: primaryToken)
@@ -632,8 +634,8 @@ final class ESPNAPIClient: DraftAPIClient {
             
             // Try with the alternate token
             let alternateToken = leagueID == "1241361400" ? 
-                AppConstants.getPrimaryESPNToken(for: AppConstants.ESPNLeagueYear) : 
-                AppConstants.getAlternateESPNToken(for: AppConstants.ESPNLeagueYear)
+                AppConstants.getPrimaryESPNToken(for: AppConstants.currentSeasonYear) : 
+                AppConstants.getAlternateESPNToken(for: AppConstants.currentSeasonYear)
             
             return try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: alternateToken)
         }
@@ -642,7 +644,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Fetch ESPN league data with a specific token
     private func fetchESPNLeagueDataWithToken(leagueID: String, token: String) async throws -> ESPNLeague {
         // Use minimal view parameters to just get team and member data
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
         
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse
@@ -674,7 +676,7 @@ final class ESPNAPIClient: DraftAPIClient {
     /// Debug method to test ESPN API connection and log response
     func debugESPNConnection(leagueID: String) async {
         // Updated with working API URL and view parameters
-        let urlString = "\(baseURL)/\(AppConstants.ESPNLeagueYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam"
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam"
         // x// x Print("🔧 DEBUG ESPN API Request: \(urlString)")
         
         guard let url = URL(string: urlString) else {

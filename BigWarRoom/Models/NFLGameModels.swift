@@ -196,7 +196,9 @@ class NFLGameDataService: ObservableObject {
     private init() {}
     
     /// Fetch real NFL game data from ESPN API
-    func fetchGameData(forWeek week: Int, year: Int = 2024, forceRefresh: Bool = false) {
+    func fetchGameData(forWeek week: Int, year: Int? = nil, forceRefresh: Bool = false) {
+        let currentYear = year ?? AppConstants.currentSeasonYearInt
+        
         // Check cache first
         if !forceRefresh, 
            let cache = cache,
@@ -206,7 +208,7 @@ class NFLGameDataService: ObservableObject {
             return
         }
         
-        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(year)") else {
+        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(currentYear)") else {
             DispatchQueue.main.async {
                 self.errorMessage = "Invalid API URL"
             }
@@ -299,14 +301,15 @@ class NFLGameDataService: ObservableObject {
     }
     
     /// Start auto-refresh for live games using AppConstants timing
-    func startLiveUpdates(forWeek week: Int, year: Int = 2024) {
+    func startLiveUpdates(forWeek week: Int, year: Int? = nil) {
+        let currentYear = year ?? AppConstants.currentSeasonYearInt
         let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
         Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             // Only refresh if we have live games
             let hasLiveGames = self?.gameData.values.contains { $0.isLive } ?? false
             if hasLiveGames {
                 // x// x Print("🏈 NFL Live Update: Refreshing game data (every \(AppConstants.MatchupRefresh)s)")
-                self?.fetchGameData(forWeek: week, year: year, forceRefresh: true)
+                self?.fetchGameData(forWeek: week, year: currentYear, forceRefresh: true)
             }
         }
     }

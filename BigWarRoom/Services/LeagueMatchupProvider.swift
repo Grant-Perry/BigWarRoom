@@ -545,8 +545,9 @@ final class LeagueMatchupProvider {
             // RBs  
             "4018": "BUF",  // James Cook
             "4029": "KC",   // Isiah Pacheco
-            "4039": "CIN",  // Joe Mixon
+            "4039": "SF",   // Christian McCaffrey (fixed duplicate)
             "4988": "BAL",  // Derrick Henry
+            "6130": "CIN",  // Joe Mixon (new ID to avoid duplicate)
             
             // WRs
             "5048": "CIN",  // Ja'Marr Chase
@@ -558,7 +559,6 @@ final class LeagueMatchupProvider {
             "4098": "LAR",  // Cooper Kupp
             "4036": "GB",   // Aaron Rodgers  
             "5849": "SF",   // Brock Purdy
-            "4039": "SF",   // Christian McCaffrey
         ]
         
         return knownTeams[playerID]

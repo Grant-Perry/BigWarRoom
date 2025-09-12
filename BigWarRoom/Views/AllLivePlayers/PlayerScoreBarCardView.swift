@@ -114,21 +114,13 @@ struct PlayerScoreBarCardView: View {
                                     .foregroundColor(.secondary)
                             }
                             
-                            // 🔥 NEW: Stat breakdown line
-                            if let statLine = formatPlayerStatBreakdown() {
+                            // 🔥 NEW: Stat breakdown line - ONLY show if player has fantasy points > 0
+                            if playerEntry.currentScore > 0, let statLine = formatPlayerStatBreakdown() {
                                 Text(statLine)
                                     .font(.system(size: 11, weight: .bold))
                                     .foregroundColor(.white)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.8)
-                            } else {
-                                // 🔥 DEBUG: Show why no stat line
-                                let playerName = playerEntry.player.fullName
-                                if playerName.lowercased().contains("allen") || playerName.lowercased().contains("jackson") {
-                                    Text("DEBUG: No stats for \(playerName)")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundColor(.red)
-                                }
                             }
                         }
                         

@@ -23,6 +23,7 @@ import SwiftUI
 struct WeekPickerView: View {
     @Binding var isPresented: Bool
     @StateObject private var weekManager = WeekSelectionManager.shared
+    @StateObject private var yearManager = SeasonYearManager.shared
     @State private var animateIn = false
     
     /// NFL season has 18 weeks (17 regular + playoffs)
@@ -41,7 +42,7 @@ struct WeekPickerView: View {
                 }
             
             VStack(spacing: 0) {
-                // Header
+                // Header with year picker
                 pickerHeader
                 
                 // Week grid
@@ -51,7 +52,7 @@ struct WeekPickerView: View {
                 pickerFooter
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 400)
+            .frame(height: 450) // Increased height for year picker
             .background(
                 RoundedRectangle(cornerRadius: 24)
                     .fill(
@@ -88,7 +89,7 @@ struct WeekPickerView: View {
         }
     }
     
-    // MARK: - Header
+    // MARK: - Header with Year Picker
     private var pickerHeader: some View {
         VStack(spacing: 12) {
             HStack {
@@ -114,6 +115,19 @@ struct WeekPickerView: View {
                 }
             }
             
+            // Year Picker Row
+            HStack(spacing: 8) {
+                Text("Season:")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.gray)
+                
+                ForEach(yearManager.availableYears, id: \.self) { year in
+                    yearPickerButton(for: year)
+                }
+                
+                Spacer()
+            }
+            
             Text("Choose a week to view matchups")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.gray)
@@ -124,6 +138,32 @@ struct WeekPickerView: View {
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 16)
+    }
+    
+    private func yearPickerButton(for year: String) -> some View {
+        let isSelected = year == yearManager.selectedYear
+        
+        return Button(action: {
+            selectYear(year)
+        }) {
+            Text(year)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(isSelected ? .black : .white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isSelected ? 
+                              LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing) :
+                              LinearGradient(colors: [Color.gray.opacity(0.2)], startPoint: .leading, endPoint: .trailing))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(isSelected ? Color.white.opacity(0.6) : Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .scaleEffect(isSelected ? 1.05 : 1.0)
+                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
+        }
     }
     
     // MARK: - Week Grid (Fixed: Left-to-Right Layout + All Weeks Fit)
@@ -357,6 +397,16 @@ struct WeekPickerView: View {
     }
     
     // MARK: - Actions
+    
+    private func selectYear(_ year: String) {
+        // Haptic feedback for year selection
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            yearManager.selectYear(year)
+        }
+    }
     
     private func selectWeek(_ week: Int) {
         // Haptic feedback for selection

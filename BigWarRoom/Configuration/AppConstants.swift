@@ -59,6 +59,52 @@ struct AppConstants {
         return "\(version) (\(build))"
     }
 
+    // MARK: -> Current Season Year (SSOT)
+    /// Get the current season year from SeasonYearManager SSOT
+    static var currentSeasonYear: String {
+        return SeasonYearManager.shared.selectedYear
+    }
+    
+    /// Get the current season year as Int for API calls
+    static var currentSeasonYearInt: Int {
+        return SeasonYearManager.shared.selectedYearInt
+    }
+    
+    // MARK: -> ESPN Token Management (Updated to use SSOT)
+    /// Get the primary ESPN token for current season year
+    static var currentESPNToken: String {
+        return getPrimaryESPNToken(for: currentSeasonYear)
+    }
+    
+    /// Get the alternate ESPN token for current season year
+    static var currentAlternateESPNToken: String {
+        return getAlternateESPNToken(for: currentSeasonYear)
+    }
+    
+    /// Get the primary ESPN token for a given year
+    static func getPrimaryESPNToken(for year: String) -> String {
+        return year == "2025" ? ESPN_S2_2025 : ESPN_S2
+    }
+    
+    /// Get the alternate ESPN token for a given year (for fallback)
+    static func getAlternateESPNToken(for year: String) -> String {
+        return year == "2025" ? ESPN_S2 : ESPN_S2_2025
+    }
+    
+    /// Get the best ESPN token for a specific league (with known problematic leagues)
+    static func getESPNTokenForLeague(_ leagueID: String, year: String) -> String {
+        // Known problematic leagues that need the 2025 token first
+        let problematicLeagues = ["1241361400"] // Add more as needed
+        
+        if problematicLeagues.contains(leagueID) {
+            // Use ESPN_S2_2025 first for problematic leagues (regardless of year)
+            return ESPN_S2_2025
+        } else {
+            // Use primary token for normal leagues
+            return getPrimaryESPNToken(for: year)
+        }
+    }
+
     // MARK: VIEWS
 
     // App Logo - Main branding logo for loading screen and about page
@@ -132,31 +178,6 @@ struct AppConstants {
                 }
                 .frame(width: 50, height: 50)
             }
-        }
-    }
-    
-    // MARK: -> ESPN Token Management
-    /// Get the primary ESPN token for a given year
-    static func getPrimaryESPNToken(for year: String) -> String {
-        return year == "2025" ? ESPN_S2_2025 : ESPN_S2
-    }
-    
-    /// Get the alternate ESPN token for a given year (for fallback)
-    static func getAlternateESPNToken(for year: String) -> String {
-        return year == "2025" ? ESPN_S2 : ESPN_S2_2025
-    }
-    
-    /// Get the best ESPN token for a specific league (with known problematic leagues)
-    static func getESPNTokenForLeague(_ leagueID: String, year: String) -> String {
-        // Known problematic leagues that need the 2025 token first
-        let problematicLeagues = ["1241361400"] // Add more as needed
-        
-        if problematicLeagues.contains(leagueID) {
-            // Use ESPN_S2_2025 first for problematic leagues (regardless of year)
-            return ESPN_S2_2025
-        } else {
-            // Use primary token for normal leagues
-            return getPrimaryESPNToken(for: year)
         }
     }
 }

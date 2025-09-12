@@ -468,7 +468,7 @@ struct ChoppedTeamRosterView: View {
             }
             
             // 🔥 NEW: Stat breakdown for starters
-            if isStarter, let statLine = formatPlayerStatBreakdown(player) {
+            if isStarter, player.currentPoints ?? 0.0 > 0, let statLine = formatPlayerStatBreakdown(player) {
                 HStack {
                     Text(statLine)
                         .font(.system(size: 9, weight: .bold))
