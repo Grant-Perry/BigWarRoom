@@ -27,7 +27,7 @@ struct FantasyDetailHeaderView: View {
         switch sortingMethod {
         case .score:
             return sortHighToLow ? "↓" : "↑"
-        case .name, .position:
+        case .name, .position, .team: // UPDATED: Added .team case
             return sortHighToLow ? "Z-A" : "A-Z"
         }
     }

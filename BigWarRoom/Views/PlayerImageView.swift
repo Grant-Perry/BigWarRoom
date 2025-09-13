@@ -34,7 +34,7 @@ struct PlayerImageView: View {
             }
         }
         .frame(width: size, height: size)
-        .clipShape(Circle())
+//        .clipShape(Circle())
         .overlay(
             Circle()
                 .stroke(team?.primaryColor.opacity(0.3) ?? Color.gray.opacity(0.3), lineWidth: 1)
@@ -42,41 +42,3 @@ struct PlayerImageView: View {
     }
 }
 
-// MARK: -> Preview
-//#Preview {
-//    VStack {
-//        PlayerImageView(
-//            player: SleeperPlayer(
-//                playerID: "wr-chase",
-//                firstName: "Ja'Marr",
-//                lastName: "Chase",
-//                position: "WR",
-//                team: "CIN",
-//                number: 1,
-//                status: "Active",
-//                height: "6'0\"",
-//                weight: "201",
-//                age: 24,
-//                college: "LSU",
-//                yearsExp: 3,
-//                fantasyPositions: ["WR"],
-//                injuryStatus: nil,
-//                depthChartOrder: 1,
-//                depthChartPosition: 1,
-//                searchRank: 5,
-//                hashtag: "#JaMarrChase",
-//                birthCountry: "United States",
-//                espnID: 4362628,
-//                yahooID: 32700,
-//                rotowireID: 14885,
-//                rotoworldID: 5479,
-//                fantasyDataID: 21688,
-//                sportradarID: "123",
-//                statsID: 123
-//            ),
-//            size: 100,
-//            team: NFLTeam.team(for: "CIN")
-//        )
-//    }
-//    .padding()
-//}

@@ -12,6 +12,7 @@ enum MatchupSortingMethod: String, CaseIterable, Identifiable {
     case position = "position"
     case score = "score" 
     case name = "name"
+    case team = "team" // NEW: Team sorting
     
     var id: String { rawValue }
     
@@ -21,6 +22,7 @@ enum MatchupSortingMethod: String, CaseIterable, Identifiable {
         case .position: return "Position"
         case .score: return "Score" 
         case .name: return "Name"
+        case .team: return "Team" // NEW
         }
     }
 }

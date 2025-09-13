@@ -8,6 +8,7 @@
 import SwiftUI
 
 /// Displays real NFL game matchup information for a fantasy player
+/// @deprecated Use MatchupTimeFinal instead for consistent styling and DRY code
 struct FantasyGameMatchupView: View {
     let player: FantasyPlayer
     

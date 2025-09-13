@@ -26,6 +26,11 @@ struct ChoppedTeamRosterView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var playerStats: [String: [String: Double]] = [:]
+    @State private var opponentInfo: OpponentInfo? // NEW: Store opponent data
+    
+    // NFL Game Data Integration - NEW
+    @StateObject private var nflGameService = NFLGameDataService.shared
+    @State private var gameDataLoaded = false
     
     // Collapsible section states
     @State private var showStartingLineup = true
@@ -35,6 +40,10 @@ struct ChoppedTeamRosterView: View {
     @State private var selectedPlayer: SleeperPlayer?
     @State private var showStats = false
     
+    // Sorting states - NEW
+    @State private var sortingMethod: MatchupSortingMethod = .position
+    @State private var sortHighToLow = false
+
     var body: some View {
         NavigationView {
             ZStack {
@@ -48,13 +57,15 @@ struct ChoppedTeamRosterView: View {
                     errorView
                 }
             }
-            .navigationTitle(teamRanking.team.ownerName)
-            .navigationBarTitleDisplayMode(.large)
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarHidden(true)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
+                    .foregroundColor(.white) // Ensure button is visible
                 }
             }
         }
@@ -124,18 +135,41 @@ struct ChoppedTeamRosterView: View {
                 // Team header with score
                 teamHeaderCard(roster)
                 
+                // NEW: Sorting controls
+                PlayerSortingControlsView(
+                    sortingMethod: $sortingMethod, 
+                    sortHighToLow: $sortHighToLow
+                )
+
                 // Starting Lineup Section
                 if !roster.starters.isEmpty {
-                    startingLineupSection(roster.starters)
+                    startingLineupSection(sortPlayers(roster.starters))
                 }
                 
                 // Bench Section
                 if !roster.bench.isEmpty {
-                    benchSection(roster.bench)
+                    benchSection(sortPlayers(roster.bench))
                 }
             }
             .padding()
         }
+        .task {
+            // Load NFL game data for real game times
+            await loadNFLGameData()
+        }
+    }
+    
+    // MARK: - Player Sorting Logic (DRY)
+    
+    private func sortPlayers(_ players: [FantasyPlayer]) -> [FantasyPlayer] {
+        return PlayerSortingService.sortPlayers(
+            players, 
+            by: sortingMethod, 
+            highToLow: sortHighToLow,
+            getPlayerPoints: { player in
+                return getActualPlayerPoints(for: player)
+            }
+        )
     }
     
     // MARK: - Team Header Card
@@ -216,6 +250,7 @@ struct ChoppedTeamRosterView: View {
                 }
             }
             
+            
             // Roster stats
             HStack(spacing: 20) {
                 statCard(
@@ -268,32 +303,10 @@ struct ChoppedTeamRosterView: View {
         )
     }
     
-    // MARK: - Starting Lineup Section
+    // MARK: - Starting Lineup Section - UPDATED to remove notice (moved to main view)
     
     private func startingLineupSection(_ starters: [FantasyPlayer]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // 🔥 NOTICE: Always show for Chopped leagues about score accuracy
-            HStack {
-                Image(systemName: "info.circle")
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                
-                Text("NOTICE: Individual scores are estimates. Team total is accurate.")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.orange)
-                    .italic()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.orange.opacity(0.1))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
-                    )
-            )
-            
             // Collapsible Header
             Button {
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -322,7 +335,7 @@ struct ChoppedTeamRosterView: View {
             
             // Collapsible Content
             if showStartingLineup {
-                VStack(spacing: 12) {
+                VStack(spacing: 18) { // INCREASED: spacing from 12 to 18
                     ForEach(starters) { player in
                         enhancedPlayerCard(player, isStarter: true)
                     }
@@ -375,7 +388,7 @@ struct ChoppedTeamRosterView: View {
                 if bench.isEmpty {
                     emptyBenchCard
                 } else {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 18) { // INCREASED: spacing from 12 to 18
                         ForEach(bench) { player in
                             enhancedPlayerCard(player, isStarter: false)
                         }
@@ -394,101 +407,231 @@ struct ChoppedTeamRosterView: View {
         )
     }
     
-    // MARK: - Enhanced Player Card (Same as MyRosterView)
+    // MARK: - Enhanced Player Card (UPDATED with FantasyPlayerCard styling) - UPDATED with matchup info
     
     private func enhancedPlayerCard(_ player: FantasyPlayer, isStarter: Bool) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                // Player headshot
-                playerImageForPlayer(player)
-                
-                // Player info - FIXED LAYOUT with better name spacing
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 8) {
-                        // Player name and position - IMPROVED LAYOUT
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(player.fullName)
-                                .font(.callout)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            Text(player.position)
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack(alignment: .topLeading) {
+            // Background jersey number - FIXED with proper shadows for contrast
+            GeometryReader { geometry in
+                VStack {
+                    HStack {
+                        Spacer()
+                            .frame(width: geometry.size.width * 0.6) // Position in the right area
                         
-                        // Starter/Bench badge - MOVED to vertical stack to save horizontal space
-                        VStack(alignment: .trailing, spacing: 4) {
-                            Text(isStarter ? "STARTER" : "BENCH")
-                                .font(.system(size: 9, weight: .bold)) // REDUCE: Smaller font
+                        HStack(alignment: .top, spacing: 2) {
+                            // Small "#" symbol with outline effect
+                            Text("#")
+                                .font(.system(size: 40, weight: .thin))
                                 .foregroundColor(.white)
-                                .padding(.horizontal, 5) // REDUCE: Less padding
-                                .padding(.vertical, 2)
-                                .background(
-                                    Capsule()
-                                        .fill(isStarter ? Color.green : Color.gray)
-                                )
-                            
-                            // Team logo - SMALLER
-                            TeamAssetManager.shared.logoOrFallback(for: player.team ?? "")
-                                .frame(width: 28, height: 28) // REDUCE: From 32 to 28
+                                .shadow(color: .black, radius: 0, x: -1, y: -1)
+                                .shadow(color: .black, radius: 0, x: 1, y: -1)
+                                .shadow(color: .black, radius: 0, x: -1, y: 1)
+                                .shadow(color: .black, radius: 0, x: 1, y: 1)
+                                .offset(x: 20, y: 25)
+								.opacity(0.75)
+
+                            // Big jersey number with outline effect
+                            Text(player.jerseyNumber ?? findSleeperPlayer(for: player)?.number?.description ?? "")
+                                .font(.system(size: 80, weight: .thin))
+                                .italic()
+                                .foregroundColor(.white)
+                                .shadow(color: .black, radius: 0, x: -2, y: -2)
+                                .shadow(color: .black, radius: 0, x: 2, y: -2)
+                                .shadow(color: .black, radius: 0, x: -2, y: 2)
+                                .shadow(color: .black, radius: 0, x: 2, y: 2)
+                                .shadow(color: .black, radius: 1, x: 0, y: 0)
+                                .offset(x: 0, y: 15)
                         }
+						.offset(y: 10)
+
+                        Spacer()
                     }
-                    
-                    // 🔥 FIXED LAYOUT: Points moved to trailing edge with better spacing
-                    HStack(spacing: 16) {
-                        Spacer() // Push points to trailing edge
-                        
-                        // Points display - FIXED: Only show if games have actually started for this week
-                        VStack(alignment: .trailing, spacing: 1) {
-                            if hasWeekStarted(), let points = getActualPlayerPoints(for: player), points > 0 {
-                                Text(String(format: "%.1f", points))
-                                    .font(.callout)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.green)
-                            } else {
-                                Text("--")
-                                    .font(.callout)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.gray)
-                            }
-                        }
-                    }
+                    Spacer()
                 }
             }
             
-            // 🔥 FIXED: Stat breakdown only for starters AND only if week has started
-            if isStarter, hasWeekStarted(), let actualPoints = getActualPlayerPoints(for: player), actualPoints > 0, let statLine = formatPlayerStatBreakdown(player) {
-                HStack {
-                    Text(statLine)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.black.opacity(0.4))
-                        )
+            // Team gradient background
+            RoundedRectangle(cornerRadius: 15)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple, .clear]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+            
+            // Team logo (subtle background)
+            Group {
+                if let team = player.team, let nflTeam = NFLTeam.team(for: team) {
+				   let logoSize: CGFloat = 180
+                    TeamAssetManager.shared.logoOrFallback(for: team)
+					  .frame(width: logoSize, height: logoSize)
+                        .offset(x: 30, y: -30)
+                        .opacity(hasWeekStarted() && getActualPlayerPoints(for: player) != nil ? 0.6 : 0.35)
+                        .shadow(color: nflTeam.primaryColor.opacity(0.5), radius: 10, x: 0, y: 0)
                 }
-                .padding(.horizontal, 12)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
             }
+            
+            // Main content stack - Player image
+            HStack(spacing: 12) {
+                // Player headshot
+                playerImageForPlayer(player)
+                    .frame(width: 140, height: 140)
+                    .offset(x: -15, y: -6)
+                    .zIndex(2)
+                
+                Spacer()
+                
+                // Score display (trailing) - FIXED clipping with offset
+                VStack(alignment: .trailing, spacing: 4) {
+                    Spacer()
+                    
+                    HStack(alignment: .bottom, spacing: 4) {
+                        Spacer()
+                        
+                        // Points display
+                        VStack(alignment: .trailing, spacing: 1) {
+                            if hasWeekStarted(), let points = getActualPlayerPoints(for: player), points > 0 {
+                                Text(String(format: "%.1f", points))
+								  .font(.system(size: 32, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                    .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
+                            } else {
+                                Text("")
+								  .font(.system(size: 32, weight: .light))
+                                    .foregroundColor(.gray)
+                                    .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
+                            }
+                        }
+                    }
+                    .padding(.bottom, 20)
+                    .padding(.trailing, 12)
+                    .offset(y: -10) // FIXED: Prevent clipping with stat line
+                }
+                .zIndex(3)
+            }
+            
+            // Player name and position (right-justified)
+            HStack {
+                Spacer()
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(player.fullName)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
+                    
+                    // Starter/Bench badge
+                    Text(isStarter ? "STARTER" : "BENCH")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.black.opacity(0.8))
+                                .stroke((isStarter ? Color.green : Color.gray).opacity(0.6), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                }
+            }
+			.offset(y: 30)
+//            .padding(.top, 30)
+            .padding(.trailing, 8)
+            .zIndex(4)
+            
+            // Game matchup (centered) with DRY component
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    MatchupTeamFinalView(player: player, scaleEffect: 1.1)
+                    Spacer()
+                }
+                .padding(.bottom, 45)
+            }
+            .zIndex(5)
+            
+            // Stats section with reserved space
+            VStack {
+                Spacer()
+                HStack {
+                    if isStarter, hasWeekStarted(), let actualPoints = getActualPlayerPoints(for: player), actualPoints > 0, let statLine = formatPlayerStatBreakdown(player) {
+                        Text(statLine)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.7)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(Color.black.opacity(0.7))
+                                    .stroke((NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple).opacity(0.4), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    } else {
+                        // Invisible spacer to reserve space when no stats
+                        Text(" ")
+                            .font(.system(size: 9, weight: .bold))
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.clear)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 12)
+            }
+            .zIndex(6)
         }
-        .padding(8)
-        .frame(minHeight: 85)
+        .frame(height: 140) // UNCHANGED: Keep card height at 140px
         .background(
-            TeamAssetManager.shared.teamBackground(for: player.team ?? "")
+            // Card background with team colors
+            RoundedRectangle(cornerRadius: 15)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.black, 
+                            (NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple).opacity(0.1), 
+                            Color.black
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(
+                    color: (NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple).opacity(0.3),
+                    radius: 8,
+                    x: 0,
+                    y: 0
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            // Card border with team colors
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            (NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple).opacity(0.6),
+                            .clear,
+                            (NFLTeam.team(for: player.team ?? "")?.primaryColor ?? .purple).opacity(0.6)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+                .opacity(0.8)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 15))
         .onTapGesture {
             // Find Sleeper player for stats
             if let sleeperPlayer = findSleeperPlayer(for: player) {
@@ -505,9 +648,10 @@ struct ChoppedTeamRosterView: View {
         if let sleeperPlayer = findSleeperPlayer(for: player) {
             PlayerImageView(
                 player: sleeperPlayer,
-                size: 60,
+                size: 100,
                 team: NFLTeam.team(for: player.team ?? "")
             )
+			.offset(x: -25, y: 1)
         } else {
             // Fallback with team colors
             Circle()
@@ -543,7 +687,7 @@ struct ChoppedTeamRosterView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
     
-    // MARK: - Data Loading
+    // MARK: - Data Loading - UPDATED to also load opponent
     
     private func loadTeamRoster() async {
         isLoading = true
@@ -571,12 +715,26 @@ struct ChoppedTeamRosterView: View {
                 throw ChoppedRosterError.teamNotFound
             }
             
-            // x Print("🔍 DP: Found team matchup with \(teamMatchup.starters?.count ?? 0) starters and \(teamMatchup.players?.count ?? 0) total players")
+            // NEW: Find opponent in the same matchup
+            if let matchupID = teamMatchup.matchupID {
+                print("🔍 Looking for opponent with matchupID: \(matchupID)")
+                let opponent = matchupData.first { matchup in
+                    matchup.matchupID == matchupID && matchup.rosterID != teamRanking.team.rosterID
+                }
+                
+                if let opponentMatchup = opponent {
+                    print("✅ Found opponent with rosterID: \(opponentMatchup.rosterID), points: \(opponentMatchup.points ?? 0)")
+                    // Load opponent team info from league data
+                    await loadOpponentInfo(rosterID: opponentMatchup.rosterID, points: opponentMatchup.points ?? 0.0)
+                } else {
+                    print("❌ No opponent found for matchupID: \(matchupID)")
+                }
+            } else {
+                print("❌ No matchupID found in team matchup")
+            }
             
             // Create roster from matchup data
             let roster = try await createChoppedTeamRoster(from: teamMatchup)
-            
-            // x Print("✅ DP: Created roster with \(roster.starters.count) starters and \(roster.bench.count) bench players")
             
             await MainActor.run {
                 self.rosterData = roster
@@ -595,6 +753,49 @@ struct ChoppedTeamRosterView: View {
         await loadPlayerStats()
     }
     
+    // MARK: - NFL Game Data Loading - NEW
+    
+    private func loadNFLGameData() async {
+        guard !gameDataLoaded else { return }
+        
+        // Load real NFL game data for this week
+        await MainActor.run {
+            nflGameService.fetchGameData(forWeek: week, year: AppConstants.currentSeasonYearInt)
+            gameDataLoaded = true
+        }
+    }
+
+    // NEW: Load opponent information
+    private func loadOpponentInfo(rosterID: Int, points: Double) async {
+        do {
+            // Fetch league rosters to get owner names
+            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: leagueID)
+            
+            // Find the opponent roster
+            if let opponentRoster = rosters.first(where: { $0.rosterID == rosterID }) {
+                // Fetch users to get owner names - FIXED method name
+                let users = try await SleeperAPIClient.shared.fetchUsers(leagueID: leagueID)
+                let ownerName = users.first(where: { $0.userID == opponentRoster.ownerID })?.displayName ?? "Unknown"
+                
+                // Create opponent info
+                let opponent = OpponentInfo(
+                    ownerName: ownerName,
+                    score: points,
+                    rankDisplay: "Opp", // Could calculate actual rank if needed
+                    teamColor: Color.blue, // Default color
+                    teamInitials: String(ownerName.prefix(2)).uppercased(),
+                    avatarURL: users.first(where: { $0.userID == opponentRoster.ownerID })?.avatar.flatMap { URL(string: "https://sleepercdn.com/avatars/\($0)") }
+                )
+                
+                await MainActor.run {
+                    self.opponentInfo = opponent
+                }
+            }
+        } catch {
+            print("❌ Failed to load opponent info: \(error)")
+        }
+    }
+
     private func createChoppedTeamRoster(from matchup: SleeperMatchupResponse) async throws -> ChoppedTeamRoster {
         let playerDirectory = PlayerDirectoryStore.shared
         
@@ -688,24 +889,16 @@ struct ChoppedTeamRosterView: View {
         // First try to get from loaded playerStats FOR THIS SPECIFIC WEEK
         if let stats = playerStats[sleeperPlayer.playerID] {
             // Use PPR points from Sleeper (most comprehensive)
-            if let pprPoints = stats["pts_ppr"] {
-                return pprPoints
-            } else if let halfPprPoints = stats["pts_half_ppr"] {
-                return halfPprPoints  
-            } else if let stdPoints = stats["pts_std"] {
-                return stdPoints
-            }
+            if let pprPoints = stats["pts_ppr"], pprPoints > 0 { return pprPoints }
+            if let halfPprPoints = stats["pts_half_ppr"], halfPprPoints > 0 { return halfPprPoints }
+            if let stdPoints = stats["pts_std"], stdPoints > 0 { return stdPoints }
         }
         
         // Fallback to cache - BUT ONLY FOR THE CURRENT WEEK
         if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: week) {
-            if let pprPoints = cachedStats["pts_ppr"] {
-                return pprPoints
-            } else if let halfPprPoints = cachedStats["pts_half_ppr"] {
-                return halfPprPoints
-            } else if let stdPoints = cachedStats["pts_std"] {
-                return stdPoints
-            }
+            if let pprPoints = cachedStats["pts_ppr"], pprPoints > 0 { return pprPoints }
+            if let halfPprPoints = cachedStats["pts_half_ppr"], halfPprPoints > 0 { return halfPprPoints }
+            if let stdPoints = cachedStats["pts_std"], stdPoints > 0 { return stdPoints }
         }
         
         // If no valid stats for THIS week, return nil (don't use player.currentPoints)
@@ -780,11 +973,12 @@ struct ChoppedTeamRosterView: View {
             }
             // Receiving if significant
             if let receptions = stats["rec"], receptions > 0 {
-                let recYards = stats["rec_yd"] ?? 0
-                let recTds = stats["rec_td"] ?? 0
-                breakdown.append("\(Int(receptions)) REC")
-                if recYards > 0 { breakdown.append("\(Int(recYards)) REC YD") }
-                if recTds > 0 { breakdown.append("\(Int(recTds)) REC TD") }
+                let targets = stats["rec_tgt"] ?? receptions
+                let yards = stats["rec_yd"] ?? 0
+                let tds = stats["rec_td"] ?? 0
+                breakdown.append("\(Int(receptions))/\(Int(targets)) REC")
+                if yards > 0 { breakdown.append("\(Int(yards)) YD") }
+                if tds > 0 { breakdown.append("\(Int(tds)) REC TD") }
             }
             
         case "WR", "TE":
@@ -796,11 +990,6 @@ struct ChoppedTeamRosterView: View {
                 breakdown.append("\(Int(receptions))/\(Int(targets)) REC")
                 if yards > 0 { breakdown.append("\(Int(yards)) YD") }
                 if tds > 0 { breakdown.append("\(Int(tds)) TD") }
-                
-                // Add pass first downs
-                if let passFd = stats["rec_fd"], passFd > 0 {
-                    breakdown.append("\(Int(passFd)) PASS FD")
-                }
             }
             // Rushing if significant for WRs
             if position == "WR", let rushYards = stats["rush_yd"], rushYards > 0 {
@@ -896,9 +1085,17 @@ struct ChoppedTeamRosterView: View {
     
     private func findSleeperPlayer(for player: FantasyPlayer) -> SleeperPlayer? {
         if let sleeperID = player.sleeperID {
-            return PlayerDirectoryStore.shared.player(for: sleeperID)
+            let sleeperPlayer = PlayerDirectoryStore.shared.player(for: sleeperID)
+            if sleeperPlayer == nil {
+                print("⚠️ No SleeperPlayer found for \(player.fullName) with ID: \(sleeperID)")
+            } else if sleeperPlayer?.number == nil {
+                print("⚠️ SleeperPlayer \(player.fullName) found but has no jersey number")
+            }
+            return sleeperPlayer
+        } else {
+            print("⚠️ No sleeperID found for player: \(player.fullName)")
+            return nil
         }
-        return nil
     }
 }
 
@@ -921,4 +1118,14 @@ enum ChoppedRosterError: LocalizedError {
             return "Invalid roster data"
         }
     }
+}
+
+// NEW: Supporting model for opponent info - MOVED to bottom
+private struct OpponentInfo {
+    let ownerName: String
+    let score: Double
+    let rankDisplay: String
+    let teamColor: Color
+    let teamInitials: String
+    let avatarURL: URL?
 }

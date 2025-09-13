@@ -280,6 +280,11 @@ extension FantasyViewModel {
                 let name1 = player1.fullName.lowercased()
                 let name2 = player2.fullName.lowercased()
                 return highToLow ? name1 > name2 : name1 < name2
+                
+            case .team: // NEW: Team sorting
+                let team1 = player1.team?.lowercased() ?? ""
+                let team2 = player2.team?.lowercased() ?? ""
+                return highToLow ? team1 > team2 : team1 < team2
             }
         }
     }
