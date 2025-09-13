@@ -15,6 +15,7 @@ import SwiftUI
 /// - Elimination status with color coding
 /// - Survival percentage display (Sleeper-style)
 /// - Current vs projected scoring indicators
+/// - Status-appropriate gradient backgrounds
 /// - 🔥 NEW: Tap to view team roster
 struct SurvivalCard: View {
     let ranking: FantasyTeamRanking
@@ -117,10 +118,29 @@ struct SurvivalCard: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.1))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            statusGradientColor.opacity(0.15),
+                            statusGradientColor.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(ranking.eliminationStatus.color.opacity(0.3), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    statusGradientColor.opacity(0.4),
+                                    statusGradientColor.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1.5
+                        )
                 )
         )
         // 🔥 NEW: Make entire card tappable
@@ -150,6 +170,24 @@ struct SurvivalCard: View {
             return Color.orange
         } else {
             return Color.red
+        }
+    }
+    
+    /// Status-appropriate gradient color based on elimination status
+    private var statusGradientColor: Color {
+        switch ranking.eliminationStatus {
+        case .safe:
+            return Color.green
+        case .warning:
+            return Color.blue
+        case .danger:
+            return Color.orange
+        case .critical:
+            return Color.red
+        case .champion:
+            return Color.yellow
+        case .eliminated:
+            return Color.gray
         }
     }
     

@@ -160,13 +160,14 @@ struct ChoppedLeaderboardView: View {
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [.red, .orange, .red],
+                                colors: [.red, .orange, .yellow, .orange, .red],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
+                        .shadow(color: .red.opacity(0.5), radius: 2, x: 0, y: 1)
                 }
                 
                 Text("🔥")
@@ -175,95 +176,243 @@ struct ChoppedLeaderboardView: View {
                     .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.5), value: viewModel.pulseAnimation)
             }
             
-            // Week and survival info (updated for pre-game state)
-            HStack(spacing: 24) {
-                VStack {
-                    Text(viewModel.weekDisplay)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text(viewModel.weekStatusDisplay)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(viewModel.hasWeekStarted ? .gray : .orange)
-                        .tracking(1)
-                }
+            // WEEK ELIMINATION ROUND HEADER with intense gradients
+            VStack(spacing: 8) {
+                Text("WEEK \(viewModel.choppedSummary.week)")
+                    .font(.system(size: 18, weight: .black))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.white, .gray, .white],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .tracking(2)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                 
-                Rectangle()
-                    .fill(Color.red)
-                    .frame(width: 2, height: 40)
-                
-                VStack {
+                Text("ELIMINATION ROUND")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.red, .orange, .red],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .tracking(3)
+                    .shadow(color: .red.opacity(0.3), radius: 1, x: 0, y: 0)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.red.opacity(0.2),
+                                Color.black,
+                                Color.red.opacity(0.1),
+                                Color.black
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.red, .orange, .red],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: 2
+                            )
+                            .opacity(viewModel.pulseAnimation ? 1.0 : 0.7)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: viewModel.pulseAnimation)
+                    )
+            )
+            
+            // Week and survival info with enhanced backgrounds
+            HStack(spacing: 8) {
+                // SURVIVORS stat card with green gradient
+                VStack(spacing: 4) {
                     Text(viewModel.survivorsCount)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.green)
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.green, .mint, .green],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                     
                     Text("SURVIVORS")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.gray)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.green)
                         .tracking(1)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.green.opacity(0.2),
+                                    Color.green.opacity(0.05)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.green.opacity(0.4), lineWidth: 1)
+                        )
+                )
                 
+                // Red separator with glow
                 Rectangle()
-                    .fill(Color.red)
+                    .fill(
+                        LinearGradient(
+                            colors: [.clear, .red, .red, .clear],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
                     .frame(width: 2, height: 40)
+                    .shadow(color: .red.opacity(0.6), radius: 2, x: 0, y: 0)
                 
-                VStack {
+                // ELIMINATED stat card with red gradient
+                VStack(spacing: 4) {
                     Text(viewModel.eliminatedCount)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.red)
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.red, .pink, .red],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                     
                     Text("ELIMINATED")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.gray)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.red)
                         .tracking(1)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.red.opacity(0.2),
+                                    Color.red.opacity(0.05)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.red.opacity(0.4), lineWidth: 1)
+                        )
+                )
             }
             
-            // Show pre-game message if week hasn't started
+            // Show pre-game message if week hasn't started with enhanced styling
             if !viewModel.hasWeekStarted {
                 HStack(spacing: 8) {
                     Text("⏰")
                         .font(.system(size: 16))
+                        .scaleEffect(viewModel.pulseAnimation ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: viewModel.pulseAnimation)
                     
                     Text("GAMES HAVEN'T STARTED YET")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.orange, .yellow, .orange],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .tracking(1)
                     
                     Text("⏰")
                         .font(.system(size: 16))
+                        .scaleEffect(viewModel.pulseAnimation ? 1.1 : 1.0)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.3), value: viewModel.pulseAnimation)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.vertical, 10)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.orange.opacity(0.1))
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.orange.opacity(0.2),
+                                    Color.yellow.opacity(0.1),
+                                    Color.orange.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.orange, .yellow, .orange],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                                .opacity(viewModel.pulseAnimation ? 1.0 : 0.6)
+                                .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: viewModel.pulseAnimation)
                         )
                 )
+                .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 24)
         .background(
+            // Main header background with apocalyptic gradients
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.gray.opacity(0.1))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.black,
+                            Color.red.opacity(0.1),
+                            Color.black,
+                            Color.orange.opacity(0.05),
+                            Color.black
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(
                             LinearGradient(
-                                colors: [.red, .orange, .red],
+                                colors: [.red, .orange, .yellow, .orange, .red],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            lineWidth: 2
+                            lineWidth: 3
                         )
+                        .opacity(viewModel.pulseAnimation ? 1.0 : 0.8)
+                        .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: viewModel.pulseAnimation)
                 )
         )
         .padding(.horizontal, 16)
         .padding(.top, 16)
+        .shadow(color: .red.opacity(0.2), radius: 8, x: 0, y: 4)
     }
     
     // MARK: -> SURVIVAL STATS (Only show if week has started)
@@ -343,7 +492,13 @@ struct ChoppedLeaderboardView: View {
             
             Text(value)
                 .font(.system(size: 16, weight: .black))
-                .foregroundColor(color)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.7), color],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
             
@@ -353,16 +508,33 @@ struct ChoppedLeaderboardView: View {
                 .tracking(0.3)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 6) // Reduced from 8 to 6
+        .padding(.vertical, 6)
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.05))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            color.opacity(0.15),
+                            color.opacity(0.05)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(color.opacity(0.2), lineWidth: 1)
+                        .stroke(
+                            LinearGradient(
+                                colors: [color.opacity(0.4), color.opacity(0.2)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1
+                        )
                 )
         )
+        .shadow(color: color.opacity(0.2), radius: 2, x: 0, y: 1)
     }
     
     // MARK: -> COMPACT PERSONAL STAT CARD

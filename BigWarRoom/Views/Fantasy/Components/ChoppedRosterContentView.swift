@@ -1,0 +1,76 @@
+//
+//  ChoppedRosterContentView.swift
+//  BigWarRoom
+//
+//  🏈 CHOPPED ROSTER CONTENT VIEW 🏈
+//  Main content view for roster display
+//
+
+import SwiftUI
+
+/// **ChoppedRosterContentView**
+/// 
+/// Main content container for the roster display
+struct ChoppedRosterContentView: View {
+    let roster: ChoppedTeamRoster
+    let teamRanking: FantasyTeamRanking
+    let week: Int
+    let parentViewModel: ChoppedTeamRosterViewModel
+    let onPlayerTap: (SleeperPlayer) -> Void
+    
+    @Binding var sortingMethod: MatchupSortingMethod
+    @Binding var sortHighToLow: Bool
+    @Binding var showStartingLineup: Bool
+    @Binding var showBench: Bool
+    
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                // Team header with score
+                ChoppedTeamHeaderCard(
+                    teamRanking: teamRanking,
+                    week: week,
+                    roster: roster
+                )
+                
+                // Sorting controls
+                PlayerSortingControlsView(
+                    sortingMethod: $sortingMethod, 
+                    sortHighToLow: $sortHighToLow
+                )
+
+                // Starting Lineup Section
+                if !roster.starters.isEmpty {
+                    ChoppedStartingLineupSection(
+                        starters: parentViewModel.sortPlayers(roster.starters, by: sortingMethod, highToLow: sortHighToLow),
+                        parentViewModel: parentViewModel,
+                        onPlayerTap: onPlayerTap,
+                        showStartingLineup: $showStartingLineup
+                    )
+                }
+                
+                // Bench Section
+                if !roster.bench.isEmpty {
+                    ChoppedBenchSection(
+                        bench: parentViewModel.sortPlayers(roster.bench, by: sortingMethod, highToLow: sortHighToLow),
+                        parentViewModel: parentViewModel,
+                        onPlayerTap: onPlayerTap,
+                        showBench: $showBench
+                    )
+                }
+            }
+            .padding()
+        }
+        .task {
+            // Load NFL game data for real game times
+            await parentViewModel.loadNFLGameData()
+        }
+    }
+}
+
+#Preview {
+    // Cannot preview without proper models setup
+    Text("ChoppedRosterContentView Preview")
+        .foregroundColor(.white)
+        .background(Color.black)
+}
