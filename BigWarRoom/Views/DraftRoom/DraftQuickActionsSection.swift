@@ -35,7 +35,7 @@ struct DraftQuickActionsSection: View {
                 subtitle: "Matchups & leagues",
                 icon: "football",
                 color: .green,
-                action: { selectedTab = 2 }
+                action: { selectedTab = 7 } // Updated to new Fantasy tab index
             )
             
             // Navigate to Draft Board

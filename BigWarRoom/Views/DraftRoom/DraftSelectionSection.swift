@@ -61,9 +61,9 @@ struct DraftSelectionSection: View {
                             onSelect: {
                                 Task { 
                                     await viewModel.selectDraft(leagueWrapper)
-                                    // Navigate to Fantasy tab after selecting league
+                                    // Navigate to Fantasy tab after selecting league (updated index)
                                     await MainActor.run {
-                                        selectedTab = 2 // Fantasy tab is now index 2
+                                        selectedTab = 7 // Fantasy tab is now index 7
                                         // x Print("🏈 Auto-navigated to Fantasy tab after selecting league: \(leagueWrapper.league.name)")
                                     }
                                 }

@@ -23,7 +23,12 @@ struct NonMicroCardView: View {
         Button(action: {
             handleTap()
         }) {
-            cardContent
+            // 🔥 CONDITIONAL CONTENT: Show eliminated state or regular card
+            if isMyManagerEliminated {
+                eliminatedCardContent
+            } else {
+                cardContent
+            }
         }
         .buttonStyle(PlainButtonStyle())
         .scaleEffect(cardScale)
@@ -34,8 +39,159 @@ struct NonMicroCardView: View {
             if matchup.isLive {
                 startLiveAnimations()
             }
+            
+            // 🔥 NEW: Start eliminated animation if eliminated
+            if isMyManagerEliminated {
+                startEliminatedAnimation()
+            }
         }
     }
+    
+    // MARK: -> Eliminated Card Content
+    
+    private var eliminatedCardContent: some View {
+        VStack(spacing: 6) {
+            // Header with league info (full league name)
+            HStack {
+                // League name with platform logo - FULL WIDTH
+                HStack(spacing: 6) {
+                    Group {
+                        switch matchup.league.source {
+                        case .espn:
+                            AppConstants.espnLogo
+                                .scaleEffect(0.4)
+                        case .sleeper:
+                            AppConstants.sleeperLogo
+                                .scaleEffect(0.4)
+                        }
+                    }
+                    .frame(width: 16, height: 16)
+                    
+                    Text("\(matchup.league.league.name)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                
+                Spacer()
+            }
+            
+            // CHOPPED badge - second row
+            HStack {
+                if matchup.isChoppedLeague {
+                    Text("🔥 CHOPPED")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.orange.opacity(0.2))
+                        )
+                }
+                
+                Spacer()
+            }
+            
+            // Main eliminated content - COMPACT
+            VStack(spacing: 4) {
+                // ELIMINATED text without skulls (fits one line)
+                Text("ELIMINATED")
+                    .font(.system(size: 16, weight: .black))
+                    .foregroundColor(.white)
+                    .tracking(1.5)
+                
+                // Skulls on separate line
+                HStack(spacing: 8) {
+                    Text("💀")
+                        .font(.system(size: 24))
+                        .scaleEffect(eliminatedPulse ? 1.1 : 1.0)
+                    
+                    Text("☠️")
+                        .font(.system(size: 24))
+                        .scaleEffect(eliminatedPulse ? 1.1 : 1.0)
+                }
+                
+                // Week and manager info - COMPACT
+                VStack(spacing: 2) {
+                    if let week = myEliminationWeek {
+                        Text("Week \(week)")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    
+                    // Manager name (if available)
+                    if let myTeam = matchup.myTeam {
+                        Text(myTeam.ownerName)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+            }
+            
+            // Footer - just time (NO SPACER!)
+            HStack {
+                HStack(spacing: 2) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray)
+                    
+                    Text(timeAgo(matchup.lastUpdated))
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                // Tap hint
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.gray.opacity(0.6))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .background(eliminatedCardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [.red, .black, .red],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2.0
+                )
+        )
+        .shadow(color: .red.opacity(0.4), radius: 8, x: 0, y: 2)
+        .frame(height: 142)
+    }
+    
+    // MARK: -> Eliminated Card Background
+    
+    private var eliminatedCardBackground: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                // 🔥 ELIMINATED GRADIENT: Use gpRedPink
+                LinearGradient(
+                    colors: [
+                        Color.gpRedPink.opacity(0.8),
+                        Color.black.opacity(0.9),
+                        Color.gpRedPink.opacity(0.6)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.4)) // Darken for readability
+            )
+    }
+    
+    @State private var eliminatedPulse: Bool = false
     
     private var cardContent: some View {
         VStack(spacing: 8) {
@@ -137,11 +293,11 @@ struct NonMicroCardView: View {
     
     private var compactMatchupContent: some View {
         VStack(spacing: 12) {
-            // Teams row - HORIZONTAL layout
+            // 🔥 FIXED: Teams row - HOME on LEFT, AWAY on RIGHT (respecting actual home/away designations)
             HStack(spacing: 8) {
-                // My team
-                if let myTeam = matchup.myTeam {
-                    compactTeamSection(myTeam, isMyTeam: true)
+                // 🔥 FIXED: Home team on LEFT (regardless of if it's me or opponent)
+                if let homeTeam = getHomeTeam() {
+                    compactTeamSection(homeTeam, isMyTeam: homeTeam.id == matchup.myTeam?.id)
                 }
                 
                 // VS separator
@@ -150,9 +306,9 @@ struct NonMicroCardView: View {
                     .foregroundColor(.white.opacity(0.6))
                     .frame(width: 24)
                 
-                // Opponent team
-                if let opponentTeam = matchup.opponentTeam {
-                    compactTeamSection(opponentTeam, isMyTeam: false)
+                // 🔥 FIXED: Away team on RIGHT (regardless of if it's me or opponent)
+                if let awayTeam = getAwayTeam() {
+                    compactTeamSection(awayTeam, isMyTeam: awayTeam.id == matchup.myTeam?.id)
                 }
             }
             
@@ -365,6 +521,67 @@ struct NonMicroCardView: View {
     
     // MARK: -> Computed Properties
     
+    // 🔥 USE COMPUTED PROPERTY: Check if MY manager is eliminated
+    private var isMyManagerEliminated: Bool {
+        return matchup.isMyManagerEliminated
+    }
+    
+    private var myEliminationWeek: Int? {
+        return matchup.myEliminationWeek
+    }
+    
+    // 🔥 ELIMINATED overlay for non-micro cards
+    private var nonMicroEliminatedOverlay: some View {
+        VStack {
+            HStack {
+                Spacer()
+                
+                // 🔥 ELIMINATED BADGE - Top right corner
+                HStack(spacing: 4) {
+                    Text("💀")
+                        .font(.system(size: 14))
+                    
+                    Text("ELIMINATED")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundColor(.white)
+                        .tracking(1)
+                    
+                    Text("☠️")
+                        .font(.system(size: 14))
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.red.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .shadow(color: .red.opacity(0.6), radius: 4)
+            }
+            .padding(.top, 8)
+            .padding(.trailing, 12)
+            
+            Spacer()
+            
+            // Week eliminated at bottom if available
+            if let week = myEliminationWeek {
+                HStack {
+                    Spacer()
+                    Text("Eliminated Week \(week)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.red.opacity(0.8))
+                        .padding(.bottom, 8)
+                        .padding(.trailing, 12)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(false) // Allow taps to pass through
+    }
+    
     private var isLiveGame: Bool {
         // Use the centralized UnifiedMatchup.isLive property
         return matchup.isLive
@@ -488,6 +705,13 @@ struct NonMicroCardView: View {
         }
     }
     
+    // 🔥 NEW: Eliminated animation
+    private func startEliminatedAnimation() {
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+            eliminatedPulse = true
+        }
+    }
+    
     private func timeAgo(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
@@ -508,5 +732,14 @@ struct NonMicroCardView: View {
             )
             .scaleEffect(matchup.isLive ? 1.0 : 0.9)
             .opacity(matchup.isLive ? 1.0 : 0.6)
+    }
+    
+    // 🔥 FIXED: Helper functions to get home/away teams from actual FantasyMatchup data
+    private func getHomeTeam() -> FantasyTeam? {
+        return matchup.fantasyMatchup?.homeTeam
+    }
+    
+    private func getAwayTeam() -> FantasyTeam? {
+        return matchup.fantasyMatchup?.awayTeam
     }
 }

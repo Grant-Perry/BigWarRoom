@@ -402,73 +402,68 @@ struct ChoppedTeamRosterView: View {
                 // Player headshot
                 playerImageForPlayer(player)
                 
-                // Player info
+                // Player info - FIXED LAYOUT with better name spacing
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 8) {
-                        // Player name and position
+                        // Player name and position - IMPROVED LAYOUT
                         VStack(alignment: .leading, spacing: 2) {
                             Text(player.fullName)
                                 .font(.callout)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             
                             Text(player.position)
                                 .font(.caption2)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                         
-                        Spacer()
-                        
-                        // Starter/Bench badge
-                        Text(isStarter ? "STARTER" : "BENCH")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(isStarter ? Color.green : Color.gray)
-                            )
-                        
-                        // Team logo
-                        TeamAssetManager.shared.logoOrFallback(for: player.team ?? "")
-                            .frame(width: 32, height: 32)
+                        // Starter/Bench badge - MOVED to vertical stack to save horizontal space
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text(isStarter ? "STARTER" : "BENCH")
+                                .font(.system(size: 9, weight: .bold)) // REDUCE: Smaller font
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 5) // REDUCE: Less padding
+                                .padding(.vertical, 2)
+                                .background(
+                                    Capsule()
+                                        .fill(isStarter ? Color.green : Color.gray)
+                                )
+                            
+                            // Team logo - SMALLER
+                            TeamAssetManager.shared.logoOrFallback(for: player.team ?? "")
+                                .frame(width: 28, height: 28) // REDUCE: From 32 to 28
+                        }
                     }
                     
-                    // Points only (REMOVED fake projections)
+                    // 🔥 FIXED LAYOUT: Points moved to trailing edge with better spacing
                     HStack(spacing: 16) {
-                        if let points = player.currentPoints, points > 0 {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Points")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                        Spacer() // Push points to trailing edge
+                        
+                        // Points display - FIXED: Only show if games have actually started for this week
+                        VStack(alignment: .trailing, spacing: 1) {
+                            if hasWeekStarted(), let points = getActualPlayerPoints(for: player), points > 0 {
                                 Text(String(format: "%.1f", points))
                                     .font(.callout)
                                     .fontWeight(.bold)
                                     .foregroundColor(.green)
-                            }
-                        } else {
-                            // Show 0.0 points if no points scored yet
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text("Points")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text("0.0")
+                            } else {
+                                Text("--")
                                     .font(.callout)
                                     .fontWeight(.bold)
                                     .foregroundColor(.gray)
                             }
                         }
-                        
-                        
-                        Spacer()
                     }
                 }
             }
             
-            // 🔥 NEW: Stat breakdown for starters
-            if isStarter, player.currentPoints ?? 0.0 > 0, let statLine = formatPlayerStatBreakdown(player) {
+            // 🔥 FIXED: Stat breakdown only for starters AND only if week has started
+            if isStarter, hasWeekStarted(), let actualPoints = getActualPlayerPoints(for: player), actualPoints > 0, let statLine = formatPlayerStatBreakdown(player) {
                 HStack {
                     Text(statLine)
                         .font(.system(size: 9, weight: .bold))
@@ -489,7 +484,7 @@ struct ChoppedTeamRosterView: View {
             }
         }
         .padding(8)
-        .frame(height: 85)
+        .frame(minHeight: 85)
         .background(
             TeamAssetManager.shared.teamBackground(for: player.team ?? "")
         )
@@ -660,8 +655,63 @@ struct ChoppedTeamRosterView: View {
         return ChoppedTeamRoster(starters: starters, bench: bench)
     }
 
-    // MARK: - Helper Methods (All methods placed here to avoid scope issues)
+    // MARK: - Week Validation Helper
+    
+    /// 🔥 NEW: Check if the current week has actually started (games have been played)
+    private func hasWeekStarted() -> Bool {
+        // For now, check if we have any actual stats data for this week
+        // If playerStats is empty or no players have points, week hasn't started
+        if playerStats.isEmpty {
+            return false
+        }
         
+        // Check if any players in this roster have actual points for this week
+        let hasAnyPoints = playerStats.values.contains { stats in
+            if let pprPoints = stats["pts_ppr"], pprPoints > 0 { return true }
+            if let halfPprPoints = stats["pts_half_ppr"], halfPprPoints > 0 { return true }
+            if let stdPoints = stats["pts_std"], stdPoints > 0 { return true }
+            return false
+        }
+        
+        return hasAnyPoints
+    }
+
+    // MARK: - Helper Methods (All methods placed here to avoid scope issues)
+    
+    /// 🔥 FIXED: Get actual player points ONLY if week has started
+    private func getActualPlayerPoints(for player: FantasyPlayer) -> Double? {
+        // If week hasn't started, don't show any points
+        guard hasWeekStarted() else { return nil }
+        
+        guard let sleeperPlayer = findSleeperPlayer(for: player) else { return nil }
+        
+        // First try to get from loaded playerStats FOR THIS SPECIFIC WEEK
+        if let stats = playerStats[sleeperPlayer.playerID] {
+            // Use PPR points from Sleeper (most comprehensive)
+            if let pprPoints = stats["pts_ppr"] {
+                return pprPoints
+            } else if let halfPprPoints = stats["pts_half_ppr"] {
+                return halfPprPoints  
+            } else if let stdPoints = stats["pts_std"] {
+                return stdPoints
+            }
+        }
+        
+        // Fallback to cache - BUT ONLY FOR THE CURRENT WEEK
+        if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: week) {
+            if let pprPoints = cachedStats["pts_ppr"] {
+                return pprPoints
+            } else if let halfPprPoints = cachedStats["pts_half_ppr"] {
+                return halfPprPoints
+            } else if let stdPoints = cachedStats["pts_std"] {
+                return stdPoints
+            }
+        }
+        
+        // If no valid stats for THIS week, return nil (don't use player.currentPoints)
+        return nil
+    }
+    
     /// Format player stat breakdown based on position - same method as FantasyMatchupDetailView
     private func formatPlayerStatBreakdown(_ player: FantasyPlayer) -> String? {
         guard let sleeperPlayer = findSleeperPlayer(for: player) else {
@@ -786,11 +836,12 @@ struct ChoppedTeamRosterView: View {
         return breakdown.isEmpty ? nil : breakdown.joined(separator: ", ")
     }
     
-    /// Load weekly player stats for detailed breakdown display only
+    /// Load weekly player stats for detailed breakdown display only - FIXED week validation
     private func loadPlayerStats() async {
         guard playerStats.isEmpty else { return }
         
-        let currentYear = "2024"
+        // 🔥 FIXED: Use SSOT for current season year
+        let currentYear = AppConstants.currentSeasonYearInt
         
         guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }
         
@@ -801,27 +852,29 @@ struct ChoppedTeamRosterView: View {
             await MainActor.run {
                 self.playerStats = statsData
             }
-            // x Print("🔥 DP: Loaded \(statsData.count) player stat records for breakdown display")
             
-            // Debug print specific players for investigation
-            for (playerID, stats) in statsData {
-                if let player = PlayerDirectoryStore.shared.player(for: playerID) {
-                    let playerName = player.fullName
-                    if playerName.lowercased().contains("mccarthy") || 
-                       playerName.lowercased().contains("j.j.") ||
-                       playerName.lowercased() == "j. j. mccarthy" {
-                        // x Print("🔍 DP: Found J.J. McCarthy stats - ID: \(playerID), Name: \(playerName), Stats: \(stats)")
-                    }
-                }
+            // 🔥 DEBUG: Check if this week actually has data
+            let totalPointsThisWeek = statsData.values.reduce(0) { total, stats in
+                let playerPoints = stats["pts_ppr"] ?? stats["pts_half_ppr"] ?? stats["pts_std"] ?? 0
+                return total + playerPoints
+            }
+            
+            print("🔥 Week \(week) Stats Summary (Year \(currentYear) via SSOT): \(statsData.count) players, Total Points: \(totalPointsThisWeek)")
+            
+            if totalPointsThisWeek == 0 {
+                print("⚠️ Week \(week) has no scoring data yet - games haven't started!")
             }
             
         } catch {
-            // x Print("❌ DP: Failed to load player stats: \(error)")
+            print("❌ Failed to load player stats for week \(week), year \(currentYear): \(error)")
         }
     }
     
     private func calculatePlayerPoints(playerID: String) -> Double? {
-        // Use cached stats if available
+        // 🔥 FIXED: Only return points if week has started
+        guard hasWeekStarted() else { return nil }
+        
+        // Use cached stats if available FOR THIS SPECIFIC WEEK
         if let stats = PlayerStatsCache.shared.getPlayerStats(playerID: playerID, week: week) {
             // Use PPR points from Sleeper
             if let pprPoints = stats["pts_ppr"] {
@@ -833,7 +886,7 @@ struct ChoppedTeamRosterView: View {
             }
         }
         
-        // If no real stats available, return nil (will show as 0.0)
+        // If no valid stats for this week, return nil
         return nil
     }
     

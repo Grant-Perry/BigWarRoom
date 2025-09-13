@@ -43,9 +43,9 @@ struct BigWarRoomModified: View {
     
     // Initialize with conditional starting tab
     init(startOnSettings: Bool) {
-        // If user needs onboarding → start on Settings (8)
+        // If user needs onboarding → start on Settings (3)
         // If user has credentials → start on Mission Control (0)
-        _selectedTab = State(initialValue: startOnSettings ? 8 : 0)
+        _selectedTab = State(initialValue: startOnSettings ? 3 : 0)
     }
     
     var body: some View {
@@ -67,29 +67,21 @@ struct BigWarRoomModified: View {
                     }
                     .tag(1)
                 
-                // Fantasy Tab (moved to position 2)
-                FantasyMatchupListView(draftRoomViewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "football")
-                        Text("Fantasy")
-                    }
-                    .tag(2)
-                
-                // All Live Players Tab - MOVED TO TAG 3
+                // All Live Players Tab
                 AllLivePlayersView()
                     .tabItem {
                         Image(systemName: "chart.bar.fill")
                         Text("Live Players")
                     }
-                    .tag(3)
+                    .tag(2)
                 
-                // Live Draft Picks Tab - MOVED TO TAG 7
-                LiveDraftPicksView(viewModel: viewModel)
+                // Settings Tab - 🔥 MOVED UP from position 8 to position 3
+                AppSettingsView()
                     .tabItem {
-                        Image(systemName: "list.bullet.rectangle.portrait")
-                        Text("Live Picks")
+                        Image(systemName: "gearshape")
+                        Text("Settings")
                     }
-                    .tag(7)
+                    .tag(3)
                 
                 // Draft Board Tab
                 LeagueDraftView(viewModel: viewModel)
@@ -99,7 +91,7 @@ struct BigWarRoomModified: View {
                     }
                     .tag(4)
                 
-                // AI Pick Suggestions Tab (moved to position 5)
+                // AI Pick Suggestions Tab
                 AIPickSuggestionsView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "wand.and.stars")
@@ -115,11 +107,19 @@ struct BigWarRoomModified: View {
                     }
                     .tag(6)
                 
-                // Settings Tab - New proper Settings view (moved to position 8)
-                AppSettingsView()
+                // Fantasy Tab - RESTORED at second-to-last position
+                FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
-                        Image(systemName: "gearshape")
-                        Text("Settings")
+                        Image(systemName: "football")
+                        Text("Fantasy")
+                    }
+                    .tag(7)
+                
+                // Live Draft Picks Tab - 🔥 MOVED DOWN from position 3 to position 8 (last)
+                LiveDraftPicksView(viewModel: viewModel)
+                    .tabItem {
+                        Image(systemName: "list.bullet.rectangle.portrait")
+                        Text("Live Picks")
                     }
                     .tag(8)
             }

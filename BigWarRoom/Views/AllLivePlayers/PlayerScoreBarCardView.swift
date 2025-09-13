@@ -61,7 +61,10 @@ struct PlayerScoreBarCardView: View {
                 }
             } else {
                 // If not animating in, set final state immediately
-                scoreBarWidth = playerEntry.scoreBarWidth
+                // Force a small delay to ensure view is fully laid out
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    scoreBarWidth = playerEntry.scoreBarWidth
+                }
             }
         }
         .onChange(of: playerEntry.scoreBarWidth) { _, newWidth in
@@ -226,35 +229,57 @@ struct PlayerScoreBarCardView: View {
     
     private var teamBackgroundView: some View {
         ZStack {
-            // Base animated scoreBar
+            // Base background
             RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, scoreBarColor],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .mask(
-                    HStack(spacing: 0) {
-                        Rectangle()
-                            .frame(width: max(
-                                (UIScreen.main.bounds.width - 32) * 0.15, // Minimum 15% width
-                                (UIScreen.main.bounds.width - 32) * scoreBarWidth
-                            ))
-                        
-                        Spacer()
-                    }
-                )
+                .fill(Color(.systemGray6).opacity(0.2))
+            
+            // Score bar with sharp trailing edge for clear value representation
+            HStack(spacing: 0) {
+                ZStack {
+                    // Main gradient background with abrupt trailing edge
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(stops: [
+                                    .init(color: Color.clear, location: 0.0),                    // Start clear
+                                    .init(color: originalScoreBarColor.opacity(0.3), location: 0.3), // Build up color
+                                    .init(color: originalScoreBarColor.opacity(0.5), location: 0.7), // Peak color
+                                    .init(color: originalScoreBarColor.opacity(0.6), location: 0.95), // Strong at edge
+                                    .init(color: originalScoreBarColor.opacity(0.6), location: 1.0)   // Sharp cutoff
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    // Subtle overlay (toned down brightness)
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.white.opacity(0.03),  // Much more subtle
+                                    Color.clear,
+                                    Color.white.opacity(0.01)   // Very subtle
+                                ]),
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                .frame(width: calculateScoreBarWidth())
+                .clipShape(RoundedRectangle(cornerRadius: 12)) // Ensure sharp edge
+                
+                Spacer()
+            }
             
             // Team-specific background overlay
             Group {
                 if let team = NFLTeam.team(for: playerEntry.player.team ?? "") {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(team.backgroundColor.opacity(0.1))
+                        .fill(team.backgroundColor.opacity(0.05))
                 } else {
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray6))
+                        .fill(Color(.systemGray6).opacity(0.05))
                 }
             }
             
@@ -267,6 +292,19 @@ struct PlayerScoreBarCardView: View {
                 .padding(.trailing, 8)
                 .padding(.top, 6)
             }
+        }
+    }
+    
+    private func calculateScoreBarWidth() -> CGFloat {
+        let screenWidth = UIScreen.main.bounds.width - 32 // Account for padding
+        let minimumWidth = screenWidth * 0.15 // 15% minimum
+        let calculatedWidth = screenWidth * scoreBarWidth
+        
+        // Ensure we always have at least the minimum width if player has any score
+        if playerEntry.currentScore > 0 {
+            return max(minimumWidth, calculatedWidth)
+        } else {
+            return max(minimumWidth, calculatedWidth)
         }
     }
     
@@ -283,6 +321,15 @@ struct PlayerScoreBarCardView: View {
             .fill(color)
             .frame(width: 8, height: 8)
             .opacity(0.7)
+    }
+    
+    /// Original score bar colors (back to .gpGreen and blue)
+    private var originalScoreBarColor: Color {
+        let percentage = playerEntry.scoreBarWidth
+        if percentage >= 0.8 { return .gpGreen }        // Elite - Green
+        else if percentage >= 0.5 { return .blue }       // Good - Blue  
+        else if percentage >= 0.25 { return .orange }    // Okay - Orange
+        else { return .red }                             // Poor - Red
     }
     
     private var scoreBarColor: Color {

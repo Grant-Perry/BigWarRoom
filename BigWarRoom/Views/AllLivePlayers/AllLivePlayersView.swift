@@ -33,8 +33,23 @@ struct AllLivePlayersView: View {
                 }
             }
             .navigationTitle("All Live Players")
-            .navigationBarTitleDisplayMode(.inline) // Changed from .large to .inline to save space
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if viewModel.matchupsHubViewModel.myMatchups.isEmpty && !viewModel.isLoading {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Refresh") {
+                            loadTask?.cancel()
+                            loadTask = Task {
+                                await viewModel.matchupsHubViewModel.loadAllMatchups()
+                                await viewModel.loadAllPlayers()
+                            }
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+            }
             .refreshable {
+                await viewModel.matchupsHubViewModel.loadAllMatchups()
                 await viewModel.refresh()
             }
         }
@@ -42,6 +57,10 @@ struct AllLivePlayersView: View {
             // Cancel any existing task before starting new one
             loadTask?.cancel()
             loadTask = Task {
+                // Ensure leagues are loaded first
+                await viewModel.matchupsHubViewModel.loadAllMatchups()
+                
+                // Then load players
                 await viewModel.loadAllPlayers()
             }
         }
@@ -222,34 +241,142 @@ struct AllLivePlayersView: View {
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 32) {
+            Spacer()
+            
+            // Clean spinning football
             FantasyLoadingIndicator()
                 .scaleEffect(1.2)
             
-            Text("Loading players from all leagues...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+            VStack(spacing: 12) {
+                Text("Loading Players")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("Fetching live player data from your leagues...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black.ignoresSafeArea())
     }
     
     // MARK: - Empty State View
     
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "person.3.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.secondary)
-            
-            Text("No Active Players")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            Text("No players found for the selected position. Try selecting a different position or check your league connections.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+        VStack(spacing: 24) {
+            // Smart empty state based on why there are no players
+            if viewModel.matchupsHubViewModel.myMatchups.isEmpty {
+                // No leagues connected - improved UX
+                VStack(spacing: 20) {
+                    // Spinning football while trying to connect
+                    if viewModel.isLoading {
+                        FantasyLoadingIndicator()
+                            .scaleEffect(1.2)
+                        
+                        VStack(spacing: 8) {
+                            Text("Connecting to Leagues...")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            
+                            Text("Searching for your connected leagues")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        // No connection established
+                        Image(systemName: "link.circle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+                        
+                        Text("No Leagues Connected")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        
+                        VStack(spacing: 12) {
+                            Text("Connect to your leagues in Mission Control first.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Text("NOTE: If connection cannot be established, re-connect your ESPN/Sleeper accounts in Mission Control.")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
+                        
+                        // Smaller, more appropriately sized button
+                        Button(action: {
+                            // Send notification to switch to Mission Control tab
+                            NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
+                        }) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.left.circle.fill")
+                                    .font(.subheadline)
+                                Text("Go to Mission Control")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
+                }
+            } else {
+                // Leagues connected but no players for this position
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.secondary)
+                
+                Text("No Active Players")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                
+                // Show some stats about connected leagues
+                VStack(spacing: 8) {
+                    Text("✅ Connected: \(viewModel.matchupsHubViewModel.myMatchups.count) league\(viewModel.matchupsHubViewModel.myMatchups.count == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    
+                    if viewModel.selectedPosition != .all {
+                        Button("Show All Positions") {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                viewModel.setPositionFilter(.all)
+                                animatedPlayers.removeAll()
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .padding(.top, 4)
+                    }
+                }
+                .padding(.top, 8)
                 .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(.systemGray6).opacity(0.2))
+                )
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

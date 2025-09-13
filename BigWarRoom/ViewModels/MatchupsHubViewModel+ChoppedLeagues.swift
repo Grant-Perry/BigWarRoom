@@ -7,8 +7,17 @@
 
 import Foundation
 
+// 🔥 NEW: Associated object key for storing graveyard teams
+private var graveyardTeamsKey: UInt8 = 0
+
 // MARK: - Chopped League Operations
 extension MatchupsHubViewModel {
+    
+    // 🔥 NEW: Store eliminated teams for graveyard
+    private var graveyardTeams: [FantasyTeam] {
+        get { objc_getAssociatedObject(self, &graveyardTeamsKey) as? [FantasyTeam] ?? [] }
+        set { objc_setAssociatedObject(self, &graveyardTeamsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
+    }
     
     /// Handle chopped league processing
     internal func handleChoppedLeague(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String) async -> UnifiedMatchup? {
@@ -105,7 +114,10 @@ extension MatchupsHubViewModel {
         userMap: [String: String], 
         avatarMap: [String: URL]
     ) -> [FantasyTeam] {
-        var choppedTeams: [FantasyTeam] = []
+        var activeTeams: [FantasyTeam] = []
+        var eliminatedTeams: [FantasyTeam] = [] // Track eliminated teams for graveyard
+        
+        print("🔍 CHOPPED DEBUG: Analyzing \(matchupData.count) teams for player status")
         
         for matchup in matchupData {
             let rosterID = matchup.rosterID
@@ -113,11 +125,21 @@ extension MatchupsHubViewModel {
             let resolvedTeamName = userMap[ownerID] ?? "Team \(rosterID)"
             let avatarURL = avatarMap[ownerID]
             
+            // 🔥 FIXED LOGIC: Only check actual player count - ignore starters
+            let playerCount = matchup.players?.count ?? 0
+            let starterCount = matchup.starters?.count ?? 0
+            let hasAnyPlayers = playerCount > 0  // ONLY this matters!
+            
             // 🔥 CRITICAL FIX: Use REAL points from the matchup data (starter-only scores)
             let realTeamScore = matchup.points ?? 0.0
             let projectedScore = matchup.projectedPoints ?? (realTeamScore * 1.05)
             
-            // x Print("🎯 CHOPPED TEAM: \(resolvedTeamName) = \(String(format: "%.2f", realTeamScore)) pts (Projected: \(String(format: "%.2f", projectedScore)))")
+            print("   Team: \(resolvedTeamName)")
+            print("     - Points: \(realTeamScore)")
+            print("     - Starters: \(starterCount)")
+            print("     - Players: \(playerCount)")
+            print("     - Has Players: \(hasAnyPlayers)")
+            print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
             
             let fantasyTeam = FantasyTeam(
                 id: String(rosterID),
@@ -131,41 +153,99 @@ extension MatchupsHubViewModel {
                 rosterID: rosterID
             )
             
-            choppedTeams.append(fantasyTeam)
+            if hasAnyPlayers {
+                activeTeams.append(fantasyTeam)
+            } else {
+                eliminatedTeams.append(fantasyTeam)
+                print("     ☠️ GRAVEYARD: \(resolvedTeamName) - NO PLAYERS")
+            }
         }
         
-        return choppedTeams
+        print("🔥 CHOPPED SEPARATION:")
+        print("   - Active teams (have players): \(activeTeams.count)")
+        print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
+        
+        if !eliminatedTeams.isEmpty {
+            print("💀 ELIMINATED TEAMS:")
+            for team in eliminatedTeams {
+                print("   - \(team.ownerName)")
+            }
+        }
+        
+        // Store eliminated teams for graveyard (we'll need to modify the summary creation)
+        self.graveyardTeams = eliminatedTeams
+        
+        // Return ONLY active teams for main rankings
+        return activeTeams
     }
     
     /// Process team rankings and create final summary
     private func processChoppedTeamRankings(teams: [FantasyTeam], league: UnifiedLeagueManager.LeagueWrapper, week: Int) async -> ChoppedWeekSummary {
-        // Sort teams by REAL scores (highest to lowest)
+        // Sort teams by REAL scores (highest to lowest) - ONLY ACTIVE TEAMS
         let sortedTeams = teams.sorted { team1, team2 in
             let score1 = team1.currentScore ?? 0.0
             let score2 = team2.currentScore ?? 0.0
             return score1 > score2
         }
         
-        // Dynamic elimination count based on league size
-        let totalTeams = sortedTeams.count
-        let eliminationCount = totalTeams >= 18 ? 2 : 1
-        // x Print("🔥 ELIMINATION LOGIC: \(totalTeams) teams = \(eliminationCount) eliminations per week")
+        // Dynamic elimination count based on league size - ONLY ACTIVE TEAMS
+        let totalActiveTeams = sortedTeams.count
+        let eliminationCount = totalActiveTeams >= 18 ? 2 : 1
+        print("🔥 ELIMINATION LOGIC: \(totalActiveTeams) active teams = \(eliminationCount) eliminations per week")
         
-        // Create team rankings with proper elimination zones
-        let teamRankings = createTeamRankings(sortedTeams: sortedTeams, eliminationCount: eliminationCount, totalTeams: totalTeams, week: week)
+        // Create team rankings with proper elimination zones - ONLY ACTIVE TEAMS
+        let teamRankings = createTeamRankings(sortedTeams: sortedTeams, eliminationCount: eliminationCount, totalTeams: totalActiveTeams, week: week)
         
         // Calculate summary stats
         let (avgScore, highScore, lowScore) = calculateSummaryStats(teamRankings: teamRankings)
         
-        // Get eliminated teams (bottom N teams)
+        // Get eliminated teams (bottom N teams FROM ACTIVE TEAMS)
         let eliminatedTeams = Array(teamRankings.suffix(eliminationCount))
         
-        logChoppedSummary(totalTeams: totalTeams, eliminationCount: eliminationCount, eliminatedTeams: eliminatedTeams, highScore: highScore, lowScore: lowScore, avgScore: avgScore, leagueName: league.league.name)
+        // 🔥 CREATE GRAVEYARD: Convert eliminated teams to EliminationEvents
+        let graveyardEvents = graveyardTeams.enumerated().map { index, team in
+            print("🔥 ADDING TO GRAVEYARD for \(league.league.name): \(team.ownerName)")
+            
+            let eliminatedRanking = FantasyTeamRanking(
+                id: team.id,
+                team: team,
+                weeklyPoints: team.currentScore ?? 0.0,
+                rank: totalActiveTeams + index + 1, // Rank them after active teams
+                eliminationStatus: .eliminated,
+                isEliminated: true,
+                survivalProbability: 0.0,
+                pointsFromSafety: 0.0,
+                weeksAlive: week - 1 // Assume eliminated last week
+            )
+            
+            return EliminationEvent(
+                id: "eliminated_\(team.id)",
+                week: week - 1, // Assume eliminated last week
+                eliminatedTeam: eliminatedRanking,
+                eliminationScore: team.currentScore ?? 0.0,
+                margin: 0.0,
+                dramaMeter: 0.5,
+                lastWords: "Left with no players to field...",
+                timestamp: Date()
+            )
+        }
+        
+        logChoppedSummary(totalTeams: totalActiveTeams, eliminationCount: eliminationCount, eliminatedTeams: eliminatedTeams, highScore: highScore, lowScore: lowScore, avgScore: avgScore, leagueName: league.league.name)
+        
+        // Log graveyard info with league context
+        if !graveyardTeams.isEmpty {
+            print("💀 GRAVEYARD POPULATED for \(league.league.name):")
+            for team in graveyardTeams {
+                print("   \(team.ownerName) - no players")
+            }
+        } else {
+            print("✅ NO GRAVEYARD TEAMS for \(league.league.name) - all teams have players")
+        }
         
         return ChoppedWeekSummary(
             id: "chopped_real_\(league.league.leagueID)_\(week)",
             week: week,
-            rankings: teamRankings,
+            rankings: teamRankings, // Only active teams
             eliminatedTeam: eliminatedTeams.first, // Primary eliminated team for UI
             cutoffScore: lowScore,
             isComplete: true, // Real data means it's complete
@@ -173,7 +253,7 @@ extension MatchupsHubViewModel {
             averageScore: avgScore,
             highestScore: highScore,
             lowestScore: lowScore,
-            eliminationHistory: [] // TODO: Could fetch this from previous weeks
+            eliminationHistory: graveyardEvents // 🔥 NOW INCLUDES TEAMS WITH NO PLAYERS
         )
     }
     
@@ -242,6 +322,7 @@ extension MatchupsHubViewModel {
     internal func findMyTeamInChoppedLeaderboard(_ choppedSummary: ChoppedWeekSummary, leagueID: String) async -> FantasyTeamRanking? {
         // Strategy 1: For Sleeper leagues, use roster ID matching
         if let userRosterID = await getCurrentUserRosterID(leagueID: leagueID) {
+            // First check active rankings
             let myRanking = choppedSummary.rankings.first { ranking in
                 ranking.team.rosterID == userRosterID
             }
@@ -250,11 +331,22 @@ extension MatchupsHubViewModel {
                 // x Print("🎯 CHOPPED: Found MY team by roster ID \(userRosterID): \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
                 return myRanking
             }
+            
+            // 🔥 NEW: Check elimination history if not found in active rankings
+            let eliminatedRanking = choppedSummary.eliminationHistory.first { elimination in
+                elimination.eliminatedTeam.team.rosterID == userRosterID
+            }
+            
+            if let eliminatedRanking = eliminatedRanking {
+                print("🎯 CHOPPED: Found MY ELIMINATED team by roster ID \(userRosterID): \(eliminatedRanking.eliminatedTeam.team.ownerName)")
+                return eliminatedRanking.eliminatedTeam
+            }
         }
         
         // Strategy 2: Fallback to username matching
         let authenticatedUsername = sleeperCredentials.currentUsername
         if !authenticatedUsername.isEmpty {
+            // First check active rankings
             let myRanking = choppedSummary.rankings.first { ranking in
                 ranking.team.ownerName.lowercased() == authenticatedUsername.lowercased()
             }
@@ -263,9 +355,20 @@ extension MatchupsHubViewModel {
                 // x Print("🎯 CHOPPED: Found MY team by username '\(authenticatedUsername)': \(myRanking.team.ownerName) (\(myRanking.eliminationStatus.displayName))")
                 return myRanking
             }
+            
+            // 🔥 NEW: Check elimination history if not found in active rankings
+            let eliminatedRanking = choppedSummary.eliminationHistory.first { elimination in
+                elimination.eliminatedTeam.team.ownerName.lowercased() == authenticatedUsername.lowercased()
+            }
+            
+            if let eliminatedRanking = eliminatedRanking {
+                print("🎯 CHOPPED: Found MY ELIMINATED team by username '\(authenticatedUsername)': \(eliminatedRanking.eliminatedTeam.team.ownerName)")
+                return eliminatedRanking.eliminatedTeam
+            }
         }
         
         // Strategy 3: Match by "Gp" (specific fallback)
+        // First check active rankings
         let gpRanking = choppedSummary.rankings.first { ranking in
             ranking.team.ownerName.lowercased().contains("gp")
         }
@@ -275,8 +378,19 @@ extension MatchupsHubViewModel {
             return gpRanking
         }
         
+        // 🔥 NEW: Check elimination history for "Gp" match
+        let eliminatedGpRanking = choppedSummary.eliminationHistory.first { elimination in
+            elimination.eliminatedTeam.team.ownerName.lowercased().contains("gp")
+        }
+        
+        if let eliminatedGpRanking = eliminatedGpRanking {
+            print("🎯 CHOPPED: Found MY ELIMINATED team by 'Gp' match: \(eliminatedGpRanking.eliminatedTeam.team.ownerName)")
+            return eliminatedGpRanking.eliminatedTeam
+        }
+        
         // x Print("⚠️ CHOPPED: Could not identify user team in league \(leagueID)")
-        // x Print("   Available teams: \(choppedSummary.rankings.map { $0.team.ownerName }.joined(separator: ", "))")
+        // x Print("   Available active teams: \(choppedSummary.rankings.map { $0.team.ownerName }.joined(separator: ", "))")
+        print("   Available eliminated teams: \(choppedSummary.eliminationHistory.map { $0.eliminatedTeam.team.ownerName }.joined(separator: ", "))")
         
         // Return first team as fallback
         return choppedSummary.rankings.first

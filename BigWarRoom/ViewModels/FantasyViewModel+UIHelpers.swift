@@ -243,6 +243,47 @@ extension FantasyViewModel {
         }
     }
     
+    // 🔥 NEW: Get roster with custom sorting for matchup detail view
+    func getRosterSorted(
+        for matchup: FantasyMatchup, 
+        teamIndex: Int, 
+        isBench: Bool, 
+        sortMethod: MatchupSortingMethod, 
+        highToLow: Bool
+    ) -> [FantasyPlayer] {
+        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
+        let filteredPlayers = team.roster.filter { player in
+            isBench ? !player.isStarter : player.isStarter
+        }
+        
+        return filteredPlayers.sorted { player1, player2 in
+            switch sortMethod {
+            case .position:
+                let order1 = positionSortOrder(player1.position)
+                let order2 = positionSortOrder(player2.position)
+                
+                if order1 != order2 {
+                    return highToLow ? order1 > order2 : order1 < order2
+                } else {
+                    // If same position, sort by score (high to low)
+                    let points1 = player1.currentPoints ?? 0.0
+                    let points2 = player2.currentPoints ?? 0.0
+                    return points1 > points2
+                }
+                
+            case .score:
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return highToLow ? points1 > points2 : points1 < points2
+                
+            case .name:
+                let name1 = player1.fullName.lowercased()
+                let name2 = player2.fullName.lowercased()
+                return highToLow ? name1 > name2 : name1 < name2
+            }
+        }
+    }
+    
     /// Get positional ranking for a player (e.g., "RB1", "WR2", "TE1")
     func getPositionalRanking(for player: FantasyPlayer, in matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> String {
         let roster = getRoster(for: matchup, teamIndex: teamIndex, isBench: isBench)
@@ -270,6 +311,180 @@ extension FantasyViewModel {
         case "D/ST", "DST", "DEF": return 8
         case "BN", "BENCH": return 9
         default: return 10
+        }
+    }
+    
+    // 🔥 NEW: Active roster section with custom sorting
+    func activeRosterSectionSorted(
+        matchup: FantasyMatchup, 
+        sortMethod: MatchupSortingMethod, 
+        highToLow: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Active Roster")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+            
+            HStack(alignment: .top, spacing: 24) {
+                // 🔥 FIXED: Home Team Active Roster (Left column - to match header)
+                VStack(spacing: 16) {
+                    let homeActiveRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: false, sortMethod: sortMethod, highToLow: highToLow)
+                    ForEach(homeActiveRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player, 
+                            fantasyViewModel: self,
+                            matchup: matchup,
+                            teamIndex: 1,
+                            isBench: false
+                        )
+                    }
+                    
+                    let awayScore = getScore(for: matchup, teamIndex: 0)
+                    let homeScore = getScore(for: matchup, teamIndex: 1)
+                    let homeWinning = homeScore > awayScore
+                    
+                    Text("Active Total: \(String(format: "%.2f", homeScore))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(homeWinning ? .gpGreen : .white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(.secondarySystemBackground), 
+                                            homeWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                }
+                
+                // 🔥 FIXED: Away Team Active Roster (Right column - to match header)
+                VStack(spacing: 16) {
+                    let awayActiveRoster = getRosterSorted(for: matchup, teamIndex: 0, isBench: false, sortMethod: sortMethod, highToLow: highToLow)
+                    ForEach(awayActiveRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player, 
+                            fantasyViewModel: self,
+                            matchup: matchup,
+                            teamIndex: 0,
+                            isBench: false
+                        )
+                    }
+                    
+                    let awayScore = getScore(for: matchup, teamIndex: 0)
+                    let homeScore = getScore(for: matchup, teamIndex: 1);
+                    let awayWinning = awayScore > homeScore
+                    
+                    Text("Active Total: \(String(format: "%.2f", awayScore))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(awayWinning ? .gpGreen : .white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [
+                                            Color(.secondarySystemBackground), 
+                                            awayWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                        ]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+    
+    // 🔥 NEW: Bench section with custom sorting - ALSO SWAPPED
+    func benchSectionSorted(
+        matchup: FantasyMatchup, 
+        sortMethod: MatchupSortingMethod, 
+        highToLow: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Bench")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+            
+            HStack(alignment: .top, spacing: 24) {
+                // 🔥 FIXED: Home Team Bench (Left column - to match header)
+                VStack(spacing: 16) {
+                    let homeBenchRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: true, sortMethod: sortMethod, highToLow: highToLow)
+                    ForEach(homeBenchRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player, 
+                            fantasyViewModel: self,
+                            matchup: matchup,
+                            teamIndex: 1,
+                            isBench: true
+                        )
+                    }
+                    
+                    let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    Text("Bench Total: \(String(format: "%.2f", benchTotal))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                }
+                
+                // 🔥 FIXED: Away Team Bench (Right column - to match header)
+                VStack(spacing: 16) {
+                    let awayBenchRoster = getRosterSorted(for: matchup, teamIndex: 0, isBench: true, sortMethod: sortMethod, highToLow: highToLow)
+                    ForEach(awayBenchRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player, 
+                            fantasyViewModel: self,
+                            matchup: matchup,
+                            teamIndex: 0,
+                            isBench: true
+                        )
+                    }
+                    
+                    let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    Text("Bench Total: \(String(format: "%.2f", benchTotal))")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                }
+            }
+            .padding(.horizontal)
         }
     }
 }

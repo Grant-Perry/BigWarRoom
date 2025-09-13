@@ -10,7 +10,20 @@ struct FantasyMatchupListView: View {
     let draftRoomViewModel: DraftRoomViewModel  // Accept the shared view model
     @StateObject private var viewModel = FantasyViewModel.shared
     @StateObject private var weekManager = WeekSelectionManager.shared
+    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel()
     @State private var forceChoppedMode = false // DEBUG: Force chopped mode
+    @State private var showLeaguePicker = false
+    @State private var availableLeagues: [UnifiedMatchup] = []
+    
+    // MARK: - Race Condition Prevention
+    @State private var isDetectingSmartMode = false
+    @State private var isSettingUpLeague = false
+    @State private var hasInitializedSmartMode = false
+    
+    // MARK: - Draft Position Selection
+    @State private var showDraftPositionPicker = false
+    @State private var selectedLeagueForPosition: UnifiedLeagueManager.LeagueWrapper?
+    @State private var selectedDraftPosition = 1
     
     var body: some View {
         NavigationView {
@@ -19,43 +32,16 @@ struct FantasyMatchupListView: View {
                 Color.black
                     .ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Connection status header (always show)
-                    connectionStatusHeader
-                    
-                    // Matchups content
-                    if viewModel.isLoading || shouldShowLoadingState {
-//                        let _ = print("⏳ UI CONDITION: Loading state - showing spinning football")
-                        loadingView
-                    } else if viewModel.detectedAsChoppedLeague || isChoppedLeague || forceChoppedMode {
-                        // CHOPPED LEAGUE: Detected via empty matchups + rosters OR settings
-//                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard!")
-//                        let _ = print("   - viewModel.detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
-//                        let _ = print("   - isChoppedLeague (computed): \(isChoppedLeague)")
-//                        let _ = print("   - forceChoppedMode: \(forceChoppedMode)")
-//                        let _ = print("   - viewModel.matchups.count: \(viewModel.matchups.count)")
-//                        let _ = print("   - viewModel.hasActiveRosters: \(viewModel.hasActiveRosters)")
-                        choppedLeaderboardView
-                    } else if viewModel.matchups.isEmpty && viewModel.hasActiveRosters {
-                        // CHOPPED LEAGUE: No matchups but has rosters (safety net)
-//                        let _ = print("🔥 UI CONDITION: Showing Chopped leaderboard (safety net)!")
-//                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
-//                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
-                        choppedLeaderboardView
-                    } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
-                        // TRUE EMPTY STATE: Only after we've confirmed data loading is complete
-//                        let _ = print("❌ UI CONDITION: Confirmed empty state (not loading)")
-//                        let _ = print("   - shouldShowLoadingState: \(shouldShowLoadingState)")
-//                        let _ = print("   - matchups.isEmpty: \(viewModel.matchups.isEmpty)")
-//                        let _ = print("   - hasActiveRosters: \(viewModel.hasActiveRosters)")
-//                        let _ = print("   - detectedAsChoppedLeague: \(viewModel.detectedAsChoppedLeague)")
-                        emptyStateView
-                    } else {
-                        // NORMAL LEAGUE: Has matchups
-//                        let _ = print("✅ UI CONDITION: Showing normal matchups")
-//                        let _ = print("   - matchups.count: \(viewModel.matchups.count)")
-                        matchupsList
-                    }
+                // Smart Mode Detection
+                if shouldShowLeaguePicker {
+                    // ALL LEAGUES MODE: Show gorgeous picker overlay
+                    Color.clear // Transparent background for overlay
+                } else if shouldShowDraftPositionPicker {
+                    // DRAFT POSITION MODE: Show position picker
+                    Color.clear // Transparent background for sheet
+                } else {
+                    // SINGLE LEAGUE MODE: Normal Fantasy view
+                    singleLeagueContent
                 }
             }
             .navigationTitle(shouldHideTitle ? "" : (viewModel.selectedLeague?.league.name ?? "Fantasy"))
@@ -75,27 +61,359 @@ struct FantasyMatchupListView: View {
                     isPresented: $viewModel.showWeekSelector
                 )
             }
+            .sheet(isPresented: $showDraftPositionPicker) {
+                if let league = selectedLeagueForPosition {
+                    ESPNDraftPickSelectionSheet.forDraft(
+                        leagueName: league.league.name,
+                        maxTeams: league.league.totalRosters,
+                        selectedPosition: $selectedDraftPosition,
+                        onConfirm: { position in
+                            confirmDraftPosition(league, position: position)
+                        },
+                        onCancel: {
+                            cancelDraftPositionSelection()
+                        }
+                    )
+                }
+            }
             .task {
-                await setupConnectedLeague()
+                // Only run once on initial load
+                if !hasInitializedSmartMode {
+                    await smartModeDetection()
+                    hasInitializedSmartMode = true
+                }
             }
             .onReceive(draftRoomViewModel.$selectedLeagueWrapper) { newLeague in
-                // Detect when league changes from War Room and refresh immediately
+                // Only react to actual changes, not repeat values
+                guard !isSettingUpLeague else {
+                    print("🔄 LEAGUE CHANGE: Ignoring during setup")
+                    return
+                }
+                
+                print("🔄 LEAGUE CHANGE DETECTED: \(newLeague?.league.name ?? "nil")")
+                
+                // Debounce this call to prevent rapid fire
                 Task {
-                    print("🔄 LEAGUE CHANGE DETECTED: \(newLeague?.league.name ?? "nil")")
-                    await setupConnectedLeague()
+                    try? await Task.sleep(for: .milliseconds(100))
+                    if !isDetectingSmartMode && !isSettingUpLeague {
+                        await smartModeDetection()
+                    }
                 }
             }
             .onAppear {
                 // Pass the shared DraftRoomViewModel to FantasyViewModel
                 viewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
-                
-                // Also check for league changes on appear (in case we missed the publisher)
-                Task {
-                    await setupConnectedLeague()
-                }
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle()) // Force stack navigation style
+        .navigationViewStyle(StackNavigationViewStyle())
+        .overlay {
+            // League Picker Overlay
+            if showLeaguePicker {
+                LeaguePickerOverlay(
+                    leagues: availableLeagues,
+                    onLeagueSelected: { selectedLeague in
+                        selectLeagueFromPicker(selectedLeague)
+                    },
+                    onDismiss: {
+                        showLeaguePicker = false
+                    }
+                )
+                .zIndex(1000) // Ensure it's on top
+            }
+        }
+    }
+    
+    // MARK: - Smart Mode Detection (Updated for Draft Position)
+    /// Determines whether to show league picker, draft position picker, or single league view
+    private var shouldShowLeaguePicker: Bool {
+        return showLeaguePicker && !availableLeagues.isEmpty && !isSettingUpLeague
+    }
+    
+    /// Determines whether to show draft position picker
+    private var shouldShowDraftPositionPicker: Bool {
+        return showDraftPositionPicker && selectedLeagueForPosition != nil
+    }
+    
+    /// Smart detection of current context and mode (Race Condition Safe)
+    private func smartModeDetection() async {
+        // Prevent concurrent executions
+        guard !isDetectingSmartMode else {
+            print("🧠 SMART MODE: Already detecting, skipping...")
+            return
+        }
+        
+        isDetectingSmartMode = true
+        defer { isDetectingSmartMode = false }
+        
+        print("🧠 SMART MODE: Detecting current context...")
+        
+        // Load all available matchups first
+        await matchupsHubViewModel.loadAllMatchups()
+        await MainActor.run {
+            availableLeagues = matchupsHubViewModel.myMatchups
+        }
+        
+        print("🧠 SMART MODE: Found \(availableLeagues.count) available leagues")
+        
+        // Check if we have a specific league selected from War Room
+        if let connectedLeague = draftRoomViewModel.selectedLeagueWrapper {
+            print("🧠 SMART MODE: War Room has selected league: \(connectedLeague.league.name)")
+            print("🧠 SMART MODE: → SINGLE LEAGUE MODE")
+            
+            // Single League Mode - setup that specific league
+            await MainActor.run {
+                showLeaguePicker = false
+                showDraftPositionPicker = false
+            }
+            await setupSingleLeague(connectedLeague)
+            
+        } else if viewModel.selectedLeague == nil && availableLeagues.count > 1 {
+            print("🧠 SMART MODE: No specific league selected, multiple leagues available")
+            print("🧠 SMART MODE: → ALL LEAGUES MODE (Show Picker)")
+            
+            // All Leagues Mode - show picker
+            await MainActor.run {
+                showLeaguePicker = true
+                showDraftPositionPicker = false
+            }
+            
+        } else if availableLeagues.count == 1 {
+            print("🧠 SMART MODE: Only one league available, checking draft position...")
+            
+            let league = availableLeagues[0].league
+            
+            // Check if we need draft position for this league
+            if needsDraftPosition(for: league) {
+                print("🧠 SMART MODE: → DRAFT POSITION SELECTION NEEDED")
+                await MainActor.run {
+                    showLeaguePicker = false
+                    selectedLeagueForPosition = league
+                    showDraftPositionPicker = true
+                }
+            } else {
+                print("🧠 SMART MODE: → AUTO SINGLE LEAGUE MODE")
+                // Auto-select the only available league
+                await MainActor.run {
+                    showLeaguePicker = false
+                    showDraftPositionPicker = false
+                }
+                await setupSingleLeague(league)
+            }
+            
+        } else {
+            print("🧠 SMART MODE: No leagues available or already selected")
+            print("🧠 SMART MODE: → MAINTAIN CURRENT STATE")
+            
+            // Maintain current state
+            await MainActor.run {
+                showLeaguePicker = false
+                showDraftPositionPicker = false
+            }
+        }
+    }
+    
+    // MARK: - Draft Position Management
+    
+    /// Check if a league needs draft position selection
+    private func needsDraftPosition(for league: UnifiedLeagueManager.LeagueWrapper) -> Bool {
+        // Always need position if coming from Fantasy directly (not War Room)
+        // War Room handles position selection, so if we're here without War Room connection, we need it
+        
+        // Check if we have a saved position for this league
+        @AppStorage("draftPosition") var storedDraftPositions: String = "{}"
+        
+        if let data = storedDraftPositions.data(using: .utf8),
+           let positions = try? JSONSerialization.jsonObject(with: data) as? [String: Int],
+           let _ = positions[league.league.name] {
+            // We have a saved position for this league
+            return false
+        }
+        
+        // No saved position and not coming from War Room = need position
+        return true
+    }
+    
+    /// Get saved draft position for a league
+    private func getSavedDraftPosition(for league: UnifiedLeagueManager.LeagueWrapper) -> Int? {
+        @AppStorage("draftPosition") var storedDraftPositions: String = "{}"
+        
+        guard let data = storedDraftPositions.data(using: .utf8),
+              let positions = try? JSONSerialization.jsonObject(with: data) as? [String: Int] else {
+            return nil
+        }
+        
+        return positions[league.league.name]
+    }
+    
+    /// Handle draft position confirmation
+    private func confirmDraftPosition(_ league: UnifiedLeagueManager.LeagueWrapper, position: Int) {
+        print("🎯 DRAFT POSITION: User selected position \(position) for league: \(league.league.name)")
+        
+        // Dismiss the position picker
+        showDraftPositionPicker = false
+        selectedLeagueForPosition = nil
+        
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+        
+        // Setup the league with the confirmed position
+        Task {
+            // Store the position for future use (handled by the sheet)
+            await setupSingleLeague(league, draftPosition: position)
+        }
+    }
+    
+    /// Handle draft position selection cancellation
+    private func cancelDraftPositionSelection() {
+        print("🎯 DRAFT POSITION: User cancelled position selection")
+        
+        // Go back to league picker if we had multiple leagues, or show empty state
+        if availableLeagues.count > 1 {
+            showDraftPositionPicker = false
+            selectedLeagueForPosition = nil
+            showLeaguePicker = true
+        } else {
+            // Single league but user cancelled - show empty state or prompt
+            showDraftPositionPicker = false
+            selectedLeagueForPosition = nil
+        }
+    }
+    
+    /// Setup Fantasy for a specific league (Race Condition Safe) - Updated with optional position
+    private func setupSingleLeague(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper, draftPosition: Int? = nil) async {
+        // Prevent concurrent executions
+        guard !isSettingUpLeague else {
+            print("🏈 Fantasy: Already setting up league, skipping...")
+            return
+        }
+        
+        isSettingUpLeague = true
+        defer { isSettingUpLeague = false }
+        
+        print("🏈 Fantasy: Setting up single league: \(leagueWrapper.league.name)")
+        if let position = draftPosition {
+            print("🏈 Fantasy:With draft position: \(position)")
+        }
+        
+        // Ensure we're on the main actor for UI updates
+        await MainActor.run {
+            viewModel.isLoading = true
+            viewModel.errorMessage = nil
+        }
+        
+        // Load all available leagues if not already loaded
+        await viewModel.loadLeagues()
+        
+        // Find matching league in Fantasy's available leagues
+        if let matchingLeague = viewModel.availableLeagues.first(where: { 
+            $0.league.leagueID == leagueWrapper.league.leagueID 
+        }) {
+            print("🏈 Fantasy: Loading matchups for league: \(matchingLeague.league.name)")
+            
+            // Determine team ID based on draft position or saved position
+            var myTeamID: String?
+            
+            if let position = draftPosition {
+                // Use the confirmed position to find team ID
+                myTeamID = "\(position)" // Simplified - you might need more complex logic
+            } else if let savedPosition = getSavedDraftPosition(for: leagueWrapper) {
+                // Use saved position
+                myTeamID = "\(savedPosition)"
+            }
+            
+            // Select the league with team ID for proper identification
+            await MainActor.run {
+                if let teamID = myTeamID {
+                    viewModel.selectLeague(matchingLeague, myTeamID: teamID)
+                } else {
+                    viewModel.selectLeague(matchingLeague)
+                }
+            }
+            
+            // Wait for data loading to complete with timeout
+            var attempts = 0
+            let maxAttempts = 20 // 2 seconds max
+            
+            while viewModel.matchups.isEmpty && !viewModel.detectedAsChoppedLeague && !viewModel.hasActiveRosters && attempts < maxAttempts {
+                try? await Task.sleep(for: .milliseconds(100))
+                attempts += 1
+            }
+            
+            // Ensure loading state is cleared
+            await MainActor.run {
+                viewModel.isLoading = false
+                
+                // Force UI refresh
+                if !viewModel.matchups.isEmpty || viewModel.detectedAsChoppedLeague || viewModel.hasActiveRosters {
+                    print("🏈 Fantasy: League setup complete with data")
+                } else {
+                    print("⚠️ Fantasy: League setup complete but no data found")
+                }
+            }
+        } else {
+            print("❌ Fantasy: League not found in available leagues")
+            await MainActor.run {
+                viewModel.isLoading = false
+                viewModel.errorMessage = "League not found in available leagues"
+            }
+        }
+    }
+    
+    /// Handle league selection from gorgeous picker (Updated for Draft Position)
+    private func selectLeagueFromPicker(_ selectedLeague: UnifiedLeagueManager.LeagueWrapper) {
+        guard !isSettingUpLeague else {
+            print("🎯 PICKER: Selection ignored - already setting up league")
+            return
+        }
+        
+        print("🎯 PICKER: User selected league: \(selectedLeague.league.name)")
+        
+        // Immediate UI feedback - dismiss picker first
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            showLeaguePicker = false
+        }
+        
+        // Haptic feedback for selection
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+        
+        // Check if we need draft position for this league
+        if needsDraftPosition(for: selectedLeague) {
+            print("🎯 PICKER: Draft position needed for league: \(selectedLeague.league.name)")
+            
+            // Show draft position picker
+            selectedLeagueForPosition = selectedLeague
+            showDraftPositionPicker = true
+        } else {
+            print("🎯 PICKER: Using saved position or War Room position")
+            
+            // Setup the selected league directly
+            Task {
+                await setupSingleLeague(selectedLeague)
+            }
+        }
+    }
+    
+    // MARK: - Single League Content (Existing Content)
+    private var singleLeagueContent: some View {
+        VStack(spacing: 0) {
+            // Connection status header (always show)
+            connectionStatusHeader
+            
+            // Matchups content
+            if viewModel.isLoading || shouldShowLoadingState {
+                loadingView
+            } else if viewModel.detectedAsChoppedLeague || isChoppedLeague || forceChoppedMode {
+                choppedLeaderboardView
+            } else if viewModel.matchups.isEmpty && viewModel.hasActiveRosters {
+                choppedLeaderboardView
+            } else if viewModel.matchups.isEmpty && !viewModel.hasActiveRosters {
+                emptyStateView
+            } else {
+                matchupsList
+            }
+        }
     }
     
     // MARK: -> Loading State Detection
@@ -321,40 +639,6 @@ struct FantasyMatchupListView: View {
                 roster: [],
                 rosterID: index + 1
             )
-        }
-    }
-    
-    // MARK: -> Connected League Setup
-    /// Setup Fantasy to show only the connected league from War Room
-    private func setupConnectedLeague() async {
-        print("🔄 SETUP: Checking for connected league changes...")
-        
-        await viewModel.loadLeagues()
-        
-        // FIXED: Only use connected league from War Room - no switching allowed
-        if let connectedLeagueWrapper = draftRoomViewModel.selectedLeagueWrapper {
-            print("🏈 Fantasy: Connected league: '\(connectedLeagueWrapper.league.name)' (\(connectedLeagueWrapper.league.leagueID))")
-            
-            // Check if this is a different league than currently selected
-            let isNewLeague = viewModel.selectedLeague?.league.leagueID != connectedLeagueWrapper.league.leagueID
-            
-            if isNewLeague {
-                print("🔄 LEAGUE SWITCH: Switching from '\(viewModel.selectedLeague?.league.name ?? "none")' to '\(connectedLeagueWrapper.league.name)'")
-                
-                // Find matching league in Fantasy's available leagues
-                if let matchingLeague = viewModel.availableLeagues.first(where: { 
-                    $0.league.leagueID == connectedLeagueWrapper.league.leagueID 
-                }) {
-                    print("🏈 Fantasy: Loading matchups for new league: '\(matchingLeague.league.name)'")
-                    viewModel.selectLeague(matchingLeague)
-                } else {
-                    print("❌ Fantasy: Connected league not found in available leagues")
-                }
-            } else {
-                print("✅ Fantasy: Same league already selected, no change needed")
-            }
-        } else {
-            print("⚠️ Fantasy: No connected league from War Room")
         }
     }
     

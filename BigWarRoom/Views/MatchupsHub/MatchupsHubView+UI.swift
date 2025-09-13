@@ -252,7 +252,18 @@ extension MatchupsHubView {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.2))
+                .fill(
+                    // 🔥 NEW: Same gradient background as overall theme using nyyDark
+                    LinearGradient(
+                        colors: [
+                            Color.nyyDark.opacity(0.8),
+                            Color.nyyDark.opacity(0.6), 
+                            Color.black.opacity(0.7)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(

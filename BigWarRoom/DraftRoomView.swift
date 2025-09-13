@@ -84,8 +84,8 @@ struct DraftRoomView: View {
             autoConnectIfConfigured()
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("NavigateToFantasy"))) { _ in
-            // Auto-navigate to Fantasy tab when position 8 is confirmed
-            selectedTab = 2 // Fantasy tab is now index 2
+            // Auto-navigate to Fantasy tab when position is confirmed (updated index)
+            selectedTab = 7 // Fantasy tab is now index 7
             NSLog("🏈 Auto-navigated to Fantasy tab after confirming position")
         }
         .alert("YOUR TURN!", isPresented: $viewModel.showingPickAlert) {

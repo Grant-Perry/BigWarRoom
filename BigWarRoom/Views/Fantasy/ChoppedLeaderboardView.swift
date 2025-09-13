@@ -245,7 +245,7 @@ struct ChoppedLeaderboardView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 24)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -262,7 +262,7 @@ struct ChoppedLeaderboardView: View {
                         )
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.top, 16)
     }
     
@@ -458,7 +458,7 @@ struct ChoppedLeaderboardView: View {
                 week: viewModel.choppedSummary.week // 🔥 NEW: Pass week
             )
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.top, 4) // Reduced top padding to tighten gap
         .padding(.bottom, 20)
     }
@@ -504,7 +504,7 @@ struct ChoppedLeaderboardView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -515,7 +515,7 @@ struct ChoppedLeaderboardView: View {
                         .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true), value: viewModel.dangerPulse)
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: -> CRITICAL ZONE (DEATH ROW)
@@ -578,7 +578,7 @@ struct ChoppedLeaderboardView: View {
                 }
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -595,7 +595,7 @@ struct ChoppedLeaderboardView: View {
                         )
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: -> SURVIVAL SECTION (GENERIC)
@@ -628,7 +628,7 @@ struct ChoppedLeaderboardView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -638,7 +638,7 @@ struct ChoppedLeaderboardView: View {
                         .stroke(sectionColor.opacity(0.2), lineWidth: 1)
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: -> HISTORICAL ELIMINATIONS SECTION (THE GRAVEYARD) 🪦💀
@@ -670,12 +670,34 @@ struct ChoppedLeaderboardView: View {
                 .italic()
                 .frame(maxWidth: .infinity, alignment: .center)
             
+            // 🔥 GRAVEYARD DISCLAIMER
+            HStack(spacing: 8) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 12))
+                    .foregroundColor(.orange)
+                
+                Text("Elimination weeks estimated - Sleeper doesn't chronicle the fallen")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.orange)
+                    .italic()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.orange.opacity(0.1))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                    )
+            )
+            
             // Historical eliminations in chronological order
             ForEach(viewModel.choppedSummary.eliminationHistory) { elimination in
                 HistoricalEliminationCard(elimination: elimination)
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -685,7 +707,7 @@ struct ChoppedLeaderboardView: View {
                         .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.bottom, 20)
     }
     
@@ -711,7 +733,7 @@ struct ChoppedLeaderboardView: View {
                         .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
     
     // MARK: -> ALL TEAMS WAITING SECTION (PRE-GAME)
@@ -744,7 +766,7 @@ struct ChoppedLeaderboardView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -754,6 +776,6 @@ struct ChoppedLeaderboardView: View {
                         .stroke(Color.gray.opacity(0.2), lineWidth: 1)
                 )
         )
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
     }
 }

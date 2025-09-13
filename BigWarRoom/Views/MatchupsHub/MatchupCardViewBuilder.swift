@@ -42,14 +42,17 @@ struct MatchupCardViewBuilder: View {
             borderOpacity: cardProperties.borderOpacity,
             shouldPulse: cardProperties.shouldPulse,
             shadowColor: cardProperties.shadowColor,
-            shadowRadius: cardProperties.shadowRadius
-        ) {
-            if matchup.isChoppedLeague {
-                onShowDetail()
-            } else {
-                onMicroCardTap(matchup.id)
-            }
-        }
+            shadowRadius: cardProperties.shadowRadius,
+            onTap: {
+                if matchup.isChoppedLeague {
+                    onShowDetail()
+                } else {
+                    onMicroCardTap(matchup.id)
+                }
+            },
+            isEliminated: cardProperties.isEliminated,
+            eliminationWeek: cardProperties.eliminationWeek
+        )
         .frame(height: 120)
         .padding(.bottom, 8)
     }
@@ -79,6 +82,10 @@ struct MatchupCardViewBuilder: View {
         let percentage = calculateWinPercentageString()
         let isLive = isMatchupLive()
         
+        // 🔥 FIXED LOGIC: Use computed property to check if MY MANAGER is eliminated
+        let isEliminated = matchup.isMyManagerEliminated
+        let eliminationWeek = matchup.myEliminationWeek
+        
         // Calculate border properties based on matchup type and live status
         let borderColors: [Color]
         let borderWidth: CGFloat
@@ -86,8 +93,15 @@ struct MatchupCardViewBuilder: View {
         let shadowColor: Color
         let shadowRadius: CGFloat
         
-        if matchup.isChoppedLeague {
-            // Chopped league styling
+        if isEliminated {
+            // 🔥 ELIMINATED STYLING - Dark and dramatic
+            borderColors = [.red, .black, .red]
+            borderWidth = 2.0
+            borderOpacity = 0.8
+            shadowColor = .black.opacity(0.6)
+            shadowRadius = 8
+        } else if matchup.isChoppedLeague {
+            // Chopped league styling (but still alive)
             if let ranking = matchup.myTeamRanking {
                 let dangerColor = ranking.eliminationStatus.color
                 borderColors = [dangerColor, dangerColor.opacity(0.7), dangerColor]
@@ -130,7 +144,9 @@ struct MatchupCardViewBuilder: View {
             borderOpacity: borderOpacity,
             shouldPulse: isLive,
             shadowColor: shadowColor,
-            shadowRadius: shadowRadius
+            shadowRadius: shadowRadius,
+            isEliminated: isEliminated, // 🔥 Use computed property
+            eliminationWeek: eliminationWeek // 🔥 Use computed property
         )
     }
     
@@ -173,4 +189,6 @@ private struct MicroCardProperties {
     let shouldPulse: Bool
     let shadowColor: Color
     let shadowRadius: CGFloat
+    let isEliminated: Bool // 🔥 Renamed from isChopped
+    let eliminationWeek: Int? // 🔥 Renamed from choppedWeek
 }
