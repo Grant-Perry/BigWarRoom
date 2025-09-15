@@ -50,13 +50,14 @@ struct ChoppedBenchSection: View {
                 if bench.isEmpty {
                     ChoppedEmptyBenchView()
                 } else {
-                    VStack(spacing: 18) {
+                    VStack(spacing: 12) {
                         ForEach(bench) { player in
                             ChoppedRosterPlayerCard(
                                 player: player,
                                 isStarter: false,
                                 parentViewModel: parentViewModel,
-                                onPlayerTap: onPlayerTap
+                                onPlayerTap: onPlayerTap,
+                                compact: true
                             )
                         }
                     }

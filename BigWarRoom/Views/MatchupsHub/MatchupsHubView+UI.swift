@@ -180,17 +180,26 @@ extension MatchupsHubView {
             
             Spacer()
             
-            if viewModel.autoRefreshEnabled {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                        .opacity(0.8)
-                    
-                    Text("Auto-refresh ON")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.green)
-                }
+            // 🔥 NEW: Auto-refresh toggle - same style as other toggles
+            VStack(spacing: 2) {
+                Text(viewModel.autoRefreshEnabled ? "On" : "Off")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(viewModel.autoRefreshEnabled ? .gpGreen : .gpRedPink)
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.toggleAutoRefresh()
+                            
+                            // Add haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                        }
+                    }
+                
+                Text("Auto-refresh")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.horizontal, 16)
@@ -214,6 +223,11 @@ extension MatchupsHubView {
             // Just Me Mode Banner (when microMode is enabled)
             if microMode {
                 justMeModeBanner
+            }
+            
+            // 🔥 NEW: Extra spacing before cards when powered by section is collapsed
+            if !poweredByExpanded {
+                Color.clear.frame(height: 4) // 🔥 CHANGED: Reduced to 8pt spacing when collapsed
             }
             
             // Always show the sort toggle and matchup cards (not controlled by battlesMinimized anymore)
@@ -283,40 +297,101 @@ extension MatchupsHubView {
         ))
     }
 
-    // MARK: - Sort By Toggle (Exact Live Players "All" Button Style)
-    var sortByToggle: some View {
+    // MARK: - Section Header
+    private var matchupsSectionHeader: some View {
         HStack {
-            // Sorting control with EXACT Live Players "All" button styling
-            HStack(spacing: 6) {
-                Text("Sorted by:")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                
-                // Exact same styling as Live Players "All" button
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        sortByWinning.toggle()
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Text(sortByWinning ? "Winning" : "Losing")
-                            .fontWeight(.semibold)
-							.font(.subheadline)
-
-                        Image(systemName: "chevron.down")
-                            .font(.caption)
-                    }
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(sortByWinning ? Color.gpGreen.opacity(0.1) : Color.gpRedPink.opacity(0.1))
-                    .foregroundColor(sortByWinning ? .gpGreen : .gpRedPink)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            Button(action: {
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    poweredByExpanded.toggle() // Control only the "Powered By" section
                 }
+            }) {
+                Image(systemName: poweredByExpanded ? "chevron.down" : "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Even spacing across the row
+            HStack {
+                Spacer()
+                
+                // 1. Winning/Losing toggle
+                VStack(spacing: 2) {
+                    Text(sortByWinning ? "Winning" : "Losing")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(sortByWinning ? .gpGreen : .gpRedPink)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                sortByWinning.toggle()
+                                
+                                // Add haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                            }
+                        }
+                    
+                    Text("Sort")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // 2. Dual/Single view toggle
+                VStack(spacing: 2) {
+                    Text(dualViewMode ? "Dual" : "Single")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(dualViewMode ? .blue : .orange)
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                dualViewMode.toggle()
+                                expandedCardId = nil
+                                
+                                // Add haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                            }
+                        }
+                    
+                    Text("View")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // 3. Just me mode toggle
+                VStack(spacing: 2) {
+                    Text(microMode ? "On" : "Off")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(microMode ? .gpGreen : .gpRedPink) // 🔥 CHANGED: Off is now .gpRedPink instead of .gray
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                microMode.toggle()
+                                expandedCardId = nil
+                                
+                                // Add haptic feedback
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                            }
+                        }
+                    
+                    Text("Just me")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
             }
             
-            Spacer()
-            
+            // 🔥 NEW: Timer dial moved to trailing edge of same row
             PollingCountdownDial(
                 countdown: refreshCountdown,
                 maxInterval: Double(AppConstants.MatchupRefresh),
@@ -328,69 +403,22 @@ extension MatchupsHubView {
                 }
             )
             .scaleEffect(0.8)
-        }
-        .padding(.horizontal, 20)
-        .padding(.bottom, 4)
-        .onAppear {
-            startCountdownTimer()
-        }
-        .onDisappear {
-            stopCountdownTimer()
-        }
-    }
-    
-    // MARK: - Section Header
-    private var matchupsSectionHeader: some View {
-        HStack {
-            HStack(spacing: 8) {
-                Button(action: {
-                    withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                        poweredByExpanded.toggle() // Control only the "Powered By" section
-                    }
-                }) {
-                    Image(systemName: poweredByExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(width: 20, height: 20)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Image(systemName: "gamecontroller.fill")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text("ALL YOUR BATTLES")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundColor(.white)
+            .onAppear {
+                startCountdownTimer()
             }
-            
-            Spacer()
-            
-            // Always show the micro mode toggle (not dependent on battlesMinimized)
-            microModeToggle
+            .onDisappear {
+                stopCountdownTimer()
+            }
         }
         .padding(.horizontal, 20)
     }
-    
-    // MARK: - Micro Mode Toggle
-    private var microModeToggle: some View {
-        HStack(spacing: 4) {
-            Text("Just me mode:")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.gray)
-            
-            Toggle("", isOn: $microMode)
-                .labelsHidden()
-                .toggleStyle(SwitchToggleStyle(tint: .gpGreen))
-                .scaleEffect(0.9)
-                .onChange(of: microMode) { oldValue, newValue in
-                    withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
-                        expandedCardId = nil
-                    }
-                }
-        }
+
+    // 🔥 REMOVED: Old sortByToggle since timer is now in header
+    var sortByToggle: some View {
+        // Empty view since timer moved to header
+        EmptyView()
     }
-    
+
     // MARK: - Minimized Summary
     var minimizedBattlesSummary: some View {
         HStack {
@@ -497,11 +525,16 @@ extension MatchupsHubView {
                 GridItem(.flexible(), spacing: 8),
                 GridItem(.flexible(), spacing: 8)
             ] :
+            // 🔥 NEW: Dynamic columns based on dualViewMode toggle
+            dualViewMode ?
             [
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16)
+            ] :
+            [
+                GridItem(.flexible(), spacing: 0) // Single column for horizontal view
             ],
-            spacing: microMode ? 8 : 16
+            spacing: microMode ? 8 : (dualViewMode ? 16 : 12)
         ) {
             ForEach(sortedMatchups, id: \.id) { matchup in
                 MatchupCardViewBuilder(
@@ -514,7 +547,8 @@ extension MatchupsHubView {
                     },
                     onMicroCardTap: { cardId in
                         handleMicroCardTap(cardId)
-                    }
+                    },
+                    dualViewMode: dualViewMode // 🔥 NEW: Pass dualViewMode parameter (moved to end)
                 )
             }
         }
@@ -523,6 +557,7 @@ extension MatchupsHubView {
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
         .animation(.spring(response: 0.2, dampingFraction: 0.8), value: sortByWinning)
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: dualViewMode) // 🔥 NEW: Animation for view mode changes
         .overlay(
             expandedCardOverlay
         )

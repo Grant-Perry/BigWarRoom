@@ -22,6 +22,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     @Published var topScore: Double = 0.0
     @Published var sortHighToLow = true
     @Published var sortingMethod: SortingMethod = .score
+    @Published var showActiveOnly: Bool = false // Changed from includeCompletedGames
     
     @Published var medianScore: Double = 0.0
     @Published var scoreRange: Double = 0.0
@@ -39,13 +40,78 @@ final class AllLivePlayersViewModel: ObservableObject {
     private var weekSubscription: AnyCancellable?
     private var debounceTask: Task<Void, Never>?
     
+    // 🔥 PERFORMANCE: Batch update control
+    private var isBatchingUpdates = false
+    
     // 🔥 NEW: Private init for singleton
     private init() {
         // Subscribe to week changes to invalidate stats with debouncing
         subscribeToWeekChanges()
     }
     
-    // 🔥 IMPROVED: Debounced week change subscription
+    // MARK: - Business Logic (Moved from View)
+    
+    /// Get the first available manager from loaded matchups
+    var firstAvailableManager: ManagerInfo? {
+        for matchup in matchupsHubViewModel.myMatchups {
+            if let myTeam = matchup.myTeam {
+                let isWinning = determineIfWinning(matchup: matchup, team: myTeam)
+                return ManagerInfo(
+                    name: myTeam.ownerName,
+                    score: myTeam.currentScore ?? 0.0,
+                    avatarURL: myTeam.avatarURL,
+                    scoreColor: isWinning ? .green : .red
+                )
+            }
+        }
+        return nil
+    }
+    
+    /// Determine if a team is currently winning their matchup
+    private func determineIfWinning(matchup: UnifiedMatchup, team: FantasyTeam) -> Bool {
+        // For chopped leagues, use ranking logic
+        if matchup.isChoppedLeague {
+            return true // Default to green for chopped leagues since there's no direct opponent
+        }
+        
+        // For regular matchups, compare against opponent
+        guard let opponent = matchup.opponentTeam else { return true }
+        return (team.currentScore ?? 0.0) > (opponent.currentScore ?? 0.0)
+    }
+    
+    /// Get dynamic sort direction text based on current sorting method
+    var sortDirectionText: String {
+        switch sortingMethod {
+        case .score:
+            return sortHighToLow ? "Highest" : "Lowest"
+        case .name:
+            return sortHighToLow ? "A to Z" : "Z to A"
+        case .team:
+            return sortHighToLow ? "A to Z" : "Z to A"
+        }
+    }
+    
+    /// Check if we have leagues connected but no players for current position
+    var hasLeaguesButNoPlayers: Bool {
+        return !matchupsHubViewModel.myMatchups.isEmpty && filteredPlayers.isEmpty && !isLoading
+    }
+    
+    /// Check if we have no leagues connected
+    var hasNoLeagues: Bool {
+        return matchupsHubViewModel.myMatchups.isEmpty
+    }
+    
+    /// Get count of connected leagues for display
+    var connectedLeaguesCount: Int {
+        return matchupsHubViewModel.myMatchups.count
+    }
+    
+    /// Apply current sorting direction to filtered players
+    func applySorting() {
+        applyPositionFilter() // Re-apply filter with current sort settings
+    }
+    
+    // 🔥 NEW: Debounced week change subscription
     private func subscribeToWeekChanges() {
         weekSubscription = WeekSelectionManager.shared.$selectedWeek
             .removeDuplicates()
@@ -214,27 +280,30 @@ final class AllLivePlayersViewModel: ObservableObject {
             // Calculate quartiles for tier determination
             let quartiles = calculateQuartiles(from: scores)
             
-            // Update all players with proper percentages and tiers
-            allPlayers = allPlayerEntries.map { entry in
-                let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
-                let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+            // 🔥 PERFORMANCE: Batch updates to prevent UI churn
+            await performBatchUpdate {
+                // Update all players with proper percentages and tiers
+                allPlayers = allPlayerEntries.map { entry in
+                    let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
+                    let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+                    
+                    return LivePlayerEntry(
+                        id: entry.id,
+                        player: entry.player,
+                        leagueName: entry.leagueName,
+                        leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
+                        currentScore: entry.currentScore,
+                        projectedScore: entry.projectedScore,
+                        isStarter: entry.isStarter,
+                        percentageOfTop: percentage,
+                        matchup: entry.matchup,
+                        performanceTier: tier
+                    )
+                }
                 
-                return LivePlayerEntry(
-                    id: entry.id,
-                    player: entry.player,
-                    leagueName: entry.leagueName,
-                    leagueSource: entry.leagueName,
-                    currentScore: entry.currentScore,
-                    projectedScore: entry.projectedScore,
-                    isStarter: entry.isStarter,
-                    percentageOfTop: percentage,
-                    matchup: entry.matchup,
-                    performanceTier: tier
-                )
+                // Apply initial filter
+                applyPositionFilter()
             }
-            
-            // Apply initial filter
-            applyPositionFilter()
             
         } catch {
             errorMessage = "Failed to load players: \(error.localizedDescription)"
@@ -301,50 +370,55 @@ final class AllLivePlayersViewModel: ObservableObject {
         }
     }
 
+    // 🔥 CRITICAL BUG FIX: Only extract players from MY teams, not opponent teams!
     private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
         
-        // For regular matchups, extract from both teams
+        print("🔍 EXTRACTING PLAYERS from matchup: \(matchup.league.league.name)")
+        
+        // For regular matchups, extract ONLY from MY team
         if let fantasyMatchup = matchup.fantasyMatchup {
-            // Extract starters from home team
-            let homeStarters = fantasyMatchup.homeTeam.roster.filter { $0.isStarter }
-            for player in homeStarters {
-                players.append(LivePlayerEntry(
-                    id: "\(matchup.id)_home_\(player.id)",
-                    player: player,
-                    leagueName: matchup.league.league.name,
-                    leagueSource: matchup.league.source.rawValue,
-                    currentScore: player.currentPoints ?? 0.0,
-                    projectedScore: player.projectedPoints ?? 0.0,
-                    isStarter: player.isStarter,
-                    percentageOfTop: 0.0, // Will be calculated later
-                    matchup: matchup,
-                    performanceTier: .average // Temporary, will be calculated later
-                ))
-            }
+            print("   - Regular matchup detected")
+            print("   - Home team: \(fantasyMatchup.homeTeam.ownerName) (ID: \(fantasyMatchup.homeTeam.id))")
+            print("   - Away team: \(fantasyMatchup.awayTeam.ownerName) (ID: \(fantasyMatchup.awayTeam.id))")
             
-            // Extract starters from away team
-            let awayStarters = fantasyMatchup.awayTeam.roster.filter { $0.isStarter }
-            for player in awayStarters {
-                players.append(LivePlayerEntry(
-                    id: "\(matchup.id)_away_\(player.id)",
-                    player: player,
-                    leagueName: matchup.league.league.name,
-                    leagueSource: matchup.league.source.rawValue,
-                    currentScore: player.currentPoints ?? 0.0,
-                    projectedScore: player.projectedPoints ?? 0.0,
-                    isStarter: player.isStarter,
-                    percentageOfTop: 0.0, // Will be calculated later
-                    matchup: matchup,
-                    performanceTier: .average // Temporary, will be calculated later
-                ))
+            // 🔥 CRITICAL FIX: Only extract from MY team, not both teams!
+            if let myTeam = matchup.myTeam {
+                print("   - My team identified: \(myTeam.ownerName) (ID: \(myTeam.id))")
+                
+                let myStarters = myTeam.roster.filter { $0.isStarter }
+                print("   - My starters count: \(myStarters.count)")
+                
+                for player in myStarters {
+                    print("     - Adding MY player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
+                    players.append(LivePlayerEntry(
+                        id: "\(matchup.id)_my_\(player.id)",
+                        player: player,
+                        leagueName: matchup.league.league.name,
+                        leagueSource: matchup.league.source.rawValue,
+                        currentScore: player.currentPoints ?? 0.0,
+                        projectedScore: player.projectedPoints ?? 0.0,
+                        isStarter: player.isStarter,
+                        percentageOfTop: 0.0, // Will be calculated later
+                        matchup: matchup,
+                        performanceTier: .average // Temporary, will be calculated later
+                    ))
+                }
+            } else {
+                print("   ❌ ERROR: Could not identify my team in this matchup!")
             }
         }
         
         // For Chopped leagues, extract from my team ranking
         if let myTeamRanking = matchup.myTeamRanking {
+            print("   - Chopped league detected")
+            print("   - My team: \(myTeamRanking.team.ownerName) (ID: \(myTeamRanking.team.id))")
+            
             let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
+            print("   - My chopped starters count: \(myTeamStarters.count)")
+            
             for player in myTeamStarters {
+                print("     - Adding MY chopped player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
                     player: player,
@@ -360,6 +434,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             }
         }
         
+        print("   - Total players extracted: \(players.count)")
         return players
     }
     
@@ -380,20 +455,89 @@ final class AllLivePlayersViewModel: ObservableObject {
         applyPositionFilter() // Re-apply filter with new sorting method
     }
     
-    // 🔥 IMPROVED: Optimized filtering with early returns
+    func setShowActiveOnly(_ showActive: Bool) {
+        showActiveOnly = showActive
+        applyPositionFilter() // Re-apply filter with new active-only setting
+    }
+
+    /// Check if a player is from a completed game (FINAL status)
+    private func isPlayerFromCompletedGame(_ player: FantasyPlayer) -> Bool {
+        guard let team = player.team else { 
+            print("🔍 FILTER DEBUG: Player \(player.fullName) has no team - treating as ACTIVE")
+            return false 
+        }
+        
+        // 🔥 FIX: Try multiple sources with fallback logic and debug logging
+        var isCompleted = false
+        var detectionMethod = "none"
+        
+        // Primary source: NFLGameDataService
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            let statusLower = gameInfo.gameStatus.lowercased()
+            isCompleted = statusLower.contains("final") || statusLower.contains("post")
+            detectionMethod = "NFLGameDataService(\(gameInfo.gameStatus))"
+            
+            // 🔥 SAFETY: Only consider truly final games with actual scores
+            if isCompleted && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
+                print("🔍 FILTER DEBUG: Game marked as \(gameInfo.gameStatus) but no scores yet - treating as ACTIVE")
+                isCompleted = false
+                detectionMethod += "[no-scores-override]"
+            }
+        } else {
+            // Fallback: Player's game status
+            if let playerGameStatus = player.gameStatus?.status {
+                let statusLower = playerGameStatus.lowercased()
+                isCompleted = statusLower.contains("final") || statusLower.contains("post")
+                detectionMethod = "PlayerGameStatus(\(playerGameStatus))"
+            }
+        }
+        
+        print("🔍 FILTER DEBUG: \(player.fullName) (\(team)) - \(isCompleted ? "COMPLETED" : "ACTIVE") via \(detectionMethod)")
+        return isCompleted
+    }
+    
+    // 🔥 IMPROVED: Enhanced filtering with safety checks and recovery
     private func applyPositionFilter() {
+        print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
+        
         // Early return if no players
         guard !allPlayers.isEmpty else { 
+            print("🔍 FILTER DEBUG: No players to filter")
             filteredPlayers = []
             return 
         }
         
-        let players = selectedPosition == .all ? 
+        // Apply position filter
+        let positionFiltered = selectedPosition == .all ? 
             allPlayers : 
             allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
         
+        print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
+        
+        // Apply active-only filter with safety checks
+        var players = positionFiltered
+        if showActiveOnly {
+            let activePlayers = positionFiltered.filter { !isPlayerFromCompletedGame($0.player) }
+            print("🔍 FILTER DEBUG: After active-only filter: \(activePlayers.count) active players out of \(positionFiltered.count)")
+            
+            // 🔥 SAFETY CHECK: If filtering results in empty list, fall back to showing all
+            if activePlayers.isEmpty && !positionFiltered.isEmpty {
+                print("⚠️ FILTER SAFETY: All players filtered out! Falling back to showing all games to prevent empty state")
+                players = positionFiltered
+                
+                // 🔥 RECOVERY: Reset the filter to prevent getting stuck
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.showActiveOnly = false
+                    print("🔧 FILTER RECOVERY: Auto-disabled 'Active Only' to prevent empty state")
+                }
+            } else {
+                players = activePlayers
+            }
+        }
+        
         // Early return if no players after filtering
         guard !players.isEmpty else {
+            print("🔍 FILTER DEBUG: No players after all filters - this should not happen due to safety checks")
             filteredPlayers = []
             positionTopScore = 0.0
             return
@@ -426,6 +570,8 @@ final class AllLivePlayersViewModel: ObservableObject {
         
         // Apply sorting based on method and direction (optimized)
         filteredPlayers = sortPlayers(updatedPlayers)
+        
+        print("🔍 FILTER DEBUG: Final result: \(filteredPlayers.count) players displayed")
     }
     
     // 🔥 NEW: Separated sorting logic for better performance
@@ -437,9 +583,10 @@ final class AllLivePlayersViewModel: ObservableObject {
                 players.sorted { $0.currentScore < $1.currentScore }
             
         case .name:
+            // 🔥 FIX: Sort by last name instead of full name
             return sortHighToLow ? 
-                players.sorted { $0.playerName < $1.playerName } :
-                players.sorted { $0.playerName > $1.playerName }
+                players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
+                players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
             
         case .team:
             return sortHighToLow ? 
@@ -458,6 +605,12 @@ final class AllLivePlayersViewModel: ObservableObject {
         }
     }
     
+    /// Extract last name from full name for proper sorting
+    private func extractLastName(_ fullName: String) -> String {
+        let components = fullName.components(separatedBy: " ")
+        return components.last ?? fullName
+    }
+    
     /// Returns priority order for positions: QB=1, RB=2, WR=3, TE=4, FLEX=5, DEF=6, K=7
     private func positionPriority(_ position: String) -> Int {
         switch position.uppercased() {
@@ -474,15 +627,101 @@ final class AllLivePlayersViewModel: ObservableObject {
 
     // MARK: - Refresh
     
-    // 🔥 IMPROVED: Enhanced refresh with task cancellation
+    // 🔥 IMPROVED: Enhanced refresh with task cancellation and batch updates
     func refresh() async {
         print("🔄 Refreshing all player data...")
         
         // Cancel any existing tasks
         debounceTask?.cancel()
         
-        statsLoaded = false  // Reset stats loaded state
-        await loadAllPlayers()
+        // Don't reset stats or loading state for background refresh
+        // statsLoaded = false  // Keep this commented - we want surgical updates only
+        
+        // Refresh matchups data first
+        await matchupsHubViewModel.loadAllMatchups()
+        
+        // Then update player data surgically
+        await updatePlayerDataSurgically()
+    }
+    
+    // 🔥 NEW: Surgical data update that doesn't trigger full UI refresh
+    private func updatePlayerDataSurgically() async {
+        var allPlayerEntries: [LivePlayerEntry] = []
+        
+        // Extract players from each matchup (with temporary values)
+        for matchup in matchupsHubViewModel.myMatchups {
+            let playersFromMatchup = extractPlayersFromMatchup(matchup)
+            allPlayerEntries.append(contentsOf: playersFromMatchup)
+        }
+        
+        // Only update if data actually changed
+        guard !allPlayerEntries.isEmpty else { return }
+        
+        // Calculate overall statistics
+        let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
+        let newTopScore = scores.first ?? 1.0
+        let bottomScore = scores.last ?? 0.0
+        let newScoreRange = newTopScore - bottomScore
+        
+        // Calculate median
+        var newMedianScore: Double = 0.0
+        if !scores.isEmpty {
+            let mid = scores.count / 2
+            newMedianScore = scores.count % 2 == 0 ? 
+                (scores[mid - 1] + scores[mid]) / 2 : 
+                scores[mid]
+        }
+        
+        // Use adaptive scaling if there's a huge gap (top score is 3x+ median)
+        let newUseAdaptiveScaling = newTopScore > (newMedianScore * 3)
+        
+        // Calculate quartiles for tier determination
+        let quartiles = calculateQuartiles(from: scores)
+        
+        // 🔥 PERFORMANCE: Only update if values actually changed
+        await performBatchUpdate {
+            topScore = newTopScore
+            scoreRange = newScoreRange
+            medianScore = newMedianScore
+            useAdaptiveScaling = newUseAdaptiveScaling
+            
+            // Update all players with proper percentages and tiers
+            allPlayers = allPlayerEntries.map { entry in
+                let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: newTopScore)
+                let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+                
+                return LivePlayerEntry(
+                    id: entry.id,
+                    player: entry.player,
+                    leagueName: entry.leagueName,
+                    leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
+                    currentScore: entry.currentScore,
+                    projectedScore: entry.projectedScore,
+                    isStarter: entry.isStarter,
+                    percentageOfTop: percentage,
+                    matchup: entry.matchup,
+                    performanceTier: tier
+                )
+            }
+            
+            // Re-apply current filter
+            applyPositionFilter()
+        }
+    }
+    
+    // 🔥 NEW: Batch update mechanism to reduce UI churn
+    private func performBatchUpdate(_ updates: () -> Void) async {
+        guard !isBatchingUpdates else { return }
+        
+        isBatchingUpdates = true
+        
+        // Perform all updates in one batch
+        updates()
+        
+        // Single UI update notification
+        objectWillChange.send()
+        
+        isBatchingUpdates = false
     }
 
     private func calculateScaledPercentage(score: Double, topScore: Double) -> Double {
@@ -524,5 +763,33 @@ final class AllLivePlayersViewModel: ObservableObject {
         } else {
             return .struggling
         }
+    }
+    
+    // 🔥 NEW: Manual recovery method for stuck filter states
+    func recoverFromStuckState() {
+        print("🔧 RECOVERY: Attempting to recover from stuck filter state...")
+        
+        // Reset all filters to safe defaults
+        showActiveOnly = false
+        selectedPosition = .all
+        
+        // Force re-apply filtering
+        applyPositionFilter()
+        
+        // Trigger UI update
+        objectWillChange.send()
+        
+        print("🔧 RECOVERY: State reset complete - \(filteredPlayers.count) players now visible")
+    }
+    
+    /// Enhanced computed property with recovery logic
+    var hasNoPlayersWithRecovery: Bool {
+        let hasNoPlayers = filteredPlayers.isEmpty && !allPlayers.isEmpty && !isLoading
+        
+        if hasNoPlayers {
+            print("⚠️ WARNING: No filtered players detected - this might be a stuck state")
+        }
+        
+        return hasNoPlayers
     }
 }

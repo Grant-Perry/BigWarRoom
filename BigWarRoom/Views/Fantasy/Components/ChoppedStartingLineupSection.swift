@@ -47,13 +47,14 @@ struct ChoppedStartingLineupSection: View {
             
             // Collapsible Content
             if showStartingLineup {
-                VStack(spacing: 18) {
+                VStack(spacing: 12) {
                     ForEach(starters) { player in
                         ChoppedRosterPlayerCard(
                             player: player,
                             isStarter: true,
                             parentViewModel: parentViewModel,
-                            onPlayerTap: onPlayerTap
+                            onPlayerTap: onPlayerTap,
+                            compact: true
                         )
                     }
                 }

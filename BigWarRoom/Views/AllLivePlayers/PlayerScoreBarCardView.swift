@@ -21,8 +21,9 @@ struct PlayerScoreBarCardView: View {
     @StateObject private var playerDirectory = PlayerDirectoryStore.shared
     
     private let maxScoreBarWidth: Double = 120.0 // Maximum width in points
-    private let cardHeight: Double = 60.0 // Shorter card height (was 70)
+    private let cardHeight: Double = 110.0 // Increased card height to accommodate stats at bottom (was 95.0)
     private let scoreBarHeight: Double = 20.0 // Shorter score bar (was 23.3)
+    private let scoreBarOpacity: Double = 0.35 // Score bar transparency
     
     var body: some View {
         Button(action: {
@@ -32,6 +33,7 @@ struct PlayerScoreBarCardView: View {
             playerCardView
         }
         .buttonStyle(PlainButtonStyle())
+        .id(playerEntry.id) // Force view refresh
         .overlay(
             // LIVE border around the entire card
             RoundedRectangle(cornerRadius: 12)
@@ -86,26 +88,44 @@ struct PlayerScoreBarCardView: View {
                     .fill(Color.clear)
                     .frame(width: 65) // Space for image
                 
-                // Player info
-                VStack(alignment: .leading, spacing: 0) {
+                // Center matchup section
+                VStack {
+                    Spacer()
+                    MatchupTeamFinalView(player: playerEntry.player)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .offset(x: 37)
+                .scaleEffect(1.1)
+                
+                // Player info - moved to right side with swapped league banner and player name
+                VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 6) {
-                        // Player name and position - with proper period formatting
-                        Text(formattedPlayerName)
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.primary)
-                        
-                        // Position badge
-                        positionBadge
-                        
-                        // Team logo
-                        teamLogoView
-                        
                         Spacer()
+                        
+                        // Player name moved to top (no position badge here)
+                        Text(formattedPlayerName)
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
                     
-                    // Score and league info
+                    HStack(spacing: 6) {
+                        Spacer()
+                        
+                        // League banner and position badge on same line (swapped order)
+                        leagueBanner
+                        positionBadge
+                    }
+                    
+                    Spacer() // Push score to bottom of this section
+                    
+                    // Score info - simplified without matchup info
                     HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 2) {
+                        Spacer()
+                        
+                        VStack(alignment: .trailing, spacing: 2) {
                             HStack(spacing: 8) {
                                 Text(playerEntry.currentScoreString)
                                     .font(.callout)
@@ -116,24 +136,11 @@ struct PlayerScoreBarCardView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            
-                            // 🔥 NEW: Stat breakdown line - ONLY show if player has fantasy points > 0
-                            if playerEntry.currentScore > 0, let statLine = formatPlayerStatBreakdown() {
-                                Text(statLine)
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(2)
-                                    .minimumScaleFactor(0.8)
-                            }
+                            .offset(y: -20)
                         }
-                        
-                        Spacer()
-                        
-                        // League banner
-                        leagueBanner
                     }
                 }
-                .frame(maxHeight: .infinity, alignment: .center)
+                .frame(maxHeight: .infinity, alignment: .top)
                 
                 Spacer()
             }
@@ -141,27 +148,111 @@ struct PlayerScoreBarCardView: View {
             .padding(.vertical, 6)
             .background(teamBackgroundView)
             
+            // Stats section spanning the entire bottom - ONLY show if player has fantasy points > 0
+            if playerEntry.currentScore > 0, let statLine = formatPlayerStatBreakdown() {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Text(statLine)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 6)
+                }
+            }
+            
             // NOW overlay the player image on top - unconstrained!
             HStack {
-                playerImageView
-                    .offset(x: -10) // Move right instead of left (was x: -15)
+                ZStack {
+                    // 🔥 FIXED: Large floating team logo behind player - positioned further right
+                    let teamCode = playerEntry.player.team ?? ""
+                    let mappedTeamCode = teamCode == "WSH" ? "WAS" : teamCode // Map WSH to WAS
+                    
+                    if let team = NFLTeam.team(for: mappedTeamCode) {
+                        TeamAssetManager.shared.logoOrFallback(for: team.id)
+                            .frame(width: 140, height: 140)
+                            .opacity(0.25)
+                            .offset(x: 10, y: -5) // 🔥 FIXED: Back to x: 20 as requested
+                            .zIndex(0)
+                    } else {
+                        let _ = print("🔍 DEBUG - No team logo for player: \(playerEntry.player.shortName), team: '\(teamCode)' (mapped: '\(mappedTeamCode)')")
+                    }
+                    
+                    // Player image in front - FIXED HEIGHT
+                    playerImageView
+                        .zIndex(1)
+                        .offset(x: -50) // 🔥 NEW: Move player left to clip off shoulder
+                }
+                .frame(height: 80) // Constrain height
+                .frame(maxWidth: 180) // 🔥 INCREASED: Wider to accommodate offset logo (was 120)
+                .offset(x: -10)
                 Spacer()
             }
         }
+        .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Clip the entire thing
     }
     
     // MARK: - Subviews
     
     private var playerImageView: some View {
-        AsyncImage(url: playerEntry.player.headshotURL) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } placeholder: {
-            playerFallbackView
+        AsyncImage(url: playerEntry.player.headshotURL) { phase in
+            switch phase {
+            case .empty:
+                // Loading state
+                playerFallbackView
+                    .overlay(
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    )
+            case .success(let image):
+                // Successfully loaded image
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .failure(_):
+                // Failed to load - try alternative URL or show fallback
+                AsyncImage(url: alternativeImageURL) { altPhase in
+                    switch altPhase {
+                    case .success(let altImage):
+                        altImage
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    default:
+                        playerFallbackView
+                    }
+                }
+            @unknown default:
+                playerFallbackView
+            }
         }
-        .frame(width: 80, height: 100) // Bigger and taller - now unconstrained by card layout!
+        .frame(width: 80, height: 100)
+        .id(playerEntry.player.id + "_" + (playerEntry.player.headshotURL?.absoluteString ?? "")) // Force refresh when URL changes
+    }
+    
+    /// Alternative image URL for retry logic
+    private var alternativeImageURL: URL? {
+        // Try ESPN headshot as fallback
+        if let espnURL = playerEntry.player.espnHeadshotURL {
+            return espnURL
+        }
+        
+        // For defense/special teams, try a different approach
+        if playerEntry.position == "DEF" || playerEntry.position == "DST" {
+            if let team = playerEntry.player.team {
+                // Try ESPN team logo as player image for defenses
+                return URL(string: "https://a.espncdn.com/i/teamlogos/nfl/500/\(team.lowercased()).png")
+            }
+        }
+        
+        return nil
     }
     
     private var playerFallbackView: some View {
@@ -191,26 +282,49 @@ struct PlayerScoreBarCardView: View {
                 TeamAssetManager.shared.logoOrFallback(for: team.id)
                     .frame(width: 20, height: 20) // Smaller logo (was 24x24)
             } else {
+                // 🔥 DEBUG: Print when small logo fails too
+                let _ = print("🔍 DEBUG - No small team logo for: \(playerEntry.player.shortName), team: '\(playerEntry.player.team ?? "nil")'")
                 Circle()
-                    .fill(.gray)
-                    .frame(width: 20, height: 20) // Smaller fallback
+                    .fill(leagueSourceColor)
+                    .frame(width: 6, height: 6)
             }
         }
     }
     
     private var leagueBanner: some View {
         HStack(spacing: 4) {
-            Circle()
-                .fill(leagueSourceColor)
-                .frame(width: 6, height: 6)
+            // 🔥 DEBUG: Add logging to see actual leagueSource values
+            Group {
+                let leagueSourceValue = playerEntry.leagueSource
+                let _ = print("🔍 DEBUG - League source: '\(leagueSourceValue)' (lowercased: '\(leagueSourceValue.lowercased())') for league: '\(playerEntry.leagueName)'")
+                
+                switch leagueSourceValue.lowercased() {
+                case "espn":
+                    Image("espnLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 12, height: 12)  // 50% smaller (was 24x24)
+                case "sleeper":
+                    Image("sleeperLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 12, height: 12)  // 50% smaller (was 24x24)
+                default:
+                    // 🔥 DEBUG: Log when falling back to circle
+                    let _ = print("❌ FALLBACK - Unknown league source: '\(leagueSourceValue)' - using circle fallback")
+                    Circle()
+                        .fill(leagueSourceColor)
+                        .frame(width: 6, height: 6)
+                }
+            }
             
             Text(playerEntry.leagueName)
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
-                .lineLimit(2) // Allow 2 lines instead of 1
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
@@ -227,49 +341,80 @@ struct PlayerScoreBarCardView: View {
         return LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom)
     }
     
+    private var playerCardGradColor: Color {
+        if let team = NFLTeam.team(for: playerEntry.player.team ?? "") {
+            return team.primaryColor
+        }
+        return .nyyDark // Fallback to original color if no team found
+    }
+    
     private var teamBackgroundView: some View {
         ZStack {
-            // Base background
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemGray6).opacity(0.2))
-            
-            // Score bar with sharp trailing edge for clear value representation
-            HStack(spacing: 0) {
-                ZStack {
-                    // Main gradient background with abrupt trailing edge
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(stops: [
-                                    .init(color: Color.clear, location: 0.0),                    // Start clear
-                                    .init(color: originalScoreBarColor.opacity(0.3), location: 0.3), // Build up color
-                                    .init(color: originalScoreBarColor.opacity(0.5), location: 0.7), // Peak color
-                                    .init(color: originalScoreBarColor.opacity(0.6), location: 0.95), // Strong at edge
-                                    .init(color: originalScoreBarColor.opacity(0.6), location: 1.0)   // Sharp cutoff
-                                ]),
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                    
-                    // Subtle overlay (toned down brightness)
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.white.opacity(0.03),  // Much more subtle
-                                    Color.clear,
-                                    Color.white.opacity(0.01)   // Very subtle
-                                ]),
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                .frame(width: calculateScoreBarWidth())
-                .clipShape(RoundedRectangle(cornerRadius: 12)) // Ensure sharp edge
+            // BASE TEAM BACKGROUND - Applied to ALL cards
+            ZStack {
+                // MAIN GRADIENT BACKGROUND - Team colored base for all cards
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        playerCardGradColor.opacity(0.9), // STRONGER opacity
+                        Color.black.opacity(0.7),
+                        playerCardGradColor.opacity(0.8) // STRONGER opacity
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
                 
-                Spacer()
+                // SUBTLE OVERLAY PATTERN
+                LinearGradient(
+                    gradient: Gradient(colors: [
+                        Color.white.opacity(0.08),
+                        Color.clear,
+                        playerCardGradColor.opacity(0.1) // Add more team color tint
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+            
+            // SCORE BAR OVERLAY - Only for players with points
+            if playerEntry.currentScore > 0 {
+                // Score bar with sharp trailing edge for clear value representation
+                HStack(spacing: 0) {
+                    ZStack {
+                        // Main gradient background with abrupt trailing edge
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: Color.clear, location: 0.0),                    // Start clear
+                                        .init(color: originalScoreBarColor.opacity(0.3), location: 0.3), // Build up color
+                                        .init(color: originalScoreBarColor.opacity(0.5), location: 0.7), // Peak color
+                                        .init(color: originalScoreBarColor.opacity(0.6), location: 0.95), // Strong at edge
+                                        .init(color: originalScoreBarColor.opacity(0.6), location: 1.0)   // Sharp cutoff
+                                    ]),
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        
+                        // Subtle overlay (toned down brightness)
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(
+                                LinearGradient(
+                                    gradient: Gradient(colors: [
+                                        Color.white.opacity(0.03),  // Much more subtle
+                                        Color.clear,
+                                        Color.white.opacity(0.01)   // Very subtle
+                                    ]),
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    }
+                    .frame(width: calculateScoreBarWidth())
+                    .clipShape(RoundedRectangle(cornerRadius: 12)) // Ensure sharp edge
+                    
+                    Spacer()
+                }
             }
             
             // Team-specific background overlay
@@ -283,14 +428,17 @@ struct PlayerScoreBarCardView: View {
                 }
             }
             
-            HStack {
-                Spacer()
-                VStack {
-                    performanceIndicator
+            // Only show performance indicator if player has points
+            if playerEntry.currentScore > 0 {
+                HStack {
                     Spacer()
+                    VStack {
+                        performanceIndicator
+                        Spacer()
+                    }
+                    .padding(.trailing, 8)
+                    .padding(.top, 6)
                 }
-                .padding(.trailing, 8)
-                .padding(.top, 6)
             }
         }
     }
@@ -326,18 +474,18 @@ struct PlayerScoreBarCardView: View {
     /// Original score bar colors (back to .gpGreen and blue)
     private var originalScoreBarColor: Color {
         let percentage = playerEntry.scoreBarWidth
-        if percentage >= 0.8 { return .gpGreen }        // Elite - Green
-        else if percentage >= 0.5 { return .blue }       // Good - Blue  
-        else if percentage >= 0.25 { return .orange }    // Okay - Orange
-        else { return .red }                             // Poor - Red
+        if percentage >= 0.8 { return .gpGreen.opacity(scoreBarOpacity) }        // Elite - Green
+        else if percentage >= 0.5 { return .blue.opacity(scoreBarOpacity) }       // Good - Blue  
+        else if percentage >= 0.25 { return .orange.opacity(scoreBarOpacity) }    // Okay - Orange
+        else { return .red.opacity(scoreBarOpacity) }                             // Poor - Red
     }
     
     private var scoreBarColor: Color {
         let percentage = playerEntry.scoreBarWidth
-        if percentage >= 0.8 { return .gpGreen.opacity(0.5) }
-        else if percentage >= 0.5 { return .blue.opacity(0.4) }
-        else if percentage >= 0.25 { return .orange.opacity(0.4) }
-        else { return .red.opacity(0.3) }
+        if percentage >= 0.8 { return .gpGreen.opacity(0.4) }
+        else if percentage >= 0.5 { return .blue.opacity(0.3) }
+        else if percentage >= 0.25 { return .orange.opacity(0.3) }
+        else { return .red.opacity(0.2) }
     }
     
     private var positionColor: Color {
@@ -393,21 +541,30 @@ struct PlayerScoreBarCardView: View {
     }
     
     private var formattedPlayerName: String {
-        let shortName = playerEntry.player.shortName
+        // 🔥 FIXED: Use full name instead of short name initials
+        let fullName = playerEntry.player.fullName
         
-        // Check if it's in "First Last" format and first name is single letter
-        let components = shortName.split(separator: " ")
-        if components.count >= 2 {
-            let firstName = String(components[0])
-            let lastName = components[1...]
+        // Check if it's in "First Last" format and first name is single letter in shortName
+        let shortName = playerEntry.player.shortName
+        let shortComponents = shortName.split(separator: " ")
+        
+        if shortComponents.count >= 2 {
+            let firstName = String(shortComponents[0])
             
-            // If first name is single character, add period
+            // If short name uses single character, but we have full name, use full name
+            if firstName.count == 1 && !fullName.isEmpty {
+                return fullName
+            }
+            
+            // If first name is single character in short name, add period to short name
             if firstName.count == 1 {
+                let lastName = shortComponents[1...]
                 return firstName + ". " + lastName.joined(separator: " ")
             }
         }
         
-        return shortName
+        // Default to full name if available, otherwise short name
+        return !fullName.isEmpty ? fullName : shortName
     }
     
     // MARK: - Stat Breakdown Methods
@@ -544,39 +701,169 @@ struct PlayerScoreBarCardView: View {
         return result
     }
     
+    // 🔥 BULLETPROOF: Enhanced player matching with comprehensive debug logging and multiple fallback strategies
     private func getSleeperPlayerData() -> SleeperPlayer? {
         let playerName = playerEntry.player.fullName
+        let shortName = playerEntry.player.shortName
+        let team = playerEntry.player.team?.uppercased() ?? "NO_TEAM"
+        let position = playerEntry.position.uppercased()
         
-        // Find all potential matches first
-        let potentialMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            if sleeperPlayer.fullName.lowercased() == playerName.lowercased() {
-                return true
-            }
+        // 🔥 JAMES COOK DEBUG: Special logging for James Cook to diagnose the issue
+        let isJamesCook = playerName.lowercased().contains("james cook") || shortName.lowercased().contains("j. cook") || shortName.lowercased().contains("cook")
+        
+        if isJamesCook {
+            print("🔍 JAMES COOK DEBUG - Starting match for:")
+            print("   Full Name: '\(playerName)'")
+            print("   Short Name: '\(shortName)'")
+            print("   Team: '\(team)'")
+            print("   Position: '\(position)'")
+            print("   Available Sleeper players: \(playerDirectory.players.count)")
             
-            if sleeperPlayer.shortName.lowercased() == playerEntry.player.shortName.lowercased() &&
-               sleeperPlayer.team?.lowercased() == playerEntry.player.team?.lowercased() {
-                return true
+            // Show sample of James Cook entries in player directory
+            let cookEntries = playerDirectory.players.values.filter { player in
+                player.fullName.lowercased().contains("cook") || player.lastName?.lowercased().contains("cook") == true
             }
-            
-            if let firstName = sleeperPlayer.firstName, let lastName = sleeperPlayer.lastName {
-                let fullName = "\(firstName) \(lastName)"
-                if fullName.lowercased() == playerName.lowercased() {
-                    return true
-                }
+            print("   Found \(cookEntries.count) 'Cook' entries in directory:")
+            for cookEntry in cookEntries.prefix(5) {
+                print("     - \(cookEntry.fullName) (\(cookEntry.team ?? "NO_TEAM")) \(cookEntry.position ?? "NO_POS") ID: \(cookEntry.playerID)")
             }
-            
-            return false
         }
         
-        // If only one match, use it
-        if potentialMatches.count == 1 {
-            return potentialMatches.first
+        // 🔥 STRATEGY 1: Exact match - Full name + team + position
+        var exactMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            sleeperPlayer.fullName.lowercased() == playerName.lowercased() &&
+            sleeperPlayer.team?.uppercased() == team &&
+            sleeperPlayer.position?.uppercased() == position
         }
         
-        // If multiple matches, use a robust prioritization system
-        if potentialMatches.count > 1 {
-            // Priority 1: Player with detailed game stats (passing, rushing, receiving, etc.)
-            let detailedStatsMatches = potentialMatches.filter { player in
+        if isJamesCook {
+            print("   Strategy 1 (Exact): \(exactMatches.count) matches")
+        }
+        
+        if exactMatches.count == 1 {
+            if isJamesCook { print("✅ JAMES COOK: Exact match found - \(exactMatches.first!.fullName)") }
+            return exactMatches.first
+        }
+        
+        // 🔥 STRATEGY 2: Short name match - Short name + team + position
+        var shortNameMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            sleeperPlayer.shortName.lowercased() == shortName.lowercased() &&
+            sleeperPlayer.team?.uppercased() == team &&
+            sleeperPlayer.position?.uppercased() == position
+        }
+        
+        if isJamesCook {
+            print("   Strategy 2 (Short Name): \(shortNameMatches.count) matches")
+        }
+        
+        if shortNameMatches.count == 1 {
+            if isJamesCook { print("✅ JAMES COOK: Short name match found - \(shortNameMatches.first!.fullName)") }
+            return shortNameMatches.first
+        }
+        
+        // 🔥 STRATEGY 3: Last name + team + position (for cases like "James Cook" vs "J. Cook")
+        let lastName = extractLastName(from: playerName)
+        var lastNameMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            let sleeperLastName = sleeperPlayer.lastName?.lowercased() ?? extractLastName(from: sleeperPlayer.fullName).lowercased()
+            return sleeperLastName == lastName.lowercased() &&
+                   sleeperPlayer.team?.uppercased() == team &&
+                   sleeperPlayer.position?.uppercased() == position
+        }
+        
+        if isJamesCook {
+            print("   Strategy 3 (Last Name '\(lastName)'): \(lastNameMatches.count) matches")
+            for match in lastNameMatches {
+                print("     - \(match.fullName) (\(match.team ?? "NO_TEAM")) \(match.position ?? "NO_POS")")
+            }
+        }
+        
+        if lastNameMatches.count == 1 {
+            if isJamesCook { print("✅ JAMES COOK: Last name match found - \(lastNameMatches.first!.fullName)") }
+            return lastNameMatches.first
+        }
+        
+        // 🔥 STRATEGY 4: Fuzzy team matching (handle team abbreviation differences)
+        let teamAliases = getTeamAliases(for: team)
+        var fuzzyTeamMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            let sleeperTeam = sleeperPlayer.team?.uppercased() ?? ""
+            return (teamAliases.contains(sleeperTeam) || sleeperTeam == team) &&
+                   sleeperPlayer.position?.uppercased() == position &&
+                   (sleeperPlayer.fullName.lowercased() == playerName.lowercased() ||
+                    sleeperPlayer.shortName.lowercased() == shortName.lowercased() ||
+                    (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
+        }
+        
+        if isJamesCook {
+            print("   Strategy 4 (Fuzzy Team): \(fuzzyTeamMatches.count) matches")
+            print("     Team aliases for \(team): \(teamAliases)")
+        }
+        
+        if fuzzyTeamMatches.count == 1 {
+            if isJamesCook { print("✅ JAMES COOK: Fuzzy team match found - \(fuzzyTeamMatches.first!.fullName)") }
+            return fuzzyTeamMatches.first
+        }
+        
+        // 🔥 STRATEGY 5: Relaxed position matching (handle FLEX, DEF vs DST, etc.)
+        let positionAliases = getPositionAliases(for: position)
+        var fuzzyPositionMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            let sleeperPosition = sleeperPlayer.position?.uppercased() ?? ""
+            return (positionAliases.contains(sleeperPosition) || sleeperPosition == position) &&
+                   sleeperPlayer.team?.uppercased() == team &&
+                   (sleeperPlayer.fullName.lowercased() == playerName.lowercased() ||
+                    sleeperPlayer.shortName.lowercased() == shortName.lowercased() ||
+                    (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
+        }
+        
+        if isJamesCook {
+            print("   Strategy 5 (Fuzzy Position): \(fuzzyPositionMatches.count) matches")
+            print("     Position aliases for \(position): \(positionAliases)")
+        }
+        
+        if fuzzyPositionMatches.count == 1 {
+            if isJamesCook { print("✅ JAMES COOK: Fuzzy position match found - \(fuzzyPositionMatches.first!.fullName)") }
+            return fuzzyPositionMatches.first
+        }
+        
+        // 🔥 STRATEGY 6: Combined fuzzy matching (last resort)
+        var combinedFuzzyMatches = playerDirectory.players.values.filter { sleeperPlayer in
+            let sleeperTeam = sleeperPlayer.team?.uppercased() ?? ""
+            let sleeperPosition = sleeperPlayer.position?.uppercased() ?? ""
+            let sleeperLastName = sleeperPlayer.lastName?.lowercased() ?? extractLastName(from: sleeperPlayer.fullName).lowercased()
+            
+            return (teamAliases.contains(sleeperTeam) || sleeperTeam == team) &&
+                   (positionAliases.contains(sleeperPosition) || sleeperPosition == position) &&
+                   sleeperLastName == lastName.lowercased()
+        }
+        
+        if isJamesCook {
+            print("   Strategy 6 (Combined Fuzzy): \(combinedFuzzyMatches.count) matches")
+        }
+        
+        // Collect all potential matches for prioritization
+        var allPotentialMatches: [SleeperPlayer] = []
+        allPotentialMatches.append(contentsOf: exactMatches)
+        allPotentialMatches.append(contentsOf: shortNameMatches)
+        allPotentialMatches.append(contentsOf: lastNameMatches)
+        allPotentialMatches.append(contentsOf: fuzzyTeamMatches)
+        allPotentialMatches.append(contentsOf: fuzzyPositionMatches)
+        allPotentialMatches.append(contentsOf: combinedFuzzyMatches)
+        
+        // Remove duplicates
+        let uniqueMatches = Array(Set(allPotentialMatches.map { $0.playerID })).compactMap { id in
+            allPotentialMatches.first { $0.playerID == id }
+        }
+        
+        if isJamesCook {
+            print("   Total unique potential matches: \(uniqueMatches.count)")
+            for match in uniqueMatches {
+                print("     - \(match.fullName) (\(match.team ?? "NO_TEAM")) \(match.position ?? "NO_POS") ID: \(match.playerID)")
+            }
+        }
+        
+        // If we have matches, prioritize them
+        if !uniqueMatches.isEmpty {
+            // Priority 1: Player with detailed game stats
+            let detailedStatsMatches = uniqueMatches.filter { player in
                 if let stats = viewModel.playerStats[player.playerID] {
                     let hasDetailedStats = stats.keys.contains { key in
                         key.contains("pass_att") || key.contains("rush_att") || 
@@ -590,31 +877,144 @@ struct PlayerScoreBarCardView: View {
             }
             
             if !detailedStatsMatches.isEmpty {
+                if isJamesCook { print("✅ JAMES COOK: Using detailed stats match - \(detailedStatsMatches.first!.fullName)") }
                 return detailedStatsMatches.first
             }
             
-            // Priority 2: Player with any stats (even if just fantasy points)
-            let anyStatsMatches = potentialMatches.filter { player in
+            // Priority 2: Player with jersey number match
+            if let jerseyNumber = playerEntry.player.jerseyNumber {
+                let jerseyMatches = uniqueMatches.filter { player in
+                    return player.number?.description == jerseyNumber
+                }
+                if !jerseyMatches.isEmpty {
+                    if isJamesCook { print("✅ JAMES COOK: Using jersey number match - \(jerseyMatches.first!.fullName)") }
+                    return jerseyMatches.first
+                }
+            }
+            
+            // Priority 3: Player with any stats (even if just fantasy points)
+            let anyStatsMatches = uniqueMatches.filter { player in
                 return viewModel.playerStats[player.playerID] != nil
             }
             
             if !anyStatsMatches.isEmpty {
+                if isJamesCook { print("✅ JAMES COOK: Using stats match - \(anyStatsMatches.first!.fullName)") }
                 return anyStatsMatches.first
             }
             
-            // Priority 3: Player with most recent/current team match
-            let teamMatches = potentialMatches.filter { player in
-                return player.team?.lowercased() == playerEntry.player.team?.lowercased()
-            }
-            
-            if !teamMatches.isEmpty {
-                return teamMatches.first
-            }
-            
             // Priority 4: Fallback to first match
-            return potentialMatches.first
+            if isJamesCook { print("⚠️ JAMES COOK: Using first match fallback - \(uniqueMatches.first!.fullName)") }
+            return uniqueMatches.first
         }
         
+        // No matches found - this is where James Cook is failing
+        if isJamesCook {
+            print("❌ JAMES COOK: NO MATCHES FOUND!")
+            print("   This suggests the player directory might not be loaded or James Cook has different data")
+            print("   Player directory loaded: \(playerDirectory.players.count > 0)")
+            print("   Stats loaded: \(viewModel.statsLoaded)")
+            print("   Available stats keys: \(viewModel.playerStats.keys.count)")
+        }
+        
+        print("❌ NO MATCH found for \(playerName) (\(team)) \(position)")
         return nil
+    }
+    
+    // MARK: - Helper Methods for Bulletproof Matching
+    
+    /// Extract last name from full name
+    private func extractLastName(from fullName: String) -> String {
+        let components = fullName.components(separatedBy: " ")
+        return components.last ?? fullName
+    }
+    
+    /// Get team aliases to handle different team abbreviations
+    private func getTeamAliases(for team: String) -> [String] {
+        switch team.uppercased() {
+        case "BUF":
+            return ["BUFFALO", "BUF"]
+        case "MIA":
+            return ["MIAMI", "MIA"]
+        case "NE", "NEP":
+            return ["NEW ENGLAND", "NE", "NEP", "PATRIOTS"]
+        case "NYJ":
+            return ["NEW YORK JETS", "NYJ", "JETS"]
+        case "BAL":
+            return ["BALTIMORE", "BAL"]
+        case "CIN":
+            return ["CINCINNATI", "CIN"]
+        case "CLE":
+            return ["CLEVELAND", "CLE"]
+        case "PIT":
+            return ["PITTSBURGH", "PIT"]
+        case "HOU":
+            return ["HOUSTON", "HOU"]
+        case "IND":
+            return ["INDIANAPOLIS", "IND"]
+        case "JAX", "JAC":
+            return ["JACKSONVILLE", "JAX", "JAC"]
+        case "TEN":
+            return ["TENNESSEE", "TEN"]
+        case "DEN":
+            return ["DENVER", "DEN"]
+        case "KC":
+            return ["KANSAS CITY", "KC"]
+        case "LV", "LVR", "OAK":
+            return ["LAS VEGAS", "LV", "LVR", "OAKLAND", "OAK", "RAIDERS"]
+        case "LAC":
+            return ["LOS ANGELES CHARGERS", "LAC", "SD", "SAN DIEGO"]
+        case "DAL":
+            return ["DALLAS", "DAL"]
+        case "NYG":
+            return ["NEW YORK GIANTS", "NYG", "GIANTS"]
+        case "PHI":
+            return ["PHILADELPHIA", "PHI"]
+        case "WSH", "WAS":
+            return ["WASHINGTON", "WSH", "WAS"]
+        case "CHI":
+            return ["CHICAGO", "CHI"]
+        case "DET":
+            return ["DETROIT", "DET"]
+        case "GB":
+            return ["GREEN BAY", "GB"]
+        case "MIN":
+            return ["MINNESOTA", "MIN"]
+        case "ATL":
+            return ["ATLANTA", "ATL"]
+        case "CAR":
+            return ["CAROLINA", "CAR"]
+        case "NO":
+            return ["NEW ORLEANS", "NO"]
+        case "TB":
+            return ["TAMPA BAY", "TB"]
+        case "ARI":
+            return ["ARIZONA", "ARI"]
+        case "LAR":
+            return ["LOS ANGELES RAMS", "LAR", "STL"]
+        case "SEA":
+            return ["SEATTLE", "SEA"]
+        case "SF":
+            return ["SAN FRANCISCO", "SF"]
+        default:
+            return [team]
+        }
+    }
+    
+    /// Get position aliases to handle different position formats
+    private func getPositionAliases(for position: String) -> [String] {
+        switch position.uppercased() {
+        case "DEF":
+            return ["DEF", "DST", "D/ST"]
+        case "DST":
+            return ["DEF", "DST", "D/ST"]
+        case "RB":
+            return ["RB", "FLEX"]
+        case "WR":
+            return ["WR", "FLEX"]
+        case "TE":
+            return ["TE", "FLEX"]
+        default:
+            return [position]
+        }
     }
 }

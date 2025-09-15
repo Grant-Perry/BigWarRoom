@@ -35,6 +35,9 @@ struct MatchupsHubView: View {
     // MARK: - Sorting States
     @State internal var sortByWinning = true // true = Win (highest scores first), false = Lose (lowest scores first)
     
+    // 🔥 NEW: View Mode State (true = Dual view, false = Single/Horizontal view)
+    @State internal var dualViewMode = true
+    
     // MARK: - Timer States
     @State internal var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
     @State internal var countdownTimer: Timer?
@@ -83,10 +86,4 @@ struct MatchupsHubView: View {
             }
         }
     }
-}
-
-// MARK: - Preview
-#Preview {
-    MatchupsHubView()
-        .preferredColorScheme(.dark)
 }

@@ -12,6 +12,9 @@ struct NonMicroCardView: View {
     let isWinning: Bool
     let onTap: () -> Void
     
+    // 🔥 NEW: Accept dualViewMode parameter to make cards more compact in Single view
+    var dualViewMode: Bool = true
+    
     @State private var cardScale: CGFloat = 1.0 // FIXED: Remove slow scale animation
     @State private var scoreAnimation: Bool = false
     @State private var glowIntensity: Double = 0.0
@@ -50,7 +53,7 @@ struct NonMicroCardView: View {
     // MARK: -> Eliminated Card Content
     
     private var eliminatedCardContent: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: dualViewMode ? 6 : 3) { // 🔥 NEW: Tighter spacing for Single view
             // Header with league info (full league name)
             HStack {
                 // League name with platform logo - FULL WIDTH
@@ -68,7 +71,7 @@ struct NonMicroCardView: View {
                     .frame(width: 16, height: 16)
                     
                     Text("\(matchup.league.league.name)")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: dualViewMode ? 18 : 22, weight: .bold)) // 🔥 NEW: Same large font as regular cards
                         .foregroundColor(.white.opacity(0.8))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -95,42 +98,42 @@ struct NonMicroCardView: View {
             }
             
             // Main eliminated content - COMPACT
-            VStack(spacing: 4) {
+            VStack(spacing: 2) { // 🔥 NEW: Much tighter spacing
                 // ELIMINATED text without skulls (fits one line)
                 Text("ELIMINATED")
-                    .font(.system(size: 16, weight: .black))
+                    .font(.system(size: dualViewMode ? 16 : 14, weight: .black)) // 🔥 NEW: Smaller for Single view
                     .foregroundColor(.white)
                     .tracking(1.5)
                 
-                // Skulls on separate line
-                HStack(spacing: 8) {
+                // Skulls on separate line - SMALLER
+                HStack(spacing: 4) { // 🔥 NEW: Tighter spacing
                     Text("💀")
-                        .font(.system(size: 24))
+                        .font(.system(size: dualViewMode ? 18 : 16)) // 🔥 NEW: Smaller skulls
                         .scaleEffect(eliminatedPulse ? 1.1 : 1.0)
                     
                     Text("☠️")
-                        .font(.system(size: 24))
+                        .font(.system(size: dualViewMode ? 18 : 16)) // 🔥 NEW: Smaller skulls
                         .scaleEffect(eliminatedPulse ? 1.1 : 1.0)
                 }
                 
                 // Week and manager info - COMPACT
-                VStack(spacing: 2) {
-                    if let week = myEliminationWeek {
-                        Text("Week \(week)")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                    
-                    // Manager name (if available)
-                    if let myTeam = matchup.myTeam {
-                        Text(myTeam.ownerName)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
+                if let week = myEliminationWeek {
+                    Text("Week \(week)")
+                        .font(.system(size: dualViewMode ? 12 : 10, weight: .semibold)) // 🔥 NEW: Smaller for Single view
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                
+                // Manager name (if available) - COMPACT
+                if let myTeam = matchup.myTeam {
+                    Text(myTeam.ownerName)
+                        .font(.system(size: dualViewMode ? 11 : 9, weight: .medium)) // 🔥 NEW: Smaller for Single view
+                        .foregroundColor(.white.opacity(0.6))
                 }
             }
             
-            // Footer - just time (NO SPACER!)
+            Spacer() // 🔥 NEW: Add spacer to push content up and fill height consistently
+            
+            // Footer - just time (NO SPACER!) - COMPACT
             HStack {
                 HStack(spacing: 2) {
                     Image(systemName: "clock")
@@ -138,7 +141,7 @@ struct NonMicroCardView: View {
                         .foregroundColor(.gray)
                     
                     Text(timeAgo(matchup.lastUpdated))
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: dualViewMode ? 9 : 8, weight: .medium)) // 🔥 NEW: Smaller for Single view
                         .foregroundColor(.gray)
                 }
                 
@@ -151,7 +154,7 @@ struct NonMicroCardView: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 14)
+        .padding(.vertical, dualViewMode ? 14 : 8) // 🔥 NEW: Same padding as regular cards
         .background(eliminatedCardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -166,7 +169,7 @@ struct NonMicroCardView: View {
                 )
         )
         .shadow(color: .red.opacity(0.4), radius: 8, x: 0, y: 2)
-        .frame(height: 142)
+        .frame(height: dualViewMode ? 142 : 120) // 🔥 FIXED: Same height as regular cards!
     }
     
     // MARK: -> Eliminated Card Background
@@ -194,7 +197,7 @@ struct NonMicroCardView: View {
     @State private var eliminatedPulse: Bool = false
     
     private var cardContent: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: dualViewMode ? 8 : 4) { // 🔥 NEW: Tighter spacing for Single view
             // Compact header with league and status
             cardHeader
             
@@ -206,10 +209,10 @@ struct NonMicroCardView: View {
             }
             
             // Compact footer
-            compactFooter
+            compactFooter // 🔥 FIXED: Always show footer (removed dualViewMode check)
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 14)
+        .padding(.vertical, dualViewMode ? 14 : 8) // 🔥 NEW: Less padding for Single view
         .background(cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
@@ -230,7 +233,7 @@ struct NonMicroCardView: View {
             x: 0,
             y: 2
         )
-        .frame(height: 142)
+        .frame(height: dualViewMode ? 142 : 120) // 🔥 NEW: Increase height even more for Single view (was 100, now 120)
     }
     
     private var cardBackground: some View {
@@ -276,7 +279,7 @@ struct NonMicroCardView: View {
                 .frame(width: 16, height: 16)
                 
                 Text("\(matchup.league.league.name)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: dualViewMode ? 18 : 22, weight: .bold)) // 🔥 NEW: Much larger for Single view (was 14, now 22)
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -292,7 +295,7 @@ struct NonMicroCardView: View {
     }
     
     private var compactMatchupContent: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: dualViewMode ? 12 : 6) { // 🔥 NEW: Tighter spacing for Single view
             // 🔥 FIXED: Teams row - HOME on LEFT, AWAY on RIGHT (respecting actual home/away designations)
             HStack(spacing: 8) {
                 // 🔥 FIXED: Home team on LEFT (regardless of if it's me or opponent)
@@ -302,9 +305,9 @@ struct NonMicroCardView: View {
                 
                 // VS separator
                 Text("VS")
-                    .font(.system(size: 10, weight: .black))
+                    .font(.system(size: dualViewMode ? 10 : 8, weight: .black)) // 🔥 NEW: Smaller font for Single view
                     .foregroundColor(.white.opacity(0.6))
-                    .frame(width: 24)
+                    .frame(width: dualViewMode ? 24 : 20) // 🔥 NEW: Narrower for Single view
                 
                 // 🔥 FIXED: Away team on RIGHT (regardless of if it's me or opponent)
                 if let awayTeam = getAwayTeam() {
@@ -312,7 +315,7 @@ struct NonMicroCardView: View {
                 }
             }
             
-            // Win probability - COMPACT
+            // 🔥 FIXED: Win probability - ALWAYS show it now (removed dualViewMode check)
             if let winProb = matchup.myWinProbability {
                 compactWinProbability(winProb)
             }
@@ -382,7 +385,7 @@ struct NonMicroCardView: View {
             }
         }()
         
-        return VStack(spacing: 6) {
+        return VStack(spacing: dualViewMode ? 6 : 3) { // 🔥 NEW: Tighter spacing for Single view
             // Avatar - FIXED: Don't let AsyncImage block the team color display
             Group {
                 if let avatarURL = team.avatarURL {
@@ -394,7 +397,7 @@ struct NonMicroCardView: View {
                         // Show team initials immediately while avatar loads
                         compactTeamInitials(team, isWinning: isTeamWinning)
                     }
-                    .frame(width: 45, height: 45)
+                    .frame(width: dualViewMode ? 45 : 32, height: dualViewMode ? 45 : 32) // 🔥 NEW: Much smaller avatars for Single view
                     .clipShape(Circle())
                     .overlay(
                         Circle()
@@ -405,7 +408,7 @@ struct NonMicroCardView: View {
                     )
                 } else {
                     compactTeamInitials(team, isWinning: isTeamWinning)
-                        .frame(width: 45, height: 45)
+                        .frame(width: dualViewMode ? 45 : 32, height: dualViewMode ? 45 : 32) // 🔥 NEW: Much smaller avatars for Single view
                         .overlay(
                             Circle()
                                 .stroke(
@@ -418,19 +421,19 @@ struct NonMicroCardView: View {
             
             // Team name - COMPACT - Pink for losers
             Text(team.ownerName)
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: dualViewMode ? 13 : 11, weight: .bold)) // 🔥 NEW: Larger font (was 11/9, now 13/11)
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .lineLimit(1)
-                .frame(maxWidth: 60)
+                .frame(maxWidth: dualViewMode ? 60 : 50) // 🔥 NEW: Narrower for Single view
             
             // Score - PROMINENT - Pink for losers
             Text(team.currentScoreString)
-                .font(.system(size: 16, weight: .black, design: .rounded))
+                .font(.system(size: dualViewMode ? 16 : 13, weight: .black, design: .rounded)) // 🔥 NEW: Smaller font for Single view
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
             
-            // Record - TINY
-            if let record = team.record {
+            // Record - TINY (only show in Dual view)
+            if dualViewMode, let record = team.record {
                 Text(record.displayString)
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.gray)
@@ -497,7 +500,7 @@ struct NonMicroCardView: View {
                     .foregroundColor(.gray)
                 
                 Text(timeAgo(matchup.lastUpdated))
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: dualViewMode ? 9 : 8, weight: .medium)) // 🔥 NEW: Smaller for Single view
                     .foregroundColor(.gray)
             }
             
@@ -506,7 +509,7 @@ struct NonMicroCardView: View {
             // Score differential - if available
             if let differential = matchup.scoreDifferential {
                 Text(differential > 0 ? "+\(String(format: "%.1f", differential))" : String(format: "%.1f", differential))
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .font(.system(size: dualViewMode ? 9 : 8, weight: .bold, design: .monospaced)) // 🔥 NEW: Smaller for Single view
                     .foregroundColor(differential > 0 ? .green : .red)
             }
             

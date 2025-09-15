@@ -103,4 +103,15 @@ extension MatchupsHubView {
             await viewModel.loadMatchupsForWeek(week)
         }
     }
+
+    /// Toggle auto-refresh on/off
+    func toggleAutoRefresh() {
+        viewModel.toggleAutoRefresh()
+        
+        if viewModel.autoRefreshEnabled {
+            startPeriodicRefresh()
+        } else {
+            stopPeriodicRefresh()
+        }
+    }
 }

@@ -91,22 +91,42 @@ final class LeagueMatchupProvider {
         }
     }
     
-    /// Get current user's team ID for ESPN leagues
+    /// Get current user's team ID for ESPN leagues - WITH DEBUG LOGGING
     private func getESPNUserTeamID() async -> String? {
+        print("🔍 ESPN TEAM IDENTIFICATION for league: \(league.league.name)")
+        print("   - League ID: \(league.league.leagueID)")
+        print("   - My ESPN ID (GpESPNID): \(AppConstants.GpESPNID)")
+        
         do {
             let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
             let myESPNID = AppConstants.GpESPNID
             
+            print("   - ESPN League data fetched successfully")
+            
             if let teams = espnLeague.teams {
+                print("   - Found \(teams.count) teams in league:")
+                
                 for team in teams {
-                    if let owners = team.owners, owners.contains(myESPNID) {
-                        return String(team.id)
+                    let managerName = espnLeague.getManagerName(for: team.owners)
+                    print("     - Team \(team.id): '\(managerName)' (Owners: \(team.owners ?? []))")
+                    
+                    if let owners = team.owners {
+                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
+                        if owners.contains(myESPNID) {
+                            print("✅ MATCH FOUND! My team ID is: \(team.id)")
+                            return String(team.id)
+                        }
                     }
                 }
+                
+                print("❌ NO MATCH: My ESPN ID '\(myESPNID)' was not found in any team owners")
+            } else {
+                print("❌ NO TEAMS: espnLeague.teams is nil")
             }
             
             return nil
         } catch {
+            print("❌ ESPN API ERROR: \(error)")
             return nil
         }
     }
@@ -146,13 +166,24 @@ final class LeagueMatchupProvider {
         return choppedSummary
     }
     
-    /// Find user's matchup by team ID
+    /// Find user's matchup by team ID - WITH DEBUG LOGGING
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
+        print("🔍 FINDING MY MATCHUP with team ID: \(myTeamID)")
+        print("   - Available matchups: \(matchups.count)")
+        
         for matchup in matchups {
-            if matchup.homeTeam.id == myTeamID || matchup.awayTeam.id == myTeamID {
+            print("   - Matchup: \(matchup.homeTeam.ownerName) (ID: \(matchup.homeTeam.id)) vs \(matchup.awayTeam.ownerName) (ID: \(matchup.awayTeam.id))")
+            
+            if matchup.homeTeam.id == myTeamID {
+                print("✅ FOUND: I am the HOME team (\(matchup.homeTeam.ownerName))")
+                return matchup
+            } else if matchup.awayTeam.id == myTeamID {
+                print("✅ FOUND: I am the AWAY team (\(matchup.awayTeam.ownerName))")
                 return matchup
             }
         }
+        
+        print("❌ NOT FOUND: No matchup found for my team ID '\(myTeamID)'")
         return nil
     }
     

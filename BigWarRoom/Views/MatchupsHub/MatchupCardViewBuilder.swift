@@ -15,6 +15,9 @@ struct MatchupCardViewBuilder: View {
     let onShowDetail: () -> Void
     let onMicroCardTap: (String) -> Void
     
+    // 🔥 NEW: Accept dualViewMode parameter to make cards compact in Single view
+    var dualViewMode: Bool = true
+
     var body: some View {
         Group {
             if microMode {
@@ -62,11 +65,12 @@ struct MatchupCardViewBuilder: View {
     private var nonMicroCardView: some View {
         NonMicroCardView(
             matchup: matchup,
-            isWinning: isWinning
+            isWinning: isWinning,
+            dualViewMode: dualViewMode // 🔥 NEW: Pass dualViewMode to NonMicroCardView
         ) {
             onShowDetail()
         }
-        .padding(.bottom, 44)
+        .padding(.bottom, dualViewMode ? 44 : 20) // 🔥 NEW: Increase bottom padding for Single view (was 16, now 20)
     }
     
     // MARK: -> Properties Calculation

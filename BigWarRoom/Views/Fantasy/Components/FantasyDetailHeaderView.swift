@@ -43,6 +43,7 @@ struct FantasyDetailHeaderView: View {
         }
         .padding(.vertical, 20) // Internal padding
         .padding(.horizontal, 20) // Internal padding
+	   // stats gradient background
         .background(
             ZStack {
                 // MAIN GRADIENT BACKGROUND - More opaque to ensure visibility

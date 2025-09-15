@@ -255,7 +255,7 @@ struct FantasyPlayerCard: View {
             Spacer()
             HStack {
                 Spacer()
-                FantasyGameMatchupView(player: player)
+                MatchupTeamFinalView(player: player, scaleEffect: 1.2)
                 Spacer()
             }
             .padding(.bottom, 45)

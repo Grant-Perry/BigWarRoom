@@ -57,12 +57,15 @@ struct DangerZoneCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 
-                HStack {
+                HStack(spacing: 4) {
                     Text("⚠️")
-                    Text("ON THE CHOPPING BLOCK")
-                        .font(.system(size: 12, weight: .bold))
+                    Text("ON THE\nCHOPPING\nBLOCK")
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.orange)
-                        .tracking(1)
+                        .tracking(0.5)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
                 // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY FOR DANGER ZONE - FIXED LAYOUT
@@ -101,6 +104,8 @@ struct DangerZoneCard: View {
                 Text(ranking.weeklyPointsString)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.orange)
+                    .fixedSize()
+                    .minimumScaleFactor(0.8)
                 
                 // Show current vs projected status
                 scoringStatusText
@@ -149,12 +154,14 @@ struct DangerZoneCard: View {
             Text("CURRENT")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.orange)
-                .tracking(1)
+                .tracking(0.5)
+                .fixedSize()
         } else if let projected = ranking.team.projectedScore, projected > 0 {
             Text("PROJECTED")
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.orange)
-                .tracking(1)
+                .tracking(0.5)
+                .fixedSize()
         }
     }
     
