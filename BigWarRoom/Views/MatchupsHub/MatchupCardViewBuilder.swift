@@ -171,9 +171,8 @@ struct MatchupCardViewBuilder: View {
         let percentage = (myScore / totalScore) * 100.0
         return "\(Int(percentage))%"
     }
-    
+
     private func isMatchupLive() -> Bool {
-        // Use the centralized UnifiedMatchup.isLive property
         return matchup.isLive
     }
 }

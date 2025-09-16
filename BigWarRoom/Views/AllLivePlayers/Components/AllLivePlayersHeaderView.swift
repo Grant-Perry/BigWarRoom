@@ -32,7 +32,7 @@ struct AllLivePlayersHeaderView: View {
                     countdown: refreshCountdown,
                     onRefresh: {
                         Task {
-                            await performBackgroundRefresh()
+                            await performRefreshWithReset()
                         }
                     }
                 )
@@ -98,6 +98,14 @@ struct AllLivePlayersHeaderView: View {
         await viewModel.refresh()
         resetCountdown()
         // DO NOT call onAnimationReset() here - that causes the jarring refresh
+    }
+    
+    // 🔥 NEW: Refresh with UI reset - for manual refresh button
+    private func performRefreshWithReset() async {
+        // 🔥 NUCLEAR OPTION: Complete state reset to fix filtering bugs
+        await viewModel.hardResetFilteringState()
+        onAnimationReset() // Reset animations and UI state
+        resetCountdown()
     }
     
     // MARK: - Global Refresh Cycle Management

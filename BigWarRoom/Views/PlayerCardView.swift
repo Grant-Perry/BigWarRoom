@@ -28,8 +28,8 @@ struct PlayerCardView: View {
             onTap?()
         }) {
             HStack(spacing: 12) {
-                // Player headshot (primary image)
-                playerImageView
+                // Player headshot (primary image) - use component
+                PlayerCardImageView(player: player, team: team)
                 
                 // Player info
                 VStack(alignment: .leading, spacing: 4) {
@@ -39,8 +39,8 @@ struct PlayerCardView: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.primary)
                         
-                        // Position badge
-                        positionBadge
+                        // Position badge - use component
+                        PlayerCardPositionBadgeView(player: player)
                         
                         // Team logo (after position)
                         if let team = team {
@@ -58,131 +58,19 @@ struct PlayerCardView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Additional details + stats preview
+                    // Additional details + stats preview - use component
                     if showDetails {
-                        statsPreviewRow
+                        PlayerCardStatsPreviewRowView(player: player)
                     }
                 }
                 
                 Spacer()
             }
             .padding(12)
-            .background(teamBackgroundView)
+            .background(PlayerCardBackgroundView(team: team))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(PlainButtonStyle())
-    }
-    
-    // MARK: -> Subviews
-    
-    private var playerImageView: some View {
-        AsyncImage(url: player.headshotURL) { image in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } placeholder: {
-            // Fallback: Team colors with player initials
-            playerFallbackView
-        }
-        .frame(width: 50, height: 50)
-        .clipShape(Circle())
-        .overlay(
-            Circle()
-                .stroke(team?.primaryColor.opacity(0.3) ?? Color.gray, lineWidth: 1)
-        )
-    }
-    
-    private var playerFallbackView: some View {
-        Circle()
-            .fill(team?.gradient ?? LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom))
-            .overlay(
-                Text(player.firstName?.prefix(1).uppercased() ?? "?")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(team?.accentColor ?? .white)
-            )
-    }
-    
-    private var positionBadge: some View {
-        Text(player.position ?? "")
-            .font(.caption)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
-            .background(positionColor)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-    
-    private var positionColor: Color {
-        guard let position = player.position else { return .gray }
-        
-        switch position {
-        case "QB": return .blue
-        case "RB": return .green
-        case "WR": return .purple
-        case "TE": return .orange
-        case "K": return .yellow
-        case "DEF": return .red
-        default: return .gray
-        }
-    }
-    
-    private var statsPreviewRow: some View {
-        HStack(spacing: 8) {
-            // Player details
-            if let number = player.number {
-                Text("#\(number)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            if let yearsExp = player.yearsExp {
-                Text("Y\(yearsExp)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Stats preview from PlayerStatsStore
-            // if let stats = PlayerStatsStore.shared.stats(for: player.playerID) {
-            //     if let ppg = stats.pprPointsPerGame {
-            //         Text(String(format: "%.1f PPG", ppg))
-            //             .font(.caption2)
-            //             .foregroundColor(.blue)
-            //             .fontWeight(.medium)
-            //     }
-            // }
-            
-            // Injury status
-            if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
-			   Text(String(injuryStatus.prefix(5)))
-                    .font(.caption2)
-                    .foregroundColor(.red)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
-            }
-        }
-    }
-    
-    private var teamBackgroundView: some View {
-        Group {
-            if let team = team {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(team.backgroundColor)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(team.borderColor, lineWidth: 1)
-                    )
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(.systemBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(.systemGray4), lineWidth: 1)
-                    )
-            }
-        }
     }
 }
 

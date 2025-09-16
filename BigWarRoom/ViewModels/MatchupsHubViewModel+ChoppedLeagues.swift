@@ -65,7 +65,7 @@ extension MatchupsHubViewModel {
             
             // Step 4: Create team mapping and fantasy teams
             let (rosterToOwnerMap, userMap, avatarMap) = createTeamMappings(rosters: rosters, users: users)
-            let choppedTeams = createChoppedFantasyTeams(matchupData: matchupData, rosterToOwnerMap: rosterToOwnerMap, userMap: userMap, avatarMap: avatarMap)
+            let choppedTeams = createChoppedFantasyTeams(matchupData: matchupData, rosterToOwnerMap: rosterToOwnerMap, userMap: userMap, avatarMap: avatarMap, league: league)
             
             // Step 5: Process and rank teams
             return await processChoppedTeamRankings(teams: choppedTeams, league: league, week: week)
@@ -112,12 +112,13 @@ extension MatchupsHubViewModel {
         matchupData: [SleeperMatchupResponse], 
         rosterToOwnerMap: [Int: String], 
         userMap: [String: String], 
-        avatarMap: [String: URL]
+        avatarMap: [String: URL],
+        league: UnifiedLeagueManager.LeagueWrapper
     ) -> [FantasyTeam] {
         var activeTeams: [FantasyTeam] = []
         var eliminatedTeams: [FantasyTeam] = [] // Track eliminated teams for graveyard
         
-        print("🔍 CHOPPED DEBUG: Analyzing \(matchupData.count) teams for player status")
+//        print("🔍 CHOPPED DEBUG: Analyzing \(matchupData.count) teams for player status")
         
         for matchup in matchupData {
             let rosterID = matchup.rosterID
@@ -141,6 +142,9 @@ extension MatchupsHubViewModel {
             print("     - Has Players: \(hasAnyPlayers)")
             print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
             
+            // 🔥 NEW: Create actual starter roster for All Live Players integration
+            let starterRoster = createStarterRoster(from: matchup, realTeamScore: realTeamScore, leagueID: league.league.leagueID)
+            
             let fantasyTeam = FantasyTeam(
                 id: String(rosterID),
                 name: resolvedTeamName,
@@ -149,7 +153,7 @@ extension MatchupsHubViewModel {
                 avatar: avatarURL?.absoluteString,
                 currentScore: realTeamScore,
                 projectedScore: projectedScore,
-                roster: [], // Empty for chopped leagues (we only care about total scores)
+                roster: starterRoster, // 🔥 FIXED: Now includes actual starter players!
                 rosterID: rosterID
             )
             
@@ -177,6 +181,113 @@ extension MatchupsHubViewModel {
         
         // Return ONLY active teams for main rankings
         return activeTeams
+    }
+    
+    /// Create starter roster from Sleeper matchup data for All Live Players integration
+    private func createStarterRoster(from matchup: SleeperMatchupResponse, realTeamScore: Double, leagueID: String) -> [FantasyPlayer] {
+        guard let starters = matchup.starters, !starters.isEmpty else {
+            print("     🔥 ROSTER: No starters found for team")
+            return []
+        }
+        
+        print("     🔥 ROSTER: Creating \(starters.count) starter players")
+        
+        // Create FantasyPlayer objects from starter player IDs
+        let starterPlayers = starters.compactMap { playerID -> FantasyPlayer? in
+            // Get player info from PlayerDirectoryStore
+            let playerInfo = PlayerDirectoryStore.shared.player(for: playerID)
+            
+            // 🔥 FIXED: Calculate REAL individual player points using actual stats
+            let actualPlayerScore = calculateRealPlayerScore(playerID: playerID, leagueID: leagueID)
+            
+            let player = FantasyPlayer(
+                id: playerID,
+                sleeperID: playerID,
+                espnID: playerInfo?.espnID,
+                firstName: playerInfo?.firstName,
+                lastName: playerInfo?.lastName,
+                position: playerInfo?.position ?? "FLEX",
+                team: playerInfo?.team,
+                jerseyNumber: playerInfo?.number?.description,
+                currentPoints: actualPlayerScore, // 🔥 REAL score, not fake average!
+                projectedPoints: actualPlayerScore * 1.05,
+                gameStatus: nil,
+                isStarter: true, // 🔥 CRITICAL: Mark as starter so they show in All Live Players!
+                lineupSlot: playerInfo?.position
+            )
+            
+            print("       - \(player.fullName) (\(player.position)) - \(String(format: "%.1f", actualPlayerScore)) pts [STARTER] \(actualPlayerScore > 0 ? "✅" : "⏳")")
+            return player
+        }
+        
+        print("     🔥 ROSTER: Created \(starterPlayers.count) starter players for All Live Players")
+        return starterPlayers
+    }
+    
+    /// Calculate real individual player score using Sleeper stats and league scoring settings
+    private func calculateRealPlayerScore(playerID: String, leagueID: String) -> Double {
+        // Get player stats from AllLivePlayersViewModel's cached stats
+        let currentWeek = WeekSelectionManager.shared.selectedWeek
+        let playerStats = AllLivePlayersViewModel.shared.playerStats[playerID] ?? [:]
+        
+        // If no stats available, return 0 (game hasn't happened yet)
+        guard !playerStats.isEmpty else {
+            return 0.0
+        }
+        
+        // Get league scoring settings (use default if not available)
+        let scoringSettings = getLeagueScoringSettings(leagueID: leagueID) ?? getDefaultScoringSettings()
+        
+        // Calculate score using Sleeper scoring logic
+        var totalScore = 0.0
+        for (statKey, statValue) in playerStats {
+            if let scoring = scoringSettings[statKey] as? Double {
+                let points = statValue * scoring
+                totalScore += points
+            }
+        }
+        
+        return totalScore
+    }
+    
+    /// Get league-specific scoring settings
+    private func getLeagueScoringSettings(leagueID: String) -> [String: Any]? {
+        // This would ideally fetch from cache or API
+        // For now, return nil to fall back to defaults
+        return nil
+    }
+    
+    /// Get default Sleeper scoring settings
+    private func getDefaultScoringSettings() -> [String: Double] {
+        return [
+            // Passing
+            "pass_yd": 0.04,      // 1 point per 25 passing yards
+            "pass_td": 4.0,       // 4 points per passing TD
+            "pass_int": -1.0,     // -1 point per interception
+            
+            // Rushing
+            "rush_yd": 0.1,       // 1 point per 10 rushing yards
+            "rush_td": 6.0,       // 6 points per rushing TD
+            
+            // Receiving
+            "rec": 1.0,           // 1 point per reception (PPR)
+            "rec_yd": 0.1,        // 1 point per 10 receiving yards
+            "rec_td": 6.0,        // 6 points per receiving TD
+            
+            // Kicking
+            "fgm": 3.0,           // 3 points per field goal made
+            "xpm": 1.0,           // 1 point per extra point made
+            
+            // Defense
+            "def_td": 6.0,        // 6 points per defensive TD
+            "def_int": 2.0,       // 2 points per interception
+            "def_fr": 2.0,        // 2 points per fumble recovery
+            "def_sack": 1.0,      // 1 point per sack
+            "def_safe": 2.0,      // 2 points per safety
+            
+            // Fumbles
+            "fum_lost": -1.0,     // -1 point per fumble lost
+        ]
     }
     
     /// Process team rankings and create final summary

@@ -13,7 +13,7 @@ struct PlayerRosteredSectionView: View {
     let team: NFLTeam?
     
     @StateObject private var matchupsHubViewModel = MatchupsHubViewModel()
-    @State private var isExpanded: Bool = false
+    @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -64,6 +64,12 @@ struct PlayerRosteredSectionView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(overlayBorder)
         .shadow(color: (team?.primaryColor ?? Color.gpBlue).opacity(0.2), radius: 4, x: 0, y: 2)
+        .onAppear {
+            // Load matchup data when view appears to ensure we have current roster info
+            Task {
+                await matchupsHubViewModel.loadAllMatchups()
+            }
+        }
     }
     
     // MARK: - Content Views
@@ -97,13 +103,19 @@ struct PlayerRosteredSectionView: View {
         return matchupsHubViewModel.myMatchups.filter { matchup in
             if matchup.isChoppedLeague {
                 // Check if player is on my chopped team
-                return matchup.myTeam?.roster.contains { player in
-                    player.fullName.lowercased() == self.player.fullName.lowercased()
+                return matchup.myTeam?.roster.contains { rosterPlayer in
+                    // More robust matching - check multiple identifiers
+                    let nameMatch = rosterPlayer.fullName.lowercased() == self.player.fullName.lowercased()
+                    let sleeperIDMatch = rosterPlayer.sleeperID == self.player.playerID
+                    return nameMatch || sleeperIDMatch
                 } ?? false
             } else {
                 // Check if player is on my fantasy team
-                return matchup.myTeam?.roster.contains { player in
-                    player.fullName.lowercased() == self.player.fullName.lowercased()
+                return matchup.myTeam?.roster.contains { rosterPlayer in
+                    // More robust matching - check multiple identifiers  
+                    let nameMatch = rosterPlayer.fullName.lowercased() == self.player.fullName.lowercased()
+                    let sleeperIDMatch = rosterPlayer.sleeperID == self.player.playerID
+                    return nameMatch || sleeperIDMatch
                 } ?? false
             }
         }
@@ -157,34 +169,36 @@ private struct RosteredLeagueRow: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        Button {
-            // Navigate to the actual matchup
-            // This would need to be implemented based on your navigation structure
-            dismiss()
-        } label: {
+        NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
             HStack(spacing: 8) {
-                // League type indicator
-                HStack(spacing: 4) {
-                    Image(systemName: matchup.isChoppedLeague ? "flame.fill" : "sportscourt.fill")
-                        .font(.caption2)
-                        .foregroundColor(matchup.isChoppedLeague ? .orange : .blue)
-                    
-                    Text(matchup.isChoppedLeague ? "CHOPPED" : "FANTASY")
-                        .font(.caption2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(Color.white.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                // Platform logo (ESPN or Sleeper)
+                platformLogo
+                    .frame(width: 20, height: 20)
                 
-                // League name
-                Text(matchup.league.league.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
+                // League name with CHOPPED suffix if applicable
+                HStack(spacing: 4) {
+                    Text(matchup.league.league.name)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    
+                    if matchup.isChoppedLeague {
+                        Text("-")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        Image(systemName: "flame.fill")
+                            .font(.caption2)
+                            .foregroundColor(.gpYellow)
+                        
+                        Text("CHOPPED")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gpYellow)
+                    }
+                }
                 
                 Spacer()
                 
@@ -215,6 +229,23 @@ private struct RosteredLeagueRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var platformLogo: some View {
+        Group {
+            switch matchup.league.source {
+            case .espn:
+                Image("espnLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            case .sleeper:
+                Image("sleeperLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            }
+        }
     }
     
     private func eliminationStatusColor(_ status: EliminationStatus) -> Color {

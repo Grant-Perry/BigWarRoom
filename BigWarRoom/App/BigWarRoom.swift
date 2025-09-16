@@ -13,7 +13,7 @@ struct BigWarRoom: View {
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             TabView(selection: $selectedTab) {
-                // MATCHUPS HUB - THE COMMAND CENTER (NEW MAIN TAB)
+                // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
                 MatchupsHubView()
                     .tabItem {
                         Image(systemName: "target")
@@ -21,15 +21,15 @@ struct BigWarRoom: View {
                     }
                     .tag(0)
                 
-                // Draft War Room Tab
-                DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
+                // NFL SCHEDULE TAB - PRIORITIZED FOR VISIBILITY
+                NFLScheduleView()
                     .tabItem {
-                        Image(systemName: "brain.head.profile")
-                        Text("War Room")
+                        Image(systemName: "calendar.circle.fill")
+                        Text("Schedule")
                     }
                     .tag(1)
                 
-                // Fantasy Tab (moved to position 2)
+                // Fantasy Tab 
                 FantasyMatchupListView(draftRoomViewModel: viewModel)
                     .tabItem {
                         Image(systemName: "football")
@@ -37,7 +37,7 @@ struct BigWarRoom: View {
                     }
                     .tag(2)
                 
-                // All Live Players Tab - MOVED TO TAG 3
+                // All Live Players Tab
                 AllLivePlayersView()
                     .tabItem {
                         Image(systemName: "chart.bar.fill")
@@ -45,45 +45,13 @@ struct BigWarRoom: View {
                     }
                     .tag(3)
                 
-                // Live Draft Picks Tab - MOVED TO TAG 7
-                LiveDraftPicksView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "list.bullet.rectangle.portrait")
-                        Text("Live Picks")
-                    }
-                    .tag(7)
-                
-                // Draft Board Tab
-                LeagueDraftView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "sportscourt")
-                        Text("Draft Board")
-                    }
-                    .tag(4)
-                
-                // AI Pick Suggestions Tab (moved to position 5)
-                AIPickSuggestionsView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "wand.and.stars")
-                        Text("AI Picks")
-                    }
-                    .tag(5)
-                
-                // My Roster Tab
-                MyRosterView(draftRoomViewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "person.fill")
-                        Text("My Roster")
-                    }
-                    .tag(6)
-                
-                // OnBoarding Tab (moved to position 8)
+                // Settings Tab
                 OnBoardingView()
                     .tabItem {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(8)
+                    .tag(4)
             }
             .preferredColorScheme(.dark)
             

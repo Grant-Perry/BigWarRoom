@@ -32,29 +32,28 @@ struct AllLivePlayersView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // 🔥 CLEAN: Extracted header component
-                AllLivePlayersHeaderView(
-                    viewModel: allLivePlayersViewModel,
-                    sortHighToLow: $sortHighToLow,
-                    onAnimationReset: resetAnimations
-                )
+            ZStack {
+                // BG6 background
+                Image("BG7")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .opacity(0.35)
+                    .ignoresSafeArea(.all)
                 
-                // 🔥 CLEAN: Content based on state - no business logic here
-                contentView
+                VStack(spacing: 0) {
+                    // 🔥 CLEAN: Extracted header component
+                    AllLivePlayersHeaderView(
+                        viewModel: allLivePlayersViewModel,
+                        sortHighToLow: $sortHighToLow,
+                        onAnimationReset: resetAnimations
+                    )
+                    
+                    // 🔥 CLEAN: Content based on state - no business logic here
+                    buildContentView()
+                }
             }
             .navigationTitle("All Live Players")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if allLivePlayersViewModel.hasNoLeagues && !allLivePlayersViewModel.isLoading {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Refresh") {
-                            refreshData()
-                        }
-                        .foregroundColor(.blue)
-                    }
-                }
-            }
             .refreshable {
                 await performRefresh()
             }
@@ -74,33 +73,36 @@ struct AllLivePlayersView: View {
     
     // MARK: - Content View Selection (No Business Logic)
     
-    @ViewBuilder
-    private var contentView: some View {
+    func buildContentView() -> some View {
         if allLivePlayersViewModel.isLoading {
-            AllLivePlayersLoadingView()
+            return AnyView(AllLivePlayersLoadingView())
         } else if allLivePlayersViewModel.filteredPlayers.isEmpty {
-            AllLivePlayersEmptyStateView(
-                viewModel: allLivePlayersViewModel,
-                onAnimationReset: resetAnimations
-            )
-            // 🔥 NEW: Automatic recovery for potentially stuck states
-            .onAppear {
-                // If we have players but filtered list is empty (and we're not loading), might be stuck
-                if !allLivePlayersViewModel.allPlayers.isEmpty && !allLivePlayersViewModel.isLoading {
-                    // Delay to allow normal filtering to complete first
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                        if allLivePlayersViewModel.filteredPlayers.isEmpty && !allLivePlayersViewModel.allPlayers.isEmpty {
-                            print("🔧 AUTO-RECOVERY: Detected potentially stuck state after 2 seconds")
-                            allLivePlayersViewModel.recoverFromStuckState()
+            return AnyView(
+                AllLivePlayersEmptyStateView(
+                    viewModel: allLivePlayersViewModel,
+                    onAnimationReset: resetAnimations
+                )
+                // 🔥 NEW: Automatic recovery for potentially stuck states
+                .onAppear {
+                    // If we have players but filtered list is empty (and we're not loading), might be stuck
+                    if !allLivePlayersViewModel.allPlayers.isEmpty && !allLivePlayersViewModel.isLoading {
+                        // Delay to allow normal filtering to complete first
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            if allLivePlayersViewModel.filteredPlayers.isEmpty && !allLivePlayersViewModel.allPlayers.isEmpty {
+                                print("🔧 AUTO-RECOVERY: Detected potentially stuck state after 2 seconds")
+                                allLivePlayersViewModel.recoverFromStuckState()
+                            }
                         }
                     }
                 }
-            }
+            )
         } else {
-            AllLivePlayersListView(
-                viewModel: allLivePlayersViewModel,
-                animatedPlayers: $animatedPlayers,
-                onPlayerTap: handlePlayerTap
+            return AnyView(
+                AllLivePlayersListView(
+                    viewModel: allLivePlayersViewModel,
+                    animatedPlayers: $animatedPlayers,
+                    onPlayerTap: handlePlayerTap
+                )
             )
         }
     }

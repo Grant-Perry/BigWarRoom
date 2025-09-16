@@ -43,7 +43,7 @@ extension FantasyViewModel {
         let allTeamData = await fetchAllChoppedTeamData(leagueID: leagueID, week: week)
         
         guard !allTeamData.activeRankings.isEmpty else {
-            print("❌ CHOPPED: No active rankings found")
+//            print("❌ CHOPPED: No active rankings found")
             return nil
         }
         
@@ -144,7 +144,7 @@ extension FantasyViewModel {
                 week: week
             )
             
-            print("🔍 CHOPPED DEBUG: Analyzing \(sleeperMatchups.count) teams for active vs eliminated status")
+//            print("🔍 CHOPPED DEBUG: Analyzing \(sleeperMatchups.count) teams for active vs eliminated status")
             
             var allTeams: [FantasyTeam] = []
             var activeTeams: [FantasyTeam] = []

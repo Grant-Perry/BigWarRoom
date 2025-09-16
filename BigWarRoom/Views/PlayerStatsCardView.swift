@@ -51,36 +51,52 @@ struct PlayerStatsCardView: View {
     @StateObject private var playerStatsViewModel = PlayerStatsViewModel()
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                // Header with player image and basic info
-                PlayerStatsHeaderView(player: player, team: team)
-                
-                // Live stats section
-                PlayerLiveStatsView(
-                    playerStatsData: playerStatsViewModel.playerStatsData,
-                    team: team,
-                    isLoading: playerStatsViewModel.isLoadingStats
-                )
-                
-                // Rostered section
-                PlayerRosteredSectionView(player: player, team: team)
-                
-                // Team depth chart section
-                TeamDepthChartView(
-                    depthChartData: playerStatsViewModel.depthChartData,
-                    team: team
-                )
-                
-                // Player details section
-                PlayerDetailsInfoView(player: player)
-                
-                // Fantasy analysis section
-                FantasyAnalysisView(
-                    fantasyAnalysisData: playerStatsViewModel.fantasyAnalysisData
-                )
+        ZStack {
+            // BG1 background
+            Image("BG1")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .opacity(0.25)
+                .ignoresSafeArea(.all)
+            
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Header with player image and basic info
+                    PlayerStatsHeaderView(player: player, team: team)
+                        .padding(.horizontal, 24) // Much more padding to header
+                    
+                    // Live stats section
+                    PlayerLiveStatsView(
+                        playerStatsData: playerStatsViewModel.playerStatsData,
+                        team: team,
+                        isLoading: playerStatsViewModel.isLoadingStats
+                    )
+                    .padding(.horizontal, 24) // Much more padding to each section
+                    
+                    // Rostered section
+                    PlayerRosteredSectionView(player: player, team: team)
+                        .padding(.horizontal, 24) // Much more padding to each section
+                    
+                    // Team depth chart section
+                    TeamDepthChartView(
+                        depthChartData: playerStatsViewModel.depthChartData,
+                        team: team
+                    )
+                    .padding(.horizontal, 24) // Much more padding to each section
+                    
+                    // Player details section
+                    PlayerDetailsInfoView(player: player)
+                        .padding(.horizontal, 24) // Much more padding to each section
+                    
+                    // Fantasy analysis section
+                    FantasyAnalysisView(
+                        fantasyAnalysisData: playerStatsViewModel.fantasyAnalysisData
+                    )
+                    .padding(.horizontal, 24) // Much more padding to each section
+                }
+                .padding(.horizontal, 32) // PLUS the existing container padding
+                .padding(.vertical, 24)
             }
-            .padding()
         }
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
@@ -89,7 +105,6 @@ struct PlayerStatsCardView: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
         .task {
             // Initialize ViewModel with player data
             playerStatsViewModel.setupPlayer(player)

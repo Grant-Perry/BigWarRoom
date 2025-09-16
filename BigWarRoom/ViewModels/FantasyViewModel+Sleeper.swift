@@ -168,7 +168,6 @@ extension FantasyViewModel {
                 hasActiveRosters = true
                 
                 await MainActor.run {
-                    // x Print("🔥 CHOPPED: Forcing UI update with objectWillChange.send()")
                     self.objectWillChange.send()
                 }
                 

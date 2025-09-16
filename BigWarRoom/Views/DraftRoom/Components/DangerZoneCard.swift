@@ -10,28 +10,20 @@ import SwiftUI
 
 /// **DangerZoneCard**
 /// 
-/// Displays teams in the danger zone with:
-/// - Pulsing warning animations
-/// - Orange warning glow effects
-/// - Safety margin indicators
-/// - Animated survival percentage display
-/// - 🔥 NEW: Tap to view team roster
+/// EXACT COPY OF SurvivalCard with orange styling + elimination delta
 struct DangerZoneCard: View {
     let ranking: FantasyTeamRanking
-    let leagueID: String? // 🔥 NEW: For roster navigation
-    let week: Int? // 🔥 NEW: For roster navigation
-    @State private var warningPulse = false
-    @State private var showTeamRoster = false // 🔥 NEW: Sheet state
+    let leagueID: String?
+    let week: Int?
+    @State private var showTeamRoster = false
     
     var body: some View {
         HStack(spacing: 16) {
-            // Warning rank with pulse
+            // Rank badge
             VStack {
                 Text(ranking.rankDisplay)
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.orange)
-                    .scaleEffect(warningPulse ? 1.1 : 1.0)
-                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
+                    .foregroundColor(.white)
                 
                 Text("DANGER")
                     .font(.system(size: 8, weight: .bold))
@@ -39,17 +31,11 @@ struct DangerZoneCard: View {
                     .tracking(0.5)
             }
             .frame(width: 50)
-            .onAppear { warningPulse = true }
             
-            // Team avatar with warning glow
+            // Team avatar
             teamAvatar
-                .overlay(
-                    Circle()
-                        .stroke(Color.orange.opacity(warningPulse ? 0.8 : 0.4), lineWidth: 2)
-                        .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
-                )
             
-            // Team info with danger indicators
+            // Team info
             VStack(alignment: .leading, spacing: 4) {
                 Text(ranking.team.ownerName)
                     .font(.system(size: 16, weight: .semibold))
@@ -57,18 +43,14 @@ struct DangerZoneCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 
-                HStack(spacing: 4) {
+                HStack(spacing: 8) {
                     Text("⚠️")
-                    Text("ON THE\nCHOPPING\nBLOCK")
-                        .font(.system(size: 10, weight: .bold))
+                    Text("Danger")
+                        .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.orange)
-                        .tracking(0.5)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 
-                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY FOR DANGER ZONE - FIXED LAYOUT
+                // 🎯 PROMINENT SLEEPER-STYLE SAFE % DISPLAY - FIXED NO WRAP
                 HStack(spacing: 8) {
                     HStack(spacing: 4) {
                         Text("SAFE")
@@ -85,35 +67,43 @@ struct DangerZoneCard: View {
                     .padding(.vertical, 3)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.orange.opacity(0.3))
+                            .fill(Color.orange.opacity(0.2))
                     )
-                    .scaleEffect(warningPulse ? 1.05 : 1.0)
-                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
                     
-                    Text("From Safety: \(ranking.safetyMarginDisplay)")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.orange)
-                        .fixedSize()
+                    // Show projected score if different from current
+                    if let projected = ranking.team.projectedScore, 
+                       let current = ranking.team.currentScore,
+                       abs(projected - current) > 1.0 {
+                        Text("PROJ: \(String(format: "%.1f", projected))")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.cyan)
+                            .fixedSize()
+                    }
                 }
             }
             
             Spacer()
             
-            // Points with warning styling
+            // Points with projected display
             VStack(alignment: .trailing, spacing: 4) {
                 Text(ranking.weeklyPointsString)
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.orange)
-                    .fixedSize()
-                    .minimumScaleFactor(0.8)
+                    .foregroundColor(.white)
                 
-                // Show current vs projected status
-                scoringStatusText
+                // Show "PROJ" or "PTS" based on scoring status
+                if let current = ranking.team.currentScore, current > 0 {
+                    Text("PTS")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.gray)
+                } else if let projected = ranking.team.projectedScore, projected > 0 {
+                    Text("PROJ")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.cyan)
+                }
                 
-                // 🔥 NEW: Tap indicator
                 Text("👆 TAP")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.orange.opacity(0.7))
+                    .foregroundColor(.gray.opacity(0.7))
                     .tracking(1)
             }
         }
@@ -121,20 +111,36 @@ struct DangerZoneCard: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.orange.opacity(0.1))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.orange.opacity(0.15),
+                            Color.orange.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.orange.opacity(warningPulse ? 0.6 : 0.1), lineWidth: 2)
-                        .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: warningPulse)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.orange.opacity(0.4),
+                                    Color.orange.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 1.5
+                        )
                 )
         )
-        // 🔥 NEW: Make entire card tappable
         .onTapGesture {
             if let leagueID = leagueID, let week = week {
                 showTeamRoster = true
             }
         }
-        // 🔥 NEW: Show roster sheet
         .sheet(isPresented: $showTeamRoster) {
             if let leagueID = leagueID, let week = week {
                 ChoppedTeamRosterView(
@@ -143,25 +149,6 @@ struct DangerZoneCard: View {
                     week: week
                 )
             }
-        }
-    }
-    
-    // MARK: - Computed Properties
-    
-    @ViewBuilder
-    private var scoringStatusText: some View {
-        if let current = ranking.team.currentScore, current > 0 {
-            Text("CURRENT")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.orange)
-                .tracking(0.5)
-                .fixedSize()
-        } else if let projected = ranking.team.projectedScore, projected > 0 {
-            Text("PROJECTED")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.orange)
-                .tracking(0.5)
-                .fixedSize()
         }
     }
     
@@ -194,7 +181,7 @@ struct DangerZoneCard: View {
                 LinearGradient(
                     gradient: Gradient(colors: [
                         ranking.team.espnTeamColor,
-                        ranking.team.espnTeamColor.opacity(0.7)
+                        ranking.team.espnTeamColor.opacity(0.8)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing

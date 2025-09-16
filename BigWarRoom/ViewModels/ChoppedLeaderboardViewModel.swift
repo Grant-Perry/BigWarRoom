@@ -256,6 +256,20 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         return myTeam.eliminationStatus == .critical || myTeam.eliminationStatus == .danger
     }
     
+    /// Your elimination delta (points from elimination line)
+    var myEliminationDelta: String? {
+        guard let myTeam = myTeamRanking else { return nil }
+        guard hasWeekStarted else { return nil }
+        return myTeam.safetyMarginDisplay
+    }
+    
+    /// Your elimination delta color (green if safe, red if in danger)
+    var myEliminationDeltaColor: Color {
+        guard let myTeam = myTeamRanking else { return .gray }
+        guard hasWeekStarted else { return .gray }
+        return myTeam.pointsFromSafety >= 0 ? .green : .red
+    }
+    
     // MARK: - Section Visibility Logic
     
     var hasChampion: Bool {

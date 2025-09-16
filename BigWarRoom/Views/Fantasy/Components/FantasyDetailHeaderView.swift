@@ -99,7 +99,7 @@ struct FantasyDetailHeaderView: View {
     private var teamComparisonRow: some View {
         HStack(spacing: 24) { // Good spacing between teams
             // Home team (left side)
-            VStack(spacing: 6) { // REDUCED spacing from 8 to 6
+            VStack(spacing: 4) { // REDUCED spacing from 6 to 4 to accommodate "Yet to play"
                 // Avatar with border
                 ZStack {
                     if let url = matchup.homeTeam.avatarURL {
@@ -141,11 +141,19 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.gray)
                 
-                // CENTERED SCORE under manager name - TIGHTER SPACING
-                Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
-                    .font(.system(size: 22, weight: .bold)) // Large, visible score
-                    .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
-                    .padding(.top, 2) // SMALL padding to bring score closer
+                // SCORE and YET TO PLAY stack - no extra spacing
+                VStack(spacing: 1) {
+                    // Team score
+                    Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
+                        .font(.system(size: 22, weight: .bold)) // Large, visible score
+                        .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                    
+                    // Yet to play count
+                    Text("Yet to play: \(homeTeamYetToPlay)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 2) // SMALL padding to bring score closer
             }
             .frame(maxWidth: .infinity)
             
@@ -174,7 +182,7 @@ struct FantasyDetailHeaderView: View {
             .frame(width: 70)
             
             // Away team (right side)
-            VStack(spacing: 6) { // REDUCED spacing from 8 to 6
+            VStack(spacing: 4) { // REDUCED spacing from 6 to 4 to accommodate "Yet to play"
                 // Avatar with border
                 ZStack {
                     if let url = matchup.awayTeam.avatarURL {
@@ -216,11 +224,19 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.gray)
                 
-                // CENTERED SCORE under manager name - TIGHTER SPACING
-                Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
-                    .font(.system(size: 22, weight: .bold)) // Large, visible score
-                    .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
-                    .padding(.top, 2) // SMALL padding to bring score closer
+                // SCORE and YET TO PLAY stack - no extra spacing
+                VStack(spacing: 1) {
+                    // Team score
+                    Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
+                        .font(.system(size: 22, weight: .bold)) // Large, visible score
+                        .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
+                    
+                    // Yet to play count
+                    Text("Yet to play: \(awayTeamYetToPlay)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.top, 2) // SMALL padding to bring score closer
             }
             .frame(maxWidth: .infinity)
         }
@@ -274,5 +290,40 @@ struct FantasyDetailHeaderView: View {
             
             Spacer()
         }
+    }
+    
+    // MARK: - Computed Properties (Data Only)
+    
+    /// Calculate number of players yet to play for home team
+    private var homeTeamYetToPlay: Int {
+        calculateYetToPlay(for: matchup.homeTeam)
+    }
+    
+    /// Calculate number of players yet to play for away team
+    private var awayTeamYetToPlay: Int {
+        calculateYetToPlay(for: matchup.awayTeam)
+    }
+    
+    /// Calculate number of players yet to play for a given team
+    /// Players "yet to play" are starters with 0 points who haven't played yet
+    private func calculateYetToPlay(for team: FantasyTeam) -> Int {
+        return team.roster.filter { player in
+            // Only count starters
+            guard player.isStarter else { return false }
+            
+            // Only count players with 0 points
+            guard (player.currentPoints ?? 0.0) == 0.0 else { return false }
+            
+            // Check if player has actually played by looking at game status
+            // If gameStatus is nil, assume they haven't played yet
+            if let gameStatus = player.gameStatus {
+                // If they have a game status and it's not "Final", they're yet to play
+                let gameStatusString = gameStatus.status.lowercased()
+                return !gameStatusString.contains("final") && !gameStatusString.contains("post")
+            }
+            
+            // If no game status available, assume they're yet to play if they have 0 points
+            return true
+        }.count
     }
 }

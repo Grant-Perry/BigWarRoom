@@ -88,7 +88,22 @@ struct ManagerInfoCardView: View {
             if style == .fullWidth {
                 Spacer()
                 
-                // Countdown timer for refresh (full width only) - using countdown from parent
+                // 🔥 NEW: Centered Refresh button - DOUBLE TAP required
+                Button(action: {
+                    // No single tap action
+                }) {
+                    Text("Refresh")
+                        .font(.footnote)
+                        .fontWeight(.medium)
+                        .foregroundColor(.blue)
+                }
+                .onTapGesture(count: 2) {
+                    onRefresh?()
+                }
+                
+                Spacer()
+                
+                // Countdown timer for refresh (full width only)
                 if let countdown = countdown {
                     PollingCountdownDial(
                         countdown: countdown,

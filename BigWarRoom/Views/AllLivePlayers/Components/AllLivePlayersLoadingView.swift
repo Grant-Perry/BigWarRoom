@@ -33,7 +33,7 @@ struct AllLivePlayersLoadingView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black.ignoresSafeArea())
+//        .background(Color.black.ignoresSafeArea())
     }
 }
 

@@ -520,18 +520,12 @@ final class AllLivePlayersViewModel: ObservableObject {
             let activePlayers = positionFiltered.filter { !isPlayerFromCompletedGame($0.player) }
             print("🔍 FILTER DEBUG: After active-only filter: \(activePlayers.count) active players out of \(positionFiltered.count)")
             
-            // 🔥 SAFETY CHECK: If filtering results in empty list, fall back to showing all
-            if activePlayers.isEmpty && !positionFiltered.isEmpty {
-                print("⚠️ FILTER SAFETY: All players filtered out! Falling back to showing all games to prevent empty state")
-                players = positionFiltered
-                
-                // 🔥 RECOVERY: Reset the filter to prevent getting stuck
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.showActiveOnly = false
-                    print("🔧 FILTER RECOVERY: Auto-disabled 'Active Only' to prevent empty state")
-                }
-            } else {
-                players = activePlayers
+            // 🔥 REMOVED PROBLEMATIC SAFETY CHECK: Let empty states be empty instead of auto-fallback
+            players = activePlayers
+            
+            // If no active players, that's legitimate - don't override user's choice
+            if activePlayers.isEmpty {
+                print("ℹ️ FILTER INFO: No active players found - this is valid for completed game days")
             }
         }
         
@@ -763,6 +757,27 @@ final class AllLivePlayersViewModel: ObservableObject {
         } else {
             return .struggling
         }
+    }
+    
+    // 🔥 NEW: Nuclear option - complete state reset to fix filtering bugs
+    func hardResetFilteringState() async {
+        print("💥 NUCLEAR RESET: Completely resetting all filtering state...")
+        
+        // Step 1: Reset all filtering state to defaults
+        showActiveOnly = false
+        selectedPosition = .all
+        sortHighToLow = true
+        sortingMethod = .score
+        
+        // Step 2: Clear all player data
+        allPlayers = []
+        filteredPlayers = []
+        
+        // Step 3: Force reload from scratch
+        await matchupsHubViewModel.loadAllMatchups()
+        await loadAllPlayers()
+        
+        print("💥 NUCLEAR RESET: Complete - \(filteredPlayers.count) players now visible")
     }
     
     // 🔥 NEW: Manual recovery method for stuck filter states

@@ -10,7 +10,7 @@ import SwiftUI
 /// Main matchups hub view - focuses on core structure and state management
 struct MatchupsHubView: View {
     // MARK: - ViewModels
-    @StateObject internal var viewModel = MatchupsHubViewModel()
+    @StateObject internal var matchupsHubViewModel = MatchupsHubViewModel()
     
     // MARK: - Week Selection (SSOT)
     @StateObject internal var weekManager = WeekSelectionManager.shared
@@ -30,15 +30,15 @@ struct MatchupsHubView: View {
     
     // MARK: - Battles Section State
     @State internal var battlesMinimized = false
-    @State internal var poweredByExpanded = true // NEW: Control "Powered By" section separately
+    @State internal var poweredByExpanded = true
     
     // MARK: - Sorting States
-    @State internal var sortByWinning = true // true = Win (highest scores first), false = Lose (lowest scores first)
+    @State internal var sortByWinning = true
     
-    // 🔥 NEW: View Mode State (true = Dual view, false = Single/Horizontal view)
+    // MARK: - View Mode State
     @State internal var dualViewMode = true
     
-    // MARK: - Timer States
+    // MARK: - Timer States (Following standard app pattern)
     @State internal var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
     @State internal var countdownTimer: Timer?
     @State internal var refreshTimer: Timer?
@@ -47,15 +47,15 @@ struct MatchupsHubView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                backgroundGradient
+                buildBackgroundView()
                 
                 // Show the black loading screen with league loading indicators
-                if viewModel.isLoading && viewModel.myMatchups.isEmpty {
-                    loadingState
-                } else if viewModel.myMatchups.isEmpty && !viewModel.isLoading {
-                    emptyState
+                if matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty {
+                    buildLoadingStateView()
+                } else if matchupsHubViewModel.myMatchups.isEmpty && !matchupsHubViewModel.isLoading {
+                    buildEmptyStateView()
                 } else {
-                    matchupsContent
+                    buildContentView()
                 }
             }
             .navigationTitle("")
@@ -72,13 +72,13 @@ struct MatchupsHubView: View {
             }
         }
         .sheet(item: $showingMatchupDetail) { matchup in
-            matchupDetailSheet(for: matchup)
+            buildMatchupDetailSheet(for: matchup)
         }
         .sheet(isPresented: $showingSettings) {
             AppSettingsView()
         }
         .sheet(isPresented: $showingWeekPicker) {
-            weekPickerSheet
+            buildWeekPickerSheet()
         }
         .onChange(of: weekManager.selectedWeek) { oldValue, newValue in
             if oldValue != newValue {

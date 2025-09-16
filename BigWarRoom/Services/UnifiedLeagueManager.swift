@@ -181,11 +181,11 @@ extension UnifiedLeagueManager.LeagueWrapper {
     /// CENTRALIZED chopped league detection for the entire app - ONE SOURCE OF TRUTH
     var isChoppedLeague: Bool {
         // Only Sleeper leagues can be chopped
-        guard source == .sleeper,
-              let sleeperLeague = league as? SleeperLeague else {
+        guard source == .sleeper else {
             return false
         }
         
-        return SleeperLeagueSettings.isChoppedLeague(sleeperLeague)
+        // 🔥 DIRECT ACCESS: Use the definitive SleeperLeagueSettings logic
+        return league.settings?.isChoppedLeague ?? false
     }
 }

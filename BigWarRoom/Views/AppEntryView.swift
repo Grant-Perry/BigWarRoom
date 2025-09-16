@@ -43,15 +43,15 @@ struct BigWarRoomModified: View {
     
     // Initialize with conditional starting tab
     init(startOnSettings: Bool) {
-        // If user needs onboarding → start on Settings (3)
+        // If user needs onboarding → start on Settings (4)
         // If user has credentials → start on Mission Control (0)
-        _selectedTab = State(initialValue: startOnSettings ? 3 : 0)
+        _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
     }
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             TabView(selection: $selectedTab) {
-                // MATCHUPS HUB - THE COMMAND CENTER (NEW MAIN TAB)
+                // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
                 MatchupsHubView()
                     .tabItem {
                         Image(systemName: "target")
@@ -59,13 +59,21 @@ struct BigWarRoomModified: View {
                     }
                     .tag(0)
                 
-                // Draft War Room Tab
+                // WAR ROOM TAB (was Draft Room)
                 DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
                     .tabItem {
-                        Image(systemName: "brain.head.profile")
+                        Image(systemName: "person.2.fill")
                         Text("War Room")
                     }
                     .tag(1)
+                
+                // NFL SCHEDULE TAB
+                NFLScheduleView()
+                    .tabItem {
+                        Image(systemName: "calendar.circle.fill")
+                        Text("Schedule")
+                    }
+                    .tag(2)
                 
                 // All Live Players Tab
                 AllLivePlayersView()
@@ -73,63 +81,113 @@ struct BigWarRoomModified: View {
                         Image(systemName: "chart.bar.fill")
                         Text("Live Players")
                     }
-                    .tag(2)
+                    .tag(3)
                 
-                // Settings Tab - 🔥 MOVED UP from position 8 to position 3
+                // Settings Tab
                 AppSettingsView()
                     .tabItem {
                         Image(systemName: "gearshape")
                         Text("Settings")
                     }
-                    .tag(3)
-                
-                // Draft Board Tab
-                LeagueDraftView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "sportscourt")
-                        Text("Draft Board")
-                    }
                     .tag(4)
                 
-                // AI Pick Suggestions Tab
-                AIPickSuggestionsView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "wand.and.stars")
-                        Text("AI Picks")
+                // MORE TAB - Contains additional features
+                NavigationView {
+                    VStack(spacing: 0) {
+                        // Header
+                        HStack {
+                            Text("More")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+                        
+                        // More options list
+                        List {
+                            NavigationLink(destination: LeagueDraftView(viewModel: viewModel)) {
+                                HStack {
+                                    Image(systemName: "list.bullet.clipboard")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 24)
+                                    Text("Draft Board")
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            NavigationLink(destination: AIPickSuggestionsView(viewModel: viewModel)) {
+                                HStack {
+                                    Image(systemName: "brain.head.profile")
+                                        .foregroundColor(.purple)
+                                        .frame(width: 24)
+                                    Text("AI Picks")
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            NavigationLink(destination: MyRosterView(draftRoomViewModel: viewModel)) {
+                                HStack {
+                                    Image(systemName: "person.crop.circle")
+                                        .foregroundColor(.green)
+                                        .frame(width: 24)
+                                    Text("My Roster")
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            NavigationLink(destination: FantasyMatchupListView(draftRoomViewModel: viewModel)) {
+                                HStack {
+                                    Image(systemName: "football")
+                                        .foregroundColor(.orange)
+                                        .frame(width: 24)
+                                    Text("Fantasy")
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                            
+                            NavigationLink(destination: LiveDraftPicksView(viewModel: viewModel)) {
+                                HStack {
+                                    Image(systemName: "clock.fill")
+                                        .foregroundColor(.red)
+                                        .frame(width: 24)
+                                    Text("Live Picks")
+                                        .foregroundColor(.white)
+                                    Spacer()
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                        .listStyle(PlainListStyle())
+                        .background(Color.black)
+                        .scrollContentBackground(.hidden)
+                        
+                        Spacer()
                     }
-                    .tag(5)
-                
-                // My Roster Tab
-                MyRosterView(draftRoomViewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "person.fill")
-                        Text("My Roster")
-                    }
-                    .tag(6)
-                
-                // Fantasy Tab - RESTORED at second-to-last position
-                FantasyMatchupListView(draftRoomViewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "football")
-                        Text("Fantasy")
-                    }
-                    .tag(7)
-                
-                // Live Draft Picks Tab - 🔥 MOVED DOWN from position 3 to position 8 (last)
-                LiveDraftPicksView(viewModel: viewModel)
-                    .tabItem {
-                        Image(systemName: "list.bullet.rectangle.portrait")
-                        Text("Live Picks")
-                    }
-                    .tag(8)
+                    .background(Color.black)
+                }
+                .tabItem {
+                    Image(systemName: "ellipsis")
+                    Text("More")
+                }
+                .tag(5)
             }
             .preferredColorScheme(.dark)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
-                // 🔥 FIX: Switch to War Room tab when Continue button is pressed
+                // Switch to War Room tab
                 selectedTab = 1
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
-                // 🔥 NEW: Switch to Mission Control tab when Continue button is pressed
+                // Switch to Mission Control tab
                 selectedTab = 0
             }
             

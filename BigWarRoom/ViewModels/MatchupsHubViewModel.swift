@@ -69,9 +69,121 @@ final class MatchupsHubViewModel: ObservableObject {
         autoRefreshEnabled.toggle()
         setupAutoRefresh()
     }
+    
+    // MARK: - UI Business Logic (Moved from View)
+    
+    /// Sort matchups by winning/losing status
+    func sortedMatchups(sortByWinning: Bool) -> [UnifiedMatchup] {
+        if sortByWinning {
+            return myMatchups.sorted { matchup1, matchup2 in
+                let score1 = matchup1.myTeam?.currentScore ?? 0
+                let score2 = matchup2.myTeam?.currentScore ?? 0
+                return score1 > score2
+            }
+        } else {
+            return myMatchups.sorted { matchup1, matchup2 in
+                let score1 = matchup1.myTeam?.currentScore ?? 0
+                let score2 = matchup2.myTeam?.currentScore ?? 0
+                return score1 < score2
+            }
+        }
+    }
+    
+    /// Count of live matchups
+    func liveMatchupsCount(from matchups: [UnifiedMatchup]) -> Int {
+        return matchups.filter { matchup in
+            if matchup.isChoppedLeague {
+                return false
+            }
+            
+            guard let myTeam = matchup.myTeam else { return false }
+            let starters = myTeam.roster.filter { $0.isStarter }
+            return starters.contains { player in
+                isPlayerInLiveGame(player)
+            }
+        }.count
+    }
+    
+    /// Count of connected leagues
+    var connectedLeaguesCount: Int {
+        Set(myMatchups.map { $0.league.id }).count
+    }
+    
+    /// Count of winning matchups
+    func winningMatchupsCount(from matchups: [UnifiedMatchup]) -> Int {
+        return matchups.filter { getWinningStatusForMatchup($0) }.count
+    }
+    
+    /// Get winning status for a matchup
+    func getWinningStatusForMatchup(_ matchup: UnifiedMatchup) -> Bool {
+        if matchup.isChoppedLeague {
+            guard let teamRanking = matchup.myTeamRanking else { return false }
+            return teamRanking.eliminationStatus == .champion || teamRanking.eliminationStatus == .safe
+        } else {
+            guard let myTeam = matchup.myTeam,
+                  let opponentTeam = matchup.opponentTeam else {
+                return false
+            }
+            
+            let myScore = myTeam.currentScore ?? 0
+            let opponentScore = opponentTeam.currentScore ?? 0
+            
+            return myScore > opponentScore
+        }
+    }
+    
+    /// Get score color for a matchup
+    func getScoreColorForMatchup(_ matchup: UnifiedMatchup) -> Color {
+        if matchup.isChoppedLeague {
+            guard let ranking = matchup.myTeamRanking else { return .white }
+            
+            switch ranking.eliminationStatus {
+            case .champion, .safe:
+                return .gpGreen
+            case .warning:
+                return .gpYellow
+            case .danger:
+                return .orange
+            case .critical, .eliminated:
+                return .gpRedPink
+            }
+        } else {
+            guard let myTeam = matchup.myTeam,
+                  let opponentTeam = matchup.opponentTeam else {
+                return .white
+            }
+            
+            let myScore = myTeam.currentScore ?? 0
+            let opponentScore = opponentTeam.currentScore ?? 0
+            
+            let isWinning = myScore > opponentScore
+            return isWinning ? .gpGreen : .gpRedPink
+        }
+    }
+    
+    /// Check if player is in live game
+    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
+        guard let gameStatus = player.gameStatus else { return false }
+        let timeString = gameStatus.timeString.lowercased()
+        
+        let quarterPatterns = ["1st ", "2nd ", "3rd ", "4th ", "ot ", "overtime"]
+        for pattern in quarterPatterns {
+            if timeString.contains(pattern) && timeString.contains(":") {
+                return true
+            }
+        }
+        
+        let liveStatusIndicators = ["live", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"]
+        return liveStatusIndicators.contains { timeString.contains($0) }
+    }
+    
+    /// Format relative time
+    func timeAgo(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
 }
-
-// MARK: - Supporting Models
 
 /// Unified matchup model combining all league types
 struct UnifiedMatchup: Identifiable {
@@ -133,7 +245,8 @@ struct UnifiedMatchup: Identifiable {
     
     /// Is this a Chopped league?
     var isChoppedLeague: Bool {
-        return league.source == .sleeper && choppedSummary != nil && fantasyMatchup == nil
+        // 🔥 FIXED: Use the definitive source from SleeperLeagueSettings
+        return league.isChoppedLeague
     }
     
     /// Display priority for sorting (higher = shown first)
@@ -258,13 +371,13 @@ struct UnifiedMatchup: Identifiable {
     var isMyManagerEliminated: Bool {
         // Only applies to chopped leagues
         guard isChoppedLeague else { 
-            print("❌ Not a chopped league, returning false")
+//            print("❌ Not a chopped league, returning false")
             return false 
         }
         
         print("🔍 ELIMINATION CHECK for league: \(league.league.name)")
         
-        // 🔥 CRITICAL FIX: Check if my team has 0 players in THIS specific league
+        // 🔥 CRITICAL FIX: Check if my team has 0 players and 0 score (most reliable for eliminated teams)
         // This is the most reliable indicator of elimination in chopped leagues
         if let myTeam = myTeam {
             print("   - My team name: '\(myTeam.ownerName)'")

@@ -1,4 +1,4 @@
-   //
+//
    //  FantasyMatchupDetailView.swift
    //  BigWarRoom
    //
@@ -47,46 +47,54 @@ struct FantasyMatchupDetailView: View {
 	  let awayTeamIsWinning = awayTeamScore > homeTeamScore
 	  let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
-	  VStack(spacing: 0) {
+	  ZStack {
+		 // BG7 background
+		 Image("BG7")
+			.resizable()
+			.aspectRatio(contentMode: .fill)
+			.opacity(0.35)
+			.ignoresSafeArea(.all)
+		 
+		 VStack(spacing: 0) {
 			// Header with navigation and countdown
-		 navigationHeader
+			navigationHeader
 
 			// Matchup details title
-		 matchupDetailsTitle
+			matchupDetailsTitle
 
-			// Fantasy detail header with team comparison
-		 FantasyDetailHeaderView(
-			leagueName: leagueName,
-			matchup: matchup,
-			awayTeamIsWinning: awayTeamIsWinning,
-			homeTeamIsWinning: homeTeamIsWinning,
-			fantasyViewModel: fantasyViewModel,
-			sortingMethod: sortingMethod,
-			sortHighToLow: sortHighToLow,
-			onSortingMethodChanged: { method in
-			   withAnimation(.easeInOut(duration: 0.3)) {
-				  sortingMethod = method
+			// Fantasy detail header with team comparison - NO OPACITY HERE
+			FantasyDetailHeaderView(
+			   leagueName: leagueName,
+			   matchup: matchup,
+			   awayTeamIsWinning: awayTeamIsWinning,
+			   homeTeamIsWinning: homeTeamIsWinning,
+			   fantasyViewModel: fantasyViewModel,
+			   sortingMethod: sortingMethod,
+			   sortHighToLow: sortHighToLow,
+			   onSortingMethodChanged: { method in
+				  withAnimation(.easeInOut(duration: 0.3)) {
+					 sortingMethod = method
 					 // Reset sort direction to logical default for each method
-				  sortHighToLow = (method == .score) // Score: High-Low, others: A-Z
+					 sortHighToLow = (method == .score) // Score: High-Low, others: A-Z
+				  }
+			   },
+			   onSortDirectionChanged: {
+				  withAnimation(.easeInOut(duration: 0.3)) {
+					 sortHighToLow.toggle()
+				  }
 			   }
-			},
-			onSortDirectionChanged: {
-			   withAnimation(.easeInOut(duration: 0.3)) {
-				  sortHighToLow.toggle()
-			   }
-			}
-		 )
-		 .padding(.horizontal, 16) // Standard horizontal padding
-		 .padding(.top, 16) // More top spacing from "Matchup Details"
-		 .padding(.bottom, 20) // More bottom spacing before "Active Roster"
+			)
+			.padding(.horizontal, 32) // EVEN MORE horizontal padding
+			.padding(.top, 16) // More top spacing from "Matchup Details"
+			.padding(.bottom, 20) // More bottom spacing before "Active Roster"
 
 			// Roster content
-		 rosterScrollView
+			rosterScrollView
+		 }
 	  }
 	  .navigationBarHidden(true)
 	  .navigationBarBackButtonHidden(true)
 	  .preferredColorScheme(.dark)
-	  .background(Color.black)
 	  .onAppear {
 		 handleViewAppearance()
 	  }
@@ -152,7 +160,7 @@ struct FantasyMatchupDetailView: View {
 			// Circular countdown timer
 		 RefreshCountdownTimerView()
 	  }
-	  .padding(.horizontal)
+	  .padding(.horizontal, 32) // EVEN MORE horizontal padding for header
 	  .padding(.top, 8)
 	  .onAppear {
 			// DEBUG: Help troubleshoot the logo issue
@@ -173,7 +181,7 @@ struct FantasyMatchupDetailView: View {
 
 		 Spacer()
 	  }
-	  .padding(.horizontal)
+	  .padding(.horizontal, 32) // EVEN MORE horizontal padding for title
 	  .padding(.top, 12) // Added top padding
 	  .padding(.bottom, 4) // Added bottom padding for separation
    }
@@ -190,8 +198,8 @@ struct FantasyMatchupDetailView: View {
 			}
 		 }
 		 .padding(.top, 8)
+		 .padding(.horizontal, 32) // EVEN MORE horizontal padding for roster content
 	  }
-	  .background(Color(.systemGroupedBackground).ignoresSafeArea())
    }
 
 	  // MARK: - Simplified Roster View (Fallback)
