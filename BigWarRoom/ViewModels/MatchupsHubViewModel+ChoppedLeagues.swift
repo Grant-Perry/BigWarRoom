@@ -161,16 +161,16 @@ extension MatchupsHubViewModel {
                 activeTeams.append(fantasyTeam)
             } else {
                 eliminatedTeams.append(fantasyTeam)
-                print("     ☠️ GRAVEYARD: \(resolvedTeamName) - NO PLAYERS")
+//                print("     ☠️ GRAVEYARD: \(resolvedTeamName) - NO PLAYERS")
             }
         }
         
-        print("🔥 CHOPPED SEPARATION:")
-        print("   - Active teams (have players): \(activeTeams.count)")
-        print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
+//        print("🔥 CHOPPED SEPARATION:")
+//        print("   - Active teams (have players): \(activeTeams.count)")
+//        print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
         
         if !eliminatedTeams.isEmpty {
-            print("💀 ELIMINATED TEAMS:")
+//            print("💀 ELIMINATED TEAMS:")
             for team in eliminatedTeams {
                 print("   - \(team.ownerName)")
             }
@@ -186,11 +186,11 @@ extension MatchupsHubViewModel {
     /// Create starter roster from Sleeper matchup data for All Live Players integration
     private func createStarterRoster(from matchup: SleeperMatchupResponse, realTeamScore: Double, leagueID: String) -> [FantasyPlayer] {
         guard let starters = matchup.starters, !starters.isEmpty else {
-            print("     🔥 ROSTER: No starters found for team")
+//            print("     🔥 ROSTER: No starters found for team")
             return []
         }
         
-        print("     🔥 ROSTER: Creating \(starters.count) starter players")
+//        print("     🔥 ROSTER: Creating \(starters.count) starter players")
         
         // Create FantasyPlayer objects from starter player IDs
         let starterPlayers = starters.compactMap { playerID -> FantasyPlayer? in
@@ -220,7 +220,7 @@ extension MatchupsHubViewModel {
             return player
         }
         
-        print("     🔥 ROSTER: Created \(starterPlayers.count) starter players for All Live Players")
+//        print("     🔥 ROSTER: Created \(starterPlayers.count) starter players for All Live Players")
         return starterPlayers
     }
     
@@ -302,7 +302,7 @@ extension MatchupsHubViewModel {
         // Dynamic elimination count based on league size - ONLY ACTIVE TEAMS
         let totalActiveTeams = sortedTeams.count
         let eliminationCount = totalActiveTeams >= 18 ? 2 : 1
-        print("🔥 ELIMINATION LOGIC: \(totalActiveTeams) active teams = \(eliminationCount) eliminations per week")
+//        print("🔥 ELIMINATION LOGIC: \(totalActiveTeams) active teams = \(eliminationCount) eliminations per week")
         
         // Create team rankings with proper elimination zones - ONLY ACTIVE TEAMS
         let teamRankings = createTeamRankings(sortedTeams: sortedTeams, eliminationCount: eliminationCount, totalTeams: totalActiveTeams, week: week)

@@ -37,7 +37,7 @@ struct MatchupCardsGridView: View {
                 )
             }
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 24) // Increased from 20 to 24 to prevent edge clipping
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: dualViewMode)

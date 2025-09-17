@@ -460,43 +460,41 @@ final class AllLivePlayersViewModel: ObservableObject {
         applyPositionFilter() // Re-apply filter with new active-only setting
     }
 
-    /// Check if a player is from a completed game (FINAL status)
-    private func isPlayerFromCompletedGame(_ player: FantasyPlayer) -> Bool {
+    /// Check if a player is currently in a LIVE game (not completed, not scheduled - LIVE only)
+    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
         guard let team = player.team else { 
-            print("🔍 FILTER DEBUG: Player \(player.fullName) has no team - treating as ACTIVE")
+            print("🔍 LIVE FILTER DEBUG: Player \(player.fullName) has no team - NOT LIVE")
             return false 
         }
         
-        // 🔥 FIX: Try multiple sources with fallback logic and debug logging
-        var isCompleted = false
+        // 🔥 FIX: Check if game is actually LIVE right now
+        var isLive = false
         var detectionMethod = "none"
         
         // Primary source: NFLGameDataService
         if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
-            let statusLower = gameInfo.gameStatus.lowercased()
-            isCompleted = statusLower.contains("final") || statusLower.contains("post")
-            detectionMethod = "NFLGameDataService(\(gameInfo.gameStatus))"
+            // Only consider live if status is "in" AND it's marked as live
+            isLive = gameInfo.gameStatus.lowercased() == "in" && gameInfo.isLive
+            detectionMethod = "NFLGameDataService(\(gameInfo.gameStatus), isLive: \(gameInfo.isLive))"
             
-            // 🔥 SAFETY: Only consider truly final games with actual scores
-            if isCompleted && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
-                print("🔍 FILTER DEBUG: Game marked as \(gameInfo.gameStatus) but no scores yet - treating as ACTIVE")
-                isCompleted = false
-                detectionMethod += "[no-scores-override]"
+            // 🔥 ADDITIONAL SAFETY: Ensure scores are actually updating (not stuck at 0-0)
+            if isLive && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
+                // Still allow it - game could be 0-0 but actively playing
+                print("🔍 LIVE FILTER DEBUG: Game is LIVE but scores are 0-0 - allowing it")
             }
         } else {
             // Fallback: Player's game status
             if let playerGameStatus = player.gameStatus?.status {
-                let statusLower = playerGameStatus.lowercased()
-                isCompleted = statusLower.contains("final") || statusLower.contains("post")
+                isLive = playerGameStatus.lowercased() == "in"
                 detectionMethod = "PlayerGameStatus(\(playerGameStatus))"
             }
         }
         
-        print("🔍 FILTER DEBUG: \(player.fullName) (\(team)) - \(isCompleted ? "COMPLETED" : "ACTIVE") via \(detectionMethod)")
-        return isCompleted
+        print("🔍 LIVE FILTER DEBUG: \(player.fullName) (\(team)) - \(isLive ? "LIVE NOW" : "NOT LIVE") via \(detectionMethod)")
+        return isLive
     }
     
-    // 🔥 IMPROVED: Enhanced filtering with safety checks and recovery
+    // 🔥 IMPROVED: Enhanced filtering with true live-only logic
     private func applyPositionFilter() {
         print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
         
@@ -514,24 +512,22 @@ final class AllLivePlayersViewModel: ObservableObject {
         
         print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
         
-        // Apply active-only filter with safety checks
+        // Apply active-only filter with LIVE-ONLY logic
         var players = positionFiltered
         if showActiveOnly {
-            let activePlayers = positionFiltered.filter { !isPlayerFromCompletedGame($0.player) }
-            print("🔍 FILTER DEBUG: After active-only filter: \(activePlayers.count) active players out of \(positionFiltered.count)")
+            let livePlayers = positionFiltered.filter { isPlayerInLiveGame($0.player) }
+            print("🔍 FILTER DEBUG: After LIVE-ONLY filter: \(livePlayers.count) live players out of \(positionFiltered.count)")
             
-            // 🔥 REMOVED PROBLEMATIC SAFETY CHECK: Let empty states be empty instead of auto-fallback
-            players = activePlayers
+            players = livePlayers
             
-            // If no active players, that's legitimate - don't override user's choice
-            if activePlayers.isEmpty {
-                print("ℹ️ FILTER INFO: No active players found - this is valid for completed game days")
+            // If no live players, that's legitimate - games may not be in progress
+            if livePlayers.isEmpty {
+                print("ℹ️ FILTER INFO: No players in LIVE games right now - this is expected when no games are actively being played")
             }
         }
         
         // Early return if no players after filtering
         guard !players.isEmpty else {
-            print("🔍 FILTER DEBUG: No players after all filters - this should not happen due to safety checks")
             filteredPlayers = []
             positionTopScore = 0.0
             return

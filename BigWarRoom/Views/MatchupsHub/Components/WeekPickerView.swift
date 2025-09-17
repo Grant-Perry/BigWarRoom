@@ -416,6 +416,11 @@ struct WeekPickerView: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
             weekManager.selectWeek(week)
         }
+        
+        // Auto-dismiss after week selection
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            dismissPicker()
+        }
     }
     
     private func selectCurrentWeek() {
@@ -424,6 +429,11 @@ struct WeekPickerView: View {
         impactFeedback.impactOccurred()
         
         weekManager.resetToCurrentWeek()
+        
+        // Auto-dismiss after current week selection
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            dismissPicker()
+        }
     }
     
     private func confirmSelection() {

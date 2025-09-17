@@ -47,8 +47,8 @@ extension FantasyViewModel {
             return nil
         }
         
-        print("🔥 CHOPPED: Active teams: \(allTeamData.activeRankings.count)")
-        print("💀 CHOPPED: Eliminated teams: \(allTeamData.eliminatedTeams.count)")
+//        print("🔥 CHOPPED: Active teams: \(allTeamData.activeRankings.count)")
+//        print("💀 CHOPPED: Eliminated teams: \(allTeamData.eliminatedTeams.count)")
 
         let activeRankings = allTeamData.activeRankings
         let eliminatedTeams = allTeamData.eliminatedTeams
@@ -122,9 +122,9 @@ extension FantasyViewModel {
         )
         
         if !graveyardEvents.isEmpty {
-            print("💀 GRAVEYARD POPULATED:")
+//            print("💀 GRAVEYARD POPULATED:")
             for event in graveyardEvents {
-                print("   \(event.eliminatedTeam.team.ownerName) - no players")
+//                print("   \(event.eliminatedTeam.team.ownerName) - no players")
             }
         }
         
@@ -195,21 +195,21 @@ extension FantasyViewModel {
                     activeTeams.append(fantasyTeam)
                 } else {
                     eliminatedTeams.append(fantasyTeam)
-                    print("     ☠️ GRAVEYARD: \(finalManagerName) - NO PLAYERS")
+//                    print("     ☠️ GRAVEYARD: \(finalManagerName) - NO PLAYERS")
                 }
                 
                 allTeams.append(fantasyTeam)
             }
             
-            print("🔥 CHOPPED SEPARATION RESULTS:")
-            print("   - Total teams: \(allTeams.count)")
-            print("   - Active teams (have players): \(activeTeams.count)")
-            print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
+//            print("🔥 CHOPPED SEPARATION RESULTS:")
+//            print("   - Total teams: \(allTeams.count)")
+//            print("   - Active teams (have players): \(activeTeams.count)")
+//            print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
             
             if !eliminatedTeams.isEmpty {
-                print("💀 ELIMINATED TEAMS:")
+//                print("💀 ELIMINATED TEAMS:")
                 for team in eliminatedTeams {
-                    print("   - \(team.ownerName)")
+//                    print("   - \(team.ownerName)")
                 }
             }
             
@@ -264,7 +264,7 @@ extension FantasyViewModel {
             return (activeRankings: activeRankings, eliminatedTeams: eliminatedTeams)
             
         } catch {
-            print("❌ Failed to fetch chopped team data: \(error)")
+//            print("❌ Failed to fetch chopped team data: \(error)")
             return (activeRankings: [], eliminatedTeams: [])
         }
     }

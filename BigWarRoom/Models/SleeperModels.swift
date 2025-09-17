@@ -118,13 +118,13 @@ struct SleeperLeagueSettings: Codable {
         
         // PRIMARY: Check if type is 3 (Guillotine/Chopped) - THE OFFICIAL WAY
         if let type = type, type == 3 {
-            print("✅ CHOPPED: Detected via type=3")
+//            print("✅ CHOPPED: Detected via type=3")
             return true
         }
         
         // FALLBACK: Check explicit Chopped flag for older leagues
         if let isChopped = isChopped, isChopped {
-            print("✅ CHOPPED: Detected via isChopped=true")
+//            print("✅ CHOPPED: Detected via isChopped=true")
             return true
         }
         

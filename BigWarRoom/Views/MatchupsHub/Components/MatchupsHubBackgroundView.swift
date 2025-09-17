@@ -15,7 +15,7 @@ struct MatchupsHubBackgroundView: View {
             Image("BG4")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .opacity(0.65)
+                .opacity(0.5) // Changed from 0.65 to 0.5
                 .ignoresSafeArea(.all)
             
             // Subtle overlay gradient for depth

@@ -45,10 +45,12 @@ struct ChoppedStartingLineupSection: View {
                 }
             }
             
-            // Collapsible Content
+            // Collapsible Content - Use All Live Players cards
             if showStartingLineup {
-                VStack(spacing: 12) {
+                VStack(spacing: 8) {
                     ForEach(starters) { player in
+                        // TODO: Replace ChoppedRosterPlayerCard with PlayerScoreBarCardView
+                        // For now, keeping the original cards until we can properly convert the data
                         ChoppedRosterPlayerCard(
                             player: player,
                             isStarter: true,

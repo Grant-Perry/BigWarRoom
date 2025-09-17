@@ -11,9 +11,8 @@ import SwiftUI
 struct NFLScheduleView: View {
     @StateObject private var viewModel = NFLScheduleViewModel()
     @StateObject private var matchupsHubViewModel = MatchupsHubViewModel()
+    @StateObject private var weekManager = WeekSelectionManager.shared // Use shared week manager
     @State private var showingWeekPicker = false
-    @State private var showingTeamFilteredMatchups = false
-    @State private var selectedGameForMatchups: ScheduleGame?
     
     var body: some View {
         NavigationView {
@@ -31,6 +30,7 @@ struct NFLScheduleView: View {
                     // Games List
                     gamesList
                 }
+                
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $viewModel.showingGameDetail) {
@@ -38,41 +38,40 @@ struct NFLScheduleView: View {
                     GameDetailView(game: game)
                 }
             }
+            // Replace WeekPickerSheet with Mission Control's WeekPickerView
             .sheet(isPresented: $showingWeekPicker) {
-                WeekPickerSheet(
-                    selectedWeek: $viewModel.selectedWeek,
-                    onWeekSelected: { week in
-                        viewModel.selectWeek(week)
-                        showingWeekPicker = false
-                    }
-                )
+                WeekPickerView(isPresented: $showingWeekPicker)
             }
-            .sheet(isPresented: $showingTeamFilteredMatchups) {
-                if let game = selectedGameForMatchups {
-                    TeamFilteredMatchupsView(
-                        awayTeam: game.awayTeam,
-                        homeTeam: game.homeTeam,
-                        matchupsHubViewModel: matchupsHubViewModel
-                    )
-                }
+            // Sync with shared week manager
+            .onChange(of: weekManager.selectedWeek) { _, newWeek in
+                viewModel.selectWeek(newWeek)
             }
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .onAppear {
+            print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
+            // Sync initial week
+            viewModel.selectWeek(weekManager.selectedWeek)
+            
             // Load matchup data when view appears
             Task {
+                print("🔍 SCHEDULE DEBUG: Starting matchup data load...")
                 await matchupsHubViewModel.loadAllMatchups()
+                print("🔍 SCHEDULE DEBUG: Matchup data load complete - \(matchupsHubViewModel.myMatchups.count) matchups loaded")
             }
+            
+            // Start global auto-refresh for live scores
+            viewModel.refreshSchedule() // Initial load only
         }
     }
     
     // MARK: -> FOX Style Background
     private var foxStyleBackground: some View {
-        // Use BG1 asset from assets folder with reduced opacity
-        Image("BG1")
+        // Use BG2 asset from assets folder with reduced opacity
+        Image("BG2")
             .resizable()
             .aspectRatio(contentMode: .fill)
-            .opacity(0.35) // Reduced opacity for better text readability
+            .opacity(0.4) // Set to 0.4 opacity as requested
             .ignoresSafeArea(.all)
     }
     
@@ -80,13 +79,21 @@ struct NFLScheduleView: View {
     private var scheduleHeader: some View {
         VStack(spacing: 12) {
             // Large "WEEK" title like FOX - CENTERED
-            Text("WEEK \(viewModel.selectedWeek)")
-                .font(.system(size: 60, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 4)
-                .frame(maxWidth: .infinity, alignment: .center) // Changed from .leading to .center
-                .padding(.horizontal, 20)
-                .padding(.bottom, 12)
+            VStack(spacing: 4) {
+                Text("WEEK \(weekManager.selectedWeek)") // Use weekManager instead of viewModel
+                    .font(.system(size: 60, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 4)
+                
+                // Week starting date
+                Text("Week starting: \(getWeekStartDate())")
+				  .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(.white.opacity(0.9))
+                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
             
             // NFL Schedule title and controls
             HStack {
@@ -96,53 +103,13 @@ struct NFLScheduleView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 12) {
-                    // Week picker
-                    Button(action: { showingWeekPicker = true }) {
-                        HStack(spacing: 4) {
-                            Text("Week \(viewModel.selectedWeek)")
-                                .font(.system(size: 14, weight: .medium))
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.white.opacity(0.1))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                                )
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    
-                    // Refresh button
-                    Button(action: { viewModel.refreshSchedule() }) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.white)
-                            .font(.system(size: 14))
-                            .rotationEffect(.degrees(viewModel.isLoading ? 360 : 0))
-                            .animation(
-                                viewModel.isLoading ? 
-                                .linear(duration: 1).repeatForever(autoreverses: false) : 
-                                .default, 
-                                value: viewModel.isLoading
-                            )
-                    }
-                    .padding(8)
-                    .background(
-                        Circle()
-                            .fill(Color.white.opacity(0.1))
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                            )
-                    )
-                    .buttonStyle(PlainButtonStyle())
+                // Week picker - now uses Mission Control's WeekPickerView
+                Button(action: { showingWeekPicker = true }) {
+                    Text("Week \(weekManager.selectedWeek)") // Use weekManager
+                        .font(.subheadline)
+                        .foregroundColor(.gpPostBot)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding(.horizontal, 20)
             
@@ -218,21 +185,9 @@ struct NFLScheduleView: View {
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
             
-            Button("Try Again") {
-                viewModel.refreshSchedule()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(
-                Capsule()
-                    .fill(Color.white.opacity(0.1))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                    )
-            )
-            .foregroundColor(.white)
-            .font(.system(size: 14, weight: .medium))
+            Text("Scores will refresh automatically")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 60)
@@ -257,19 +212,42 @@ struct NFLScheduleView: View {
     private var gamesScrollView: some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
-                ForEach(viewModel.games) { game in
-                    ScheduleGameCard(game: game) {
-                        selectedGameForMatchups = game
-                        showingTeamFilteredMatchups = true
+                ForEach(viewModel.games, id: \.id) { game in
+                    NavigationLink(destination: TeamFilteredMatchupsView(
+                        awayTeam: game.awayTeam,
+                        homeTeam: game.homeTeam,
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        gameData: game
+                    )) {
+                        ScheduleGameCard(game: game) {
+                            print("🔗 Card tapped: \(game.awayTeam) vs \(game.homeTeam)")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(width: UIScreen.main.bounds.width * 0.8)
+                        .contentShape(Rectangle())
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(width: UIScreen.main.bounds.width * 0.8) // 80% of screen width
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
-            .frame(maxWidth: .infinity) // Center the stack
+            .frame(maxWidth: .infinity)
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
+    }
+
+    // MARK: - Helper function to get week start date
+    private func getWeekStartDate() -> String {
+        // NFL 2024 season start date (Week 1 starts September 5, 2024)
+        let season2024Start = Calendar.current.date(from: DateComponents(year: 2024, month: 9, day: 5))!
+        let calendar = Calendar.current
+        
+        // Calculate the start date for the selected week
+        let weekStartDate = calendar.date(byAdding: .day, value: (weekManager.selectedWeek - 1) * 7, to: season2024Start)!
+        
+        // Format as "Thursday, January 4"
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: weekStartDate)
     }
 }
 

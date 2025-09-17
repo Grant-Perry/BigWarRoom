@@ -286,27 +286,6 @@ struct PlayerScoreBarCardContentView: View {
         
         @StateObject var playerDirectory = PlayerDirectoryStore.shared
         
-        // 🔥 JAMES COOK DEBUG: Special logging for James Cook to diagnose the issue
-        let isJamesCook = playerName.lowercased().contains("james cook") || shortName.lowercased().contains("j. cook") || shortName.lowercased().contains("cook")
-        
-        if isJamesCook {
-            print("🔍 JAMES COOK DEBUG - Starting match for:")
-            print("   Full Name: '\(playerName)'")
-            print("   Short Name: '\(shortName)'")
-            print("   Team: '\(team)'")
-            print("   Position: '\(position)'")
-            print("   Available Sleeper players: \(playerDirectory.players.count)")
-            
-            // Show sample of James Cook entries in player directory
-            let cookEntries = playerDirectory.players.values.filter { player in
-                player.fullName.lowercased().contains("cook") || player.lastName?.lowercased().contains("cook") == true
-            }
-            print("   Found \(cookEntries.count) 'Cook' entries in directory:")
-            for cookEntry in cookEntries.prefix(5) {
-                print("     - \(cookEntry.fullName) (\(cookEntry.team ?? "NO_TEAM")) \(cookEntry.position ?? "NO_POS") ID: \(cookEntry.playerID)")
-            }
-        }
-        
         // 🔥 STRATEGY 1: Exact match - Full name + team + position
         var exactMatches = playerDirectory.players.values.filter { sleeperPlayer in
             sleeperPlayer.fullName.lowercased() == playerName.lowercased() &&
@@ -314,12 +293,7 @@ struct PlayerScoreBarCardContentView: View {
             sleeperPlayer.position?.uppercased() == position
         }
         
-        if isJamesCook {
-            print("   Strategy 1 (Exact): \(exactMatches.count) matches")
-        }
-        
         if exactMatches.count == 1 {
-            if isJamesCook { print("✅ JAMES COOK: Exact match found - \(exactMatches.first!.fullName)") }
             return exactMatches.first
         }
         
@@ -330,12 +304,7 @@ struct PlayerScoreBarCardContentView: View {
             sleeperPlayer.position?.uppercased() == position
         }
         
-        if isJamesCook {
-            print("   Strategy 2 (Short Name): \(shortNameMatches.count) matches")
-        }
-        
         if shortNameMatches.count == 1 {
-            if isJamesCook { print("✅ JAMES COOK: Short name match found - \(shortNameMatches.first!.fullName)") }
             return shortNameMatches.first
         }
         
@@ -348,15 +317,7 @@ struct PlayerScoreBarCardContentView: View {
                    sleeperPlayer.position?.uppercased() == position
         }
         
-        if isJamesCook {
-            print("   Strategy 3 (Last Name '\(lastName)'): \(lastNameMatches.count) matches")
-            for match in lastNameMatches {
-                print("     - \(match.fullName) (\(match.team ?? "NO_TEAM")) \(match.position ?? "NO_POS")")
-            }
-        }
-        
         if lastNameMatches.count == 1 {
-            if isJamesCook { print("✅ JAMES COOK: Last name match found - \(lastNameMatches.first!.fullName)") }
             return lastNameMatches.first
         }
         
@@ -371,13 +332,7 @@ struct PlayerScoreBarCardContentView: View {
                     (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
         }
         
-        if isJamesCook {
-            print("   Strategy 4 (Fuzzy Team): \(fuzzyTeamMatches.count) matches")
-            print("     Team aliases for \(team): \(teamAliases)")
-        }
-        
         if fuzzyTeamMatches.count == 1 {
-            if isJamesCook { print("✅ JAMES COOK: Fuzzy team match found - \(fuzzyTeamMatches.first!.fullName)") }
             return fuzzyTeamMatches.first
         }
         
@@ -392,13 +347,7 @@ struct PlayerScoreBarCardContentView: View {
                     (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
         }
         
-        if isJamesCook {
-            print("   Strategy 5 (Fuzzy Position): \(fuzzyPositionMatches.count) matches")
-            print("     Position aliases for \(position): \(positionAliases)")
-        }
-        
         if fuzzyPositionMatches.count == 1 {
-            if isJamesCook { print("✅ JAMES COOK: Fuzzy position match found - \(fuzzyPositionMatches.first!.fullName)") }
             return fuzzyPositionMatches.first
         }
         
@@ -413,10 +362,6 @@ struct PlayerScoreBarCardContentView: View {
                    sleeperLastName == lastName.lowercased()
         }
         
-        if isJamesCook {
-            print("   Strategy 6 (Combined Fuzzy): \(combinedFuzzyMatches.count) matches")
-        }
-        
         // Collect all potential matches for prioritization
         var allPotentialMatches: [SleeperPlayer] = []
         allPotentialMatches.append(contentsOf: exactMatches)
@@ -429,13 +374,6 @@ struct PlayerScoreBarCardContentView: View {
         // Remove duplicates
         let uniqueMatches = Array(Set(allPotentialMatches.map { $0.playerID })).compactMap { id in
             allPotentialMatches.first { $0.playerID == id }
-        }
-        
-        if isJamesCook {
-            print("   Total unique potential matches: \(uniqueMatches.count)")
-            for match in uniqueMatches {
-                print("     - \(match.fullName) (\(match.team ?? "NO_TEAM")) \(match.position ?? "NO_POS") ID: \(match.playerID)")
-            }
         }
         
         // If we have matches, prioritize them
@@ -455,7 +393,6 @@ struct PlayerScoreBarCardContentView: View {
             }
             
             if !detailedStatsMatches.isEmpty {
-                if isJamesCook { print("✅ JAMES COOK: Using detailed stats match - \(detailedStatsMatches.first!.fullName)") }
                 return detailedStatsMatches.first
             }
             
@@ -465,7 +402,6 @@ struct PlayerScoreBarCardContentView: View {
                     return player.number?.description == jerseyNumber
                 }
                 if !jerseyMatches.isEmpty {
-                    if isJamesCook { print("✅ JAMES COOK: Using jersey number match - \(jerseyMatches.first!.fullName)") }
                     return jerseyMatches.first
                 }
             }
@@ -476,24 +412,14 @@ struct PlayerScoreBarCardContentView: View {
             }
             
             if !anyStatsMatches.isEmpty {
-                if isJamesCook { print("✅ JAMES COOK: Using stats match - \(anyStatsMatches.first!.fullName)") }
                 return anyStatsMatches.first
             }
             
             // Priority 4: Fallback to first match
-            if isJamesCook { print("⚠️ JAMES COOK: Using first match fallback - \(uniqueMatches.first!.fullName)") }
             return uniqueMatches.first
         }
         
-        // No matches found - this is where James Cook is failing
-        if isJamesCook {
-            print("❌ JAMES COOK: NO MATCHES FOUND!")
-            print("   This suggests the player directory might not be loaded or James Cook has different data")
-            print("   Player directory loaded: \(playerDirectory.players.count > 0)")
-            print("   Stats loaded: \(viewModel.statsLoaded)")
-            print("   Available stats keys: \(viewModel.playerStats.keys.count)")
-        }
-        
+        // No matches found
         print("❌ NO MATCH found for \(playerName) (\(team)) \(position)")
         return nil
     }

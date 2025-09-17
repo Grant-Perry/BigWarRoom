@@ -13,9 +13,11 @@ struct TeamFilteredMatchupsView: View {
     // MARK: - Properties
     let awayTeam: String
     let homeTeam: String
+    let gameData: ScheduleGame? // 🔥 NEW: Pass actual game data to avoid NFLGameDataService lookup
     
     // MARK: - ViewModels
     @StateObject private var viewModel: TeamFilteredMatchupsViewModel
+    @StateObject private var standingsService = NFLStandingsService.shared
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - UI State (reusing Mission Control patterns)
@@ -26,9 +28,10 @@ struct TeamFilteredMatchupsView: View {
     @State private var expandedCardId: String? = nil
     
     // MARK: - Initialization
-    init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel) {
+    init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel, gameData: ScheduleGame? = nil) {
         self.awayTeam = awayTeam
         self.homeTeam = homeTeam
+        self.gameData = gameData // 🔥 NEW: Store actual game data
         self._viewModel = StateObject(wrappedValue: TeamFilteredMatchupsViewModel(matchupsHubViewModel: matchupsHubViewModel))
     }
     
@@ -36,12 +39,12 @@ struct TeamFilteredMatchupsView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Same background as Mission Control
+                // Background changes based on loading state
                 buildBackgroundView()
                 
-                if viewModel.isLoading && viewModel.filteredMatchups.isEmpty {
+                if viewModel.shouldShowLoadingState {
                     buildLoadingView()
-                } else if !viewModel.hasMatchups && !viewModel.isLoading {
+                } else if !viewModel.hasMatchups {
                     buildEmptyStateView()
                 } else {
                     buildContentView()
@@ -50,7 +53,25 @@ struct TeamFilteredMatchupsView: View {
             .navigationTitle("")
             .navigationBarHidden(true)
             .onAppear {
-                viewModel.filterMatchups(awayTeam: awayTeam, homeTeam: homeTeam)
+                print("🔍 SHEET DEBUG: TeamFilteredMatchupsView appeared")
+                print("🔍 SHEET DEBUG: Away team: \(awayTeam), Home team: \(homeTeam)")
+                print("🔍 SHEET DEBUG: Passed game data: \(gameData?.scoreDisplay ?? "nil")")
+                print("🔍 SHEET DEBUG: shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
+                
+                // Use the game object if available, otherwise fall back to team strings
+                if let gameData = gameData {
+                    print("🔍 SHEET DEBUG: Using passed game data for filtering")
+                    viewModel.filterMatchups(for: gameData)
+                } else {
+                    print("🔍 SHEET DEBUG: Falling back to team strings for filtering")
+                    viewModel.filterMatchups(awayTeam: awayTeam, homeTeam: homeTeam)
+                }
+                
+                print("🔍 SHEET DEBUG: After filterMatchups call - shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
+            }
+            .onDisappear {
+                print("🔍 SHEET DEBUG: TeamFilteredMatchupsView disappeared - clearing filter state")
+                viewModel.clearFilterState()
             }
             .refreshable {
                 await handlePullToRefresh()
@@ -63,27 +84,99 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - Background (reuse Mission Control)
     private func buildBackgroundView() -> some View {
-        // Use BG5 asset with reduced opacity
-        Image("BG5")
+        // Use BG3 asset with reduced opacity for loading states, BG5 for content
+        Image(viewModel.shouldShowLoadingState ? "BG3" : "BG5")
             .resizable()
             .aspectRatio(contentMode: .fill)
-            .opacity(0.35)
+            .opacity(viewModel.shouldShowLoadingState ? 0.25 : 0.35)
             .ignoresSafeArea(.all)
     }
     
     // MARK: - Loading View
     private func buildLoadingView() -> some View {
-        VStack(spacing: 16) {
-            ProgressView()
-                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                .scaleEffect(1.2)
+        ZStack {
+            // BG3 background is handled by buildBackgroundView()
             
-            Text("Loading matchups...")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white.opacity(0.7))
+            VStack(spacing: 24) {
+                // Header with team logos (even during loading)
+                buildFilteredHeader()
+                
+                Spacer()
+                
+                // Main loading section
+                VStack(spacing: 20) {
+                    // Animated team logos during loading
+                    HStack(spacing: 32) {
+                        // Away team logo with pulse animation
+                        TeamLogoView(teamCode: awayTeam, size: 80)
+                            .frame(width: 80, height: 80)
+                            .scaleEffect(1.1)
+                            .opacity(0.9)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: true)
+                        
+                        // VS text with glow
+                        Text("vs")
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                            .shadow(color: .white.opacity(0.3), radius: 8)
+                        
+                        // Home team logo with pulse animation (offset timing)
+                        TeamLogoView(teamCode: homeTeam, size: 80)
+                            .frame(width: 80, height: 80)
+                            .scaleEffect(1.1)
+                            .opacity(0.9)
+                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.5), value: true)
+                    }
+                    
+                    // Glowing progress indicator
+                    VStack(spacing: 12) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                            .shadow(color: .white.opacity(0.3), radius: 8)
+                        
+                        Text("Loading your \(awayTeam) vs \(homeTeam) matchups...")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                            .multilineTextAlignment(.center)
+                            .shadow(color: .black.opacity(0.5), radius: 2)
+                        
+                        // Subtle loading dots animation
+                        HStack(spacing: 8) {
+                            ForEach(0..<3, id: \.self) { index in
+                                Circle()
+                                    .fill(Color.white.opacity(0.7))
+                                    .frame(width: 8, height: 8)
+                                    .scaleEffect(1.2)
+                                    .animation(
+                                        .easeInOut(duration: 0.6)
+                                        .repeatForever(autoreverses: true)
+                                        .delay(Double(index) * 0.2),
+                                        value: true
+                                    )
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                }
+                
+                Spacer()
+                
+                // Loading tips/info
+                VStack(spacing: 8) {
+                    Text("🔍 Analyzing fantasy rosters...")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                    
+                    Text("This might take a moment if you have many leagues")
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.bottom, 32)
+            }
+            .padding(.horizontal, 20)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 100)
     }
     
     // MARK: - Empty State View
@@ -185,19 +278,35 @@ struct TeamFilteredMatchupsView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .center)
             
-            // Team section with gradient background and border (back to original width)
+            // Team section with gradient background and prominent border
             VStack(spacing: 8) {
                 // Large team logos (styled like Schedule cards)
                 HStack(spacing: 24) {
-                    // Away team logo - bleeding off edges
-                    ZStack {
-                        TeamLogoView(teamCode: awayTeam, size: 140)
-                            .scaleEffect(1.1)
-                            .clipped()
+                    // Away team section
+                    VStack(spacing: 4) { // Reduced spacing from 6 to 4
+                        ZStack {
+                            TeamLogoView(teamCode: awayTeam, size: 140)
+							  .scaleEffect(0.75)
+                                .clipped()
+                        }
+                        .frame(width: 90, height: 60) // Increased width from 80 to 90
+                        .clipShape(Rectangle())
+                        .offset(x: -10, y: -8) // Bleed off leading and top edges
+                        
+                        // Away team name - centered and smaller font
+                        Text(getTeamName(for: awayTeam))
+                            .font(.system(size: 14, weight: .bold)) // Reduced from 16 to 14
+                            .foregroundColor(.white)
+                            .lineLimit(2) // Allow 2 lines for city + team name
+                            .minimumScaleFactor(0.7)
+                            .multilineTextAlignment(.center) // Center the text
+                            .frame(width: 90) // Match logo width for centering
+                        
+                        // Away team record - reduced spacing
+                        Text(getTeamRecord(for: awayTeam))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
                     }
-                    .frame(width: 80, height: 60)
-                    .clipShape(Rectangle())
-                    .offset(x: -10, y: -8) // Bleed off leading and top edges
                     
                     // Game info section (VS + score/status)
                     VStack(spacing: 4) {
@@ -209,26 +318,42 @@ struct TeamFilteredMatchupsView: View {
                         buildGameInfo()
                     }
                     
-                    // Home team logo - bleeding off edges
-                    ZStack {
-                        TeamLogoView(teamCode: homeTeam, size: 140)
-                            .scaleEffect(1.1)
-                            .clipped()
+                    // Home team section
+                    VStack(spacing: 4) { // Reduced spacing from 6 to 4
+                        ZStack {
+                            TeamLogoView(teamCode: homeTeam, size: 140)
+							  .scaleEffect(0.75)
+                                .clipped()
+                        }
+                        .frame(width: 90, height: 60) // Increased width from 80 to 90
+                        .clipShape(Rectangle())
+                        .offset(x: 10, y: -8) // Bleed off trailing and top edges
+                        
+                        // Home team name - centered and smaller font
+                        Text(getTeamName(for: homeTeam))
+                            .font(.system(size: 14, weight: .bold)) // Reduced from 16 to 14
+                            .foregroundColor(.white)
+                            .lineLimit(2) // Allow 2 lines for city + team name
+                            .minimumScaleFactor(0.7)
+                            .multilineTextAlignment(.center) // Center the text
+                            .frame(width: 90) // Match logo width for centering
+                        
+                        // Home team record - reduced spacing
+                        Text(getTeamRecord(for: homeTeam))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
                     }
-                    .frame(width: 80, height: 60)
-                    .clipShape(Rectangle())
-                    .offset(x: 10, y: -8) // Bleed off trailing and top edges
                 }
                 
-                // Matchup count
-                Text("\(viewModel.filteredMatchups.count) matchup\(viewModel.filteredMatchups.count == 1 ? "" : "s")")
+                // Matchup count - changed to "Players in X matchups"
+                Text("Players in \(viewModel.filteredMatchups.count) matchup\(viewModel.filteredMatchups.count == 1 ? "" : "s")")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 20)
             .background(
-                // .nyyPrimary gradient background with opacity
+                // .nyyPrimary gradient background with opacity 0.75
                 RoundedRectangle(cornerRadius: 16)
                     .fill(
                         LinearGradient(
@@ -241,18 +366,24 @@ struct TeamFilteredMatchupsView: View {
                             endPoint: .bottomTrailing
                         )
                     )
+                    .opacity(0.75) // Added .opacity(0.75) to the background
             )
             .overlay(
-                // Conditional border with reduced opacity
+                // More prominent border
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke((isGameLive ? Color.gpGreen : Color.white).opacity(0.3), lineWidth: 2)
+                    .stroke((isGameLive ? Color.gpGreen : Color.white), lineWidth: 3) // Increased from 2 to 3 and removed opacity for more prominence
             )
-            .clipped() // Clip the entire container to hide overflowing logos
         }
     }
     
     // MARK: - Helper to check if game is live
     private var isGameLive: Bool {
+        // 🔥 FIXED: Use passed gameData first, then fallback to service lookup
+        if let gameData = gameData {
+            return gameData.isLive
+        }
+        
+        // Fallback to service lookup (original behavior)
         if let gameInfo = NFLGameDataService.shared.getGameInfo(for: awayTeam) {
             return gameInfo.isLive
         }
@@ -262,7 +393,42 @@ struct TeamFilteredMatchupsView: View {
     // MARK: - Game Info Display
     private func buildGameInfo() -> some View {
         Group {
-            if let gameInfo = NFLGameDataService.shared.getGameInfo(for: awayTeam) {
+            // 🔥 FIXED: Use passed gameData first, then fallback to service lookup
+            if let gameData = gameData {
+                VStack(spacing: 2) {
+                    // Score display (if game has started)
+                    if gameData.awayScore > 0 || gameData.homeScore > 0 {
+                        HStack(spacing: 6) {
+                            // Away team score
+                            Text("\(gameData.awayScore)")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(gameData.awayScore > gameData.homeScore ? .gpGreen : .white)
+                            
+                            Text("-")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            // Home team score  
+                            Text("\(gameData.homeScore)")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(gameData.homeScore > gameData.awayScore ? .gpGreen : .white)
+                        }
+                    }
+                    
+                    // Game status/time
+                    Text(gameData.displayTime)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(gameData.isLive ? .red : .white.opacity(0.8))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(
+                            gameData.isLive ? 
+                            AnyView(Capsule().fill(Color.red.opacity(0.2))) :
+                            AnyView(Color.clear)
+                        )
+                }
+            } else if let gameInfo = NFLGameDataService.shared.getGameInfo(for: awayTeam) {
+                // Fallback to service lookup (original behavior)
                 VStack(spacing: 2) {
                     // Score display (if game has started)
                     if gameInfo.awayScore > 0 || gameInfo.homeScore > 0 {
@@ -302,6 +468,17 @@ struct TeamFilteredMatchupsView: View {
     // MARK: - Helper function to get team color
     private func getTeamColor(for teamCode: String) -> Color {
         return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+    }
+    
+    // MARK: - Helper function to get team name
+    private func getTeamName(for teamCode: String) -> String {
+        // Return full city + team name like "Miami Dolphins" instead of just "Dolphins"
+        return NFLTeam.team(for: teamCode)?.fullName ?? teamCode
+    }
+    
+    // MARK: - Helper function to get team record (REAL DATA - NO MORE MOCK BULLSHIT)
+    private func getTeamRecord(for teamCode: String) -> String {
+        return standingsService.getTeamRecord(for: teamCode)
     }
     
     // MARK: - Stats Overview (reuse Mission Control)
@@ -359,7 +536,7 @@ struct TeamFilteredMatchupsView: View {
                 )
             }
         }
-        .padding(.horizontal, 20) // Add proper edge padding to prevent clipping - same as Mission Control
+        .padding(.horizontal, 32) // Increased from 20 to 32 to prevent card clipping
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
     }
@@ -399,7 +576,18 @@ struct TeamFilteredMatchupsView: View {
     TeamFilteredMatchupsView(
         awayTeam: "WSH", 
         homeTeam: "GB",
-        matchupsHubViewModel: MatchupsHubViewModel()
+        matchupsHubViewModel: MatchupsHubViewModel(),
+        gameData: ScheduleGame(
+            id: "WSH@GB",
+            awayTeam: "WSH",
+            homeTeam: "GB",
+            awayScore: 24,
+            homeScore: 31,
+            gameStatus: "final",
+            gameTime: "",
+            startDate: Date(),
+            isLive: false
+        )
     )
     .preferredColorScheme(.dark)
 }
@@ -408,7 +596,18 @@ struct TeamFilteredMatchupsView: View {
     TeamFilteredMatchupsView(
         awayTeam: "JAX",
         homeTeam: "TEN", 
-        matchupsHubViewModel: MatchupsHubViewModel()
+        matchupsHubViewModel: MatchupsHubViewModel(),
+        gameData: ScheduleGame(
+            id: "JAX@TEN",
+            awayTeam: "JAX",
+            homeTeam: "TEN",
+            awayScore: 10,
+            homeScore: 17,
+            gameStatus: "final",
+            gameTime: "",
+            startDate: Date(),
+            isLive: false
+        )
     )
     .preferredColorScheme(.dark)
 }

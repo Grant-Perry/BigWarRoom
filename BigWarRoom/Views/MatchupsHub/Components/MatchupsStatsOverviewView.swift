@@ -66,10 +66,10 @@ private struct StatCardView: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.1))
+                .fill(color.opacity(0.2)) // Increased from 0.1 to 0.2 for higher opacity
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.3), lineWidth: 1)
+                        .stroke(color.opacity(0.5), lineWidth: 1) // Increased from 0.3 to 0.5 for more visible border
                 )
         )
     }

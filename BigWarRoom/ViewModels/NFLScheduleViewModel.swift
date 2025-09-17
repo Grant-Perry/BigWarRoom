@@ -18,6 +18,7 @@ final class NFLScheduleViewModel: ObservableObject {
     @Published var selectedWeek: Int
     @Published var selectedGame: ScheduleGame?
     @Published var showingGameDetail = false
+    @Published var selectedGameId: String? // For NavigationLink selection
     
     private var cancellables = Set<AnyCancellable>()
     private let gameDataService = NFLGameDataService.shared
@@ -89,29 +90,45 @@ final class NFLScheduleViewModel: ObservableObject {
             processedGames.append(scheduleGame)
             
             // DEBUG: Print game info to see what we're getting
-            print("🏈 Schedule Game: \(gameInfo.awayTeam) @ \(gameInfo.homeTeam) - Status: \(gameInfo.gameStatus) - Scores: \(gameInfo.awayScore)-\(gameInfo.homeScore)")
+//            print("🏈 Schedule Game: \(gameInfo.awayTeam) @ \(gameInfo.homeTeam) - Status: \(gameInfo.gameStatus) - Scores: \(gameInfo.awayScore)-\(gameInfo.homeScore)")
         }
         
-        // Sort by game time, live games first, then by start date
-        games = processedGames.sorted { first, second in
-            if first.isLive && !second.isLive { return true }
-            if !first.isLive && second.isLive { return false }
+        // STABLE SORT: Keep existing games in their current positions when possible
+        let existingGameOrder = games.map { $0.id }
+        
+        // Sort by STABLE criteria - primarily by start date, not live status
+        let sortedGames = processedGames.sorted { first, second in
+            // First, try to maintain existing order for stability
+            let firstIndex = existingGameOrder.firstIndex(of: first.id) ?? Int.max
+            let secondIndex = existingGameOrder.firstIndex(of: second.id) ?? Int.max
             
-            // If both are final games, sort by start date
-            if first.gameStatus.lowercased().contains("final") && second.gameStatus.lowercased().contains("final") {
-                guard let firstDate = first.startDate, let secondDate = second.startDate else {
-                    return first.gameStatus < second.gameStatus
-                }
-                return firstDate < secondDate
+            // If both games existed before, keep their original order
+            if firstIndex != Int.max && secondIndex != Int.max {
+                return firstIndex < secondIndex
             }
             
-            // Sort by start date
+            // For new games or mixed cases, sort by start date only
             guard let firstDate = first.startDate,
                   let secondDate = second.startDate else {
                 return first.gameStatus < second.gameStatus
             }
             
             return firstDate < secondDate
+        }
+        
+        // Only update if there are actual changes to prevent unnecessary reordering
+        let newGameIds = Set(sortedGames.map { $0.id })
+        let existingGameIds = Set(games.map { $0.id })
+        
+        if newGameIds != existingGameIds || games.isEmpty {
+            print("🏈 Game order changed - updating games array")
+            games = sortedGames
+        } else {
+            print("🏈 Game data updated but order preserved")
+            // Update game data but preserve order
+            games = games.compactMap { existingGame in
+                processedGames.first { $0.id == existingGame.id }
+            }
         }
         
         print("🏈 Total games processed: \(games.count)")
@@ -145,7 +162,7 @@ struct ScheduleGame: Identifiable, Hashable {
         let dayName = formatter.string(from: date)
         
         // DEBUG: Print the day name to see what we're getting
-        print("🏈 Game day for \(awayTeam)@\(homeTeam): \(dayName)")
+//        print("🏈 Game day for \(awayTeam)@\(homeTeam): \(dayName)")
         
         return dayName
     }

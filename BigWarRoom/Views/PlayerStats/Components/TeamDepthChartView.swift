@@ -13,7 +13,7 @@ struct TeamDepthChartView: View {
     let team: NFLTeam?
     
     @StateObject private var teamAssets = TeamAssetManager.shared
-    @State private var isExpanded: Bool = true // Changed to true for initial expanded state
+    @State private var isExpanded: Bool = false // Changed to false for initial minimized state
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
