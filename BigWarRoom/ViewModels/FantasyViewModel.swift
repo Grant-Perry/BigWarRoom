@@ -320,4 +320,140 @@ final class FantasyViewModel: ObservableObject {
             nflGameService.startLiveUpdates(forWeek: currentWeek, year: currentYear)
         }
     }
+    
+    // MARK: - ADD: ESPN Scoring Settings Helper
+    
+    /// Convert ESPN scoring settings to format usable by ScoreBreakdownFactory
+    func getESPNScoringSettings() -> [String: Double]? {
+        print("🐛 DEBUG: getESPNScoringSettings called")
+        
+        // 🔥 FIX: If currentESPNLeague is nil, try to fetch it from the selected league
+        if currentESPNLeague == nil, let league = selectedLeague, league.source == .espn {
+            print("🐛 DEBUG: currentESPNLeague is nil, attempting to fetch ESPN league data")
+            Task {
+                do {
+                    let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
+                    await MainActor.run {
+                        self.currentESPNLeague = espnLeague
+                        print("🐛 DEBUG: Successfully fetched and stored ESPN league data")
+                    }
+                } catch {
+                    print("🐛 DEBUG: Failed to fetch ESPN league data: \(error)")
+                }
+            }
+            // For now, return nil since the fetch is async
+            print("🐛 DEBUG: Initiated async fetch, returning nil for now")
+            return nil
+        }
+        
+        guard let espnLeague = currentESPNLeague else {
+            print("🐛 DEBUG: No currentESPNLeague - selectedLeague: \(selectedLeague?.source.rawValue ?? "nil")")
+            return nil
+        }
+        
+//        print("🐛 DEBUG: Found currentESPNLeague: \(espnLeague.displayName)")
+        
+        // 🔥 UPDATED: Check both root level and nested scoring settings
+        var scoringSettings: ESPNScoringSettings?
+        
+        // First try root level scoring settings
+        if let rootScoring = espnLeague.scoringSettings {
+//            print("🐛 DEBUG: Found root level scoringSettings")
+            scoringSettings = rootScoring
+        }
+        // Then try nested scoring settings in league settings
+        else if let nestedScoring = espnLeague.settings?.scoringSettings {
+//            print("🐛 DEBUG: Found nested scoringSettings in league settings")
+            scoringSettings = nestedScoring
+        } else {
+//            print("🐛 DEBUG: No scoringSettings found in ESPN league (checked root and nested)")
+            return nil
+        }
+        
+//        print("🐛 DEBUG: Using scoringSettings from: \(espnLeague.scoringSettings != nil ? "root" : "nested")")
+        
+        guard let finalScoringSettings = scoringSettings,
+              let scoringItems = finalScoringSettings.scoringItems else {
+//            print("🐛 DEBUG: No scoringItems in ESPN scoring settings")
+            return nil
+        }
+        
+//        print("🐛 DEBUG: Found \(scoringItems.count) ESPN scoring items")
+        
+        var scoringMap: [String: Double] = [:]
+        
+        for item in scoringItems {
+            guard let statId = item.statId,
+                  let points = item.points else { 
+//                print("🐛 DEBUG: Skipping item with missing statId or points")
+                continue 
+            }
+            
+            // 🔥 FIX: Use direct ESPN stat ID to Sleeper key mapping instead of display names
+            if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
+                scoringMap[sleeperKey] = points
+//                print("🐛 DEBUG: ESPN Scoring - \(sleeperKey) (stat \(statId)) = \(points) points")
+            } else {
+//                print("🐛 DEBUG: No mapping for ESPN stat ID \(statId)")
+            }
+        }
+        
+//        print("🐛 DEBUG: Final ESPN scoring map has \(scoringMap.count) entries")
+        return scoringMap.isEmpty ? nil : scoringMap
+    }
+    
+    // 🔥 NEW: Synchronous ESPN scoring settings getter for immediate use
+    func getESPNScoringSettingsSync() -> [String: Double]? {
+        guard let espnLeague = currentESPNLeague else {
+            return nil
+        }
+        
+        var scoringSettings: ESPNScoringSettings?
+        
+        if let rootScoring = espnLeague.scoringSettings {
+            scoringSettings = rootScoring
+        } else if let nestedScoring = espnLeague.settings?.scoringSettings {
+            scoringSettings = nestedScoring
+        } else {
+            return nil
+        }
+        
+        guard let finalScoringSettings = scoringSettings,
+              let scoringItems = finalScoringSettings.scoringItems else {
+            return nil
+        }
+        
+        var scoringMap: [String: Double] = [:]
+        
+        for item in scoringItems {
+            guard let statId = item.statId,
+                  let points = item.points else { 
+                continue 
+            }
+            
+            // 🔥 FIX: Use direct ESPN stat ID to Sleeper key mapping
+            if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
+                scoringMap[sleeperKey] = points
+            }
+        }
+        
+        return scoringMap.isEmpty ? nil : scoringMap
+    }
+    
+    // 🔥 NEW: Method to ensure ESPN league data is loaded
+    func ensureESPNLeagueDataLoaded() async {
+        guard let league = selectedLeague, 
+              league.source == .espn,
+              currentESPNLeague == nil else {
+            return
+        }
+        
+        do {
+            let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
+            currentESPNLeague = espnLeague
+//            print("✅ ESPN: Loaded league data for scoring breakdown")
+        } catch {
+//            print("❌ ESPN: Failed to load league data: \(error)")
+        }
+    }
 }

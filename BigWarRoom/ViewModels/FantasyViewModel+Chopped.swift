@@ -184,12 +184,12 @@ extension FantasyViewModel {
                 )
                 
                 // 🔥 DEBUG: Log each team's status
-                print("   Team: \(finalManagerName)")
-                print("     - Points: \(teamScore)")
-                print("     - Starters: \(starterCount)")
-                print("     - Players: \(playerCount)")
-                print("     - Has Players: \(hasAnyPlayers)")
-                print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
+//                print("   Team: \(finalManagerName)")
+//                print("     - Points: \(teamScore)")
+//                print("     - Starters: \(starterCount)")
+//                print("     - Players: \(playerCount)")
+//                print("     - Has Players: \(hasAnyPlayers)")
+//                print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
                 
                 if hasAnyPlayers {
                     activeTeams.append(fantasyTeam)

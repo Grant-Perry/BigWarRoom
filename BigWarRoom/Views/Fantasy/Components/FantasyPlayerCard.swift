@@ -17,6 +17,8 @@ struct FantasyPlayerCard: View {
     
     @StateObject private var viewModel = FantasyPlayerViewModel()
     
+    @State private var showingScoreBreakdown = false
+    
     var body: some View {
         VStack {
             ZStack(alignment: .topLeading) {
@@ -32,7 +34,7 @@ struct FantasyPlayerCard: View {
                 // Main content stack
                 buildMainContentStack()
                 
-                // Player name and position (right-justified)
+                // Player name and position (right-justified) - UPDATED with score breakdown action
                 buildPlayerNameAndPosition()
                 
                 // Game matchup (centered)
@@ -67,6 +69,17 @@ struct FantasyPlayerCard: View {
                 }
             }
         }
+        .sheet(isPresented: $showingScoreBreakdown) {
+            if let breakdown = createScoreBreakdown() {
+                ScoreBreakdownView(breakdown: breakdown)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            } else {
+                ScoreBreakdownView(breakdown: createEmptyBreakdown())
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
     }
     
     // MARK: - Builder Functions (NO COMPUTED VIEW PROPERTIES)
@@ -94,7 +107,10 @@ struct FantasyPlayerCard: View {
         FantasyPlayerCardMainContentView(
             player: player,
             isPlayerLive: viewModel.isPlayerLive(player),
-            glowIntensity: viewModel.glowIntensity
+            glowIntensity: viewModel.glowIntensity,
+            onScoreTap: {
+                showingScoreBreakdown = true
+            }
         )
     }
     
@@ -139,6 +155,73 @@ struct FantasyPlayerCard: View {
             borderOpacity: viewModel.borderOpacity(for: player),
             shadowColor: viewModel.shadowColor(for: player),
             shadowRadius: viewModel.shadowRadius(for: player)
+        )
+    }
+    
+    // MARK: - ADD: Score Breakdown Helper Methods
+    
+    /// Creates score breakdown from current player stats
+    private func createScoreBreakdown() -> PlayerScoreBreakdown? {
+        print("🐛 DEBUG: FantasyPlayerCard createScoreBreakdown called")
+        
+        guard let sleeperPlayer = viewModel.getSleeperPlayerData(for: player) else {
+            print("🐛 DEBUG: No sleeperPlayer data")
+            return nil
+        }
+        
+        // Get stats from AllLivePlayersViewModel
+        let livePlayersViewModel = AllLivePlayersViewModel.shared
+        guard let stats = livePlayersViewModel.playerStats[sleeperPlayer.playerID],
+              !stats.isEmpty else {
+            print("🐛 DEBUG: No player stats found")
+            return nil
+        }
+        
+        print("🐛 DEBUG: Found \(stats.count) player stats")
+        
+        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
+        // 🔥 NEW: Get league information for unified scoring
+        var leagueID: String? = nil
+        var leagueSource: LeagueSource? = nil
+        
+        if let selectedLeague = fantasyViewModel.selectedLeague {
+            leagueID = selectedLeague.league.id        // <--- correct property for ID
+            leagueSource = selectedLeague.source == .espn ? .espn : .sleeper
+            print("🔥 DEBUG: Using unified scoring - League: \(leagueID!), Source: \(leagueSource!)")
+        } else {
+            print("⚠️ DEBUG: No selectedLeague available, falling back to legacy scoring")
+        }
+        
+        // Create breakdown using our unified manager - 🔥 UPDATED: Use new parameters!
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
+            for: player,
+            stats: stats,
+            week: selectedWeek,
+            scoringSystem: .ppr,
+            isChoppedLeague: false, // Regular fantasy league
+            leagueScoringSettings: nil, // Not a Sleeper chopped league
+            espnScoringSettings: nil, // 🔥 REMOVED: No longer using legacy ESPN scoring
+            leagueID: leagueID, // 🔥 NEW: Pass league ID for unified scoring
+            leagueSource: leagueSource // 🔥 NEW: Pass league source for unified scoring
+        )
+        
+        print("🔥 DEBUG: Created breakdown with hasRealScoringData: \(breakdown.hasRealScoringData)")
+        
+        return breakdown
+    }
+    
+    /// Creates empty breakdown for players with no stats
+    private func createEmptyBreakdown() -> PlayerScoreBreakdown {
+        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        return PlayerScoreBreakdown(
+            player: player,
+            week: selectedWeek, // 🔥 FIXED: Use selected week instead of current week
+            items: [],
+            totalScore: player.currentPoints ?? 0.0,
+            isChoppedLeague: false // Regular fantasy league
         )
     }
 }

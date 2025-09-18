@@ -47,6 +47,9 @@ final class AllLivePlayersViewModel: ObservableObject {
     private init() {
         // Subscribe to week changes to invalidate stats with debouncing
         subscribeToWeekChanges()
+        
+        // Scoring settings are now extracted from existing API calls automatically
+        // No separate initialization needed
     }
     
     // MARK: - Business Logic (Moved from View)
@@ -117,7 +120,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             .removeDuplicates()
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main) // Add 500ms debounce
             .sink { [weak self] newWeek in
-                print("📊 AllLivePlayersViewModel: Week changed to \(newWeek), invalidating stats (debounced)")
+                // print("📊 AllLivePlayersViewModel: Week changed to \(newWeek), invalidating stats (debounced)")
                 
                 // Cancel any existing debounce task
                 self?.debounceTask?.cancel()
@@ -145,11 +148,11 @@ final class AllLivePlayersViewModel: ObservableObject {
     // 🔥 NEW: Synchronous stats loading method for immediate access
     func loadStatsIfNeeded() {
         guard !statsLoaded else { 
-            print("📊 Stats already loaded, skipping...")
+            // print("📊 Stats already loaded, skipping...")
             return 
         }
         
-        print("📊 Starting synchronous stats load...")
+        // print("📊 Starting synchronous stats load...")
         
         Task {
             await loadPlayerStats()
@@ -314,7 +317,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // 🔥 IMPROVED: Add method to force refresh stats
     func forceLoadStats() async {
-        print("📊 Force loading stats...")
+        // print("📊 Force loading stats...")
         statsLoaded = false
         await loadPlayerStats()
     }
@@ -328,10 +331,10 @@ final class AllLivePlayersViewModel: ObservableObject {
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(selectedWeek)"
         
-        print("📊 AllLivePlayersViewModel: Loading stats for Week \(selectedWeek) (async)")
+        // print("📊 AllLivePlayersViewModel: Loading stats for Week \(selectedWeek) (async)")
         
         guard let url = URL(string: urlString) else { 
-            print("❌ AllLivePlayersViewModel: Invalid URL: \(urlString)")
+            // print("❌ AllLivePlayersViewModel: Invalid URL: \(urlString)")
             await MainActor.run {
                 self.statsLoaded = true
             }
@@ -354,14 +357,14 @@ final class AllLivePlayersViewModel: ObservableObject {
                 
                 self.playerStats = statsData
                 self.statsLoaded = true
-                print("✅ AllLivePlayersViewModel: Stats loaded for Week \(selectedWeek). Player count: \(statsData.keys.count)")
+                // print("✅ AllLivePlayersViewModel: Stats loaded for Week \(selectedWeek). Player count: \(statsData.keys.count)")
                 
                 // Only update UI if we're not cancelled
                 self.objectWillChange.send()
             }
             
         } catch {
-            print("❌ AllLivePlayersViewModel: Stats loading failed for Week \(selectedWeek): \(error)")
+            // print("❌ AllLivePlayersViewModel: Stats loading failed for Week \(selectedWeek): \(error)")
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.statsLoaded = true // Mark as loaded even on error to prevent infinite loading
@@ -374,23 +377,23 @@ final class AllLivePlayersViewModel: ObservableObject {
     private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
         
-        print("🔍 EXTRACTING PLAYERS from matchup: \(matchup.league.league.name)")
+        // print("🔍 EXTRACTING PLAYERS from matchup: \(matchup.league.league.name)")
         
         // For regular matchups, extract ONLY from MY team
         if let fantasyMatchup = matchup.fantasyMatchup {
-            print("   - Regular matchup detected")
-            print("   - Home team: \(fantasyMatchup.homeTeam.ownerName) (ID: \(fantasyMatchup.homeTeam.id))")
-            print("   - Away team: \(fantasyMatchup.awayTeam.ownerName) (ID: \(fantasyMatchup.awayTeam.id))")
+            // print("   - Regular matchup detected")
+            // print("   - Home team: \(fantasyMatchup.homeTeam.ownerName) (ID: \(fantasyMatchup.homeTeam.id))")
+            // print("   - Away team: \(fantasyMatchup.awayTeam.ownerName) (ID: \(fantasyMatchup.awayTeam.id))")
             
             // 🔥 CRITICAL FIX: Only extract from MY team, not both teams!
             if let myTeam = matchup.myTeam {
-                print("   - My team identified: \(myTeam.ownerName) (ID: \(myTeam.id))")
+                // print("   - My team identified: \(myTeam.ownerName) (ID: \(myTeam.id))")
                 
                 let myStarters = myTeam.roster.filter { $0.isStarter }
-                print("   - My starters count: \(myStarters.count)")
+                // print("   - My starters count: \(myStarters.count)")
                 
                 for player in myStarters {
-                    print("     - Adding MY player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
+//                    // print("     - Adding MY player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
                     players.append(LivePlayerEntry(
                         id: "\(matchup.id)_my_\(player.id)",
                         player: player,
@@ -405,20 +408,20 @@ final class AllLivePlayersViewModel: ObservableObject {
                     ))
                 }
             } else {
-                print("   ❌ ERROR: Could not identify my team in this matchup!")
+                // print("   ❌ ERROR: Could not identify my team in this matchup!")
             }
         }
         
         // For Chopped leagues, extract from my team ranking
         if let myTeamRanking = matchup.myTeamRanking {
-            print("   - Chopped league detected")
-            print("   - My team: \(myTeamRanking.team.ownerName) (ID: \(myTeamRanking.team.id))")
+            // print("   - Chopped league detected")
+            // print("   - My team: \(myTeamRanking.team.ownerName) (ID: \(myTeamRanking.team.id))")
             
             let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
-            print("   - My chopped starters count: \(myTeamStarters.count)")
+            // print("   - My chopped starters count: \(myTeamStarters.count)")
             
             for player in myTeamStarters {
-                print("     - Adding MY chopped player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
+//                // print("     - Adding MY chopped player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
                     player: player,
@@ -434,7 +437,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             }
         }
         
-        print("   - Total players extracted: \(players.count)")
+//        // print("   - Total players extracted: \(players.count)")
         return players
     }
     
@@ -463,7 +466,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     /// Check if a player is currently in a LIVE game (not completed, not scheduled - LIVE only)
     private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
         guard let team = player.team else { 
-            print("🔍 LIVE FILTER DEBUG: Player \(player.fullName) has no team - NOT LIVE")
+//            // print("🔍 LIVE FILTER DEBUG: Player \(player.fullName) has no team - NOT LIVE")
             return false 
         }
         
@@ -480,7 +483,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             // 🔥 ADDITIONAL SAFETY: Ensure scores are actually updating (not stuck at 0-0)
             if isLive && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
                 // Still allow it - game could be 0-0 but actively playing
-                print("🔍 LIVE FILTER DEBUG: Game is LIVE but scores are 0-0 - allowing it")
+//                // print("🔍 LIVE FILTER DEBUG: Game is LIVE but scores are 0-0 - allowing it")
             }
         } else {
             // Fallback: Player's game status
@@ -490,17 +493,17 @@ final class AllLivePlayersViewModel: ObservableObject {
             }
         }
         
-        print("🔍 LIVE FILTER DEBUG: \(player.fullName) (\(team)) - \(isLive ? "LIVE NOW" : "NOT LIVE") via \(detectionMethod)")
+//        // print("🔍 LIVE FILTER DEBUG: \(player.fullName) (\(team)) - \(isLive ? "LIVE NOW" : "NOT LIVE") via \(detectionMethod)")
         return isLive
     }
     
     // 🔥 IMPROVED: Enhanced filtering with true live-only logic
     private func applyPositionFilter() {
-        print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
+//        // print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
         
         // Early return if no players
         guard !allPlayers.isEmpty else { 
-            print("🔍 FILTER DEBUG: No players to filter")
+//            // print("🔍 FILTER DEBUG: No players to filter")
             filteredPlayers = []
             return 
         }
@@ -510,19 +513,19 @@ final class AllLivePlayersViewModel: ObservableObject {
             allPlayers : 
             allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
         
-        print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
+//        // print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
         
         // Apply active-only filter with LIVE-ONLY logic
         var players = positionFiltered
         if showActiveOnly {
             let livePlayers = positionFiltered.filter { isPlayerInLiveGame($0.player) }
-            print("🔍 FILTER DEBUG: After LIVE-ONLY filter: \(livePlayers.count) live players out of \(positionFiltered.count)")
+//            // print("🔍 FILTER DEBUG: After LIVE-ONLY filter: \(livePlayers.count) live players out of \(positionFiltered.count)")
             
             players = livePlayers
             
             // If no live players, that's legitimate - games may not be in progress
             if livePlayers.isEmpty {
-                print("ℹ️ FILTER INFO: No players in LIVE games right now - this is expected when no games are actively being played")
+//                // print("ℹ️ FILTER INFO: No players in LIVE games right now - this is expected when no games are actively being played")
             }
         }
         
@@ -561,7 +564,7 @@ final class AllLivePlayersViewModel: ObservableObject {
         // Apply sorting based on method and direction (optimized)
         filteredPlayers = sortPlayers(updatedPlayers)
         
-        print("🔍 FILTER DEBUG: Final result: \(filteredPlayers.count) players displayed")
+//        // print("🔍 FILTER DEBUG: Final result: \(filteredPlayers.count) players displayed")
     }
     
     // 🔥 NEW: Separated sorting logic for better performance
@@ -619,7 +622,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // 🔥 IMPROVED: Enhanced refresh with task cancellation and batch updates
     func refresh() async {
-        print("🔄 Refreshing all player data...")
+//        // print("🔄 Refreshing all player data...")
         
         // Cancel any existing tasks
         debounceTask?.cancel()
@@ -757,7 +760,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // 🔥 NEW: Nuclear option - complete state reset to fix filtering bugs
     func hardResetFilteringState() async {
-        print("💥 NUCLEAR RESET: Completely resetting all filtering state...")
+//        // // print("💥 NUCLEAR RESET: Completely resetting all filtering state...")
         
         // Step 1: Reset all filtering state to defaults
         showActiveOnly = false
@@ -773,12 +776,12 @@ final class AllLivePlayersViewModel: ObservableObject {
         await matchupsHubViewModel.loadAllMatchups()
         await loadAllPlayers()
         
-        print("💥 NUCLEAR RESET: Complete - \(filteredPlayers.count) players now visible")
+        // print("💥 NUCLEAR RESET: Complete - \(filteredPlayers.count) players now visible")
     }
     
     // 🔥 NEW: Manual recovery method for stuck filter states
     func recoverFromStuckState() {
-        print("🔧 RECOVERY: Attempting to recover from stuck filter state...")
+        // print("🔧 RECOVERY: Attempting to recover from stuck filter state...")
         
         // Reset all filters to safe defaults
         showActiveOnly = false
@@ -790,7 +793,7 @@ final class AllLivePlayersViewModel: ObservableObject {
         // Trigger UI update
         objectWillChange.send()
         
-        print("🔧 RECOVERY: State reset complete - \(filteredPlayers.count) players now visible")
+        // print("🔧 RECOVERY: State reset complete - \(filteredPlayers.count) players now visible")
     }
     
     /// Enhanced computed property with recovery logic
@@ -798,9 +801,55 @@ final class AllLivePlayersViewModel: ObservableObject {
         let hasNoPlayers = filteredPlayers.isEmpty && !allPlayers.isEmpty && !isLoading
         
         if hasNoPlayers {
-            print("⚠️ WARNING: No filtered players detected - this might be a stuck state")
+            // print("⚠️ WARNING: No filtered players detected - this might be a stuck state")
         }
         
         return hasNoPlayers
+    }
+    
+    // 🔥 REMOVED: Separate scoring settings initialization since we now piggyback on existing API calls
+    // Scoring settings are automatically extracted when leagues are fetched via registerESPNScoringSettings()
+    
+    // 🔥 NEW: Validate player points against calculated points using unified manager
+    func validatePlayerPoints(player: FantasyPlayer, leagueID: String, source: LeagueSource) -> PointsValidationResult? {
+        guard let playerStats = playerStats[player.id] else { return nil }
+        
+        return ScoringSettingsManager.shared.validatePlayerPoints(
+            player: player,
+            stats: playerStats,
+            leagueID: leagueID,
+            source: source
+        )
+    }
+    
+    /// Get validation results for all players with scoring discrepancies
+    func getAllValidationResults() -> [PointsValidationResult] {
+        var results: [PointsValidationResult] = []
+        
+        for entry in allPlayers {
+            let leagueID = String(entry.matchup.league.league.id)
+            let source: LeagueSource = entry.leagueSource == "ESPN" ? .espn : .sleeper
+            
+            if let validation = validatePlayerPoints(player: entry.player, leagueID: leagueID, source: source) {
+                results.append(validation)
+            }
+        }
+        
+        return results.filter { $0.hasDiscrepancy }
+    }
+    
+    /// 🔥 NEW: Debug method to print all scoring bases
+    func debugPrintScoringBases() {
+        ScoringSettingsManager.shared.printAllScoringBases()
+    }
+    
+    /// 🔥 NEW: Call this after loading matchups to see scoring basis for each league
+    func debugScoringAfterLoad() async {
+        // Load all matchups first (this will register scoring settings automatically)
+        await matchupsHubViewModel.loadAllMatchups()
+        
+        // Then print the scoring bases to see what we got
+        print("🎯 SCORING DEBUG: After loading matchups, here are the scoring bases:")
+        debugPrintScoringBases()
     }
 }

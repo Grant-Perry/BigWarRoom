@@ -22,7 +22,7 @@ class ChoppedPlayerCardViewModel: ObservableObject {
     
     let player: FantasyPlayer
     let isStarter: Bool
-    private let parentViewModel: ChoppedTeamRosterViewModel
+    let parentViewModel: ChoppedTeamRosterViewModel // 🔥 FIXED: Changed from private to public
     
     // MARK: - Initialization
     
@@ -88,6 +88,18 @@ class ChoppedPlayerCardViewModel: ObservableObject {
         return isStarter ? Color.green : Color.gray
     }
     
+    // MARK: - ADD: Public Methods for Score Breakdown
+    
+    /// Get player stats for score breakdown
+    func getPlayerStats(for playerID: String) -> [String: Double]? {
+        return parentViewModel.getPlayerStats(for: playerID)
+    }
+    
+    /// Get the correct week for this roster
+    func getCurrentWeek() -> Int {
+        return parentViewModel.getCurrentWeek()
+    }
+
     // MARK: - Private Methods
     
     /// Calculate positional ranking within the team's starting lineup (QB1, RB1, RB2, etc.)

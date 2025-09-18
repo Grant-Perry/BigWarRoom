@@ -612,3 +612,155 @@ struct ESPNDraftResponse: Codable {
     let picks: [ESPNDraftPick]?
     let teams: [ESPNTeam]?
 }
+
+// MARK: -> ESPN Stat ID Mapping
+struct ESPNStatIDMapper {
+    /// Get human-readable stat display name from ESPN stat ID (for score breakdown)
+    static func getStatDisplayName(for statId: Int) -> String {
+        switch statId {
+        // Passing
+        case 0: return "Passing Attempts"
+        case 1: return "Pass Completed"
+        case 3: return "Passing Yards"
+        case 4: return "Passing TD"
+        case 20: return "Interception"
+        case 21: return "Sacked"
+        case 24: return "Passing 1st Down"
+        
+        // Rushing
+        case 23: return "Rushing Attempts"
+        case 24: return "Rushing Yards" 
+        case 25: return "Rushing TD"
+        case 26: return "Rushing 1st Down"
+        
+        // Receiving
+        case 41: return "Reception"
+        case 42: return "Receiving Yards"
+        case 43: return "Receiving TD"
+        case 44: return "Targets"
+        case 45: return "Receiving 1st Down"
+        
+        // Fumbles
+        case 72: return "Fumble"
+        case 73: return "Fumble Lost"
+        
+        // Kicking
+        case 74: return "Extra Point Made"
+        case 77: return "Field Goal Made"
+        case 80: return "Field Goal Missed"
+        
+        // Defense
+        case 89: return "Interception"
+        case 90: return "Fumble Recovery"
+        case 91: return "Defensive TD"
+        case 92: return "Sack"
+        case 93: return "Safety"
+        
+        // Bonus scoring
+        case 101: return "40+ Yard Completion Bonus"
+        case 102: return "40+ Yard Pass TD Bonus"
+        case 103: return "50+ Yard Pass TD Bonus"
+        case 104: return "40+ Yard Rush Bonus"
+        case 105: return "40+ Yard Reception Bonus"
+        
+        default: return "Unknown Stat \(statId)"
+        }
+    }
+    
+    /// Map ESPN stat IDs to Sleeper stat keys for matching player stats
+    static let statIdToSleeperKey: [Int: String] = [
+        // Passing
+        0: "pass_att",        // Passing Attempts
+        1: "pass_cmp",        // Passing Completions  
+        3: "pass_yd",         // Passing Yards
+        4: "pass_td",         // Passing Touchdowns
+        20: "pass_int",       // Interceptions
+        21: "pass_sack",      // Sacks (against QB)
+        
+        // 🔥 FIX: Correct ESPN stat IDs for rushing
+        23: "rush_att",       // Rushing Attempts  
+        24: "rush_yd",        // Rushing Yards
+        25: "rush_td",        // Rushing Touchdowns
+        26: "rush_fd",        // Rushing 1st Downs
+        
+        // 🔥 FIX: Correct ESPN stat IDs for receiving
+        41: "rec",            // Receptions
+        42: "rec_yd",         // Receiving Yards
+        43: "rec_td",         // Receiving Touchdowns
+        44: "rec_tgt",        // Targets
+        45: "rec_fd",         // Receiving 1st Downs
+        
+        // 🔥 FIX: Correct ESPN stat IDs for passing first downs and other passing stats
+        68: "pass_fd",        // Passing 1st Downs (different from rushing yards!)
+        
+        // Fumbles
+        72: "fum",            // Fumbles
+        73: "fum_lost",       // Fumbles Lost
+        
+        // Kicking
+        74: "xpm",            // Extra Points Made
+        77: "fgm",            // Field Goals Made
+        80: "fgmiss",         // Field Goals Missed
+        
+        // Defense
+        89: "def_int",        // Defensive Interceptions
+        90: "def_fum_rec",    // Fumble Recoveries
+        91: "def_td",         // Defensive Touchdowns
+        92: "def_sack",       // Sacks
+        93: "def_safe",       // Safeties
+        
+        // Bonus/Special
+        101: "pass_40",       // 40+ Yard Pass Completion
+        102: "pass_td_40p",   // 40+ Yard Pass TD
+        103: "pass_td_50p",   // 50+ Yard Pass TD
+        104: "rush_40",       // 40+ Yard Rush
+        105: "rec_40",        // 40+ Yard Reception
+        
+        // Additional stats (removing potential duplicates)
+        15: "pass_2pt",       // 2-Point Conversion Pass
+        16: "rush_2pt",       // 2-Point Conversion Rush  
+        17: "rec_2pt",        // 2-Point Conversion Reception
+        18: "fum_rec_td",     // Fumble Recovery TD
+        19: "int_td",         // Interception Return TD
+        
+        // Special teams and returns
+        37: "kick_ret_yd",    // Kick Return Yards
+        38: "punt_ret_yd",    // Punt Return Yards
+        46: "kick_ret_td",    // Kick Return TD
+        53: "punt_ret_td",    // Punt Return TD
+        57: "punt_in20",      // Punts Inside 20
+        63: "punt_yd",        // Punt Yards
+        
+        // Defensive stats
+        85: "def_tkl",        // Tackles
+        86: "def_ast",        // Assisted Tackles
+        95: "def_pass_def",   // Passes Defended
+        96: "def_int_yd",     // Interception Return Yards
+        97: "def_fum_force",  // Forced Fumbles
+        98: "def_fum_rec_yd", // Fumble Recovery Yards
+        99: "def_tkl_loss",   // Tackles for Loss
+        
+        // Special teams
+        123: "st_td",         // Special Teams TD
+        124: "st_fum_rec",    // Special Teams Fumble Recovery
+        125: "st_ff",         // Special Teams Forced Fumble
+        128: "blk_kick",      // Blocked Kick
+        129: "blk_punt",      // Blocked Punt
+        
+        // Kicking distance ranges
+        132: "fga_0_19",      // FG Attempted 0-19 yards
+        133: "fga_20_29",     // FG Attempted 20-29 yards
+        134: "fga_30_39",     // FG Attempted 30-39 yards
+        135: "fga_40_49",     // FG Attempted 40-49 yards
+        136: "fga_50p",       // FG Attempted 50+ yards
+        
+        // Advanced QB stats
+        198: "qb_hit",        // QB Hits
+        201: "pass_drop",     // Dropped Passes
+        206: "pass_air_yd",   // Passing Air Yards
+        209: "pass_yac",      // Yards After Catch
+        211: "pass_rz_att",   // Red Zone Pass Attempts
+        212: "rush_rz_att",   // Red Zone Rush Attempts
+        213: "rec_rz_tgt",    // Red Zone Targets
+    ]
+}

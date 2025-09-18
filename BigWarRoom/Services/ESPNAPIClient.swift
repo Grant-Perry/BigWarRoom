@@ -87,8 +87,8 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch league with a specific token
     private func fetchLeagueWithToken(leagueID: String, token: String) async throws -> SleeperLeague {
-        // Updated view parameters to include members data for manager name mapping
-        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings"
+        // 🔥 UPDATED: Include comprehensive view parameters to get scoring settings
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mTeam&view=mSettings&view=mScoringDetail&view=mPositionalRatings&view=mStats&view=mMatchup"
         // x Print("🌐 ESPN API Request: \(urlString)")
         // x Print("🔑 Using token: \(String(token.prefix(50)))...")
     
@@ -152,6 +152,26 @@ final class ESPNAPIClient: DraftAPIClient {
             // x Print("🔍 Debug - Root name: \(espnLeague.name ?? "nil"), Settings name: \(espnLeague.settings?.name ?? "nil")")
             // x Print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
             
+            // 🔥 NEW: Debug scoring settings data
+            print("🎯 DEBUG SCORING SETTINGS:")
+            print("   League scoringSettings: \(espnLeague.scoringSettings != nil ? "EXISTS" : "NIL")")
+            if let scoringSettings = espnLeague.scoringSettings {
+                print("   scoringItems count: \(scoringSettings.scoringItems?.count ?? 0)")
+                if let items = scoringSettings.scoringItems, !items.isEmpty {
+                    print("   First few scoring items:")
+                    for (index, item) in items.prefix(5).enumerated() {
+                        let statName = ESPNStatIDMapper.getStatDisplayName(for: item.statId ?? -1)
+                        print("     [\(index)] Stat \(item.statId ?? -1): \(statName) = \(item.points ?? 0.0) pts")
+                    }
+                } else {
+                    print("   No scoringItems found!")
+                }
+            }
+//            print("   Settings scoringSettings: \(espnLeague.settings?.scoringSettings != nil ? "EXISTS" : "NIL")")
+//            if let nestedScoring = espnLeague.settings?.scoringSettings {
+//                print("   nested scoringItems count: \(nestedScoring.scoringItems?.count ?? 0)")
+//            }
+            
             // NEW: Log members data for debugging
             if let members = espnLeague.members {
                 // x Print("👥 Found \(members.count) league members:")
@@ -181,6 +201,9 @@ final class ESPNAPIClient: DraftAPIClient {
             // x Print("   Teams array count: \(espnLeague.teams?.count ?? -1)")
             // x Print("   Calculated totalRosters: \(espnLeague.totalRosters)")
 
+            // 🔥 NEW: Register scoring settings with ScoringSettingsManager
+            ScoringSettingsManager.shared.registerESPNScoringSettings(from: espnLeague, leagueID: leagueID)
+            
             return espnLeague.toSleeperLeague()
     
         } catch DecodingError.keyNotFound(let key, let context) {
@@ -669,6 +692,35 @@ final class ESPNAPIClient: DraftAPIClient {
         }
         
         return try JSONDecoder().decode(ESPNLeague.self, from: data)
+    }
+    
+    /// Get ESPN league scoring settings for score breakdown calculation
+    func fetchESPNLeagueScoring(leagueID: String) async throws -> [String: Double] {
+        let espnLeague = try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.currentSeasonYear))
+        
+        guard let scoringSettings = espnLeague.scoringSettings,
+              let scoringItems = scoringSettings.scoringItems else {
+            print("⚠️ ESPN: No scoring settings found for league \(leagueID)")
+            return [:]
+        }
+        
+        var scoringMap: [String: Double] = [:]
+        
+        for item in scoringItems {
+            guard let statId = item.statId,
+                  let points = item.points else { continue }
+            
+            // Convert ESPN stat ID to readable stat name
+            if let statName = ESPNStatIDMapper.statIdToSleeperKey[statId] {
+                scoringMap[statName] = points
+                print("📊 ESPN Scoring: \(statName) = \(points) points")
+            } else {
+                print("⚠️ ESPN: Unknown stat ID \(statId) with \(points) points")
+            }
+        }
+        
+        print("✅ ESPN: Loaded \(scoringMap.count) scoring rules for league \(leagueID)")
+        return scoringMap
     }
     
     // MARK: -> ESPN Debug Methods

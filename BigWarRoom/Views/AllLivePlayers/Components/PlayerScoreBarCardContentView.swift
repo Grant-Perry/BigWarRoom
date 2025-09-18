@@ -16,6 +16,8 @@ struct PlayerScoreBarCardContentView: View {
     
     @ObservedObject var viewModel: AllLivePlayersViewModel
     
+    @State private var showingScoreBreakdown = false
+    
     var body: some View {
         ZStack(alignment: .leading) {
             // Build the card content first (without image)
@@ -58,16 +60,27 @@ struct PlayerScoreBarCardContentView: View {
                     
                     Spacer() // Push score to bottom of this section
                     
-                    // Score info - simplified without matchup info
+                    // Score info - UPDATED: Make tappable for score breakdown
                     HStack(spacing: 8) {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             HStack(spacing: 8) {
-                                Text(playerEntry.currentScoreString)
-                                    .font(.callout)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(playerScoreColor)
+                                // UPDATED: Make score tappable
+                                Button(action: {
+                                    showingScoreBreakdown = true
+                                }) {
+                                    Text(playerEntry.currentScoreString)
+                                        .font(.callout)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(playerScoreColor)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                                .padding(-2)
+                                        )
+                                }
+                                .buttonStyle(PlainButtonStyle())
                                 
                                 Text("pts")
                                     .font(.caption)
@@ -139,6 +152,97 @@ struct PlayerScoreBarCardContentView: View {
         }
         .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Clip the entire thing
+        .sheet(isPresented: $showingScoreBreakdown) {
+            if let breakdown = createScoreBreakdown() {
+                ScoreBreakdownView(breakdown: breakdown)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            } else {
+                ScoreBreakdownView(breakdown: createEmptyBreakdown())
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+    
+    // MARK: - ADD: Score Breakdown Helper Methods
+    
+    /// Creates score breakdown from current player stats
+    private func createScoreBreakdown() -> PlayerScoreBreakdown? {
+        guard let sleeperPlayer = getSleeperPlayerData() else {
+            return nil
+        }
+        
+        // Get stats from viewModel
+        guard let stats = viewModel.playerStats[sleeperPlayer.playerID],
+              !stats.isEmpty else {
+            return nil
+        }
+        
+        // Convert LivePlayerEntry to FantasyPlayer for breakdown
+        let fantasyPlayer = FantasyPlayer(
+            id: playerEntry.id,
+            sleeperID: sleeperPlayer.playerID,
+            espnID: playerEntry.player.espnID,
+            firstName: playerEntry.player.firstName,
+            lastName: playerEntry.player.lastName,
+            position: playerEntry.position,
+            team: playerEntry.player.team,
+            jerseyNumber: playerEntry.player.jerseyNumber,
+            currentPoints: playerEntry.currentScore,
+            projectedPoints: playerEntry.projectedScore,
+            gameStatus: nil,
+            isStarter: true,
+            lineupSlot: playerEntry.position
+        )
+        
+        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
+        // Create breakdown using our factory
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
+            for: fantasyPlayer,
+            stats: stats,
+            week: selectedWeek,
+            scoringSystem: .ppr,
+            isChoppedLeague: false,
+            leagueScoringSettings: nil,
+            espnScoringSettings: nil, // 🔥 REMOVED: No longer using legacy
+            leagueID: playerEntry.matchup.league.league.id, // 🔥 NEW: Pass league ID
+            leagueSource: playerEntry.leagueSource == "ESPN" ? .espn : .sleeper // 🔥 NEW: Pass source
+        )
+        
+        return breakdown
+    }
+    
+    /// Creates empty breakdown for players with no stats
+    private func createEmptyBreakdown() -> PlayerScoreBreakdown {
+        // Convert LivePlayerEntry to FantasyPlayer
+        let fantasyPlayer = FantasyPlayer(
+            id: playerEntry.id,
+            sleeperID: nil,
+            espnID: playerEntry.player.espnID,
+            firstName: playerEntry.player.firstName,
+            lastName: playerEntry.player.lastName,
+            position: playerEntry.position,
+            team: playerEntry.player.team,
+            jerseyNumber: playerEntry.player.jerseyNumber,
+            currentPoints: playerEntry.currentScore,
+            projectedPoints: playerEntry.projectedScore,
+            gameStatus: nil,
+            isStarter: true,
+            lineupSlot: playerEntry.position
+        )
+        
+        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        return PlayerScoreBreakdown(
+            player: fantasyPlayer,
+            week: selectedWeek, // 🔥 FIXED: Use selected week instead of current week
+            items: [],
+            totalScore: playerEntry.currentScore,
+            isChoppedLeague: false // All Live Players - not chopped
+        )
     }
     
     // MARK: - Stat Breakdown Methods (moved from main file)

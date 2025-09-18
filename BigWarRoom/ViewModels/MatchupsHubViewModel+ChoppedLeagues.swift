@@ -135,13 +135,13 @@ extension MatchupsHubViewModel {
             let realTeamScore = matchup.points ?? 0.0
             let projectedScore = matchup.projectedPoints ?? (realTeamScore * 1.05)
             
-            print("   Team: \(resolvedTeamName)")
-            print("     - Points: \(realTeamScore)")
-            print("     - Starters: \(starterCount)")
-            print("     - Players: \(playerCount)")
-            print("     - Has Players: \(hasAnyPlayers)")
-            print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
-            
+//            print("   Team: \(resolvedTeamName)")
+//            print("     - Points: \(realTeamScore)")
+//            print("     - Starters: \(starterCount)")
+//            print("     - Players: \(playerCount)")
+//            print("     - Has Players: \(hasAnyPlayers)")
+//            print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
+//            
             // 🔥 NEW: Create actual starter roster for All Live Players integration
             let starterRoster = createStarterRoster(from: matchup, realTeamScore: realTeamScore, leagueID: league.league.leagueID)
             
@@ -216,7 +216,7 @@ extension MatchupsHubViewModel {
                 lineupSlot: playerInfo?.position
             )
             
-            print("       - \(player.fullName) (\(player.position)) - \(String(format: "%.1f", actualPlayerScore)) pts [STARTER] \(actualPlayerScore > 0 ? "✅" : "⏳")")
+//            print("       - \(player.fullName) (\(player.position)) - \(String(format: "%.1f", actualPlayerScore)) pts [STARTER] \(actualPlayerScore > 0 ? "✅" : "⏳")")
             return player
         }
         
@@ -315,7 +315,7 @@ extension MatchupsHubViewModel {
         
         // 🔥 CREATE GRAVEYARD: Convert eliminated teams to EliminationEvents
         let graveyardEvents = graveyardTeams.enumerated().map { index, team in
-            print("🔥 ADDING TO GRAVEYARD for \(league.league.name): \(team.ownerName)")
+//            print("🔥 ADDING TO GRAVEYARD for \(league.league.name): \(team.ownerName)")
             
             let eliminatedRanking = FantasyTeamRanking(
                 id: team.id,
@@ -345,12 +345,12 @@ extension MatchupsHubViewModel {
         
         // Log graveyard info with league context
         if !graveyardTeams.isEmpty {
-            print("💀 GRAVEYARD POPULATED for \(league.league.name):")
+//            print("💀 GRAVEYARD POPULATED for \(league.league.name):")
             for team in graveyardTeams {
-                print("   \(team.ownerName) - no players")
+//                print("   \(team.ownerName) - no players")
             }
         } else {
-            print("✅ NO GRAVEYARD TEAMS for \(league.league.name) - all teams have players")
+//            print("✅ NO GRAVEYARD TEAMS for \(league.league.name) - all teams have players")
         }
         
         return ChoppedWeekSummary(
@@ -449,7 +449,7 @@ extension MatchupsHubViewModel {
             }
             
             if let eliminatedRanking = eliminatedRanking {
-                print("🎯 CHOPPED: Found MY ELIMINATED team by roster ID \(userRosterID): \(eliminatedRanking.eliminatedTeam.team.ownerName)")
+//                print("🎯 CHOPPED: Found MY ELIMINATED team by roster ID \(userRosterID): \(eliminatedRanking.eliminatedTeam.team.ownerName)")
                 return eliminatedRanking.eliminatedTeam
             }
         }
@@ -473,7 +473,7 @@ extension MatchupsHubViewModel {
             }
             
             if let eliminatedRanking = eliminatedRanking {
-                print("🎯 CHOPPED: Found MY ELIMINATED team by username '\(authenticatedUsername)': \(eliminatedRanking.eliminatedTeam.team.ownerName)")
+//                print("🎯 CHOPPED: Found MY ELIMINATED team by username '\(authenticatedUsername)': \(eliminatedRanking.eliminatedTeam.team.ownerName)")
                 return eliminatedRanking.eliminatedTeam
             }
         }
@@ -495,13 +495,12 @@ extension MatchupsHubViewModel {
         }
         
         if let eliminatedGpRanking = eliminatedGpRanking {
-            print("🎯 CHOPPED: Found MY ELIMINATED team by 'Gp' match: \(eliminatedGpRanking.eliminatedTeam.team.ownerName)")
+//            print("🎯 CHOPPED: Found MY ELIMINATED team by 'Gp' match: \(eliminatedGpRanking.eliminatedTeam.team.ownerName)")
             return eliminatedGpRanking.eliminatedTeam
         }
         
-        // x Print("⚠️ CHOPPED: Could not identify user team in league \(leagueID)")
-        // x Print("   Available active teams: \(choppedSummary.rankings.map { $0.team.ownerName }.joined(separator: ", "))")
-        print("   Available eliminated teams: \(choppedSummary.eliminationHistory.map { $0.eliminatedTeam.team.ownerName }.joined(separator: ", "))")
+
+//        print("   Available eliminated teams: \(choppedSummary.eliminationHistory.map { $0.eliminatedTeam.team.ownerName }.joined(separator: ", "))")
         
         // Return first team as fallback
         return choppedSummary.rankings.first

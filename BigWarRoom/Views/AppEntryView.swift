@@ -83,103 +83,13 @@ struct BigWarRoomModified: View {
                     }
                     .tag(3)
                 
-                // Settings Tab
-                AppSettingsView()
+                // MORE TAB - Contains additional features AND settings
+                MoreTabView(viewModel: viewModel)
                     .tabItem {
-                        Image(systemName: "gearshape")
-                        Text("Settings")
+                        Image(systemName: "ellipsis")
+                        Text("More")
                     }
                     .tag(4)
-                
-                // MORE TAB - Contains additional features
-                NavigationView {
-                    VStack(spacing: 0) {
-                        // Header
-                        HStack {
-                            Text("More")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 20)
-                        
-                        // More options list
-                        List {
-                            NavigationLink(destination: LeagueDraftView(viewModel: viewModel)) {
-                                HStack {
-                                    Image(systemName: "list.bullet.clipboard")
-                                        .foregroundColor(.blue)
-                                        .frame(width: 24)
-                                    Text("Draft Board")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            
-                            NavigationLink(destination: AIPickSuggestionsView(viewModel: viewModel)) {
-                                HStack {
-                                    Image(systemName: "brain.head.profile")
-                                        .foregroundColor(.purple)
-                                        .frame(width: 24)
-                                    Text("AI Picks")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            
-                            NavigationLink(destination: MyRosterView(draftRoomViewModel: viewModel)) {
-                                HStack {
-                                    Image(systemName: "person.crop.circle")
-                                        .foregroundColor(.green)
-                                        .frame(width: 24)
-                                    Text("My Roster")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            
-                            NavigationLink(destination: FantasyMatchupListView(draftRoomViewModel: viewModel)) {
-                                HStack {
-                                    Image(systemName: "football")
-                                        .foregroundColor(.orange)
-                                        .frame(width: 24)
-                                    Text("Fantasy")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                            
-                            NavigationLink(destination: LiveDraftPicksView(viewModel: viewModel)) {
-                                HStack {
-                                    Image(systemName: "clock.fill")
-                                        .foregroundColor(.red)
-                                        .frame(width: 24)
-                                    Text("Live Picks")
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        }
-                        .listStyle(PlainListStyle())
-                        .background(Color.black)
-                        .scrollContentBackground(.hidden)
-                        
-                        Spacer()
-                    }
-                    .background(Color.black)
-                }
-                .tabItem {
-                    Image(systemName: "ellipsis")
-                    Text("More")
-                }
-                .tag(5)
             }
             .preferredColorScheme(.dark)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
@@ -209,7 +119,6 @@ struct BigWarRoomModified: View {
 }
 
 // MARK: - Preview
-
 #Preview("Loading") {
     AppEntryView()
 }

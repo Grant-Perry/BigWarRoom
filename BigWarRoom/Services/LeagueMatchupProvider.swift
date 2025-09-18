@@ -111,7 +111,7 @@ final class LeagueMatchupProvider {
 //                    print("     - Team \(team.id): '\(managerName)' (Owners: \(team.owners ?? []))")
                     
                     if let owners = team.owners {
-                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
+//                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
                         if owners.contains(myESPNID) {
 //                            print("✅ MATCH FOUND! My team ID is: \(team.id)")
                             return String(team.id)
@@ -197,6 +197,8 @@ final class LeagueMatchupProvider {
         // First fetch league data for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
+            // 🔥 NEW: Sync ESPN league data to main FantasyViewModel for score breakdowns
+            await syncESPNDataToMainViewModel()
         } catch {
             currentESPNLeague = nil
         }
@@ -659,5 +661,15 @@ final class LeagueMatchupProvider {
             homeScore: nil,
             awayScore: nil
         )
+    }
+    
+    // 🔥 NEW: Sync ESPN data to main FantasyViewModel for score breakdowns
+    private func syncESPNDataToMainViewModel() async {
+        guard let espnLeague = currentESPNLeague else { return }
+        
+        await MainActor.run {
+            FantasyViewModel.shared.currentESPNLeague = espnLeague
+//            print("✅ SYNC: Synced ESPN league data to main FantasyViewModel for score breakdowns")
+        }
     }
 }

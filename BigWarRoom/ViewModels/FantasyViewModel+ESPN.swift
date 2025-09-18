@@ -20,12 +20,22 @@ extension FantasyViewModel {
         
         // x Print("🔍 ESPN: Fetching \(leagueID) week \(week)")
         
-        // 🔥 FIX: First fetch the full league data with member info for name resolution
+        // 🔥 FIX: First fetch the full league data with member info for name resolution AND scoring settings
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: leagueID)
-            // x Print("✅ ESPN: Got league member data for name resolution")
+            print("✅ ESPN: Got league data with scoring settings for score breakdown")
+            
+            // 🔥 NEW: Debug the scoring settings to ensure they're available
+            if let scoringSettings = currentESPNLeague?.scoringSettings {
+                print("🔥 DEBUG: ESPN league has ROOT level scoring settings with \(scoringSettings.scoringItems?.count ?? 0) items")
+            } else if let nestedScoring = currentESPNLeague?.settings?.scoringSettings {
+                print("🔥 DEBUG: ESPN league has NESTED scoring settings with \(nestedScoring.scoringItems?.count ?? 0) items")
+            } else {
+                print("⚠️ DEBUG: ESPN league has NO scoring settings available for breakdown")
+            }
+            
         } catch {
-            // x Print("⚠️ ESPN: Failed to get league member data, using fallback names")
+            print("⚠️ ESPN: Failed to get league data, using fallback names - \(error)")
             currentESPNLeague = nil
         }
         
@@ -259,6 +269,13 @@ extension FantasyViewModel {
         byeWeekTeams = byeTeams
         
         // x Print("🎯 ESPN \(leagueID): Created \(processedMatchups.count) matchups and \(byeTeams.count) bye week teams")
+        
+        // 🔥 NEW: Verify that currentESPNLeague is still populated after processing
+        if currentESPNLeague != nil {
+            print("✅ ESPN: currentESPNLeague is available for score breakdowns")
+        } else {
+            print("❌ ESPN: currentESPNLeague is unexpectedly nil after processing")
+        }
     }
 
     /// Create FantasyTeam from ESPN data

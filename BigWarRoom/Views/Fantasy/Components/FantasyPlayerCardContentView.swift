@@ -13,6 +13,15 @@ struct FantasyPlayerCardMainContentView: View {
     let isPlayerLive: Bool
     let glowIntensity: Double
     
+    let onScoreTap: (() -> Void)?
+    
+    init(player: FantasyPlayer, isPlayerLive: Bool, glowIntensity: Double, onScoreTap: (() -> Void)? = nil) {
+        self.player = player
+        self.isPlayerLive = isPlayerLive
+        self.glowIntensity = glowIntensity
+        self.onScoreTap = onScoreTap
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Player headshot
@@ -21,25 +30,47 @@ struct FantasyPlayerCardMainContentView: View {
                 isPlayerLive: isPlayerLive
             )
             
-            // Score display
+            // Score display - UPDATED: Make tappable when action provided
             VStack(alignment: .trailing, spacing: 4) {
                 Spacer()
                 
                 HStack(alignment: .bottom, spacing: 4) {
                     Spacer()
-                    Text(player.currentPointsString)
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                        .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
-                        .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
+                    
+                    // UPDATED: Wrap score in button if tap action provided
+                    if let onScoreTap = onScoreTap {
+                        Button(action: onScoreTap) {
+                            scoreText
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    } else {
+                        scoreText
+                    }
                 }
                 .padding(.bottom, 36)
                 .padding(.trailing, 12)
             }
             .zIndex(3)
         }
+    }
+    
+    // MARK: - Helper Views
+    
+    private var scoreText: some View {
+        Text(player.currentPointsString)
+            .font(.system(size: 22, weight: .black))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
+            .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
+            .overlay(
+                onScoreTap != nil ? 
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    .padding(-4)
+                : nil
+            )
     }
 }
 
@@ -152,6 +183,7 @@ struct FantasyPlayerCardNamePositionView: View {
                     .minimumScaleFactor(0.6)
                     .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
                 
+                // UPDATED: Remove tap action - just display the badge
                 Text(positionalRanking)
                     .font(.system(size: 12, weight: .black))
                     .foregroundColor(.white)

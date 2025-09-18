@@ -31,6 +31,7 @@ class ChoppedTeamRosterViewModel: ObservableObject {
     // MARK: - Private Properties
     
     private var playerStats: [String: [String: Double]] = [:]
+    private var leagueScoringSettings: [String: Any] = [:] // 🔥 NEW: Store actual league scoring
     private let teamRanking: FantasyTeamRanking
     private let leagueID: String
     private let week: Int
@@ -49,6 +50,12 @@ class ChoppedTeamRosterViewModel: ObservableObject {
     func loadTeamRoster() async {
         isLoading = true
         errorMessage = nil
+        
+        // 🔥 FIX: Load league scoring settings FIRST!
+        await loadLeagueScoringSettings()
+        
+        // 🔥 FIX: Load player stats SECOND, before anything else!
+        await loadPlayerStats()
         
         do {
             // Fetch matchup data for this week to get roster info
@@ -82,9 +89,6 @@ class ChoppedTeamRosterViewModel: ObservableObject {
             self.errorMessage = "Failed to load roster: \(error.localizedDescription)"
             self.isLoading = false
         }
-        
-        // Also load stats for breakdown display
-        await loadPlayerStats()
     }
     
     /// Load NFL game data for real game times
@@ -118,18 +122,14 @@ class ChoppedTeamRosterViewModel: ObservableObject {
         
         guard let sleeperPlayer = findSleeperPlayer(for: player) else { return nil }
         
-        // First try to get from loaded playerStats FOR THIS SPECIFIC WEEK
+        // 🔥 FIXED: Use actual league scoring settings to calculate points!
         if let stats = playerStats[sleeperPlayer.playerID] {
-            if let pprPoints = stats["pts_ppr"], pprPoints > 0 { return pprPoints }
-            if let halfPprPoints = stats["pts_half_ppr"], halfPprPoints > 0 { return halfPprPoints }
-            if let stdPoints = stats["pts_std"], stdPoints > 0 { return stdPoints }
+            return calculatePlayerScoreWithLeagueSettings(playerID: sleeperPlayer.playerID, stats: stats)
         }
         
         // Fallback to cache - BUT ONLY FOR THE CURRENT WEEK
         if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: week) {
-            if let pprPoints = cachedStats["pts_ppr"], pprPoints > 0 { return pprPoints }
-            if let halfPprPoints = cachedStats["pts_half_ppr"], halfPprPoints > 0 { return halfPprPoints }
-            if let stdPoints = cachedStats["pts_std"], stdPoints > 0 { return stdPoints }
+            return calculatePlayerScoreWithLeagueSettings(playerID: sleeperPlayer.playerID, stats: cachedStats)
         }
         
         return nil
@@ -283,6 +283,33 @@ class ChoppedTeamRosterViewModel: ObservableObject {
         }
     }
     
+    // MARK: - ADD: Public Method for Score Breakdown
+    
+    /// Get player stats for score breakdown functionality
+    func getPlayerStats(for playerID: String) -> [String: Double]? {
+        return playerStats[playerID]
+    }
+    
+    /// Get the specific week this roster is for (needed for score breakdown)
+    func getCurrentWeek() -> Int {
+        return week
+    }
+    
+    /// Get the actual league scoring settings for score breakdown
+    func getLeagueScoringSettings() -> [String: Double]? {
+        // Convert [String: Any] to [String: Double] for breakdown factory
+        return leagueScoringSettings.compactMapValues { value in
+            if let doubleValue = value as? Double {
+                return doubleValue
+            } else if let intValue = value as? Int {
+                return Double(intValue)
+            } else if let stringValue = value as? String, let doubleValue = Double(stringValue) {
+                return doubleValue
+            }
+            return nil
+        }
+    }
+
     // MARK: - Private Methods
     
     /// Load opponent information
@@ -377,7 +404,8 @@ class ChoppedTeamRosterViewModel: ObservableObject {
     
     /// Load weekly player stats for detailed breakdown display
     private func loadPlayerStats() async {
-        guard playerStats.isEmpty else { return }
+        // 🔥 REMOVED: Allow reloading stats if needed
+        // guard playerStats.isEmpty else { return }
         
         let currentYear = AppConstants.currentSeasonYearInt
         
@@ -389,6 +417,9 @@ class ChoppedTeamRosterViewModel: ObservableObject {
             
             self.playerStats = statsData
             
+            // 🔥 NEW: Trigger UI refresh after stats are loaded
+            objectWillChange.send()
+            
             // Debug: Check if this week actually has data
             let totalPointsThisWeek = statsData.values.reduce(0) { total, stats in
                 let playerPoints = stats["pts_ppr"] ?? stats["pts_half_ppr"] ?? stats["pts_std"] ?? 0
@@ -399,6 +430,8 @@ class ChoppedTeamRosterViewModel: ObservableObject {
             
             if totalPointsThisWeek == 0 {
                 print("⚠️ Week \(week) has no scoring data yet - games haven't started!")
+            } else {
+                print("✅ Week \(week) stats loaded - scores should now appear!")
             }
             
         } catch {
@@ -428,5 +461,84 @@ class ChoppedTeamRosterViewModel: ObservableObject {
     /// Create mock game status
     private func createMockGameStatus() -> GameStatus {
         return GameStatus(status: "live")
+    }
+    
+    // MARK: - ADD: New Methods for Real League Scoring
+    
+    /// 🔥 NEW: Load actual league scoring settings from Sleeper
+    private func loadLeagueScoringSettings() async {
+        do {
+            let league = try await SleeperAPIClient.shared.fetchLeague(leagueID: leagueID)
+            if let scoringSettings = league.scoringSettings {
+                self.leagueScoringSettings = scoringSettings
+                print("✅ CHOPPED: Loaded \(scoringSettings.count) league scoring settings")
+                
+                // Debug: Print key scoring settings
+                for (key, value) in scoringSettings.prefix(10) {
+                    print("   \(key): \(value)")
+                }
+            } else {
+                print("⚠️ CHOPPED: League has no scoring settings - using defaults")
+                self.leagueScoringSettings = getDefaultSleeperScoring()
+            }
+        } catch {
+            print("❌ CHOPPED: Failed to load league scoring settings: \(error)")
+            self.leagueScoringSettings = getDefaultSleeperScoring()
+        }
+    }
+    
+    /// 🔥 NEW: Calculate player score using actual league scoring settings
+    private func calculatePlayerScoreWithLeagueSettings(playerID: String, stats: [String: Double]) -> Double {
+        var totalScore = 0.0
+        
+        for (statKey, statValue) in stats {
+            if let scoring = leagueScoringSettings[statKey] as? Double {
+                let points = statValue * scoring
+                totalScore += points
+            } else if let scoring = leagueScoringSettings[statKey] as? Int {
+                let points = statValue * Double(scoring)
+                totalScore += points
+            }
+        }
+        
+        return totalScore
+    }
+    
+    /// Default Sleeper scoring settings (fallback)
+    private func getDefaultSleeperScoring() -> [String: Any] {
+        return [
+            // Passing
+            "pass_yd": 0.04,      // 1 point per 25 passing yards
+            "pass_td": 4.0,       // 4 points per passing TD
+            "pass_int": -1.0,     // -1 point per interception
+            "pass_fd": 1.0,       // 1 point per passing 1st down
+            
+            // Rushing
+            "rush_yd": 0.1,       // 1 point per 10 rushing yards
+            "rush_td": 6.0,       // 6 points per rushing TD
+            "rush_fd": 1.0,       // 1 point per rushing 1st down
+            
+            // Receiving
+            "rec": 1.0,           // 1 point per reception (PPR)
+            "rec_yd": 0.1,        // 1 point per 10 receiving yards
+            "rec_td": 6.0,        // 6 points per receiving TD
+            "rec_fd": 1.0,        // 1 point per receiving 1st down
+            
+            // Fumbles
+            "fum": -1.0,          // -1 point per fumble
+            "fum_lost": -2.0,     // -2 points per fumble lost
+            
+            // Kicking
+            "fgm": 3.0,           // 3 points per field goal made
+            "fgmiss": -1.0,       // -1 point per field goal missed
+            "xpm": 1.0,           // 1 point per extra point made
+            
+            // Defense
+            "def_td": 6.0,        // 6 points per defensive TD
+            "def_int": 2.0,       // 2 points per interception
+            "def_fum_rec": 2.0,   // 2 points per fumble recovery
+            "def_sack": 1.0,      // 1 point per sack
+            "def_safe": 2.0,      // 2 points per safety
+        ]
     }
 }

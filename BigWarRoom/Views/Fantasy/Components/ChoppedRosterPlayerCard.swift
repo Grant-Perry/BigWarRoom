@@ -16,6 +16,8 @@ struct ChoppedRosterPlayerCard: View {
     let onPlayerTap: (SleeperPlayer) -> Void
     let compact: Bool
     
+    @State private var showingScoreBreakdown = false
+    
     init(player: FantasyPlayer, isStarter: Bool, parentViewModel: ChoppedTeamRosterViewModel, onPlayerTap: @escaping (SleeperPlayer) -> Void, compact: Bool = false) {
         self._viewModel = StateObject(wrappedValue: ChoppedPlayerCardViewModel(
             player: player,
@@ -71,15 +73,7 @@ struct ChoppedRosterPlayerCard: View {
                         HStack(spacing: 6) {
                             Spacer()
                             
-                            // League source and position badge
-//                            Text("SLEEPER")
-//                                .font(.system(size: compact ? 7 : 8, weight: .bold))
-//                                .padding(.horizontal, compact ? 4 : 6)
-//                                .padding(.vertical, compact ? 2 : 3)
-//                                .background(Color.blue.opacity(0.8))
-//                                .foregroundColor(.white)
-//                                .clipShape(Capsule())
-                            
+                            // Position badge
                             Text(viewModel.badgeText)
                                 .font(.system(size: compact ? 10 : 8, weight: .bold))
                                 .padding(.horizontal, compact ? 4 : 6)
@@ -91,18 +85,30 @@ struct ChoppedRosterPlayerCard: View {
                         
                         Spacer()
                         
-                        // Score info
+                        // Score info - UPDATED: Make score tappable only if has points
                         HStack(spacing: 8) {
                             Spacer()
                             
                             VStack(alignment: .trailing, spacing: 2) {
                                 HStack(spacing: 8) {
                                     if let points = viewModel.actualPoints, points > 0 {
-                                        Text(String(format: "%.1f", points))
-                                            .font(.callout)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(scoreColor)
+                                        // UPDATED: Make score tappable
+                                        Button(action: {
+                                            showingScoreBreakdown = true
+                                        }) {
+                                            Text(String(format: "%.1f", points))
+                                                .font(.callout)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(scoreColor)
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 4)
+                                                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                                                        .padding(-2)
+                                                )
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
                                     } else {
+                                        // REVERT: Show 0.0 for no points (original logic)
                                         Text("0.0")
                                             .font(.callout)
                                             .fontWeight(.bold)
@@ -185,6 +191,86 @@ struct ChoppedRosterPlayerCard: View {
                     lineWidth: viewModel.player.isLive ? 3 : 2
                 )
                 .opacity(viewModel.player.isLive ? 0.8 : 0.6)
+        )
+        .sheet(isPresented: $showingScoreBreakdown) {
+            if let breakdown = createScoreBreakdown() {
+                ScoreBreakdownView(breakdown: breakdown)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            } else {
+                ScoreBreakdownView(breakdown: createEmptyBreakdown())
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+    
+    // MARK: - ADD: Score Breakdown Helper Methods
+    
+    /// Creates score breakdown from current player stats
+    private func createScoreBreakdown() -> PlayerScoreBreakdown? {
+        guard let sleeperPlayer = viewModel.sleeperPlayer else {
+            return nil
+        }
+        
+        let rosterWeek = viewModel.getCurrentWeek()
+        
+        // FIXED: Use the same multi-source approach as getActualPlayerPoints
+        var stats: [String: Double]?
+        
+        // First try ChoppedTeamRosterViewModel stats
+        if let localStats = viewModel.getPlayerStats(for: sleeperPlayer.playerID) {
+            stats = localStats
+            print("🐛 CHOPPED BREAKDOWN - Found local stats for \(viewModel.player.fullName): \(localStats.keys)")
+        }
+        // Fallback to PlayerStatsCache (same as getActualPlayerPoints)
+        else if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: rosterWeek) {
+            stats = cachedStats
+            print("🐛 CHOPPED BREAKDOWN - Found cached stats for \(viewModel.player.fullName): \(cachedStats.keys)")
+        }
+        // Final fallback to AllLivePlayersViewModel (global update source)
+        else if let globalStats = AllLivePlayersViewModel.shared.playerStats[sleeperPlayer.playerID] {
+            stats = globalStats
+            print("🐛 CHOPPED BREAKDOWN - Found global stats for \(viewModel.player.fullName): \(globalStats.keys)")
+        } else {
+            print("🐛 CHOPPED BREAKDOWN - NO STATS FOUND for \(viewModel.player.fullName) (playerID: \(sleeperPlayer.playerID))")
+            return nil
+        }
+        
+        guard let finalStats = stats, !finalStats.isEmpty else {
+            print("🐛 CHOPPED BREAKDOWN - Final stats empty for \(viewModel.player.fullName)")
+            return nil
+        }
+        
+        print("🐛 CHOPPED BREAKDOWN - Creating breakdown for \(viewModel.player.fullName) with \(finalStats.count) stats")
+        
+        // 🔥 FIXED: Get actual league scoring settings from parent view model
+        let leagueScoring = viewModel.parentViewModel.getLeagueScoringSettings()
+        
+        // Create breakdown using our factory - UPDATED: Pass actual league scoring settings
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
+            for: viewModel.player,
+            stats: finalStats,
+            week: rosterWeek,
+            scoringSystem: .ppr,
+            isChoppedLeague: true,
+            leagueScoringSettings: leagueScoring // 🔥 NEW: Pass actual scoring settings!
+        )
+        
+        print("🐛 CHOPPED BREAKDOWN - Created breakdown with \(breakdown.items.count) items, total: \(breakdown.totalScore)")
+        
+        return breakdown
+    }
+    
+    /// Creates empty breakdown for players with no stats
+    private func createEmptyBreakdown() -> PlayerScoreBreakdown {
+        let rosterWeek = viewModel.getCurrentWeek()
+        return PlayerScoreBreakdown(
+            player: viewModel.player,
+            week: rosterWeek,
+            items: [],
+            totalScore: viewModel.actualPoints ?? 0.0,
+            isChoppedLeague: true // Chopped league
         )
     }
     
