@@ -42,6 +42,7 @@ struct MatchupsHubView: View {
     @State internal var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
     @State internal var countdownTimer: Timer?
     @State internal var refreshTimer: Timer?
+    @State internal var justMeModeTimer: Timer?
     
     // MARK: - Body
     var body: some View {
@@ -66,6 +67,7 @@ struct MatchupsHubView: View {
             }
             .onDisappear {
                 stopPeriodicRefresh()
+                stopJustMeModeTimer()
             }
             .refreshable {
                 await handlePullToRefresh()

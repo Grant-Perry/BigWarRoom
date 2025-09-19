@@ -15,34 +15,59 @@ struct AllLivePlayersListView: View {
     
     var body: some View {
         ScrollView {
+            // 🔥 FIXED: Use stable ID and reset animations when sort changes
             LazyVStack(spacing: 8) { // Reduced from 12 to 8 for tighter spacing
-                ForEach(Array(viewModel.filteredPlayers.enumerated()), id: \.element.id) { index, playerEntry in
+                ForEach(viewModel.filteredPlayers, id: \.id) { playerEntry in
                     PlayerScoreBarCardView(
                         playerEntry: playerEntry,
-                        animateIn: !animatedPlayers.contains(playerEntry.id),
+                        animateIn: shouldAnimatePlayer(playerEntry.id),
                         onTap: {
                             onPlayerTap(playerEntry.matchup)
                         },
                         viewModel: viewModel
                     )
                     .onAppear {
-                        // Optimized staggered animation with shorter delays
-                        if !animatedPlayers.contains(playerEntry.id) {
-                            let delay = min(Double(index) * 0.05, 1.0) // Cap max delay at 1 second
-                            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                                // Check if view is still alive before animating
-                                guard !Task.isCancelled else { return }
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    animatedPlayers.append(playerEntry.id)
-                                }
-                            }
-                        }
+                        handlePlayerAppearance(playerEntry)
                     }
                 }
             }
+            .id(viewModel.sortChangeID) // 🔥 FIXED: Force LazyVStack to rebuild when sort changes
             .padding()
         }
         .clipped() // Prevent scroll view overflow during fast scrolling
+        .onChange(of: viewModel.shouldResetAnimations) { _, shouldReset in
+            if shouldReset {
+                // 🔥 FIXED: Clear animation state when sorting changes
+                animatedPlayers.removeAll()
+            }
+        }
+    }
+    
+    // 🔥 NEW: Determine if player should animate in
+    private func shouldAnimatePlayer(_ playerID: String) -> Bool {
+        return !animatedPlayers.contains(playerID)
+    }
+    
+    // 🔥 NEW: Handle player card appearance with improved logic
+    private func handlePlayerAppearance(_ playerEntry: AllLivePlayersViewModel.LivePlayerEntry) {
+        guard shouldAnimatePlayer(playerEntry.id) else { return }
+        
+        // Get the index for staggered animation
+        let index = viewModel.filteredPlayers.firstIndex(where: { $0.id == playerEntry.id }) ?? 0
+        
+        // Optimized staggered animation with shorter delays
+        let delay = min(Double(index) * 0.03, 0.8) // Reduced delay and cap
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+            // Check if view is still alive and player still exists
+            guard !Task.isCancelled,
+                  viewModel.filteredPlayers.contains(where: { $0.id == playerEntry.id }),
+                  shouldAnimatePlayer(playerEntry.id) else { return }
+            
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                animatedPlayers.append(playerEntry.id)
+            }
+        }
     }
 }
 

@@ -52,7 +52,7 @@ struct AllLivePlayersView: View {
                     buildContentView()
                 }
             }
-            .navigationTitle("All Live Players")
+            .navigationTitle("All Rostered Players")
             .navigationBarTitleDisplayMode(.inline)
             .refreshable {
                 await performRefresh()
@@ -68,6 +68,10 @@ struct AllLivePlayersView: View {
             if let matchup = selectedMatchup {
                 MatchupDetailSheet(matchup: matchup)
             }
+        }
+        // 🔥 FIXED: Listen for sort changes and reset animations
+        .onChange(of: allLivePlayersViewModel.sortChangeID) { _, _ in
+            resetAnimations()
         }
     }
     
@@ -111,7 +115,10 @@ struct AllLivePlayersView: View {
     
     /// Reset animation state for smooth transitions
     private func resetAnimations() {
-        animatedPlayers.removeAll()
+        // 🔥 IMPROVED: Clear animations immediately and smoothly
+        withAnimation(.easeOut(duration: 0.1)) {
+            animatedPlayers.removeAll()
+        }
     }
     
     /// Handle player tap - open matchup detail

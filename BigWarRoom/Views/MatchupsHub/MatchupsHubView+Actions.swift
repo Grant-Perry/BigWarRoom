@@ -52,6 +52,7 @@ extension MatchupsHubView {
         refreshTimer?.invalidate()
         refreshTimer = nil
         stopCountdownTimer()
+        stopJustMeModeTimer() // Clean up Just Me Mode timer as well
     }
     
     private func startCountdownTimer() {
@@ -72,6 +73,26 @@ extension MatchupsHubView {
     
     private func resetCountdown() {
         refreshCountdown = Double(AppConstants.MatchupRefresh)
+    }
+    
+    // MARK: - Just Me Mode Timer Management
+    private func startJustMeModeTimer() {
+        stopJustMeModeTimer() // Clean up any existing timer
+        
+        justMeModeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+            Task { @MainActor in
+                // Auto-collapse Just Me Mode banner after 5 seconds
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                    microMode = false
+                    expandedCardId = nil
+                }
+            }
+        }
+    }
+    
+    func stopJustMeModeTimer() {
+        justMeModeTimer?.invalidate()
+        justMeModeTimer = nil
     }
     
     // MARK: - UI Animation Actions
@@ -139,6 +160,10 @@ extension MatchupsHubView {
             microMode.toggle()
             if !microMode {
                 expandedCardId = nil // Collapse any expanded cards when exiting micro mode
+                stopJustMeModeTimer() // Stop timer if manually toggled off
+            } else {
+                // Start 5-second auto-collapse timer when Just Me Mode is activated
+                startJustMeModeTimer()
             }
         }
     }

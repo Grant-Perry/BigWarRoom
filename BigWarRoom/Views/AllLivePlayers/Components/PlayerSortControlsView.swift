@@ -25,10 +25,9 @@ struct PlayerSortControlsView: View {
                 Menu {
                     ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                         Button(action: {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                viewModel.setSortingMethod(method)
-                                onSortChange()
-                            }
+                            // 🔥 FIXED: Proper sort method change with animation reset
+                            viewModel.setSortingMethod(method)
+                            onSortChange()
                         }) {
                             HStack {
                                 Text(method.displayName)
@@ -59,12 +58,11 @@ struct PlayerSortControlsView: View {
             
             // Sort direction toggle
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    sortHighToLow.toggle()
-                    // 🔥 FIX: Sync the View state with ViewModel state
-                    viewModel.setSortDirection(highToLow: sortHighToLow)
-                    onSortChange()
-                }
+                // 🔥 FIXED: Update ViewModel first, then sync local binding
+                let newDirection = !viewModel.sortHighToLow
+                viewModel.setSortDirection(highToLow: newDirection)
+                sortHighToLow = newDirection // Sync the binding
+                onSortChange()
             }) {
                 Text(viewModel.sortDirectionText)
                     .fontWeight(.semibold)
@@ -77,6 +75,14 @@ struct PlayerSortControlsView: View {
                     .foregroundColor(.orange)
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
+        }
+        .onChange(of: viewModel.sortingMethod) { _, _ in
+            // 🔥 NEW: Reset animations when sorting method changes from ViewModel
+            onSortChange()
+        }
+        .onChange(of: viewModel.sortHighToLow) { _, newValue in
+            // 🔥 FIXED: Keep binding in sync with ViewModel
+            sortHighToLow = newValue
         }
     }
 }

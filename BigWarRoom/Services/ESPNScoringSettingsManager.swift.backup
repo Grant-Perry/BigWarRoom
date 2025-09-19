@@ -129,7 +129,431 @@ final class ScoringSettingsManager: ObservableObject {
     func getScoringSettings(for leagueID: String, source: LeagueSource) -> [String: Double]? {
         switch source {
         case .espn:
-            // 🔥 NEW: Return validated settings if available, fallback to raw settings
+            // 🔥 NEW: Check for Gp's specific league scoring rules first
+            if let gpLeagueScoring = getGpLeagueSpecificScoring(leagueID: leagueID) {
+                return gpLeagueScoring
+            }
+            
+            // Fallback to existing system: Return validated settings if available, fallback to raw settings
+            return validatedESPNScoringSettings[leagueID] ?? espnScoringSettings[leagueID]
+        case .sleeper:
+            return sleeperScoringSettings[leagueID]
+        }
+    }
+    
+    // MARK: - 🔥 NEW: Gp's League-Specific Scoring Rules
+    
+    /// Returns exact scoring rules for Gp's 5 specific ESPN leagues
+    /// If leagueID doesn't match any of Gp's leagues, returns nil to use fallback system
+    private func getGpLeagueSpecificScoring(leagueID: String) -> [String: Double]? {
+        switch leagueID {
+        case "1739710242":
+            // Basic scoring, TD pass = 4
+            return [
+                // Passing
+                "pass_yd": 0.04,        // 0.04 per yard
+                "pass_td": 4.0,         // 4 points per TD
+                "pass_int": -2.0,       // -2 points per interception
+                "pass_2pt": 2.0,        // 2 points per 2PC
+                
+                // Rushing
+                "rush_yd": 0.1,         // 0.1 per yard
+                "rush_td": 6.0,         // 6 points per TD
+                "rush_2pt": 2.0,        // 2 points per 2PC
+                
+                // Receiving
+                "rec_yd": 0.1,          // 0.1 per yard
+                "rec": 1.0,             // 1 point per reception
+                "rec_td": 6.0,          // 6 points per TD
+                "rec_2pt": 2.0,         // 2 points per 2PC
+                
+                // Kicking
+                "xpm": 1.0,             // 1 point per PAT
+                "fgmiss": -1.0,         // -1 point per missed FG
+                "fgm_0_39": 3.0,        // 3 points FG 0-39 yards
+                "fgm_40_49": 4.0,       // 4 points FG 40-49 yards
+                "fgm_50_59": 5.0,       // 5 points FG 50-59 yards
+                "fgm_60p": 6.0,         // 6 points FG 60+ yards
+                
+                // Team Defense/Special Teams
+                "def_int": 2.0,         // 2 points per interception
+                "def_fum_rec": 2.0,     // 2 points per fumble recovery
+                "def_sack": 1.0,        // 1 point per sack
+                "def_safe": 2.0,        // 2 points per safety
+                "def_td": 6.0,          // 6 points per defensive TD
+                "st_td": 6.0,           // 6 points per special teams TD
+                "blk_kick": 2.0,        // 2 points per blocked kick
+                
+                // Miscellaneous
+                "fum_lost": -2.0,       // -2 points per fumble lost
+                
+                // Points allowed (defense)
+                "pts_allow_0": 5.0,     // 5 points for 0 points allowed
+                "pts_allow_1_6": 4.0,   // 4 points for 1-6 points allowed
+                "pts_allow_7_13": 3.0,  // 3 points for 7-13 points allowed
+                "pts_allow_14_17": 1.0, // 1 point for 14-17 points allowed
+                "pts_allow_28_34": -1.0, // -1 point for 28-34 points allowed
+                "pts_allow_35_45": -3.0, // -3 points for 35-45 points allowed
+                "pts_allow_46p": -5.0,  // -5 points for 46+ points allowed
+                
+                // Yards allowed (defense)
+                "yds_allow_0_99": 5.0,      // 5 points for <100 yards allowed
+                "yds_allow_100_199": 3.0,   // 3 points for 100-199 yards allowed
+                "yds_allow_200_299": 2.0,   // 2 points for 200-299 yards allowed
+                "yds_allow_350_399": -1.0,  // -1 point for 350-399 yards allowed
+                "yds_allow_400_449": -3.0,  // -3 points for 400-449 yards allowed
+                "yds_allow_450_499": -5.0,  // -5 points for 450-499 yards allowed
+                "yds_allow_500_549": -6.0,  // -6 points for 500-549 yards allowed
+                "yds_allow_550p": -7.0     // -7 points for 550+ yards allowed
+            ]
+            
+        case "1486575797":
+            // Complex with bonuses, TD pass = 6
+            return [
+                // Passing
+                "pass_yd": 0.04,        // 0.04 per yard
+                "pass_cmp": 1.0,        // 1 point per completion
+                "pass_td": 6.0,         // 6 points per TD
+                "pass_td_40p": 1.0,     // 1 bonus point for 40+ yard pass TD
+                "pass_td_50p": 2.0,     // 2 bonus points for 50+ yard pass TD
+                "pass_fd": 0.25,        // 0.25 points per passing first down
+                "pass_int": -2.0,       // -2 points per interception
+                "pass_2pt": 2.0,        // 2 points per 2PC
+                "pass_300_399": 4.0,    // 4 bonus points for 300-399 yard game
+                "pass_400p": 5.0,       // 5 bonus points for 400+ yard game
+                
+                // Rushing
+                "rush_yd": 0.1,         // 0.1 per yard
+                "rush_td": 6.0,         // 6 points per TD
+                "rush_fd": 0.25,        // 0.25 points per rushing first down
+                "rush_2pt": 2.0,        // 2 points per 2PC
+                "rush_100_199": 1.0,    // 1 bonus point for 100-199 yard game
+                "rush_200p": 2.0,       // 2 bonus points for 200+ yard game
+                
+                // Receiving
+                "rec_yd": 0.1,          // 0.1 per yard
+                "rec": 1.0,             // 1 point per reception
+                "rec_td": 6.0,          // 6 points per TD
+                "rec_td_40p": 1.0,      // 1 bonus point for 40+ yard rec TD
+                "rec_td_50p": 2.0,      // 2 bonus points for 50+ yard rec TD
+                "rec_fd": 0.5,          // 0.5 points per receiving first down
+                "rec_2pt": 2.0,         // 2 points per 2PC
+                "rec_200p": 1.0,        // 1 bonus point for 200+ yard game
+                
+                // Kicking
+                "xpm": 1.0,             // 1 point per PAT
+                "fgmiss": -1.0,         // -1 point per missed FG
+                "fgm_0_39": 3.0,        // 3 points FG 0-39 yards
+                "fgm_40_49": 4.0,       // 4 points FG 40-49 yards
+                "fgm_50_59": 5.0,       // 5 points FG 50-59 yards
+                "fgm_60p": 6.0,         // 6 points FG 60+ yards
+                
+                // Team Defense/Special Teams (same as basic league)
+                "def_int": 2.0,         // 2 points per interception
+                "def_fum_rec": 2.0,     // 2 points per fumble recovery
+                "def_sack": 1.0,        // 1 point per sack
+                "def_safe": 2.0,        // 2 points per safety
+                "def_td": 6.0,          // 6 points per defensive TD
+                "st_td": 6.0,           // 6 points per special teams TD
+                "blk_kick": 2.0,        // 2 points per blocked kick
+                
+                // Miscellaneous
+                "fum_lost": -2.0,       // -2 points per fumble lost
+                
+                // Points allowed (defense) - same as basic
+                "pts_allow_0": 5.0,     // 5 points for 0 points allowed
+                "pts_allow_1_6": 4.0,   // 4 points for 1-6 points allowed
+                "pts_allow_7_13": 3.0,  // 3 points for 7-13 points allowed
+                "pts_allow_14_17": 1.0, // 1 point for 14-17 points allowed
+                "pts_allow_28_34": -1.0, // -1 point for 28-34 points allowed
+                "pts_allow_35_45": -3.0, // -3 points for 35-45 points allowed
+                "pts_allow_46p": -5.0,  // -5 points for 46+ points allowed
+                
+                // Yards allowed (defense) - same as basic
+                "yds_allow_0_99": 5.0,      // 5 points for <100 yards allowed
+                "yds_allow_100_199": 3.0,   // 3 points for 100-199 yards allowed
+                "yds_allow_200_299": 2.0,   // 2 points for 200-299 yards allowed
+                "yds_allow_350_399": -1.0,  // -1 point for 350-399 yards allowed
+                "yds_allow_400_449": -3.0,  // -3 points for 400-449 yards allowed
+                "yds_allow_450_499": -5.0,  // -5 points for 450-499 yards allowed
+                "yds_allow_500_549": -6.0,  // -6 points for 500-549 yards allowed
+                "yds_allow_550p": -7.0     // -7 points for 550+ yards allowed
+            ]
+            
+        case "1003758336":
+            // Basic scoring, TD pass = 4 (same as 1739710242)
+            return [
+                // Passing
+                "pass_yd": 0.04,        // 0.04 per yard
+                "pass_td": 4.0,         // 4 points per TD
+                "pass_int": -2.0,       // -2 points per interception
+                "pass_2pt": 2.0,        // 2 points per 2PC
+                
+                // Rushing
+                "rush_yd": 0.1,         // 0.1 per yard
+                "rush_td": 6.0,         // 6 points per TD
+                "rush_2pt": 2.0,        // 2 points per 2PC
+                
+                // Receiving
+                "rec_yd": 0.1,          // 0.1 per yard
+                "rec": 1.0,             // 1 point per reception
+                "rec_td": 6.0,          // 6 points per TD
+                "rec_2pt": 2.0,         // 2 points per 2PC
+                
+                // Kicking
+                "xpm": 1.0,             // 1 point per PAT
+                "fgmiss": -1.0,         // -1 point per missed FG
+                "fgm_0_39": 3.0,        // 3 points FG 0-39 yards
+                "fgm_40_49": 4.0,       // 4 points FG 40-49 yards
+                "fgm_50_59": 5.0,       // 5 points FG 50-59 yards
+                "fgm_60p": 6.0,         // 6 points FG 60+ yards
+                
+                // Team Defense/Special Teams (same as basic)
+                "def_int": 2.0,         // 2 points per interception
+                "def_fum_rec": 2.0,     // 2 points per fumble recovery
+                "def_sack": 1.0,        // 1 point per sack
+                "def_safe": 2.0,        // 2 points per safety
+                "def_td": 6.0,          // 6 points per defensive TD
+                "st_td": 6.0,           // 6 points per special teams TD
+                "blk_kick": 2.0,        // 2 points per blocked kick
+                
+                // Miscellaneous
+                "fum_lost": -2.0,       // -2 points per fumble lost
+                
+                // Points/Yards allowed (same as basic leagues)
+                "pts_allow_0": 5.0, "pts_allow_1_6": 4.0, "pts_allow_7_13": 3.0,
+                "pts_allow_14_17": 1.0, "pts_allow_28_34": -1.0, "pts_allow_35_45": -3.0,
+                "pts_allow_46p": -5.0, "yds_allow_0_99": 5.0, "yds_allow_100_199": 3.0,
+                "yds_allow_200_299": 2.0, "yds_allow_350_399": -1.0, "yds_allow_400_449": -3.0,
+                "yds_allow_450_499": -5.0, "yds_allow_500_549": -6.0, "yds_allow_550p": -7.0
+            ]
+            
+        case "1471913910":
+            // Basic scoring, TD pass = 4 (same as 1003758336)
+            return [
+                // Passing
+                "pass_yd": 0.04, "pass_td": 4.0, "pass_int": -2.0, "pass_2pt": 2.0,
+                
+                // Rushing  
+                "rush_yd": 0.1, "rush_td": 6.0, "rush_2pt": 2.0,
+                
+                // Receiving
+                "rec_yd": 0.1, "rec": 1.0, "rec_td": 6.0, "rec_2pt": 2.0,
+                
+                // Kicking
+                "xpm": 1.0, "fgmiss": -1.0, "fgm_0_39": 3.0, "fgm_40_49": 4.0,
+                "fgm_50_59": 5.0, "fgm_60p": 6.0,
+                
+                // Team Defense/Special Teams (same as basic)
+                "def_int": 2.0, "def_fum_rec": 2.0, "def_sack": 1.0, "def_safe": 2.0,
+                "def_td": 6.0, "st_td": 6.0, "blk_kick": 2.0, "fum_lost": -2.0,
+                "pts_allow_0": 5.0, "pts_allow_1_6": 4.0, "pts_allow_7_13": 3.0,
+                "pts_allow_14_17": 1.0, "pts_allow_28_34": -1.0, "pts_allow_35_45": -3.0,
+                "pts_allow_46p": -5.0, "yds_allow_0_99": 5.0, "yds_allow_100_199": 3.0,
+                "yds_allow_200_299": 2.0, "yds_allow_350_399": -1.0, "yds_allow_400_449": -3.0,
+                "yds_allow_450_499": -5.0, "yds_allow_500_549": -6.0, "yds_allow_550p": -7.0
+            ]
+            
+        case "1241361400":
+            // Minimal scoring - NO receiving yards or receptions, TD pass = 4
+            return [
+                // Passing
+                "pass_yd": 0.04,        // 0.04 per yard
+                "pass_td": 4.0,         // 4 points per TD
+                "pass_int": -2.0,       // -2 points per interception
+                "pass_2pt": 2.0,        // 2 points per 2PC
+                
+                // Rushing
+                "rush_yd": 0.1,         // 0.1 per yard
+                "rush_td": 6.0,         // 6 points per TD
+                "rush_2pt": 2.0,        // 2 points per 2PC
+                
+                // Receiving - ONLY TDs, NO yards or catches
+                "rec_td": 6.0,          // 6 points per TD
+                "rec_2pt": 2.0,         // 2 points per 2PC
+                // NO "rec_yd" or "rec" - this league doesn't award points for yards/catches
+                
+                // Kicking - NO PAT or missed FG penalties
+                "fgm_0_39": 3.0,        // 3 points FG 0-39 yards
+                "fgm_40_49": 4.0,       // 4 points FG 40-49 yards
+                "fgm_50_59": 5.0,       // 5 points FG 50-59 yards
+                "fgm_60p": 6.0,         // 6 points FG 60+ yards
+                // NO "xpm" or "fgmiss" - this league doesn't score PATs or penalize misses
+                
+                // Team Defense/Special Teams (same as basic)
+                "def_int": 2.0, "def_fum_rec": 2.0, "def_sack": 1.0, "def_safe": 2.0,
+                "def_td": 6.0, "st_td": 6.0, "blk_kick": 2.0, "fum_lost": -2.0,
+                "pts_allow_0": 5.0, "pts_allow_1_6": 4.0, "pts_allow_7_13": 3.0,
+                "pts_allow_14_17": 1.0, "pts_allow_28_34": -1.0, "pts_allow_35_45": -3.0,
+                "pts_allow_46p": -5.0, "yds_allow_0_99": 5.0, "yds_allow_100_199": 3.0,
+                "yds_allow_200_299": 2.0, "yds_allow_350_399": -1.0, "yds_allow_400_449": -3.0,
+                "yds_allow_450_499": -5.0, "yds_allow_500_549": -6.0, "yds_allow_550p": -7.0
+            ]
+            
+        default:
+            // Not one of Gp's specific leagues - return nil to use existing fallback system
+            return nil
+        }
+    }
+    
+    /// Half-PPR League (same as PPR but 0.5 receptions)
+    static let halfPPR: [String: Double] = {
+        var settings = standardPPR
+        settings["rec"] = 0.5   // 0.5 pts per reception
+        return settings
+    }()
+    
+    /// Standard (Non-PPR) League (same as PPR but 0 receptions)
+    static let standard: [String: Double] = {
+        var settings = standardPPR
+        settings["rec"] = 0.0   // 0 pts per reception
+        return settings
+    }()
+    
+    /// Advanced PPR League (includes bonus categories ~60% use)
+    static let advancedPPR: [String: Double] = {
+        var settings = standardPPR
+        // Bonus categories
+        settings["pass_40"] = 1.0       // 40+ yard pass bonus
+        settings["rush_40"] = 1.0       // 40+ yard rush bonus  
+        settings["rec_40"] = 1.0        // 40+ yard reception bonus
+        settings["pass_td_40p"] = 1.0   // 40+ yard pass TD bonus
+        settings["rush_td_40p"] = 1.0   // 40+ yard rush TD bonus
+        settings["rec_td_40p"] = 1.0    // 40+ yard rec TD bonus
+        return settings
+    }()
+    
+    /// Core stats that 90%+ of leagues use (high confidence these are active)
+    static let coreStats: Set<String> = [
+        "pass_yd", "pass_td", "pass_int",
+        "rush_yd", "rush_td", 
+        "rec", "rec_yd", "rec_td",
+        "fgm", "xpm", "fum_lost"
+    ]
+    
+    /// Advanced stats that some leagues use (medium confidence)
+    static let commonAdvancedStats: Set<String> = [
+        "pass_2pt", "rush_2pt", "rec_2pt",
+        "def_int", "def_fum_rec", "def_sack", "def_td", "def_safe",
+        "st_td", "blk_kick"
+    ]
+    
+    /// Rare stats that few leagues use (low confidence)
+    static let rareStats: Set<String> = [
+        "kick_ret_yd", "punt_ret_yd", "qb_hit", "pass_air_yd",
+        "pass_yac", "pass_drop", "punt_yd", "def_tkl", "def_ast"
+    ]
+    
+    /// Comprehensive scoring baselines for different league types
+    static let scoringBaselines: [LeagueType: [String: Double]] = [
+        .standardPPR: standardPPR,
+        .halfPPR: halfPPR,
+        .standard: standard,
+        .advancedPPR: advancedPPR
+    ]
+    
+    // MARK: - 🔥 NEW: Fantasy Football Scoring Baselines
+    
+    /// Comprehensive scoring baselines for different league types
+    struct ESPNScoringBaselines {
+        
+        /// Standard PPR League (most common fantasy setup)
+        static let standardPPR: [String: Double] = [
+            // Core Passing (99% of leagues use)
+            "pass_yd": 0.04,        // 1 pt per 25 yards (25 × 0.04 = 1.0)
+            "pass_td": 6.0,         // 6 pts per touchdown
+            "pass_int": -2.0,       // -2 pts per interception
+            "pass_2pt": 2.0,        // 2 pts per 2-point conversion
+            
+            // Core Rushing (99% of leagues use)
+            "rush_yd": 0.1,         // 1 pt per 10 yards (10 × 0.1 = 1.0)
+            "rush_td": 6.0,         // 6 pts per touchdown
+            "rush_2pt": 2.0,        // 2 pts per 2-point conversion
+            
+            // Core Receiving (99% of PPR leagues use)
+            "rec": 1.0,             // 1 pt per reception (PPR defining characteristic)
+            "rec_yd": 0.1,          // 1 pt per 10 yards
+            "rec_td": 6.0,          // 6 pts per touchdown
+            "rec_2pt": 2.0,         // 2 pts per 2-point conversion
+            
+            // Core Kicking (95% of leagues use)
+            "xpm": 1.0,             // 1 pt per extra point
+            "fgm": 3.0,             // 3 pts per field goal (basic)
+            
+            // Core Fumbles (90% of leagues use)
+            "fum_lost": -2.0,       // -2 pts per fumble lost
+            
+            // Core Defense/ST (85% of leagues use DST)
+            "def_int": 2.0,         // 2 pts per defensive interception
+            "def_fum_rec": 2.0,     // 2 pts per fumble recovery
+            "def_sack": 1.0,        // 1 pt per sack
+            "def_td": 6.0,          // 6 pts per defensive TD
+            "def_safe": 2.0,        // 2 pts per safety
+            "st_td": 6.0,           // 6 pts per special teams TD
+            "blk_kick": 2.0,        // 2 pts per blocked kick
+        ]
+        
+        /// Half-PPR League (same as PPR but 0.5 receptions)
+        static let halfPPR: [String: Double] = {
+            var settings = standardPPR
+            settings["rec"] = 0.5   // 0.5 pts per reception
+            return settings
+        }()
+        
+        /// Standard (Non-PPR) League (same as PPR but 0 receptions)
+        static let standard: [String: Double] = {
+            var settings = standardPPR
+            settings["rec"] = 0.0   // 0 pts per reception
+            return settings
+        }()
+        
+        /// Advanced PPR League (includes bonus categories ~60% use)
+        static let advancedPPR: [String: Double] = {
+            var settings = standardPPR
+            // Bonus categories
+            settings["pass_40"] = 1.0       // 40+ yard pass bonus
+            settings["rush_40"] = 1.0       // 40+ yard rush bonus  
+            settings["rec_40"] = 1.0        // 40+ yard reception bonus
+            settings["pass_td_40p"] = 1.0   // 40+ yard pass TD bonus
+            settings["rush_td_40p"] = 1.0   // 40+ yard rush TD bonus
+            settings["rec_td_40p"] = 1.0    // 40+ yard rec TD bonus
+            return settings
+        }()
+        
+        /// Core stats that 90%+ of leagues use (high confidence these are active)
+        static let coreStats: Set<String> = [
+            "pass_yd", "pass_td", "pass_int",
+            "rush_yd", "rush_td", 
+            "rec", "rec_yd", "rec_td",
+            "fgm", "xpm", "fum_lost"
+        ]
+        
+        /// Advanced stats that some leagues use (medium confidence)
+        static let commonAdvancedStats: Set<String> = [
+            "pass_2pt", "rush_2pt", "rec_2pt",
+            "def_int", "def_fum_rec", "def_sack", "def_td", "def_safe",
+            "st_td", "blk_kick"
+        ]
+        
+        /// Rare stats that few leagues use (low confidence)
+        static let rareStats: Set<String> = [
+            "kick_ret_yd", "punt_ret_yd", "qb_hit", "pass_air_yd",
+            "pass_yac", "pass_drop", "punt_yd", "def_tkl", "def_ast"
+        ]
+    }
+    
+    // MARK: - Public Interface
+    
+    /// Get scoring settings for any league (ESPN or Sleeper) - 🔥 NEW: Returns validated settings
+    func getScoringSettings(for leagueID: String, source: LeagueSource) -> [String: Double]? {
+        switch source {
+        case .espn:
+            // 🔥 NEW: Check for Gp's specific league scoring rules first
+            if let gpLeagueScoring = getGpLeagueSpecificScoring(leagueID: leagueID) {
+                return gpLeagueScoring
+            }
+            
+            // Fallback to existing system: Return validated settings if available, fallback to raw settings
             return validatedESPNScoringSettings[leagueID] ?? espnScoringSettings[leagueID]
         case .sleeper:
             return sleeperScoringSettings[leagueID]
@@ -148,6 +572,11 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Get the basis (data source) for a league's scoring settings
     func getScoringBasis(for leagueID: String) -> String {
+        // 🔥 NEW: Check if this is one of Gp's specific leagues
+        if getGpLeagueSpecificScoring(leagueID: leagueID) != nil {
+            return "Gp's League-Specific Configuration"
+        }
+        
         return leagueScoringBasis[leagueID] ?? "Unknown"
     }
     
@@ -233,79 +662,46 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Extract ESPN scoring settings from existing ESPNLeague data
     func registerESPNScoringSettings(from espnLeague: ESPNLeague, leagueID: String) {
-        print("🎯 ScoringManager: Processing ESPN scoring for league \(leagueID) - SILVER BULLET IMPLEMENTED")
-
-        // Directly use authoritative ESPN API scoringItems -- no overrides, no filtering, full trust
+        print("🎯 ScoringManager: Extracting ESPN scoring for league \(leagueID)")
+        
+        // Try to extract from scoringSettings first
         if let scoringSettings = espnLeague.scoringSettings,
            let scoringItems = scoringSettings.scoringItems {
-
-            print("🎯 ESPN API: Found \(scoringItems.count) scoring items - processing ALL with FULL TRUST")
-
-            var trustedSettings: [String: Double] = [:]
-
-            for item in scoringItems {
-                guard let statId = item.statId, let points = item.points else { continue }
-
-                if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
-                    if points != 0.0 {
-                        trustedSettings[sleeperKey] = points
-                        print("   ✅ TRUSTED: \(sleeperKey) = \(points) pts (statId: \(statId))")
-                    } else {
-                        print("   ⏭️ SKIPPED: \(sleeperKey) = 0.0 pts (explicitly disabled)")
-                    }
-
-                    // Handle position-specific overrides (like DST scoring)
-                    if let overrides = item.pointsOverrides, !overrides.isEmpty {
-                        print("   🔧 \(overrides.count) position overrides for \(sleeperKey)")
-                        for (positionKey, overridePoints) in overrides {
-                            if positionKey == "16" { // DST
-                                let dstKey = "\(sleeperKey)_dst"
-                                trustedSettings[dstKey] = overridePoints
-                                print("     ✅ DST Override: \(dstKey) = \(overridePoints) pts")
-                            }
-                        }
-                    }
-                } else {
-                    print("   ⚠️ UNMAPPED: ESPN statId \(statId) = \(points) pts (no mapper entry)")
-                }
-            }
-
-            espnScoringSettings[leagueID] = trustedSettings
-            validatedESPNScoringSettings[leagueID] = trustedSettings
-            leagueScoringBasis[leagueID] = "ESPN Silver Bullet (Authoritative JSON: \(scoringItems.count) raw → \(trustedSettings.count) mapped)"
-
-            print("🎯 SILVER BULLET APPLIED: League \(leagueID) now uses ESPN JSON exclusively.")
+            
+            let rawSettings = convertESPNScoringItems(scoringItems)
+            espnScoringSettings[leagueID] = rawSettings
+            
+            // 🔥 NEW: Apply smart filtering instead of complex differential analysis
+            let filteredSettings = performSmartFiltering(rawSettings: rawSettings, leagueID: leagueID)
+            validatedESPNScoringSettings[leagueID] = filteredSettings
+            
+            leagueScoringBasis[leagueID] = "ESPN API - Smart Filtered (\(scoringItems.count) raw → \(filteredSettings.count) active)"
+            
+            print("✅ BASIS: League \(leagueID) - \(leagueScoringBasis[leagueID]!)")
             return
         }
-
-        // Try nested settings as fallback
+        
+        // Try to extract from nested settings.scoringSettings
         if let settings = espnLeague.settings,
            let nestedScoring = settings.scoringSettings,
            let scoringItems = nestedScoring.scoringItems {
-
-            print("🎯 ESPN NESTED: Using \(scoringItems.count) scoring items with FULL TRUST")
-            var trustedSettings: [String: Double] = [:]
-
-            for item in scoringItems {
-                guard let statId = item.statId, let points = item.points else { continue }
-                if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
-                    if points != 0.0 {
-                        trustedSettings[sleeperKey] = points
-                        print("   ✅ NESTED TRUSTED: \(sleeperKey) = \(points) pts")
-                    }
-                }
-            }
-
-            espnScoringSettings[leagueID] = trustedSettings
-            validatedESPNScoringSettings[leagueID] = trustedSettings
-            leagueScoringBasis[leagueID] = "ESPN Silver Bullet (Nested JSON: \(scoringItems.count) raw → \(trustedSettings.count) mapped)"
-            print("🎯 NESTED SILVER BULLET applied for league \(leagueID).")
+            
+            let rawSettings = convertESPNScoringItems(scoringItems)
+            espnScoringSettings[leagueID] = rawSettings
+            
+            // 🔥 NEW: Apply smart filtering
+            let filteredSettings = performSmartFiltering(rawSettings: rawSettings, leagueID: leagueID)
+            validatedESPNScoringSettings[leagueID] = filteredSettings
+            
+            leagueScoringBasis[leagueID] = "ESPN API - Smart Filtered (\(scoringItems.count) raw → \(filteredSettings.count) active)"
+            
+            print("✅ BASIS: League \(leagueID) - \(leagueScoringBasis[leagueID]!)")
             return
         }
-
+        
         // No scoring settings found
         leagueScoringBasis[leagueID] = "ESPN API - No scoring settings found"
-        print("❌ NO SCORING DATA: League \(leagueID)")
+        print("❌ BASIS: League \(leagueID) - \(leagueScoringBasis[leagueID]!)")
     }
     
     // MARK: - 🔥 NEW: Differential Analysis System
@@ -844,6 +1240,12 @@ final class ScoringSettingsManager: ObservableObject {
         if isYardStat(statKey) {
             if pointsPerStat > 0 {
                 let increment = 1.0 / pointsPerStat  // 25 yards per point
+                let points = floor(statValue / increment) * 1.0  //        // 🔥 OLD BROKEN MATH (REMOVED):
+        // This was systematically undercounting every player with yards
+        /* REMOVED - WRONG MATH:
+        if isYardStat(statKey) {
+            if pointsPerStat > 0 {
+                let increment = 1.0 / pointsPerStat  // 25 yards per point
                 let points = floor(statValue / increment) * 1.0  // 🚨 WRONG: floor() loses 0.44 points on 211 yards
                 return points
             }
@@ -896,103 +1298,6 @@ final class ScoringSettingsManager: ObservableObject {
         }
     }
     
-    /// 🔥 NEW: Print detailed differential analysis results
-    func printDifferentialAnalysisDetails(for leagueID: String) {
-        guard let rawSettings = espnScoringSettings[leagueID],
-              let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            print("❌ No data for league \(leagueID)")
-            return
-        }
-        
-        print("🔬 DIFFERENTIAL ANALYSIS DETAILS: League \(leagueID)")
-        print("   Raw Rules: \(rawSettings.count)")
-        print("   Validated Rules: \(validatedSettings.count)")
-        print("   Filtered Out: \(rawSettings.count - validatedSettings.count)")
-        
-        print("\n✅ VALIDATED RULES:")
-        for (statKey, points) in validatedSettings.sorted(by: { $0.key < $1.key }) {
-            let isCore = ESPNScoringBaselines.coreStats.contains(statKey) ? " (CORE)" : ""
-            print("     \(statKey): \(points)\(isCore)")
-        }
-        
-        print("\n❌ FILTERED OUT:")
-        let filteredOut = rawSettings.filter { validatedSettings[$0.key] == nil }
-        for (statKey, points) in filteredOut.sorted(by: { $0.key < $1.key }) {
-            print("     \(statKey): \(points)")
-        }
-        
-        print("\n🎯 LEAGUE TYPE ANALYSIS:")
-        let leagueType = detectLeagueType(from: rawSettings)
-        print("     Detected: \(leagueType)")
-        let receptionPoints = rawSettings["rec"] ?? 0.0
-        print("     Reception Points: \(receptionPoints)")
-    }
-    
-    /// 🔥 NEW: Test differential analysis against known players
-    func testDifferentialAnalysis(for leagueID: String) {
-        print("🧪 TESTING DIFFERENTIAL ANALYSIS: League \(leagueID)")
-        
-        // Create test players with known stats
-        let testScenarios = [
-            TestScenario(
-                name: "Josh Allen", 
-                stats: [
-                    "pass_yd": 287.0,
-                    "pass_td": 2.0,
-                    "rush_yd": 45.0,
-                    "rush_td": 1.0
-                ],
-                expectedRange: (20.0, 30.0)
-            ),
-            TestScenario(
-                name: "Christian McCaffrey",
-                stats: [
-                    "rush_yd": 118.0,
-                    "rush_td": 1.0,
-                    "rec": 8.0,
-                    "rec_yd": 72.0
-                ],
-                expectedRange: (25.0, 35.0)
-            ),
-            TestScenario(
-                name: "Tyreek Hill",
-                stats: [
-                    "rec": 12.0,
-                    "rec_yd": 143.0,
-                    "rec_td": 1.0
-                ],
-                expectedRange: (25.0, 35.0)
-            )
-        ]
-        
-        guard let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            print("❌ No validated settings for league \(leagueID)")
-            return
-        }
-        
-        for scenario in testScenarios {
-            let calculatedPoints = calculatePoints(stats: scenario.stats, scoringSettings: validatedSettings)
-            let inRange = calculatedPoints >= scenario.expectedRange.0 && calculatedPoints <= scenario.expectedRange.1
-            let status = inRange ? "✅ PASS" : "❌ FAIL"
-            
-            print("   \(status) \(scenario.name): \(String(format: "%.2f", calculatedPoints)) pts (expected: \(scenario.expectedRange.0)-\(scenario.expectedRange.1))")
-            
-            // Show breakdown
-            for (statKey, statValue) in scenario.stats {
-                if let pointsPerStat = validatedSettings[statKey] {
-                    let points = calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: pointsPerStat)
-                    print("     \(statKey): \(statValue) × \(pointsPerStat) = \(String(format: "%.2f", points))")
-                }
-            }
-        }
-    }
-    
-    struct TestScenario {
-        let name: String
-        let stats: [String: Double]
-        let expectedRange: (Double, Double)
-    }
-    
     /// Clear all scoring settings (for testing/debugging)
     func clearAllSettings() {
         espnScoringSettings.removeAll()
@@ -1003,9 +1308,8 @@ final class ScoringSettingsManager: ObservableObject {
     }
 }
 
-// MARK: - Supporting Models (unchanged)
+// MARK: - Supporting Models
 
-// Import the proper LeagueSource
 typealias LeagueSource = UnifiedLeagueManager.LeagueWrapper.LeagueSource
 
 struct PointsValidationResult {

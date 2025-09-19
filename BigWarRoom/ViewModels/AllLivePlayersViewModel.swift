@@ -24,6 +24,10 @@ final class AllLivePlayersViewModel: ObservableObject {
     @Published var sortingMethod: SortingMethod = .score
     @Published var showActiveOnly: Bool = false // Changed from includeCompletedGames
     
+    // 🔥 NEW: Animation state management
+    @Published var shouldResetAnimations = false
+    @Published var sortChangeID = UUID()
+    
     @Published var medianScore: Double = 0.0
     @Published var scoreRange: Double = 0.0
     @Published var useAdaptiveScaling: Bool = false
@@ -111,6 +115,8 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     /// Apply current sorting direction to filtered players
     func applySorting() {
+        // 🔥 FIXED: Clear animation state when sorting changes
+        triggerAnimationReset()
         applyPositionFilter() // Re-apply filter with current sort settings
     }
     
@@ -474,21 +480,29 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     func setPositionFilter(_ position: PlayerPosition) {
         selectedPosition = position
+        // 🔥 FIXED: Clear animations when filter changes
+        triggerAnimationReset()
         applyPositionFilter()
     }
     
     func setSortDirection(highToLow: Bool) {
         sortHighToLow = highToLow
+        // 🔥 FIXED: Clear animations when sort direction changes
+        triggerAnimationReset()
         applyPositionFilter() // Re-apply filter with new sort direction
     }
     
     func setSortingMethod(_ method: SortingMethod) {
         sortingMethod = method
+        // 🔥 FIXED: Clear animations when sorting method changes
+        triggerAnimationReset()
         applyPositionFilter() // Re-apply filter with new sorting method
     }
     
     func setShowActiveOnly(_ showActive: Bool) {
         showActiveOnly = showActive
+        // 🔥 FIXED: Clear animations when active filter changes
+        triggerAnimationReset()
         applyPositionFilter() // Re-apply filter with new active-only setting
     }
 
@@ -528,11 +542,12 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // 🔥 IMPROVED: Enhanced filtering with true live-only logic
     private func applyPositionFilter() {
-//        // print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
+        print("🔍 FILTER DEBUG: Starting filter - Position: \(selectedPosition.rawValue), Show Active Only: \(showActiveOnly)")
+        print("🔍 FILTER DEBUG: All players count: \(allPlayers.count)")
         
         // Early return if no players
         guard !allPlayers.isEmpty else { 
-//            // print("🔍 FILTER DEBUG: No players to filter")
+            print("🔍 FILTER DEBUG: No players to filter")
             filteredPlayers = []
             return 
         }
@@ -542,24 +557,25 @@ final class AllLivePlayersViewModel: ObservableObject {
             allPlayers : 
             allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
         
-//        // print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
+        print("🔍 FILTER DEBUG: After position filter: \(positionFiltered.count) players")
         
         // Apply active-only filter with LIVE-ONLY logic
         var players = positionFiltered
         if showActiveOnly {
             let livePlayers = positionFiltered.filter { isPlayerInLiveGame($0.player) }
-//            // print("🔍 FILTER DEBUG: After LIVE-ONLY filter: \(livePlayers.count) live players out of \(positionFiltered.count)")
+            print("🔍 FILTER DEBUG: After LIVE-ONLY filter: \(livePlayers.count) live players out of \(positionFiltered.count)")
             
             players = livePlayers
             
             // If no live players, that's legitimate - games may not be in progress
             if livePlayers.isEmpty {
-//                // print("ℹ️ FILTER INFO: No players in LIVE games right now - this is expected when no games are actively being played")
+                print("ℹ️ FILTER INFO: No players in LIVE games right now - this is expected when no games are actively being played")
             }
         }
         
         // Early return if no players after filtering
         guard !players.isEmpty else {
+            print("🔍 FILTER DEBUG: No players after filtering - setting empty array")
             filteredPlayers = []
             positionTopScore = 0.0
             return
@@ -576,6 +592,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: positionTopScore)
             let tier = determinePerformanceTier(score: entry.currentScore, quartiles: positionQuartiles)
             
+            // 🔥 REMOVED PROBLEMATIC STABLE ID: Back to original IDs
             return LivePlayerEntry(
                 id: entry.id,
                 player: entry.player,
@@ -590,41 +607,63 @@ final class AllLivePlayersViewModel: ObservableObject {
             )
         }
         
+        print("🔍 FILTER DEBUG: Before sorting: \(updatedPlayers.count) players")
+        
         // Apply sorting based on method and direction (optimized)
         filteredPlayers = sortPlayers(updatedPlayers)
         
-//        // print("🔍 FILTER DEBUG: Final result: \(filteredPlayers.count) players displayed")
+        print("🔍 FILTER DEBUG: Final result: \(filteredPlayers.count) players displayed")
     }
     
     // 🔥 NEW: Separated sorting logic for better performance
     private func sortPlayers(_ players: [LivePlayerEntry]) -> [LivePlayerEntry] {
+        print("🔍 SORT DEBUG: Sorting \(players.count) players by \(sortingMethod.rawValue), direction: \(sortHighToLow ? "high to low" : "low to high")")
+        
+        let sortedPlayers: [LivePlayerEntry]
+        
         switch sortingMethod {
         case .score:
-            return sortHighToLow ? 
+            sortedPlayers = sortHighToLow ? 
                 players.sorted { $0.currentScore > $1.currentScore } :
                 players.sorted { $0.currentScore < $1.currentScore }
             
         case .name:
             // 🔥 FIX: Sort by last name instead of full name
-            return sortHighToLow ? 
+            sortedPlayers = sortHighToLow ? 
                 players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
                 players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
             
         case .team:
-            return sortHighToLow ? 
+            // 🔥 FIXED: Don't filter out players - handle empty team names in sorting instead
+            sortedPlayers = sortHighToLow ? 
                 players.sorted { player1, player2 in
-                    if player1.teamName != player2.teamName {
-                        return player1.teamName < player2.teamName
+                    let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
+                    let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
+                    
+                    if team1 != team2 {
+                        return team1 < team2
                     }
                     return positionPriority(player1.position) < positionPriority(player2.position)
                 } :
                 players.sorted { player1, player2 in
-                    if player1.teamName != player2.teamName {
-                        return player1.teamName > player2.teamName
+                    let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
+                    let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
+                    
+                    if team1 != team2 {
+                        return team1 > team2
                     }
                     return positionPriority(player1.position) < positionPriority(player2.position)
                 }
         }
+        
+        print("🔍 SORT DEBUG: After sorting, returning \(sortedPlayers.count) players")
+        
+        // 🔥 DEBUG: Print first few players to see what we're returning
+        for (index, player) in sortedPlayers.prefix(5).enumerated() {
+            print("  \(index + 1). \(player.playerName) (\(player.teamName.isEmpty ? "NO TEAM" : player.teamName)) - \(player.currentScore) pts")
+        }
+        
+        return sortedPlayers
     }
     
     /// Extract last name from full name for proper sorting
@@ -950,6 +989,17 @@ final class AllLivePlayersViewModel: ObservableObject {
             }
         } else {
             print("✅ All Josh Allen scores are consistent")
+        }
+    }
+
+    // 🔥 NEW: Method to trigger animation reset
+    private func triggerAnimationReset() {
+        shouldResetAnimations = true
+        sortChangeID = UUID()
+        
+        // Reset the flag after a short delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.shouldResetAnimations = false
         }
     }
 }

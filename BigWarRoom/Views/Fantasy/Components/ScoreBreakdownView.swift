@@ -297,21 +297,37 @@ struct ScoreBreakdownView: View {
                 .frame(height: 3)
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("NOTICE: Most calculated points accounted for")
+                    Text("CALCULATED BREAKDOWN")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("May differ from actual total due to league-specific rules. Working on it!")
+                    Text("Based on available stats and league scoring rules")
                         .font(.system(size: 11, weight: .regular))
                         .foregroundColor(.white.opacity(0.8))
                 }
                 
                 Spacer()
                 
-                // Official total pushed to trailing
-                Text("Official total: \(breakdown.totalScoreString) pts")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                // Calculated vs Official comparison
+                VStack(alignment: .trailing, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text("Calculated Total:")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                        Text("\(calculatedTotalString) pts")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    
+                    HStack(spacing: 8) {
+                        Text("Drift:")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                        Text("\(deltaString) pts")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(deltaColor)
+                    }
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
@@ -326,6 +342,45 @@ struct ScoreBreakdownView: View {
                 endPoint: .trailing
             )
         )
+    }
+
+    // MARK: - Calculated Total and Delta Properties
+    
+    /// Sum of all breakdown item points
+    private var calculatedTotal: Double {
+        breakdown.items.reduce(0) { $0 + $1.totalPoints }
+    }
+    
+    /// Formatted calculated total string
+    private var calculatedTotalString: String {
+        return String(format: "%.2f", calculatedTotal)
+    }
+    
+    /// Delta between calculated and official totals (from calculated perspective)
+    private var delta: Double {
+        return calculatedTotal - breakdown.totalScore
+    }
+    
+    /// Formatted delta string with sign or bullseye for perfect match
+    private var deltaString: String {
+        if abs(delta) < 0.01 {
+            return "🎯 0.00"
+        } else {
+            let deltaValue = abs(delta)
+            let sign = delta >= 0 ? "+" : "-"
+            return "\(sign)\(String(format: "%.2f", deltaValue))"
+        }
+    }
+    
+    /// Color for delta display - with animation for perfect matches
+    private var deltaColor: Color {
+        if abs(delta) < 0.01 {
+		   return .gpMinty // Perfect match gets special color
+        } else if delta > 0 {
+            return .gpGreen // Positive delta = we're over-calculating
+        } else {
+            return .gpRedPink // Negative delta = we're missing points  
+        }
     }
 
     private var noStatsSection: some View {

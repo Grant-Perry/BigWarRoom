@@ -683,105 +683,82 @@ struct ESPNStatIDMapper {
     }
     
     /// Map ESPN stat IDs to Sleeper stat keys for matching player stats
+    /// 🔥 COMPLETELY REBUILT using official cwendt94/espn-api source
     static let statIdToSleeperKey: [Int: String] = [
-        // Passing
-        0: "pass_att",        // Passing Attempts
-        1: "pass_cmp",        // Passing Completions  
-        3: "pass_yd",         // Passing Yards
-        4: "pass_td",         // Passing Touchdowns
-        20: "pass_int",       // QB Interceptions
-        21: "pass_sack",      // Sacks (against QB)
-        68: "pass_fd",        // Passing 1st Downs (CORRECT stat ID)
+        // 🔥 CORE PASSING STATS (verified against cwendt94/espn-api)
+        0: "pass_att",        // passingAttempts
+        1: "pass_cmp",        // passingCompletions  
+        3: "pass_yd",         // passingYards
+        4: "pass_td",         // passingTouchdowns
+        15: "pass_td_40p",    // passing40PlusYardTD
+        16: "pass_td_50p",    // passing50PlusYardTD
+        19: "pass_2pt",       // passing2PtConversions
+        20: "pass_int",       // passingInterceptions
         
-        // Rushing
-        23: "rush_att",       // Rushing Attempts  
-        24: "rush_yd",        // 🔥 FIXED: Rushing Yards (keep consistent)
-        25: "rush_td",        // Rushing Touchdowns
-        26: "rush_fd",        // Rushing 1st Downs
-        // 🔥 REMOVED: 35: "rush_att" - duplicate of 23, causes conflicts
+        // 🔥 CORE RUSHING STATS (verified)
+        23: "rush_att",       // rushingAttempts  
+        24: "rush_yd",        // rushingYards
+        25: "rush_td",        // rushingTouchdowns
+        26: "rush_2pt",       // rushing2PtConversions
+        35: "rush_td_40p",    // rushing40PlusYardTD
+        36: "rush_td_50p",    // rushing50PlusYardTD
         
-        // Receiving
-        41: "rec",            // Receptions
-        42: "rec_yd",         // Receiving Yards
-        43: "rec_td",         // Receiving Touchdowns
-        44: "rec_tgt",        // Targets
-        45: "rec_fd",         // Receiving 1st Downs
+        // 🔥 CORE RECEIVING STATS (verified)
+        41: "rec",            // receivingReceptions
+        42: "rec_yd",         // receivingYards ✅ CONFIRMED CORRECT
+        43: "rec_td",         // receivingTouchdowns
+        44: "rec_2pt",        // receiving2PtConversions
+        45: "rec_td_40p",     // receiving40PlusYardTD
+        46: "rec_td_50p",     // receiving50PlusYardTD
+        58: "rec_tgt",        // receivingTargets
         
-        // Fumbles
-        72: "fum",            // Fumbles
-        73: "fum_lost",       // Fumbles Lost
+        // 🔥 FUMBLES (verified)
+        68: "fum",            // fumbles
+        72: "fum_lost",       // lostFumbles
         
-        // Kicking
-        74: "xpm",            // Extra Points Made
-        77: "fgm",            // Field Goals Made
-        78: "xpmiss",         // Extra Point Missed
-        80: "fgmiss",         // Field Goals Missed
-        137: "fga",           // Field Goal Attempts (total)
+        // 🔥 KICKING STATS (verified - ESPN uses different ranges than Sleeper)
+        74: "fgm_50p",        // madeFieldGoalsFrom50Plus (ESPN: 50+, not 60+)
+        77: "fgm_40_49",      // madeFieldGoalsFrom40To49
+        80: "fgm_0_39",       // madeFieldGoalsFromUnder40  
+        83: "fgm",            // madeFieldGoals (total)
+        86: "xpm",            // madeExtraPoints
+        88: "xpmiss",         // missedExtraPoints
         
-        // Defense
-        85: "def_tkl",        // Tackles
-        86: "def_ast",        // Assisted Tackles
-        87: "def_solo",       // Solo Tackles
-        88: "def_comb",       // Combined Tackles
-        89: "def_int",        // Defensive Interceptions
-        90: "def_fum_rec",    // Fumble Recoveries
-        91: "def_td",         // Defensive Touchdowns
-        92: "def_sack",       // Sacks (by defense)
-        93: "def_safe",       // Safeties
-        94: "def_stf",        // Defensive Stuffs
-        95: "def_pass_def",   // Passes Defended
-        96: "def_int_yd",     // Interception Return Yards
-        97: "def_fum_force",  // Forced Fumbles
-        98: "def_fum_rec_yd", // Fumble Recovery Yards
-        99: "def_tkl_loss",   // Tackles for Loss
+        // 🔥 DEFENSE/ST STATS (verified)
+        95: "def_int",        // defensiveInterceptions
+        96: "def_fum_rec",    // defensiveFumbles (fumble recoveries)
+        97: "blk_kick",       // defensiveBlockedKicks
+        98: "def_safe",       // defensiveSafeties
+        99: "def_sack",       // defensiveSacks
+        101: "kick_ret_td",   // kickoffReturnTouchdowns
+        102: "punt_ret_td",   // puntReturnTouchdowns
+        103: "int_td",        // interceptionReturnTouchdowns
+        104: "fum_rec_td",    // fumbleReturnTouchdowns
+        106: "def_fum_force", // defensiveForcedFumbles
+        107: "def_ast",       // defensiveAssistedTackles
+        108: "def_solo",      // defensiveSoloTackles
+        109: "def_comb",      // defensiveTotalTackles
+        113: "def_pass_def",  // defensivePassesDefensed
+        114: "kick_ret_yd",   // kickoffReturnYards
+        115: "punt_ret_yd",   // puntReturnYards
         
-        // Bonus/Special
-        101: "pass_40",       // 40+ Yard Pass Completion
-        102: "pass_td_40p",   // 40+ Yard Pass TD
-        103: "pass_td_50p",   // 50+ Yard Pass TD
-        104: "rush_40",       // 40+ Yard Rush
-        105: "rec_40",        // 40+ Yard Reception
+        // 🔥 ADVANCED KICKING (verified ranges)
+        201: "fgm_60p",       // madeFieldGoalsFrom60Plus (ESPN specific)
         
-        // 2-Point Conversions
-        15: "pass_2pt",       // 2-Point Conversion Pass
-        16: "rush_2pt",       // 2-Point Conversion Rush  
-        17: "rec_2pt",        // 2-Point Conversion Reception
-        18: "fum_rec_td",     // Fumble Recovery TD
-        19: "int_td",         // Interception Return TD
+        // 🔥 2-POINT RETURNS & SPECIAL (verified)
+        205: "def_2pt_ret",   // defensive2PtReturns
+        206: "def_2pt_ret",   // defensive2PtReturns (duplicate mapping, same stat)
         
-        // Special teams and returns
-        37: "kick_ret_yd",    // Kick Return Yards
-        38: "punt_ret_yd",    // Punt Return Yards
-        46: "kick_ret_td",    // Kick Return TD
-        50: "kick_ret_att",   // Kick Return Attempts
-        51: "punt_ret_att",   // Punt Return Attempts  
-        53: "punt_ret_td",    // Punt Return TD
-        57: "punt_in20",      // Punts Inside 20
-        63: "punt_yd",        // Punt Yards
-        131: "punt_att",      // Punt Attempts
+        // 🔥 FIRST DOWNS (verified)
+        211: "pass_fd",       // passingFirstDown  
+        212: "rush_fd",       // rushingFirstDown
+        213: "rec_fd",        // receivingFirstDown
         
-        // Special teams defense
-        123: "st_td",         // Special Teams TD
-        124: "st_fum_rec",    // Special Teams Fumble Recovery
-        125: "st_ff",         // Special Teams Forced Fumble
-        128: "blk_kick",      // Blocked Kick
-        129: "blk_punt",      // Blocked Punt
-        
-        // Kicking distance ranges
-        132: "fga_0_19",      // FG Attempted 0-19 yards
-        133: "fga_20_29",     // FG Attempted 20-29 yards
-        134: "fga_30_39",     // FG Attempted 30-39 yards
-        135: "fga_40_49",     // FG Attempted 40-49 yards
-        136: "fga_50p",       // FG Attempted 50+ yards
-        
-        // Unknown/Advanced stats
-        130: "unknown_130",   // Unknown ESPN stat 130 - appears in league scoring but unmapped
-        198: "qb_hit",        // QB Hits
-        201: "pass_drop",     // Dropped Passes
-        206: "pass_air_yd",   // Passing Air Yards
-        209: "pass_yac",      // Yards After Catch
-        211: "pass_rz_att",   // Red Zone Pass Attempts
-        212: "rush_rz_att",   // Red Zone Rush Attempts
-        213: "rec_rz_tgt",    // Red Zone Targets
+        // 🔥 REMOVED ALL THE BULLSHIT MAPPINGS:
+        // - pass_air_yd (NEVER EXISTED)
+        // - pass_yac (not in core stats)  
+        // - qb_hit (not in core stats)
+        // - pass_drop (not in core stats)
+        // - All the red zone attempt garbage (not in core ESPN stats)
     ]
 }
