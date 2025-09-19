@@ -623,13 +623,13 @@ struct ESPNStatIDMapper {
         case 1: return "Pass Completed"
         case 3: return "Passing Yards"
         case 4: return "Passing TD"
-        case 20: return "Interception"
+        case 20: return "QB Interception"  // 🔥 FIXED: Disambiguate from defensive INT
         case 21: return "Sacked"
-        case 24: return "Passing 1st Down"
+        case 68: return "Passing 1st Down"  // 🔥 FIXED: Move from 24 to proper stat ID
         
         // Rushing
         case 23: return "Rushing Attempts"
-        case 24: return "Rushing Yards" 
+        case 24: return "Rushing Yards"  // 🔥 FIXED: Keep consistent - 24 = rushing yards
         case 25: return "Rushing TD"
         case 26: return "Rushing 1st Down"
         
@@ -647,14 +647,18 @@ struct ESPNStatIDMapper {
         // Kicking
         case 74: return "Extra Point Made"
         case 77: return "Field Goal Made"
+        case 78: return "Extra Point Missed"
         case 80: return "Field Goal Missed"
         
         // Defense
-        case 89: return "Interception"
+        case 87: return "Solo Tackles"
+        case 88: return "Combined Tackles"
+        case 89: return "Defensive Interception"  // 🔥 FIXED: Disambiguate from QB INT
         case 90: return "Fumble Recovery"
         case 91: return "Defensive TD"
         case 92: return "Sack"
         case 93: return "Safety"
+        case 94: return "Defensive Stuffs"
         
         // Bonus scoring
         case 101: return "40+ Yard Completion Bonus"
@@ -662,6 +666,17 @@ struct ESPNStatIDMapper {
         case 103: return "50+ Yard Pass TD Bonus"
         case 104: return "40+ Yard Rush Bonus"
         case 105: return "40+ Yard Reception Bonus"
+        
+        // Special teams and returns
+        case 50: return "Kick Return Attempts"
+        case 51: return "Punt Return Attempts"
+        case 131: return "Punt Attempts"
+        case 137: return "Field Goal Attempts"
+        
+        // Unknown/Advanced stats  
+        case 130: return "Unknown Stat 130"
+        
+        // 🔥 REMOVE: Duplicate case 35 (was "Rushing Attempts") - handled by case 23
         
         default: return "Unknown Stat \(statId)"
         }
@@ -674,24 +689,23 @@ struct ESPNStatIDMapper {
         1: "pass_cmp",        // Passing Completions  
         3: "pass_yd",         // Passing Yards
         4: "pass_td",         // Passing Touchdowns
-        20: "pass_int",       // Interceptions
+        20: "pass_int",       // QB Interceptions
         21: "pass_sack",      // Sacks (against QB)
+        68: "pass_fd",        // Passing 1st Downs (CORRECT stat ID)
         
-        // 🔥 FIX: Correct ESPN stat IDs for rushing
+        // Rushing
         23: "rush_att",       // Rushing Attempts  
-        24: "rush_yd",        // Rushing Yards
+        24: "rush_yd",        // 🔥 FIXED: Rushing Yards (keep consistent)
         25: "rush_td",        // Rushing Touchdowns
         26: "rush_fd",        // Rushing 1st Downs
+        // 🔥 REMOVED: 35: "rush_att" - duplicate of 23, causes conflicts
         
-        // 🔥 FIX: Correct ESPN stat IDs for receiving
+        // Receiving
         41: "rec",            // Receptions
         42: "rec_yd",         // Receiving Yards
         43: "rec_td",         // Receiving Touchdowns
         44: "rec_tgt",        // Targets
         45: "rec_fd",         // Receiving 1st Downs
-        
-        // 🔥 FIX: Correct ESPN stat IDs for passing first downs and other passing stats
-        68: "pass_fd",        // Passing 1st Downs (different from rushing yards!)
         
         // Fumbles
         72: "fum",            // Fumbles
@@ -700,14 +714,26 @@ struct ESPNStatIDMapper {
         // Kicking
         74: "xpm",            // Extra Points Made
         77: "fgm",            // Field Goals Made
+        78: "xpmiss",         // Extra Point Missed
         80: "fgmiss",         // Field Goals Missed
+        137: "fga",           // Field Goal Attempts (total)
         
         // Defense
+        85: "def_tkl",        // Tackles
+        86: "def_ast",        // Assisted Tackles
+        87: "def_solo",       // Solo Tackles
+        88: "def_comb",       // Combined Tackles
         89: "def_int",        // Defensive Interceptions
         90: "def_fum_rec",    // Fumble Recoveries
         91: "def_td",         // Defensive Touchdowns
-        92: "def_sack",       // Sacks
+        92: "def_sack",       // Sacks (by defense)
         93: "def_safe",       // Safeties
+        94: "def_stf",        // Defensive Stuffs
+        95: "def_pass_def",   // Passes Defended
+        96: "def_int_yd",     // Interception Return Yards
+        97: "def_fum_force",  // Forced Fumbles
+        98: "def_fum_rec_yd", // Fumble Recovery Yards
+        99: "def_tkl_loss",   // Tackles for Loss
         
         // Bonus/Special
         101: "pass_40",       // 40+ Yard Pass Completion
@@ -716,7 +742,7 @@ struct ESPNStatIDMapper {
         104: "rush_40",       // 40+ Yard Rush
         105: "rec_40",        // 40+ Yard Reception
         
-        // Additional stats (removing potential duplicates)
+        // 2-Point Conversions
         15: "pass_2pt",       // 2-Point Conversion Pass
         16: "rush_2pt",       // 2-Point Conversion Rush  
         17: "rec_2pt",        // 2-Point Conversion Reception
@@ -727,20 +753,14 @@ struct ESPNStatIDMapper {
         37: "kick_ret_yd",    // Kick Return Yards
         38: "punt_ret_yd",    // Punt Return Yards
         46: "kick_ret_td",    // Kick Return TD
+        50: "kick_ret_att",   // Kick Return Attempts
+        51: "punt_ret_att",   // Punt Return Attempts  
         53: "punt_ret_td",    // Punt Return TD
         57: "punt_in20",      // Punts Inside 20
         63: "punt_yd",        // Punt Yards
+        131: "punt_att",      // Punt Attempts
         
-        // Defensive stats
-        85: "def_tkl",        // Tackles
-        86: "def_ast",        // Assisted Tackles
-        95: "def_pass_def",   // Passes Defended
-        96: "def_int_yd",     // Interception Return Yards
-        97: "def_fum_force",  // Forced Fumbles
-        98: "def_fum_rec_yd", // Fumble Recovery Yards
-        99: "def_tkl_loss",   // Tackles for Loss
-        
-        // Special teams
+        // Special teams defense
         123: "st_td",         // Special Teams TD
         124: "st_fum_rec",    // Special Teams Fumble Recovery
         125: "st_ff",         // Special Teams Forced Fumble
@@ -754,7 +774,8 @@ struct ESPNStatIDMapper {
         135: "fga_40_49",     // FG Attempted 40-49 yards
         136: "fga_50p",       // FG Attempted 50+ yards
         
-        // Advanced QB stats
+        // Unknown/Advanced stats
+        130: "unknown_130",   // Unknown ESPN stat 130 - appears in league scoring but unmapped
         198: "qb_hit",        // QB Hits
         201: "pass_drop",     // Dropped Passes
         206: "pass_air_yd",   // Passing Air Yards

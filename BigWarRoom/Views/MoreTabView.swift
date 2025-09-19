@@ -108,6 +108,31 @@ struct MoreTabView: View {
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())
+                            
+                            // Debug/Testing Section (only show in debug mode)
+                            if AppConstants.debug {
+                                // Endpoint Validation Testing
+                                NavigationLink(destination: EndpointValidationTestView()) {
+                                    MoreRowView(
+                                        icon: "network",
+                                        iconColor: .yellow,
+                                        title: "🔧 Endpoint Validation",
+                                        subtitle: "Test API endpoints for scoring engine"
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                                
+                                // ESPN Fantasy Testing (existing)
+                                NavigationLink(destination: ESPNFantasyTestView()) {
+                                    MoreRowView(
+                                        icon: "testtube.2",
+                                        iconColor: .cyan,
+                                        title: "🧪 ESPN Fantasy Test",
+                                        subtitle: "ESPN API testing and debugging"
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)

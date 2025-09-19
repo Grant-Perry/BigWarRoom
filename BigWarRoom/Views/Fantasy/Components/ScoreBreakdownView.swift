@@ -7,11 +7,10 @@
 
 import SwiftUI
 
-/// Score breakdown popup view that displays detailed fantasy scoring
 struct ScoreBreakdownView: View {
     let breakdown: PlayerScoreBreakdown
     @Environment(\.dismiss) private var dismiss
-    
+
     // Get team color for gradient styling
     private var teamColor: Color {
         if let team = breakdown.player.team {
@@ -20,7 +19,6 @@ struct ScoreBreakdownView: View {
         return .blue
     }
     
-    // Create gradient background like Live Game Stats
     private var backgroundGradient: LinearGradient {
         LinearGradient(
             gradient: Gradient(colors: [
@@ -34,7 +32,6 @@ struct ScoreBreakdownView: View {
         )
     }
     
-    // Create gradient border
     private var borderGradient: LinearGradient {
         LinearGradient(
             gradient: Gradient(colors: [
@@ -48,32 +45,45 @@ struct ScoreBreakdownView: View {
         )
     }
     
+    // Score color based on performance
+    private var scoreColor: Color {
+        let score = breakdown.totalScore
+        // Consider 15+ points as "good" performance
+        return score >= 15.0 ? .gpGreen : .gpRedPink
+    }
+    
+    // Position color
+    private var positionColor: Color {
+        switch breakdown.player.position.uppercased() {
+        case "QB": return .blue
+        case "RB": return .green
+        case "WR": return .purple
+        case "TE": return .orange
+        case "K": return .yellow
+        case "DEF": return .red
+        default: return .gray
+        }
+    }
+
     var body: some View {
         ZStack {
-            // Dark background overlay
             Color.black.opacity(0.85)
                 .ignoresSafeArea()
                 .onTapGesture {
                     dismiss()
                 }
-            
-            // Main content card with team color gradient
             VStack(spacing: 0) {
-                // Header section
                 headerSection
-                
-                // 🔥 FIXED: Add ScrollView around stats section
                 if breakdown.hasStats {
                     ScrollView(.vertical, showsIndicators: true) {
                         statsTableSection
                     }
-                    .frame(maxHeight: 400) // Limit height so total is always visible
+                    .frame(maxHeight: 400)
                 } else {
                     noStatsSection
                 }
-                
-                // Total section - ALWAYS VISIBLE at bottom
-                totalSection
+                // NOTICE section styled like the Fantasy Points row, but now a disclaimer
+                noticeSection
             }
             .background(
                 RoundedRectangle(cornerRadius: 16)
@@ -87,7 +97,60 @@ struct ScoreBreakdownView: View {
             .shadow(color: teamColor.opacity(0.3), radius: 20, x: 0, y: 10)
             .shadow(color: .black.opacity(0.5), radius: 15, x: 0, y: 8)
             
-            // Close button
+            // 🔥 UPDATED: Player image overlay on the left - properly clipped like the player card
+            .overlay(
+                HStack {
+                    VStack {
+                        AsyncImage(url: breakdown.player.headshotURL) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(breakdown.player.teamColor.opacity(0.3))
+                                
+                                Text(breakdown.player.position)
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+                        }
+                        .frame(width: 100, height: 130)
+                        .scaleEffect(0.65)
+                        .clipped()
+                        .offset(x: 25, y: -10)
+                        
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                    
+                    // 🔥 UPDATED: Smaller score
+                    VStack {
+                        VStack(spacing: 6) {
+                            // Smaller position badge
+                               Text(breakdown.player.position.uppercased())
+								   .font(.system(size: 10, weight: .bold))
+								   .foregroundColor(.white)
+								   .background(positionColor)
+								   .clipShape(RoundedRectangle(cornerRadius: 6))
+                            // Smaller score
+                            Text(breakdown.totalScoreString)
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(scoreColor)
+                        }
+                        .offset(x: -40, y: 35)
+//                        .padding(.trailing, 40)
+//                        .padding(.top, 100)
+                        
+                        Spacer()
+                    }
+                },
+                alignment: .topLeading
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16)) // 🔥 MOVED: Apply clipShape to the entire modal structure
+            
+            // Close button, matches original
             VStack {
                 HStack {
                     Spacer()
@@ -114,20 +177,35 @@ struct ScoreBreakdownView: View {
             }
         }
     }
-    
-    // MARK: - View Components
-    
+
+    // MARK: - Header Section
     private var headerSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
             // Player name
             Text(breakdown.playerDisplayName)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
             
+            // League info with logo
+            HStack(spacing: 8) {
+                // League logo
+                if let leagueContext = breakdown.leagueContext {
+                    Image(leagueContext.source == .espn ? "espnLogo" : "sleeperLogo")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 25, height: 25)
+                }
+                
+                // League name (you'll need to pass this through)
+                Text(breakdown.leagueName ?? "Unknown League")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+            }
+            
             // Week info
             Text(breakdown.weekDisplayString)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.8))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
         }
         .padding(.top, 20)
         .padding(.bottom, 16)
@@ -137,51 +215,47 @@ struct ScoreBreakdownView: View {
                 .fill(Color.black.opacity(0.2))
         )
     }
-    
+
     private var statsTableSection: some View {
         VStack(spacing: 0) {
-            // Table header - Show different headers for Chopped vs Regular leagues
             tableHeaderRow
-            
-            // Divider
             Rectangle()
                 .fill(teamColor.opacity(0.6))
                 .frame(height: 2)
             
-            // Stats rows
-            ForEach(breakdown.items) { item in
-                statsRow(item: item)
-                
-                // Divider between rows (except last)
-                if item.id != breakdown.items.last?.id {
-                    Rectangle()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(height: 0.5)
+            // 🔥 NEW: Add ScrollView for stats
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVStack(spacing: 0) {
+                    ForEach(breakdown.items) { item in
+                        statsRow(item: item)
+                        if item.id != breakdown.items.last?.id {
+                            Rectangle()
+                                .fill(Color.white.opacity(0.1))
+                                .frame(height: 0.5)
+                        }
+                    }
                 }
             }
+            .frame(maxHeight: 300) // Limit height so notice is always visible
         }
         .padding(.horizontal, 16)
     }
-    
+
     private var tableHeaderRow: some View {
         HStack(spacing: 8) {
             Text("STAT")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
             Text("QTY")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
                 .frame(width: 60, alignment: .center)
-            
-            // 🔥 FIXED: Show PTS PER and POINTS columns when we have REAL scoring data (chopped OR ESPN)
             if breakdown.hasRealScoringData {
                 Text("PTS PER")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
                     .frame(width: 70, alignment: .center)
-                
                 Text("POINTS")
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
@@ -190,27 +264,22 @@ struct ScoreBreakdownView: View {
         }
         .padding(.vertical, 12)
     }
-    
+
     private func statsRow(item: ScoreBreakdownItem) -> some View {
         HStack(spacing: 8) {
             Text(item.statName)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
-            // QTY column - shows the stat value
             Text(item.statValueString)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(.white)
                 .frame(width: 60, alignment: .center)
-            
-            // 🔥 FIXED: Show PTS PER and POINTS for leagues with REAL scoring data (chopped OR ESPN)
             if breakdown.hasRealScoringData {
                 Text(item.pointsPerStatString)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
                     .frame(width: 70, alignment: .center)
-                
                 Text(item.totalPointsString)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
@@ -219,31 +288,33 @@ struct ScoreBreakdownView: View {
         }
         .padding(.vertical, 12)
     }
-    
-    private var totalSection: some View {
+
+    // MARK: - NOTICE Section (takes the place of the Fantasy Points row)
+    private var noticeSection: some View {
         VStack(spacing: 0) {
-            // Divider with team color
             Rectangle()
                 .fill(teamColor.opacity(0.8))
                 .frame(height: 3)
-            
-            // Total row
             HStack(spacing: 8) {
-                Text("Fantasy Points")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("NOTICE: Most calculated points accounted for")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text("May differ from actual total due to league-specific rules. Working on it!")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundColor(.white.opacity(0.8))
+                }
                 
-                // 🔥 FIXED: Alignment based on whether we have real scoring data
-                Text(breakdown.totalScoreString)
-                    .font(.system(size: 22, weight: .black))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(width: breakdown.hasRealScoringData ? 70 : 60, alignment: breakdown.hasRealScoringData ? .trailing : .center)
+                Spacer()
+                
+                // Official total pushed to trailing
+                Text("Official total: \(breakdown.totalScoreString) pts")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 18)
+            .padding(.vertical, 14)
         }
         .background(
             LinearGradient(
@@ -256,7 +327,7 @@ struct ScoreBreakdownView: View {
             )
         )
     }
-    
+
     private var noStatsSection: some View {
         VStack(spacing: 12) {
             Text("No stats available")
@@ -267,8 +338,61 @@ struct ScoreBreakdownView: View {
                 .font(.system(size: 14))
                 .foregroundColor(.white.opacity(0.6))
                 .multilineTextAlignment(.center)
+            
+            // 🔥 NEW: Show player's next game or BYE status
+            VStack(spacing: 8) {
+                Text("\(breakdown.playerDisplayName) is playing:")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+                
+                gameStatusView
+                    .scaleEffect(1.2) // Make it slightly larger for emphasis
+            }
+            .padding(.top, 8)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 32)
+    }
+    
+    // 🔥 NEW: Game status view for no stats section
+    private var gameStatusView: some View {
+        Group {
+            if let team = breakdown.player.team {
+                if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+                    // Show actual game matchup
+                    VStack(spacing: 4) {
+                        Text(gameInfo.matchupString)
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(teamColor.opacity(0.8))
+                            )
+                        
+                        Text(gameInfo.formattedGameTime)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                } else {
+                    // Show BYE week
+                    Text("BYE")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(teamColor.opacity(0.8))
+                        )
+                }
+            } else {
+                // No team info available
+                Text("Unknown Schedule")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+        }
     }
 }

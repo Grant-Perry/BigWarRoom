@@ -127,16 +127,17 @@ struct PlayerScoreBarCardContentView: View {
                 ZStack {
                     // 🔥 FIXED: Large floating team logo behind player - positioned further right
                     let teamCode = playerEntry.player.team ?? ""
-                    let mappedTeamCode = teamCode == "WSH" ? "WAS" : teamCode // Map WSH to WAS
+                    // 🔥 NEW: Use TeamCodeNormalizer for consistent team mapping
+                    let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
                     
-                    if let team = NFLTeam.team(for: mappedTeamCode) {
+                    if let team = NFLTeam.team(for: normalizedTeamCode) {
                         TeamAssetManager.shared.logoOrFallback(for: team.id)
                             .frame(width: 140, height: 140)
                             .opacity(0.25)
                             .offset(x: 10, y: -5) // 🔥 FIXED: Back to x: 20 as requested
                             .zIndex(0)
                     } else {
-                        let _ = print("🔍 DEBUG - No team logo for player: \(playerEntry.player.shortName), team: '\(teamCode)' (mapped: '\(mappedTeamCode)')")
+                        let _ = print("🔍 DEBUG - No team logo for player: \(playerEntry.player.shortName), team: '\(teamCode)' (normalized: '\(normalizedTeamCode)')")
                     }
                     
                     // Player image in front - FIXED HEIGHT
@@ -179,6 +180,23 @@ struct PlayerScoreBarCardContentView: View {
             return nil
         }
         
+        // 🔥 NEW: Debug Josh Allen specifically
+        if playerEntry.player.fullName.contains("Josh Allen") {
+            print("🎯 JOSH ALLEN STATS DEBUG:")
+            print("   League: \(playerEntry.leagueName)")
+            print("   Score: \(playerEntry.currentScore)")
+            print("   Sleeper ID: \(sleeperPlayer.playerID)")
+            print("   Stats count: \(stats.count)")
+            
+            // Show key stats
+            let keyStats = ["pass_yd", "pass_td", "pass_int", "rush_yd", "rush_td", "rec", "rec_yd", "pts_ppr", "pts_std"]
+            for statKey in keyStats {
+                if let value = stats[statKey], value > 0 {
+                    print("     \(statKey): \(value)")
+                }
+            }
+        }
+        
         // Convert LivePlayerEntry to FantasyPlayer for breakdown
         let fantasyPlayer = FantasyPlayer(
             id: playerEntry.id,
@@ -196,23 +214,30 @@ struct PlayerScoreBarCardContentView: View {
             lineupSlot: playerEntry.position
         )
         
-        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        // 🔥 FIXED: Create consistent league context
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        let leagueID = playerEntry.matchup.league.league.id
+        let source: LeagueSource = playerEntry.leagueSource.uppercased() == "ESPN" ? .espn : .sleeper
         
-        // Create breakdown using our factory
-        let breakdown = ScoreBreakdownFactory.createBreakdown(
-            for: fantasyPlayer,
-            stats: stats,
-            week: selectedWeek,
-            scoringSystem: .ppr,
-            isChoppedLeague: false,
-            leagueScoringSettings: nil,
-            espnScoringSettings: nil, // 🔥 REMOVED: No longer using legacy
-            leagueID: playerEntry.matchup.league.league.id, // 🔥 NEW: Pass league ID
-            leagueSource: playerEntry.leagueSource == "ESPN" ? .espn : .sleeper // 🔥 NEW: Pass source
+        print("🎯 DEBUG: Creating score breakdown for \(fantasyPlayer.fullName)")
+        print("   League: \(playerEntry.leagueName) (ID: \(leagueID))")
+        print("   Source: \(source)")
+        print("   Score: \(playerEntry.currentScore)")
+        
+        let leagueContext = LeagueContext(
+            leagueID: leagueID,
+            source: source,
+            isChopped: playerEntry.matchup.isChoppedLeague,
+            customScoringSettings: nil
         )
         
-        return breakdown
+        // Use standardized breakdown factory
+        return ScoreBreakdownFactory.createBreakdown(
+            for: fantasyPlayer,
+            week: selectedWeek,
+            localStatsProvider: nil, // AllLivePlayersViewModel will be used via StatsFacade
+            leagueContext: leagueContext
+        ).withLeagueName(playerEntry.leagueName) // 🔥 NEW: Add league name
     }
     
     /// Creates empty breakdown for players with no stats
@@ -234,11 +259,10 @@ struct PlayerScoreBarCardContentView: View {
             lineupSlot: playerEntry.position
         )
         
-        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         return PlayerScoreBreakdown(
             player: fantasyPlayer,
-            week: selectedWeek, // 🔥 FIXED: Use selected week instead of current week
+            week: selectedWeek,
             items: [],
             totalScore: playerEntry.currentScore,
             isChoppedLeague: false // All Live Players - not chopped
@@ -381,246 +405,19 @@ struct PlayerScoreBarCardContentView: View {
     
     // MARK: - Player Matching Logic (moved from main file)
     
-    // 🔥 BULLETPROOF: Enhanced player matching with comprehensive debug logging and multiple fallback strategies
+    // 🔥 PERFORMANCE: Use PlayerMatchService instead of O(n) scans
     private func getSleeperPlayerData() -> SleeperPlayer? {
         let playerName = playerEntry.player.fullName
         let shortName = playerEntry.player.shortName
-        let team = playerEntry.player.team?.uppercased() ?? "NO_TEAM"
+        let team = playerEntry.player.team
         let position = playerEntry.position.uppercased()
         
-        @StateObject var playerDirectory = PlayerDirectoryStore.shared
-        
-        // 🔥 STRATEGY 1: Exact match - Full name + team + position
-        var exactMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            sleeperPlayer.fullName.lowercased() == playerName.lowercased() &&
-            sleeperPlayer.team?.uppercased() == team &&
-            sleeperPlayer.position?.uppercased() == position
-        }
-        
-        if exactMatches.count == 1 {
-            return exactMatches.first
-        }
-        
-        // 🔥 STRATEGY 2: Short name match - Short name + team + position
-        var shortNameMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            sleeperPlayer.shortName.lowercased() == shortName.lowercased() &&
-            sleeperPlayer.team?.uppercased() == team &&
-            sleeperPlayer.position?.uppercased() == position
-        }
-        
-        if shortNameMatches.count == 1 {
-            return shortNameMatches.first
-        }
-        
-        // 🔥 STRATEGY 3: Last name + team + position (for cases like "James Cook" vs "J. Cook")
-        let lastName = extractLastName(from: playerName)
-        var lastNameMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            let sleeperLastName = sleeperPlayer.lastName?.lowercased() ?? extractLastName(from: sleeperPlayer.fullName).lowercased()
-            return sleeperLastName == lastName.lowercased() &&
-                   sleeperPlayer.team?.uppercased() == team &&
-                   sleeperPlayer.position?.uppercased() == position
-        }
-        
-        if lastNameMatches.count == 1 {
-            return lastNameMatches.first
-        }
-        
-        // 🔥 STRATEGY 4: Fuzzy team matching (handle team abbreviation differences)
-        let teamAliases = getTeamAliases(for: team)
-        var fuzzyTeamMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            let sleeperTeam = sleeperPlayer.team?.uppercased() ?? ""
-            return (teamAliases.contains(sleeperTeam) || sleeperTeam == team) &&
-                   sleeperPlayer.position?.uppercased() == position &&
-                   (sleeperPlayer.fullName.lowercased() == playerName.lowercased() ||
-                    sleeperPlayer.shortName.lowercased() == shortName.lowercased() ||
-                    (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
-        }
-        
-        if fuzzyTeamMatches.count == 1 {
-            return fuzzyTeamMatches.first
-        }
-        
-        // 🔥 STRATEGY 5: Relaxed position matching (handle FLEX, DEF vs DST, etc.)
-        let positionAliases = getPositionAliases(for: position)
-        var fuzzyPositionMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            let sleeperPosition = sleeperPlayer.position?.uppercased() ?? ""
-            return (positionAliases.contains(sleeperPosition) || sleeperPosition == position) &&
-                   sleeperPlayer.team?.uppercased() == team &&
-                   (sleeperPlayer.fullName.lowercased() == playerName.lowercased() ||
-                    sleeperPlayer.shortName.lowercased() == shortName.lowercased() ||
-                    (sleeperPlayer.lastName?.lowercased() ?? "") == lastName.lowercased())
-        }
-        
-        if fuzzyPositionMatches.count == 1 {
-            return fuzzyPositionMatches.first
-        }
-        
-        // 🔥 STRATEGY 6: Combined fuzzy matching (last resort)
-        var combinedFuzzyMatches = playerDirectory.players.values.filter { sleeperPlayer in
-            let sleeperTeam = sleeperPlayer.team?.uppercased() ?? ""
-            let sleeperPosition = sleeperPlayer.position?.uppercased() ?? ""
-            let sleeperLastName = sleeperPlayer.lastName?.lowercased() ?? extractLastName(from: sleeperPlayer.fullName).lowercased()
-            
-            return (teamAliases.contains(sleeperTeam) || sleeperTeam == team) &&
-                   (positionAliases.contains(sleeperPosition) || sleeperPosition == position) &&
-                   sleeperLastName == lastName.lowercased()
-        }
-        
-        // Collect all potential matches for prioritization
-        var allPotentialMatches: [SleeperPlayer] = []
-        allPotentialMatches.append(contentsOf: exactMatches)
-        allPotentialMatches.append(contentsOf: shortNameMatches)
-        allPotentialMatches.append(contentsOf: lastNameMatches)
-        allPotentialMatches.append(contentsOf: fuzzyTeamMatches)
-        allPotentialMatches.append(contentsOf: fuzzyPositionMatches)
-        allPotentialMatches.append(contentsOf: combinedFuzzyMatches)
-        
-        // Remove duplicates
-        let uniqueMatches = Array(Set(allPotentialMatches.map { $0.playerID })).compactMap { id in
-            allPotentialMatches.first { $0.playerID == id }
-        }
-        
-        // If we have matches, prioritize them
-        if !uniqueMatches.isEmpty {
-            // Priority 1: Player with detailed game stats
-            let detailedStatsMatches = uniqueMatches.filter { player in
-                if let stats = viewModel.playerStats[player.playerID] {
-                    let hasDetailedStats = stats.keys.contains { key in
-                        key.contains("pass_att") || key.contains("rush_att") || 
-                        key.contains("rec") || key.contains("fgm") || 
-                        key.contains("def_sack") || key.contains("pass_cmp") ||
-                        key.contains("rush_yd") || key.contains("rec_yd")
-                    }
-                    return hasDetailedStats
-                }
-                return false
-            }
-            
-            if !detailedStatsMatches.isEmpty {
-                return detailedStatsMatches.first
-            }
-            
-            // Priority 2: Player with jersey number match
-            if let jerseyNumber = playerEntry.player.jerseyNumber {
-                let jerseyMatches = uniqueMatches.filter { player in
-                    return player.number?.description == jerseyNumber
-                }
-                if !jerseyMatches.isEmpty {
-                    return jerseyMatches.first
-                }
-            }
-            
-            // Priority 3: Player with any stats (even if just fantasy points)
-            let anyStatsMatches = uniqueMatches.filter { player in
-                return viewModel.playerStats[player.playerID] != nil
-            }
-            
-            if !anyStatsMatches.isEmpty {
-                return anyStatsMatches.first
-            }
-            
-            // Priority 4: Fallback to first match
-            return uniqueMatches.first
-        }
-        
-        // No matches found
-        print("❌ NO MATCH found for \(playerName) (\(team)) \(position)")
-        return nil
-    }
-    
-    /// Extract last name from full name
-    private func extractLastName(from fullName: String) -> String {
-        let components = fullName.components(separatedBy: " ")
-        return components.last ?? fullName
-    }
-    
-    /// Get team aliases to handle different team abbreviations
-    private func getTeamAliases(for team: String) -> [String] {
-        switch team.uppercased() {
-        case "BUF":
-            return ["BUFFALO", "BUF"]
-        case "MIA":
-            return ["MIAMI", "MIA"]
-        case "NE", "NEP":
-            return ["NEW ENGLAND", "NE", "NEP", "PATRIOTS"]
-        case "NYJ":
-            return ["NEW YORK JETS", "NYJ", "JETS"]
-        case "BAL":
-            return ["BALTIMORE", "BAL"]
-        case "CIN":
-            return ["CINCINNATI", "CIN"]
-        case "CLE":
-            return ["CLEVELAND", "CLE"]
-        case "PIT":
-            return ["PITTSBURGH", "PIT"]
-        case "HOU":
-            return ["HOUSTON", "HOU"]
-        case "IND":
-            return ["INDIANAPOLIS", "IND"]
-        case "JAX", "JAC":
-            return ["JACKSONVILLE", "JAX", "JAC"]
-        case "TEN":
-            return ["TENNESSEE", "TEN"]
-        case "DEN":
-            return ["DENVER", "DEN"]
-        case "KC":
-            return ["KANSAS CITY", "KC"]
-        case "LV", "LVR", "OAK":
-            return ["LAS VEGAS", "LV", "LVR", "OAKLAND", "OAK", "RAIDERS"]
-        case "LAC":
-            return ["LOS ANGELES CHARGERS", "LAC", "SD", "SAN DIEGO"]
-        case "DAL":
-            return ["DALLAS", "DAL"]
-        case "NYG":
-            return ["NEW YORK GIANTS", "NYG", "GIANTS"]
-        case "PHI":
-            return ["PHILADELPHIA", "PHI"]
-        case "WSH", "WAS":
-            return ["WASHINGTON", "WSH", "WAS"]
-        case "CHI":
-            return ["CHICAGO", "CHI"]
-        case "DET":
-            return ["DETROIT", "DET"]
-        case "GB":
-            return ["GREEN BAY", "GB"]
-        case "MIN":
-            return ["MINNESOTA", "MIN"]
-        case "ATL":
-            return ["ATLANTA", "ATL"]
-        case "CAR":
-            return ["CAROLINA", "CAR"]
-        case "NO":
-            return ["NEW ORLEANS", "NO"]
-        case "TB":
-            return ["TAMPA BAY", "TB"]
-        case "ARI":
-            return ["ARIZONA", "ARI"]
-        case "LAR":
-            return ["LOS ANGELES RAMS", "LAR", "STL"]
-        case "SEA":
-            return ["SEATTLE", "SEA"]
-        case "SF":
-            return ["SAN FRANCISCO", "SF"]
-        default:
-            return [team]
-        }
-    }
-    
-    /// Get position aliases to handle different position formats
-    private func getPositionAliases(for position: String) -> [String] {
-        switch position.uppercased() {
-        case "DEF":
-            return ["DEF", "DST", "D/ST"]
-        case "DST":
-            return ["DEF", "DST", "D/ST"]
-        case "RB":
-            return ["RB", "FLEX"]
-        case "WR":
-            return ["WR", "FLEX"]
-        case "TE":
-            return ["TE", "FLEX"]
-        default:
-            return [position]
-        }
+        // 🔥 NEW: Use high-performance PlayerMatchService - specify which overload to use
+        return PlayerMatchService.shared.matchPlayer(
+            fullName: playerName,
+            shortName: shortName,
+            team: team,
+            position: position
+        )
     }
 }

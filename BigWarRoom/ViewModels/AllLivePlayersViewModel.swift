@@ -306,6 +306,9 @@ final class AllLivePlayersViewModel: ObservableObject {
                 
                 // Apply initial filter
                 applyPositionFilter()
+                
+                // 🔥 NEW: Debug Josh Allen after loading
+                debugJoshAllenScoreDifferences()
             }
             
         } catch {
@@ -393,7 +396,20 @@ final class AllLivePlayersViewModel: ObservableObject {
                 // print("   - My starters count: \(myStarters.count)")
                 
                 for player in myStarters {
-//                    // print("     - Adding MY player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
+                    // 🔥 NEW: Debug Josh Allen specifically
+                    if player.fullName.contains("Josh Allen") {
+                        print("🎯 JOSH ALLEN DEBUG:")
+                        print("   League: \(matchup.league.league.name) (ID: \(matchup.league.league.id))")
+                        print("   Source: \(matchup.league.source)")
+                        print("   Player ID: \(player.id)")
+                        print("   ESPN ID: \(player.espnID ?? "none")")
+                        print("   Sleeper ID: \(player.sleeperID ?? "none")")
+                        print("   Current Points: \(player.currentPoints ?? 0.0)")
+                        print("   Projected Points: \(player.projectedPoints ?? 0.0)")
+                        print("   Position: \(player.position)")
+                        print("   Team: \(player.team ?? "none")")
+                    }
+                    
                     players.append(LivePlayerEntry(
                         id: "\(matchup.id)_my_\(player.id)",
                         player: player,
@@ -421,7 +437,20 @@ final class AllLivePlayersViewModel: ObservableObject {
             // print("   - My chopped starters count: \(myTeamStarters.count)")
             
             for player in myTeamStarters {
-//                // print("     - Adding MY chopped player: \(player.fullName) (\(player.currentPoints ?? 0.0) pts)")
+                // 🔥 NEW: Debug Josh Allen specifically
+                if player.fullName.contains("Josh Allen") {
+                    print("🎯 JOSH ALLEN CHOPPED DEBUG:")
+                    print("   League: \(matchup.league.league.name) (ID: \(matchup.league.league.id))")
+                    print("   Source: \(matchup.league.source)")
+                    print("   Player ID: \(player.id)")
+                    print("   ESPN ID: \(player.espnID ?? "none")")
+                    print("   Sleeper ID: \(player.sleeperID ?? "none")")
+                    print("   Current Points: \(player.currentPoints ?? 0.0)")
+                    print("   Projected Points: \(player.projectedPoints ?? 0.0)")
+                    print("   Position: \(player.position)")
+                    print("   Team: \(player.team ?? "none")")
+                }
+                
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
                     player: player,
@@ -851,5 +880,76 @@ final class AllLivePlayersViewModel: ObservableObject {
         // Then print the scoring bases to see what we got
         print("🎯 SCORING DEBUG: After loading matchups, here are the scoring bases:")
         debugPrintScoringBases()
+    }
+
+    /// 🔥 NEW: Debug method to analyze Josh Allen score differences
+    func debugJoshAllenScoreDifferences() {
+        print("🎯 JOSH ALLEN SCORE ANALYSIS:")
+        print("===============================")
+        
+        let joshAllenEntries = allPlayers.filter { $0.player.fullName.contains("Josh Allen") }
+        
+        if joshAllenEntries.isEmpty {
+            print("❌ No Josh Allen entries found")
+            return
+        }
+        
+        print("Found \(joshAllenEntries.count) Josh Allen entries:")
+        
+        for (index, entry) in joshAllenEntries.enumerated() {
+            print("\n\(index + 1). League: \(entry.leagueName)")
+            print("   Source: \(entry.leagueSource)")
+            print("   Score: \(entry.currentScore)")
+            print("   Player ID: \(entry.player.id)")
+            print("   ESPN ID: \(entry.player.espnID ?? "none")")
+            print("   Sleeper ID: \(entry.player.sleeperID ?? "none")")
+            
+            // Try to get Sleeper stats
+            if let sleeperPlayer = PlayerMatchService.shared.matchPlayer(
+                fullName: entry.player.fullName,
+                shortName: entry.player.shortName,
+                team: entry.player.team,
+                position: entry.player.position
+            ) {
+                print("   Matched Sleeper ID: \(sleeperPlayer.playerID)")
+                
+                if let stats = playerStats[sleeperPlayer.playerID] {
+                    print("   Stats available: YES (\(stats.count) categories)")
+                    
+                    // Show key stats
+                    let keyStats = ["pass_yd", "pass_td", "pass_int", "rush_yd", "rush_td", "pts_ppr", "pts_std", "pts_half_ppr"]
+                    for statKey in keyStats {
+                        if let value = stats[statKey], value > 0 {
+                            print("     \(statKey): \(value)")
+                        }
+                    }
+                } else {
+                    print("   Stats available: NO")
+                }
+            } else {
+                print("   Sleeper matching: FAILED")
+            }
+        }
+        
+        // Analyze score differences
+        let uniqueScores = Set(joshAllenEntries.map { $0.currentScore })
+        print("\n🔍 SCORE ANALYSIS:")
+        print("Unique scores: \(uniqueScores.sorted(by: >))")
+        
+        if uniqueScores.count > 1 {
+            print("⚠️ INCONSISTENT SCORES DETECTED!")
+            
+            // Group by score
+            let scoreGroups = Dictionary(grouping: joshAllenEntries) { $0.currentScore }
+            
+            for (score, entries) in scoreGroups.sorted(by: { $0.key > $1.key }) {
+                print("\nScore \(score):")
+                for entry in entries {
+                    print("  - \(entry.leagueName) (\(entry.leagueSource))")
+                }
+            }
+        } else {
+            print("✅ All Josh Allen scores are consistent")
+        }
     }
 }

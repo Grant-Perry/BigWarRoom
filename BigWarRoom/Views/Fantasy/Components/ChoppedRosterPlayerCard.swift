@@ -215,51 +215,23 @@ struct ChoppedRosterPlayerCard: View {
         
         let rosterWeek = viewModel.getCurrentWeek()
         
-        // FIXED: Use the same multi-source approach as getActualPlayerPoints
-        var stats: [String: Double]?
-        
-        // First try ChoppedTeamRosterViewModel stats
-        if let localStats = viewModel.getPlayerStats(for: sleeperPlayer.playerID) {
-            stats = localStats
-            print("🐛 CHOPPED BREAKDOWN - Found local stats for \(viewModel.player.fullName): \(localStats.keys)")
-        }
-        // Fallback to PlayerStatsCache (same as getActualPlayerPoints)
-        else if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: rosterWeek) {
-            stats = cachedStats
-            print("🐛 CHOPPED BREAKDOWN - Found cached stats for \(viewModel.player.fullName): \(cachedStats.keys)")
-        }
-        // Final fallback to AllLivePlayersViewModel (global update source)
-        else if let globalStats = AllLivePlayersViewModel.shared.playerStats[sleeperPlayer.playerID] {
-            stats = globalStats
-            print("🐛 CHOPPED BREAKDOWN - Found global stats for \(viewModel.player.fullName): \(globalStats.keys)")
-        } else {
-            print("🐛 CHOPPED BREAKDOWN - NO STATS FOUND for \(viewModel.player.fullName) (playerID: \(sleeperPlayer.playerID))")
-            return nil
-        }
-        
-        guard let finalStats = stats, !finalStats.isEmpty else {
-            print("🐛 CHOPPED BREAKDOWN - Final stats empty for \(viewModel.player.fullName)")
-            return nil
-        }
-        
-        print("🐛 CHOPPED BREAKDOWN - Creating breakdown for \(viewModel.player.fullName) with \(finalStats.count) stats")
-        
-        // 🔥 FIXED: Get actual league scoring settings from parent view model
+        // 🔥 UPDATED: Use smart filtered scoring settings 
         let leagueScoring = viewModel.parentViewModel.getLeagueScoringSettings()
         
-        // Create breakdown using our factory - UPDATED: Pass actual league scoring settings
-        let breakdown = ScoreBreakdownFactory.createBreakdown(
+        // Create league context for chopped league
+        let leagueContext = LeagueContext.chopped(scoringSettings: leagueScoring ?? [:])
+        
+        // Use the chopped view model as local stats provider  
+        let localStatsProvider = viewModel.parentViewModel.statsProvider
+        
+        // 🔥 NEW: Create breakdown with ESPN's authoritative total but show stats for transparency
+        return ScoreBreakdownFactory.createTransparentBreakdown(
             for: viewModel.player,
-            stats: finalStats,
             week: rosterWeek,
-            scoringSystem: .ppr,
-            isChoppedLeague: true,
-            leagueScoringSettings: leagueScoring // 🔥 NEW: Pass actual scoring settings!
+            authoritativeTotal: viewModel.actualPoints ?? 0.0, // ESPN's appliedTotal
+            localStatsProvider: localStatsProvider,
+            leagueContext: leagueContext
         )
-        
-        print("🐛 CHOPPED BREAKDOWN - Created breakdown with \(breakdown.items.count) items, total: \(breakdown.totalScore)")
-        
-        return breakdown
     }
     
     /// Creates empty breakdown for players with no stats
@@ -268,8 +240,8 @@ struct ChoppedRosterPlayerCard: View {
         return PlayerScoreBreakdown(
             player: viewModel.player,
             week: rosterWeek,
-            items: [],
-            totalScore: viewModel.actualPoints ?? 0.0,
+            items: [], // No stats to show
+            totalScore: viewModel.actualPoints ?? 0.0, // Use ESPN's authoritative total
             isChoppedLeague: true // Chopped league
         )
     }

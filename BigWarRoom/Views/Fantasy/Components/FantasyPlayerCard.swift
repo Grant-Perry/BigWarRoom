@@ -179,46 +179,45 @@ struct FantasyPlayerCard: View {
         
         print("🐛 DEBUG: Found \(stats.count) player stats")
         
-        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
+        // 🔥 NEW: Use standardized ScoreBreakdownFactory interface
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
-        // 🔥 NEW: Get league information for unified scoring
-        var leagueID: String? = nil
-        var leagueSource: LeagueSource? = nil
+        // Create league context if available
+        var leagueContext: LeagueContext? = nil
+        var leagueName: String? = nil // 🔥 NEW: Track league name
         
         if let selectedLeague = fantasyViewModel.selectedLeague {
-            leagueID = selectedLeague.league.id        // <--- correct property for ID
-            leagueSource = selectedLeague.source == .espn ? .espn : .sleeper
-            print("🔥 DEBUG: Using unified scoring - League: \(leagueID!), Source: \(leagueSource!)")
+            let leagueID = selectedLeague.league.id
+            let source: LeagueSource = selectedLeague.source == .espn ? .espn : .sleeper
+            leagueContext = LeagueContext(leagueID: leagueID, source: source)
+            leagueName = selectedLeague.league.name // 🔥 NEW: Get league name
+            print("🔥 DEBUG: Using unified scoring - League: \(selectedLeague.league.name), Source: \(source)")
         } else {
-            print("⚠️ DEBUG: No selectedLeague available, falling back to legacy scoring")
+            print("⚠️ DEBUG: No selectedLeague available, using estimated scoring")
         }
         
-        // Create breakdown using our unified manager - 🔥 UPDATED: Use new parameters!
+        // Use new standardized interface - stats will be looked up automatically via StatsFacade
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: player,
-            stats: stats,
             week: selectedWeek,
-            scoringSystem: .ppr,
-            isChoppedLeague: false, // Regular fantasy league
-            leagueScoringSettings: nil, // Not a Sleeper chopped league
-            espnScoringSettings: nil, // 🔥 REMOVED: No longer using legacy ESPN scoring
-            leagueID: leagueID, // 🔥 NEW: Pass league ID for unified scoring
-            leagueSource: leagueSource // 🔥 NEW: Pass league source for unified scoring
+            localStatsProvider: nil, // Stats will be found via StatsFacade -> AllLivePlayersViewModel
+            leagueContext: leagueContext
         )
         
-        print("🔥 DEBUG: Created breakdown with hasRealScoringData: \(breakdown.hasRealScoringData)")
+        // 🔥 NEW: Add league name to breakdown
+        let finalBreakdown = leagueName != nil ? breakdown.withLeagueName(leagueName!) : breakdown
         
-        return breakdown
+        print("🔥 DEBUG: Created breakdown with hasRealScoringData: \(finalBreakdown.hasRealScoringData)")
+        
+        return finalBreakdown
     }
     
     /// Creates empty breakdown for players with no stats
     private func createEmptyBreakdown() -> PlayerScoreBreakdown {
-        // 🔥 FIXED: Use WeekSelectionManager.shared.selectedWeek instead of NFLWeekService.shared.currentWeek
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         return PlayerScoreBreakdown(
             player: player,
-            week: selectedWeek, // 🔥 FIXED: Use selected week instead of current week
+            week: selectedWeek,
             items: [],
             totalScore: player.currentPoints ?? 0.0,
             isChoppedLeague: false // Regular fantasy league

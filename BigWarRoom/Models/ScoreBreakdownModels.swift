@@ -11,13 +11,36 @@ import SwiftUI
 struct ScoreBreakdownItem: Identifiable {
     let id = UUID()
     let statName: String
-    let statValue: Int
-    let pointsPerStat: Double // REVERT: Back to Double for actual calculations
-    let totalPoints: Double // REVERT: Back to Double for actual calculations
+    let statValue: Double
+    let pointsEarned: Double // 🔥 CHANGED: For Option 2, this will be 0.0 (no calculations)
+    let description: String  // 🔥 NEW: Description for display
     
-    /// Formatted stat value (e.g., "1", "76", "4")
+    // 🔥 LEGACY: Keep old properties for backward compatibility
+    var pointsPerStat: Double { pointsEarned != 0.0 ? pointsEarned / statValue : 0.0 }
+    var totalPoints: Double { pointsEarned }
+    
+    /// Initialize with new structure
+    init(statName: String, statValue: Double, pointsEarned: Double, description: String) {
+        self.statName = statName
+        self.statValue = statValue
+        self.pointsEarned = pointsEarned
+        self.description = description
+    }
+    
+    /// Legacy initializer for backward compatibility
+    init(statName: String, statValue: Double, pointsPerStat: Double, totalPoints: Double) {
+        self.statName = statName
+        self.statValue = statValue
+        self.pointsEarned = totalPoints
+        self.description = ""
+    }
+    
+    /// Formatted stat value (e.g., "1", "76.5", "4")
     var statValueString: String {
-        return "\(statValue)"
+        // Show fractional values when they're not whole numbers
+        return statValue.truncatingRemainder(dividingBy: 1) == 0 ? 
+            String(format: "%.0f", statValue) : 
+            String(format: "%.1f", statValue)
     }
     
     /// Formatted points per stat (e.g., "10.00", "0.10", "1.00")
@@ -39,14 +62,32 @@ struct PlayerScoreBreakdown {
     let totalScore: Double
     let isChoppedLeague: Bool
     let hasRealScoringData: Bool // 🔥 NEW: Track if we have real scoring calculations
+    let leagueContext: LeagueContext? // 🔥 NEW: League context for logo/name
+    let leagueName: String? // 🔥 NEW: League name for display
     
-    init(player: FantasyPlayer, week: Int, items: [ScoreBreakdownItem], totalScore: Double, isChoppedLeague: Bool, hasRealScoringData: Bool = false) {
+    init(player: FantasyPlayer, week: Int, items: [ScoreBreakdownItem], totalScore: Double, isChoppedLeague: Bool, hasRealScoringData: Bool = false, leagueContext: LeagueContext? = nil, leagueName: String? = nil) {
         self.player = player
         self.week = week
         self.items = items
         self.totalScore = totalScore
         self.isChoppedLeague = isChoppedLeague
         self.hasRealScoringData = hasRealScoringData
+        self.leagueContext = leagueContext
+        self.leagueName = leagueName
+    }
+    
+    /// Helper to add league name after creation
+    func withLeagueName(_ name: String) -> PlayerScoreBreakdown {
+        return PlayerScoreBreakdown(
+            player: self.player,
+            week: self.week,
+            items: self.items,
+            totalScore: self.totalScore,
+            isChoppedLeague: self.isChoppedLeague,
+            hasRealScoringData: self.hasRealScoringData,
+            leagueContext: self.leagueContext,
+            leagueName: name
+        )
     }
     
     /// Formatted total score
@@ -73,8 +114,50 @@ struct PlayerScoreBreakdown {
 /// Factory for creating score breakdowns from player stats
 struct ScoreBreakdownFactory {
     
-    /// Create a score breakdown from raw player stats
-    /// UPDATED: Now handles both Sleeper (with league scoring) and ESPN (with unified manager) properly
+    // MARK: - Standardized Interface
+    
+    /// **STANDARDIZED METHOD** - Use this for all new code
+    /// Creates a score breakdown with automatic stats lookup and league scoring detection
+    static func createBreakdown(
+        for player: FantasyPlayer,
+        week: Int? = nil, // 🔥 CHANGED: Make optional to avoid main actor isolation
+        localStatsProvider: LocalStatsProvider? = nil,
+        leagueContext: LeagueContext? = nil
+    ) -> PlayerScoreBreakdown {
+        
+        // Get the week, defaulting to current selected week
+        let effectiveWeek = week ?? WeekSelectionManager.shared.selectedWeek
+        
+        // Step 1: Get player stats using StatsFacade
+        guard let sleeperPlayer = PlayerMatchService.shared.matchPlayer(
+            fullName: player.fullName,
+            shortName: player.shortName ?? (player.firstName ?? ""), // 🔥 FIXED: Handle optional shortName
+            team: player.team,
+            position: player.position
+        ) else {
+            return createEmptyBreakdown(player: player, week: effectiveWeek)
+        }
+        
+        guard let stats = StatsFacade.getPlayerStats(
+            playerID: sleeperPlayer.playerID,
+            week: effectiveWeek,
+            localStatsProvider: localStatsProvider
+        ) else {
+            return createEmptyBreakdown(player: player, week: effectiveWeek)
+        }
+        
+        // 🔥 NEW: Always create consistent breakdown using player's authoritative total
+        return createConsistentBreakdown(
+            player: player,
+            stats: stats,
+            week: effectiveWeek,
+            leagueContext: leagueContext
+        )
+    }
+    
+    // MARK: - Legacy Interface (For Backward Compatibility)
+    
+    /// **LEGACY METHOD** - Kept for backward compatibility, but prefer the standardized method above
     static func createBreakdown(
         for player: FantasyPlayer,
         stats: [String: Double],
@@ -82,239 +165,315 @@ struct ScoreBreakdownFactory {
         scoringSystem: ScoringSystem = .ppr,
         isChoppedLeague: Bool = false,
         leagueScoringSettings: [String: Double]? = nil,
-        espnScoringSettings: [String: Double]? = nil,
-        leagueID: String? = nil, // 🔥 NEW: Add league ID for unified scoring lookup
-        leagueSource: LeagueSource? = nil // 🔥 NEW: Add league source for unified scoring lookup
+        espnScoringSettings: [String: Double]? = nil,  // Deprecated
+        leagueID: String? = nil,
+        leagueSource: LeagueSource? = nil
     ) -> PlayerScoreBreakdown {
         
-        var items: [ScoreBreakdownItem] = []
+        // Convert to new interface
+        var leagueContext: LeagueContext? = nil
         
-        // 🔥 PRIORITY 1: UNIFIED SCORING - Use ScoringSettingsManager for both platforms!
         if let leagueID = leagueID, let leagueSource = leagueSource {
-            let scoringSettings = ScoringSettingsManager.shared.getScoringSettings(for: leagueID, source: leagueSource)
-            
-            if let settings = scoringSettings {
-                print("🔥 BREAKDOWN: Using \(settings.count) actual \(leagueSource == .espn ? "ESPN" : "Sleeper") scoring settings from unified manager")
-                
-                // 🔥 DETAILED DEBUG: Print all available stats
-                print("🔍 AVAILABLE STATS for \(player.fullName):")
-                for (statKey, statValue) in stats.sorted(by: { $0.key < $1.key }) {
-                    print("   \(statKey): \(statValue)")
-                }
-                
-                print("🔍 AVAILABLE SCORING RULES:")
-                for (statKey, pointsPerStat) in settings.sorted(by: { $0.key < $1.key }) {
-                    print("   \(statKey): \(pointsPerStat) pts")
-                }
-                
-                var calculationDetails: [(String, Double, Double, Double)] = []
-                
-                // Calculate points using league scoring rules
-                for (sleeperKey, pointsPerStat) in settings {
-                    let statValue = stats[sleeperKey] ?? 0.0
-                    if statValue != 0 {
-                        let totalPoints = statValue * pointsPerStat
-                        let statDisplayName = getStatDisplayName(for: sleeperKey)
-                        
-                        calculationDetails.append((sleeperKey, statValue, pointsPerStat, totalPoints))
-                        
-                        print("🧮 CALC: \(statDisplayName) (\(sleeperKey)): \(statValue) × \(pointsPerStat) = \(totalPoints)")
-                        
-                        items.append(ScoreBreakdownItem(
-                            statName: statDisplayName,
-                            statValue: Int(statValue),
-                            pointsPerStat: pointsPerStat,
-                            totalPoints: totalPoints
-                        ))
-                    } else if pointsPerStat != 0 {
-                        // For diagnostics: Warn if the scoring setting exists but the stat is missing/zero.
-                        print("⚠️ ESPN: League scores '\(sleeperKey)' but stat value is missing or zero. Stat may not be tracked for this player/game.")
-                    }
-                }
-                
-                // Sort by point impact
-                items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
-                
-                let calculatedTotal = items.reduce(0) { $0 + $1.totalPoints }
-                
-                // 🔥 DETAILED VALIDATION: Check for discrepancy
-                let apiTotal = player.currentPoints ?? 0.0
-                let discrepancy = calculatedTotal - apiTotal
-                
-                print("🧮 FINAL CALCULATION:")
-                print("   Items total: \(calculatedTotal)")
-                print("   API total: \(apiTotal)")
-                print("   Discrepancy: \(discrepancy)")
-                
-                if abs(discrepancy) > 0.01 {
-                    print("🚨 \(leagueSource == .espn ? "ESPN" : "SLEEPER") BREAKDOWN: DISCREPANCY DETECTED!")
-                    print("   Player: \(player.fullName)")
-                    print("   API Total: \(apiTotal)")
-                    print("   Calculated: \(calculatedTotal)")  
-                    print("   Difference: \(discrepancy)")
-                    
-                    // 🔥 NEW: Print all calculation details for debugging
-                    print("📊 DETAILED CALCULATION:")
-                    for (statKey, statValue, pointsPerStat, totalPoints) in calculationDetails.sorted(by: { abs($0.3) > abs($1.3) }) {
-                        print("   \(statKey): \(statValue) × \(pointsPerStat) = \(totalPoints)")
-                    }
-                    
-                    // 🔥 SHOW STATS THAT ESPN MIGHT HAVE BUT WE DON'T CALCULATE
-                    print("🔍 UNUSED STATS (might be calculated by ESPN):")
-                    for (statKey, statValue) in stats.sorted(by: { $0.key < $1.key }) {
-                        if statValue != 0 && settings[statKey] == nil {
-                            print("   \(statKey): \(statValue) (NO SCORING RULE)")
-                        }
-                    }
-                    
-                    // 🔥 SHOW SCORING RULES THAT WE HAVE BUT NO STATS FOR
-                    print("🔍 UNUSED SCORING RULES (might have 0 stats):")
-                    for (statKey, pointsPerStat) in settings.sorted(by: { $0.key < $1.key }) {
-                        if stats[statKey] == nil || stats[statKey] == 0 {
-                            print("   \(statKey): \(pointsPerStat) pts (NO STATS)")
-                        }
-                    }
-                }
-                
-                return PlayerScoreBreakdown(
-                    player: player,
-                    week: week,
-                    items: items,
-                    totalScore: calculatedTotal, // 🔥 Use calculated total with REAL league scoring!
-                    isChoppedLeague: false,
-                    hasRealScoringData: true
-                )
-            }
-        }
-        
-        // 🔥 PRIORITY 2: FOR CHOPPED LEAGUES - Use provided league scoring settings (UNCHANGED - keep working!)
-        if isChoppedLeague {
-            let scoringSettings = leagueScoringSettings ?? getEstimatedSleeperScoring()
-            
-            print("🔥 BREAKDOWN: Using \(scoringSettings.count) actual league scoring settings")
-            
-            // Show all available stats in breakdown (much more comprehensive)
-            for (statKey, statValue) in stats {
-                guard statValue != 0, let pointsPerStat = scoringSettings[statKey] else { continue }
-                
-                let totalPoints = statValue * pointsPerStat
-                let statDisplayName = getStatDisplayName(for: statKey)
-                
-                items.append(ScoreBreakdownItem(
-                    statName: statDisplayName,
-                    statValue: Int(statValue),
-                    pointsPerStat: pointsPerStat,
-                    totalPoints: totalPoints
-                ))
-            }
-            
-            // Sort items by absolute point value (highest impact first)
-            items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
-            
-            let calculatedTotal = items.reduce(0) { $0 + $1.totalPoints }
-            
-            return PlayerScoreBreakdown(
-                player: player,
-                week: week,
-                items: items,
-                totalScore: calculatedTotal, // ✅ Use calculated total with REAL league scoring!
-                isChoppedLeague: true,
-                hasRealScoringData: true // 🔥 NEW: Chopped leagues have real scoring data
+            leagueContext = LeagueContext(
+                leagueID: leagueID,
+                source: leagueSource,
+                isChopped: isChoppedLeague,
+                customScoringSettings: leagueScoringSettings ?? espnScoringSettings
+            )
+        } else if isChoppedLeague {
+            leagueContext = LeagueContext(
+                leagueID: "chopped",
+                source: .sleeper,
+                isChopped: true,
+                customScoringSettings: leagueScoringSettings
             )
         }
         
-        // 🔥 PRIORITY 3: LEGACY - FOR ESPN LEAGUES with provided scoring settings (fallback)
-        else if let espnScoring = espnScoringSettings {
-            print("🔥 BREAKDOWN: Using \(espnScoring.count) actual ESPN scoring settings (legacy)")
-            
-            // 🔥 FIX: ESPN scoring is now mapped to Sleeper keys, so match directly
-            for (sleeperKey, pointsPerStat) in espnScoring {
-                if let statValue = stats[sleeperKey], statValue != 0 {
-                    let totalPoints = statValue * pointsPerStat
-                    let statDisplayName = getStatDisplayName(for: sleeperKey)
+        // Use the unified scoring approach
+        return createWithProvidedStats(
+            player: player,
+            stats: stats,
+            week: week,
+            leagueContext: leagueContext
+        )
+    }
+    
+    // MARK: - Internal Implementation Methods
+    
+    private static func createWithUnifiedScoring(
+        player: FantasyPlayer,
+        stats: [String: Double],
+        week: Int,
+        leagueID: String,
+        leagueSource: LeagueSource,
+        isChoppedLeague: Bool,
+        customScoringSettings: [String: Double]?
+    ) -> PlayerScoreBreakdown {
+        
+        var items: [ScoreBreakdownItem] = []
+        var scoringSettings: [String: Double]?
+        var hasRealScoringData = false
+        
+        // Priority 1: Use custom scoring settings (for chopped leagues)
+        if isChoppedLeague, let customScoring = customScoringSettings {
+            scoringSettings = customScoring
+            hasRealScoringData = true
+            print("🔥 Using custom chopped league scoring (\(customScoring.count) rules)")
+        }
+        // Priority 2: Use unified scoring manager
+        else if let unifiedScoring = ScoringSettingsManager.shared.getScoringSettings(for: leagueID, source: leagueSource) {
+            scoringSettings = unifiedScoring
+            hasRealScoringData = true
+            print("🔥 Using unified \(leagueSource) scoring (\(unifiedScoring.count) rules)")
+        }
+        // Priority 3: Fallback to estimates
+        else {
+            scoringSettings = getEstimatedSleeperScoring()
+            hasRealScoringData = false
+            print("⚠️ Using estimated scoring (no league rules found)")
+        }
+        
+        // Calculate breakdown using the selected scoring with proper position handling
+        if let settings = scoringSettings {
+            for (statKey, statValue) in stats {
+                guard statValue != 0 else { continue }
+                
+                // 🔥 UPDATED: Use enhanced calculation that considers player position
+                let totalPoints = calculateAdvancedStatPoints(
+                    player: player,
+                    statKey: statKey,
+                    statValue: statValue,
+                    scoringSettings: settings
+                )
+                
+                // Only create breakdown items for stats that actually score points
+                if totalPoints != 0 {
+                    let pointsPerStat = totalPoints / statValue // Calculate effective rate
+                    let statDisplayName = getStatDisplayName(for: statKey)
                     
                     items.append(ScoreBreakdownItem(
                         statName: statDisplayName,
-                        statValue: Int(statValue),
+                        statValue: statValue,
                         pointsPerStat: pointsPerStat,
                         totalPoints: totalPoints
                     ))
                 }
             }
-            
-            // Sort by point impact
-            items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
-            
-            let calculatedTotal = items.reduce(0) { $0 + $1.totalPoints }
-            
-            return PlayerScoreBreakdown(
+        }
+        
+        items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
+        let calculatedTotal = items.reduce(0) { $0 + $1.totalPoints }
+        
+        return PlayerScoreBreakdown(
+            player: player,
+            week: week,
+            items: items,
+            totalScore: hasRealScoringData ? calculatedTotal : (player.currentPoints ?? calculatedTotal),
+            isChoppedLeague: isChoppedLeague,
+            hasRealScoringData: hasRealScoringData
+        )
+    }
+    
+    private static func createWithProvidedStats(
+        player: FantasyPlayer,
+        stats: [String: Double],
+        week: Int,
+        leagueContext: LeagueContext?
+    ) -> PlayerScoreBreakdown {
+        
+        if let context = leagueContext {
+            return createWithUnifiedScoring(
                 player: player,
+                stats: stats,
                 week: week,
-                items: items,
-                totalScore: player.currentPoints ?? calculatedTotal, // 🔥 FORCE: Use ESPN's API total as definitive for exact match
-                isChoppedLeague: false,
-                hasRealScoringData: true
+                leagueID: context.leagueID,
+                leagueSource: context.source,
+                isChoppedLeague: context.isChopped,
+                customScoringSettings: context.customScoringSettings
+            )
+        } else {
+            return createWithEstimatedScoring(player: player, stats: stats, week: week)
+        }
+    }
+    
+    private static func createWithEstimatedScoring(
+        player: FantasyPlayer,
+        stats: [String: Double],
+        week: Int
+    ) -> PlayerScoreBreakdown {
+        
+        var items: [ScoreBreakdownItem] = []
+        let estimatedScoring = getEstimatedSleeperScoring()
+        
+        for (statKey, statValue) in stats {
+            guard statValue != 0, let pointsPerStat = estimatedScoring[statKey] else { continue }
+            
+            let totalPoints = calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: pointsPerStat)
+            let statDisplayName = getStatDisplayName(for: statKey)
+            
+            items.append(ScoreBreakdownItem(
+                statName: statDisplayName,
+                statValue: statValue,
+                pointsPerStat: pointsPerStat,
+                totalPoints: totalPoints
+            ))
+        }
+        
+        items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
+        
+        return PlayerScoreBreakdown(
+            player: player,
+            week: week,
+            items: items,
+            totalScore: player.currentPoints ?? 0.0,
+            isChoppedLeague: false,
+            hasRealScoringData: false
+        )
+    }
+    
+    private static func createEmptyBreakdown(player: FantasyPlayer, week: Int) -> PlayerScoreBreakdown {
+        return PlayerScoreBreakdown(
+            player: player,
+            week: week,
+            items: [],
+            totalScore: player.currentPoints ?? 0.0,
+            isChoppedLeague: false,
+            hasRealScoringData: false
+        )
+    }
+    
+    /// Calculate points for a specific stat using proper fantasy football math
+    /// This handles the difference between yard-based stats and event-based stats
+    private static func calculateStatPoints(statKey: String, statValue: Double, pointsPerStat: Double) -> Double {
+        // 🔥 GUMBY'S CRITICAL FIX: YARDAGE MATH WAS SYSTEMATICALLY WRONG!
+        // OLD BROKEN: floor(statValue / increment) - this undercounted every player
+        // NEW CORRECT: Pure fractional multiplication - exact points like ESPN/Sleeper actually do
+        
+        if isYardStat(statKey) {
+            // 🔥 NEW CORRECT MATH: Direct fractional multiplication  
+            // Example: 211 pass yards × 0.04 = 8.44 points (not 8.0 points)
+            return statValue * pointsPerStat
+        }
+        
+        // Event-based stats (TDs, INTs, etc.) use direct multiplication
+        return statValue * pointsPerStat
+    }
+    
+    /// Enhanced calculation that handles advanced ESPN scoring rules
+    /// - Parameters:
+    ///   - player: The fantasy player (for position-specific rules)
+    ///   - statKey: The stat key (e.g., "fgm", "rec")
+    ///   - statValue: The stat value
+    ///   - scoringSettings: All available scoring settings including advanced rules
+    /// - Returns: Points earned for this stat
+    private static func calculateAdvancedStatPoints(
+        player: FantasyPlayer,
+        statKey: String,
+        statValue: Double,
+        scoringSettings: [String: Double]
+    ) -> Double {
+        
+        // 🔥 UPDATED: First check for standard scoring rule
+        if let standardPoints = scoringSettings[statKey], standardPoints != 0.0 {
+            return calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: standardPoints)
+        }
+        
+        // 🔥 NEW: Handle advanced field goal distance scoring
+        if statKey == "fgm" && statValue > 0 {
+            return calculateFieldGoalPoints(makes: Int(statValue), scoringSettings: scoringSettings)
+        }
+        
+        // 🔥 NEW: Handle position-specific reception scoring (TE premium, etc.)
+        if statKey == "rec" && statValue > 0 {
+            return calculatePositionSpecificReceptionPoints(
+                player: player,
+                receptions: statValue,
+                scoringSettings: scoringSettings
             )
         }
         
-        // 🔥 PRIORITY 4: FOR ESPN LEAGUES WITHOUT SCORING SETTINGS - Show simplified breakdown
-        else if player.espnID != nil {
-            print("🔥 BREAKDOWN: ESPN league without scoring settings - showing simplified breakdown")
+        // 🔥 UPDATED: For stats with no base scoring, return 0 (don't apply incorrect rules)
+        return 0.0
+    }
+    
+    /// Calculate field goal points using distance-based scoring if available
+    private static func calculateFieldGoalPoints(makes: Int, scoringSettings: [String: Double]) -> Double {
+        // Check if we have distance-specific FG scoring rules
+        let distanceRules = [
+            "fgm_0_19": scoringSettings["fgm_0_19"],
+            "fgm_20_29": scoringSettings["fgm_20_29"],
+            "fgm_30_39": scoringSettings["fgm_30_39"],
+            "fgm_40_49": scoringSettings["fgm_40_49"],
+            "fgm_50p": scoringSettings["fgm_50p"]
+        ].compactMapValues { $0 }
+        
+        if !distanceRules.isEmpty {
+            print("🎯 Using distance-based FG scoring: \(distanceRules)")
             
-            // Create a single summary item showing the total score
-            if let totalScore = player.currentPoints, totalScore > 0 {
-                items.append(ScoreBreakdownItem(
-                    statName: "Fantasy Points Earned",
-                    statValue: 1,
-                    pointsPerStat: totalScore,
-                    totalPoints: totalScore
-                ))
-            }
-            
-            return PlayerScoreBreakdown(
-                player: player,
-                week: week,
-                items: items,
-                totalScore: player.currentPoints ?? 0.0, // Use ESPN's calculated total
-                isChoppedLeague: false,
-                hasRealScoringData: false // No detailed scoring breakdown available
-            )
+            // For now, use the most common range (30-39) as default
+            // This could be enhanced with actual game data to determine distances
+            let defaultPoints = distanceRules["fgm_30_39"] ?? distanceRules.values.first ?? 3.0
+            return Double(makes) * defaultPoints
         }
         
-        // 🔥 PRIORITY 5: FOR OTHER LEAGUES - Show stat breakdown with estimates but use actual API score for total
-        else {
-            // Create breakdown items for display (with estimated standard scoring for reference)
-            let estimatedScoring = getStandardScoringEstimates()
-            
-            // Only show meaningful stats (non-zero values)
-            for (statKey, statValue) in stats {
-                guard statValue != 0 else { continue }
-                
-                let statDisplayName = getStatDisplayName(for: statKey)
-                let estimatedPointsPerStat = estimatedScoring[statKey] ?? 0.0
-                let estimatedTotalPoints = statValue * estimatedPointsPerStat
-                
-                items.append(ScoreBreakdownItem(
-                    statName: statDisplayName,
-                    statValue: Int(statValue),
-                    pointsPerStat: estimatedPointsPerStat,
-                    totalPoints: estimatedTotalPoints
-                ))
-            }
-            
-            // Sort by estimated point impact
-            items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
-            
-            // 🔥 FIXED: Use actual player score (from ESPN/Sleeper API) as the definitive total
-            return PlayerScoreBreakdown(
-                player: player,
-                week: week,
-                items: items,
-                totalScore: player.currentPoints ?? 0.0, // ✅ Use the REAL score from API!
-                isChoppedLeague: false,
-                hasRealScoringData: false // 🔥 NEW: No real scoring calculation, just estimates
-            )
+        // Fallback to standard FG scoring
+        let standardPoints = scoringSettings["fgm"] ?? 3.0
+        return Double(makes) * standardPoints
+    }
+    
+    /// Calculate reception points using position-specific scoring if available
+    private static func calculatePositionSpecificReceptionPoints(
+        player: FantasyPlayer,
+        receptions: Double,
+        scoringSettings: [String: Double]
+    ) -> Double {
+        
+        let position = player.position.uppercased()
+        
+        // Check for position-specific reception scoring
+        let positionSpecificKey = "rec_\(position.lowercased())"
+        if let positionPoints = scoringSettings[positionSpecificKey] {
+            print("🎯 Using position-specific reception scoring: \(position) = \(positionPoints) pts")
+            return receptions * positionPoints
         }
+        
+        // Fallback to standard reception scoring
+        let standardPoints = scoringSettings["rec"] ?? 1.0
+        return receptions * standardPoints
+    }
+    
+    /// Calculate points for other advanced scoring rules
+    private static func calculateOtherAdvancedPoints(
+        statKey: String,
+        statValue: Double,
+        scoringSettings: [String: Double]
+    ) -> Double? {
+        
+        // Look for advanced scoring rules related to this stat
+        let advancedRules = scoringSettings.filter { key, _ in
+            key.hasPrefix(statKey + "_")
+        }
+        
+        if !advancedRules.isEmpty {
+            print("🔧 Found advanced rules for \(statKey): \(advancedRules)")
+            
+            // For now, just sum all the advanced rule points
+            // This could be made more sophisticated based on specific rule types
+            let totalAdvancedPoints = advancedRules.values.reduce(0, +)
+            return statValue * (totalAdvancedPoints / Double(advancedRules.count))
+        }
+        
+        return nil
+    }
+    
+    /// Check if a stat is yard-based and needs increment calculation
+    private static func isYardStat(_ statKey: String) -> Bool {
+        let yardStats = [
+            "pass_yd", "rush_yd", "rec_yd", 
+            "def_int_yd", "def_fum_rec_yd", 
+            "kick_ret_yd", "punt_ret_yd"
+        ]
+        return yardStats.contains(statKey)
     }
     
     /// Find matching stat value in player stats by attempting multiple name variations
@@ -456,12 +615,17 @@ struct ScoreBreakdownFactory {
         case "pass_40": return "40+ Yard Completion Bonus"
         case "pass_td_40p": return "40+ Yard Pass TD Bonus"
         case "pass_td_50p": return "50+ Yard Pass TD Bonus"
+        case "pass_2pt": return "2-Point Conversion Pass"
+        case "pass_rz_att": return "Red Zone Pass Attempt"
         
         // Rushing
         case "rush_yd": return "Rushing Yards"
         case "rush_td": return "Rushing TD"
         case "rush_fd": return "Rushing 1st Down"
         case "rush_40": return "40+ Yard Rush Bonus"
+        case "rush_2pt": return "2-Point Conversion Rush"
+        case "rush_rz_att": return "Red Zone Rush Attempt"
+        case "rush_att": return "Rushing Attempts" // 🔥 NEW
         
         // Receiving
         case "rec": return "Reception"
@@ -469,28 +633,282 @@ struct ScoreBreakdownFactory {
         case "rec_td": return "Receiving TD"
         case "rec_fd": return "Receiving 1st Down"
         case "rec_40": return "40+ Yard Reception Bonus"
+        case "rec_2pt": return "2-Point Conversion Reception"
+        case "rec_tgt": return "Target"
+        case "rec_rz_tgt": return "Red Zone Target"
         
         // Fumbles
         case "fum": return "Fumble"
         case "fum_lost": return "Fumble Lost"
         case "fum_rec": return "Fumble Recovery"
+        case "fum_rec_td": return "Fumble Recovery TD"
+        case "int_td": return "Interception Return TD"
         
         // Kicking
         case "fgm": return "Field Goal Made"
         case "fgmiss": return "Field Goal Missed"
         case "xpm": return "Extra Point Made"
         case "xpmiss": return "Extra Point Missed"
+        case "fga_0_19": return "FG Attempt 0-19"
+        case "fga_20_29": return "FG Attempt 20-29"
+        case "fga_30_39": return "FG Attempt 30-39"
+        case "fga_40_49": return "FG Attempt 40-49"
+        case "fga_50p": return "FG Attempt 50+"
+        case "fga": return "Field Goal Attempts" // 🔥 NEW
         
-        // Defense
+        // Punting
+        case "punt_in20": return "Punt Inside 20"
+        case "punt_att": return "Punt Attempts" // 🔥 NEW
+        
+        // Defense/Special Teams
         case "def_td": return "Defensive TD"
         case "def_int": return "Interception"
         case "def_fum_rec": return "Fumble Recovery"
         case "def_sack": return "Sack"
         case "def_safe": return "Safety"
+        case "def_tkl": return "Tackle"
+        case "def_ast": return "Assisted Tackle"
+        case "def_solo": return "Solo Tackle" // 🔥 NEW
+        case "def_comb": return "Combined Tackles" // 🔥 NEW
+        case "def_stf": return "Defensive Stuff" // 🔥 NEW
+        case "def_pass_def": return "Pass Defended"
+        case "def_int_yd": return "Interception Return Yards"
+        case "def_fum_rec_yd": return "Fumble Recovery Yards"
+        case "def_fum_force": return "Forced Fumble"
+        case "def_tkl_loss": return "Tackle for Loss"
+        case "st_td": return "Special Teams TD"
+        case "st_fum_rec": return "Special Teams Fumble Recovery"
+        case "st_ff": return "Special Teams Forced Fumble"
+        case "blk_kick": return "Blocked Kick"
+        case "blk_punt": return "Blocked Punt"
+        case "punt_ret_td": return "Punt Return TD"
+        case "kick_ret_td": return "Kick Return TD"
+        case "kick_ret_att": return "Kick Return Attempts" // 🔥 NEW
+        case "punt_ret_att": return "Punt Return Attempts" // 🔥 NEW
+        
+        // 🔥 NEW: Add unknown stat 130
+        case "unknown_130": return "Unknown Stat 130"
         
         // Default: Clean up the key name
         default:
             return statKey.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+    
+    /// 🔥 NEW: Create transparent breakdown using authoritative total (Option 2 approach)
+    /// Shows stats breakdown with point calculations for reference, but uses official total
+    static func createTransparentBreakdown(
+        for player: FantasyPlayer,
+        week: Int,
+        authoritativeTotal: Double,
+        localStatsProvider: LocalStatsProvider? = nil,
+        leagueContext: LeagueContext
+    ) -> PlayerScoreBreakdown? {
+        
+        print("🔍 Creating transparent breakdown for \(player.fullName)")
+        
+        // Get player stats (for display calculation)
+        var allStats: [String: Double] = [:]
+        
+        // Try local stats first via StatsFacade
+        if let stats = StatsFacade.getPlayerStats(
+            playerID: player.id, 
+            week: week,
+            localStatsProvider: localStatsProvider
+        ) {
+            allStats = stats
+            print("   📊 Found stats: \(stats.count) categories")
+        }
+        
+        // Get smart filtered scoring settings for this league context
+        var scoringSettings: [String: Double] = [:]
+        
+        if let customScoring = leagueContext.customScoringSettings {
+            scoringSettings = customScoring
+        } else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(for: leagueContext.leagueID, source: leagueContext.source) {
+            scoringSettings = leagueScoring
+        } else {
+            // Fallback to estimated scoring
+            scoringSettings = getEstimatedSleeperScoring()
+        }
+        
+        print("   🎯 Using scoring settings: \(scoringSettings.count) rules")
+        
+        // Filter out zero/irrelevant stats for cleaner display
+        let relevantStats = allStats.filter { key, value in
+            value > 0.0 && isRelevantDisplayStat(key)
+        }
+        
+        print("   ✨ Display stats: \(relevantStats.count) relevant categories")
+        
+        // Convert stats to breakdown items with point calculations for reference
+        let breakdownItems = relevantStats.compactMap { statKey, statValue -> ScoreBreakdownItem? in
+            let displayName = StatDisplayHelper.getDisplayName(for: statKey)
+            
+            // Calculate points for display (but won't be used for total)
+            let pointsPerStat = scoringSettings[statKey] ?? 0.0
+            let calculatedPoints = pointsPerStat > 0.0 ? 
+                calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: pointsPerStat) : 0.0
+            
+            return ScoreBreakdownItem(
+                statName: displayName,
+                statValue: statValue,
+                pointsPerStat: pointsPerStat,
+                totalPoints: calculatedPoints
+            )
+        }
+        .filter { $0.pointsPerStat > 0.0 } // Only show stats that have scoring rules
+        .sorted { abs($0.totalPoints) > abs($1.totalPoints) } // Sort by points value
+        
+        print("   📋 Breakdown items: \(breakdownItems.count)")
+        
+        return PlayerScoreBreakdown(
+            player: player,
+            week: week,
+            items: breakdownItems,
+            totalScore: authoritativeTotal, // 🔥 USE AUTHORITATIVE TOTAL ONLY
+            isChoppedLeague: leagueContext.isChopped,
+            hasRealScoringData: false // Mark as reference only
+        )
+    }
+    
+    // 🔥 NEW: Always create consistent breakdown format
+    private static func createConsistentBreakdown(
+        player: FantasyPlayer,
+        stats: [String: Double],
+        week: Int,
+        leagueContext: LeagueContext?
+    ) -> PlayerScoreBreakdown {
+        
+        var items: [ScoreBreakdownItem] = []
+        var scoringSettings: [String: Double] = [:]
+        var confidenceLevel = "Estimated"
+        
+        // Try to get actual league scoring settings
+        if let context = leagueContext {
+            if context.isChopped, let customScoring = context.customScoringSettings {
+                scoringSettings = customScoring
+                confidenceLevel = "Custom League Rules"
+            }
+            else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(
+                for: context.leagueID, 
+                source: context.source
+            ) {
+                scoringSettings = leagueScoring
+                confidenceLevel = "League Rules (\(context.source == .espn ? "ESPN" : "SLEEPER"))"
+            }
+        }
+        
+        // Fallback to standard scoring if no league settings found
+        if scoringSettings.isEmpty {
+            scoringSettings = getEstimatedSleeperScoring()
+            confidenceLevel = "Standard PPR Estimates"
+        }
+        
+        print("🎯 Creating consistent breakdown for \(player.fullName)")
+        print("   Week: \(week)")
+        print("   Confidence: \(confidenceLevel)")
+        print("   Scoring Rules: \(scoringSettings.count) categories")
+        print("   Player's Total: \(player.currentPoints ?? 0.0) pts")
+        
+        // Create breakdown items for all relevant stats
+        for (statKey, statValue) in stats {
+            guard statValue != 0 else { continue }
+            
+            // Get points per stat (fallback to 0 if not found)
+            let pointsPerStat = scoringSettings[statKey] ?? 0.0
+            
+            // Only include stats that have scoring rules OR are important display stats
+            guard pointsPerStat != 0.0 || isImportantDisplayStat(statKey) else { continue }
+            
+            let totalPoints = calculateStatPoints(
+                statKey: statKey, 
+                statValue: statValue, 
+                pointsPerStat: pointsPerStat
+            )
+            
+            let statDisplayName = getStatDisplayName(for: statKey)
+            
+            items.append(ScoreBreakdownItem(
+                statName: statDisplayName,
+                statValue: statValue,
+                pointsPerStat: pointsPerStat,
+                totalPoints: totalPoints
+            ))
+        }
+        
+        // Sort by points value (highest first)
+        items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
+        
+        // 🔥 CRITICAL: Always use player's authoritative total, not our calculation
+        let authoritativeTotal = player.currentPoints ?? 0.0
+        
+        print("   Breakdown Items: \(items.count)")
+        print("   Using Authoritative Total: \(authoritativeTotal)")
+        
+        return PlayerScoreBreakdown(
+            player: player,
+            week: week,
+            items: items,
+            totalScore: authoritativeTotal, // 🔥 Always use API total
+            isChoppedLeague: leagueContext?.isChopped ?? false,
+            hasRealScoringData: true, // 🔥 Always show full breakdown format
+            leagueContext: leagueContext,
+            leagueName: nil // Will be set by caller
+        )
+    }
+    
+    /// Check if stat should be shown even without scoring rules (for display purposes)
+    private static func isImportantDisplayStat(_ statKey: String) -> Bool {
+        let displayStats: Set<String> = [
+            "pass_td", "pass_yd", "pass_cmp", "pass_int",
+            "rush_td", "rush_yd", "rush_att",
+            "rec_td", "rec_yd", "rec",
+            "fgm", "xpm", "fum_lost"
+        ]
+        return displayStats.contains(statKey)
+    }
+    
+    /// Filter stats that are relevant for display purposes
+    private static func isRelevantDisplayStat(_ statKey: String) -> Bool {
+        // Only show stats that fantasy users care about seeing
+        let relevantStats: Set<String> = [
+            // Core offensive stats
+            "pass_yd", "pass_td", "pass_int", "pass_cmp", "pass_att",
+            "rush_yd", "rush_td", "rush_att", 
+            "rec", "rec_yd", "rec_td", "rec_tgt",
+            
+            // Kicking
+            "fgm", "fga", "xpm", "xpmiss",
+            "fgm_0_19", "fgm_20_29", "fgm_30_39", "fgm_40_49", "fgm_50p",
+            
+            // Defense/ST 
+            "def_int", "def_fum_rec", "def_sack", "def_td", "def_safe",
+            "st_td", "blk_kick",
+            
+            // Fumbles
+            "fum", "fum_lost",
+            
+            // Bonus categories
+            "pass_2pt", "rush_2pt", "rec_2pt",
+            "pass_40", "rush_40", "rec_40"
+        ]
+        
+        return relevantStats.contains(statKey)
+    }
+    
+    /// Get stat importance for sorting (lower = more important)
+    private static func getStatImportance(_ statName: String) -> Int {
+        switch statName.lowercased() {
+        // Most important stats first
+        case let name where name.contains("touchdown"): return 1
+        case let name where name.contains("yards"): return 2  
+        case let name where name.contains("reception"): return 3
+        case let name where name.contains("attempt"): return 4
+        case let name where name.contains("field goal"): return 5
+        case let name where name.contains("interception"): return 6
+        case let name where name.contains("fumble"): return 7
+        default: return 8
         }
     }
 }
@@ -500,4 +918,86 @@ enum ScoringSystem {
     case standard
     case halfPPR
     case ppr
+}
+
+// MARK: - 🔥 NEW: Stat Display Helper
+
+/// Helper for formatting stat names and descriptions
+struct StatDisplayHelper {
+    
+    /// Get human-readable display name for a stat key
+    static func getDisplayName(for statKey: String) -> String {
+        switch statKey {
+        // Passing
+        case "pass_yd": return "Passing Yards"
+        case "pass_td": return "Passing Touchdowns"
+        case "pass_int": return "Interceptions"
+        case "pass_cmp": return "Pass Completions"
+        case "pass_att": return "Pass Attempts"
+        case "pass_2pt": return "2-Point Conversions"
+        
+        // Rushing
+        case "rush_yd": return "Rushing Yards"
+        case "rush_td": return "Rushing Touchdowns"
+        case "rush_att": return "Rush Attempts"
+        case "rush_2pt": return "2-Point Conversions"
+        
+        // Receiving
+        case "rec": return "Receptions"
+        case "rec_yd": return "Receiving Yards"
+        case "rec_td": return "Receiving Touchdowns"
+        case "rec_tgt": return "Targets"
+        case "rec_2pt": return "2-Point Conversions"
+        
+        // Kicking
+        case "fgm": return "Field Goals Made"
+        case "fga": return "Field Goal Attempts"
+        case "xpm": return "Extra Points Made"
+        case "xpmiss": return "Extra Points Missed"
+        case "fgm_0_19": return "FG Made (0-19 yds)"
+        case "fgm_20_29": return "FG Made (20-29 yds)"
+        case "fgm_30_39": return "FG Made (30-39 yds)"
+        case "fgm_40_49": return "FG Made (40-49 yds)"
+        case "fgm_50p": return "FG Made (50+ yds)"
+        
+        // Defense/ST
+        case "def_int": return "Interceptions"
+        case "def_fum_rec": return "Fumble Recoveries"
+        case "def_sack": return "Sacks"
+        case "def_td": return "Defensive Touchdowns"
+        case "def_safe": return "Safeties"
+        case "st_td": return "Special Teams TDs"
+        case "blk_kick": return "Blocked Kicks"
+        
+        // Fumbles
+        case "fum": return "Fumbles"
+        case "fum_lost": return "Fumbles Lost"
+        
+        // Bonus
+        case "pass_40": return "40+ Yard Pass"
+        case "rush_40": return "40+ Yard Rush"
+        case "rec_40": return "40+ Yard Reception"
+        
+        default:
+            // Convert snake_case to Title Case
+            return statKey.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+    
+    /// Format a stat description for display
+    static func formatStatDescription(statKey: String, value: Double) -> String {
+        let formattedValue = value.truncatingRemainder(dividingBy: 1) == 0 ? 
+            String(format: "%.0f", value) : 
+            String(format: "%.1f", value)
+        
+        let displayName = getDisplayName(for: statKey).lowercased()
+        
+        if value == 1.0 {
+            // Singular form
+            return "1 \(displayName.replacingOccurrences(of: "s$", with: "", options: .regularExpression))"
+        } else {
+            // Plural form  
+            return "\(formattedValue) \(displayName)"
+        }
+    }
 }
