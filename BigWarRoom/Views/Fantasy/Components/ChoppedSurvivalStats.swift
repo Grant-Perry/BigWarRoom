@@ -17,7 +17,7 @@ struct ChoppedSurvivalStats: View {
         Group {
             if choppedLeaderboardViewModel.shouldShowSurvivalStats {
                 // Single row with all 5 compact stat cards
-                HStack(spacing: 6) {
+                HStack(spacing: 12) {
                     // Your personal stats card (COMPACT!)
                     ChoppedPersonalStatCard(
                         choppedLeaderboardViewModel: choppedLeaderboardViewModel,
@@ -55,6 +55,7 @@ struct ChoppedSurvivalStats: View {
                     )
                 }
                 .padding(.vertical, 8)
+				.padding(.horizontal, 20)
             } else {
                 // Show pre-game message instead of stats
                 VStack(spacing: 12) {

@@ -30,6 +30,5 @@ struct ChoppedPreGameMessage: View {
                         .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                 )
         )
-        .padding(.horizontal, 16)
     }
 }

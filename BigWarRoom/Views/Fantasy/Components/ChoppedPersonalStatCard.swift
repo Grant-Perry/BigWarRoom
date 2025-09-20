@@ -18,12 +18,12 @@ struct ChoppedPersonalStatCard: View {
             // Show your roster using SwiftUI sheet navigation
             showingMyRoster = true
         }) {
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 // Your rank badge (smaller)
                 HStack(spacing: 2) {
                     Text(choppedLeaderboardViewModel.myRankDisplay)
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundColor(.white)
+					  .font(.system(size: 8, weight: .medium))
+					  .foregroundColor(choppedLeaderboardViewModel.myForeColor)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
@@ -31,10 +31,10 @@ struct ChoppedPersonalStatCard: View {
                                 .fill(choppedLeaderboardViewModel.myStatusColor)
                         )
                     
-                    Text("YOU")
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundColor(.gray)
-                        .tracking(0.3)
+//                    Text("YOU")
+//                        .font(.system(size: 7, weight: .bold))
+//                        .foregroundColor(.gray)
+//                        .tracking(0.3)
                 }
                 
                 // Your score (smaller)
@@ -57,7 +57,7 @@ struct ChoppedPersonalStatCard: View {
                         .minimumScaleFactor(0.7)
                 }
             }
-            .frame(maxWidth: .infinity)
+			.frame(maxWidth: .infinity)
             .padding(.vertical, 6)
             .padding(.horizontal, 6)
             .background(

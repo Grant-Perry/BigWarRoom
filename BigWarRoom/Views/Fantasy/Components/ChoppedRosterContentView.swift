@@ -32,12 +32,14 @@ struct ChoppedRosterContentView: View {
                     week: week,
                     roster: roster
                 )
+                .padding(.horizontal, 16) // 🔥 ADDED: Horizontal padding for header
                 
                 // Sorting controls
                 PlayerSortingControlsView(
                     sortingMethod: $sortingMethod, 
                     sortHighToLow: $sortHighToLow
                 )
+                .padding(.horizontal, 16) // 🔥 ADDED: Horizontal padding for controls
 
                 // Starting Lineup Section
                 if !roster.starters.isEmpty {
@@ -47,6 +49,7 @@ struct ChoppedRosterContentView: View {
                         onPlayerTap: onPlayerTap,
                         showStartingLineup: $showStartingLineup
                     )
+                    .padding(.horizontal, 16) // 🔥 ADDED: Horizontal padding for starting lineup
                 }
                 
                 // Bench Section
@@ -57,9 +60,10 @@ struct ChoppedRosterContentView: View {
                         onPlayerTap: onPlayerTap,
                         showBench: $showBench
                     )
+                    .padding(.horizontal, 16) // 🔥 ADDED: Horizontal padding for bench
                 }
             }
-            .padding()
+            .padding(.vertical, 8) // 🔥 ADDED: Vertical padding for top/bottom spacing
         }
         .task {
             // Load NFL game data for real game times

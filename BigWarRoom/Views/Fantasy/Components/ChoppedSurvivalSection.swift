@@ -25,7 +25,7 @@ struct ChoppedSurvivalSection: View {
                     .foregroundColor(sectionColor)
                     .tracking(1)
                 
-                Spacer()
+//                Spacer()
                 
                 Text("\(teams.count) TEAMS")
                     .font(.system(size: 12, weight: .bold))
@@ -46,7 +46,6 @@ struct ChoppedSurvivalSection: View {
                 )
             }
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)

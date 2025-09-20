@@ -133,7 +133,7 @@ struct CriticalCard: View {
                 }
             }
             
-            Spacer()
+//            Spacer()
             
             // Critical points display
             VStack(alignment: .trailing, spacing: 4) {
@@ -153,9 +153,9 @@ struct CriticalCard: View {
                     .tracking(1)
             }
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 16)
-        .background(
+		.padding(.horizontal, 18)
+		.background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.red.opacity(0.15))
                 .overlay(

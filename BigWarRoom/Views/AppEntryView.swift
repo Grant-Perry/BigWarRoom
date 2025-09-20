@@ -91,6 +91,7 @@ struct BigWarRoomModified: View {
                     }
                     .tag(4)
             }
+            .padding(.horizontal, 16) // FINALLY! This should add padding to ALL tab content
             .preferredColorScheme(.dark)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
                 // Switch to War Room tab

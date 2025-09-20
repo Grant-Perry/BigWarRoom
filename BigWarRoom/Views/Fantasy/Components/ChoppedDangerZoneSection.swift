@@ -34,7 +34,7 @@ struct ChoppedDangerZoneSection: View {
                     .scaleEffect(dangerPulse ? 1.3 : 1.0)
                     .animation(.easeInOut(duration: 1).repeatForever(autoreverses: true).delay(0.5), value: dangerPulse)
                 
-                Spacer()
+//                Spacer()
                 
                 Text("\(choppedLeaderboardViewModel.dangerZoneCount) IN DANGER")
                     .font(.system(size: 12, weight: .bold))
@@ -54,8 +54,8 @@ struct ChoppedDangerZoneSection: View {
                     week: week
                 )
             }
+			.padding(.horizontal, 18)
         }
-        .padding(.horizontal, 16) // FIXED: Normal padding like other sections
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)

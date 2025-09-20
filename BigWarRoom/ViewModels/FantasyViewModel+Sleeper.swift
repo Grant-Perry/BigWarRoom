@@ -18,12 +18,32 @@ extension FantasyViewModel {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let settings = json["scoring_settings"] as? [String: Any] {
-                sleeperLeagueSettings = settings
+            // 🔥 UPDATED: Decode the full SleeperLeague to get proper scoring settings
+            let sleeperLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            
+            // Store in local property for backward compatibility
+            if let scoringSettings = sleeperLeague.scoringSettings {
+                var convertedSettings: [String: Any] = [:]
+                for (key, value) in scoringSettings {
+                    convertedSettings[key] = value
+                }
+                sleeperLeagueSettings = convertedSettings
+                
+                print("🎯 SLEEPER SCORING: Loaded \(scoringSettings.count) rules for league \(leagueID)")
+                
+                // 🔥 FIX: Register the scoring settings with ScoringSettingsManager
+                ScoringSettingsManager.shared.registerSleeperScoringSettings(
+                    from: sleeperLeague, 
+                    leagueID: leagueID
+                )
+                
+                print("✅ SLEEPER SCORING: Registered with ScoringSettingsManager for league \(leagueID)")
+            } else {
+                print("⚠️ SLEEPER SCORING: No scoring settings found for league \(leagueID)")
             }
+            
         } catch {
-            // Silent error handling
+            print("❌ SLEEPER SCORING: Error fetching league \(leagueID): \(error)")
         }
     }
     

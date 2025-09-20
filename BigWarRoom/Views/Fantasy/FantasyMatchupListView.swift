@@ -40,8 +40,11 @@ struct FantasyMatchupListView: View {
                         fantasyMatchupListViewModel: fantasyMatchupListViewModel,
                         forceChoppedMode: $fantasyMatchupListViewModel.forceChoppedMode
                     )
+                    .padding(.horizontal, 24) // Increased from 20 to bring it in more
+                    .padding(.top, 10) // Added top padding
                 }
             }
+            .padding(.horizontal, 16) // THIS adds padding to the entire fucking screen content!
             .navigationTitle(fantasyMatchupListViewModel.shouldHideTitle() ? "" : (viewModel.selectedLeague?.league.name ?? "Fantasy"))
             .navigationBarTitleDisplayMode(fantasyMatchupListViewModel.shouldHideTitle() ? .inline : .large)
             .toolbar {

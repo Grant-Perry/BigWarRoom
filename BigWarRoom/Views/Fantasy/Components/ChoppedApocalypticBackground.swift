@@ -42,5 +42,6 @@ struct ChoppedApocalypticBackground: View {
                 .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: dangerPulse)
             }
         }
+        .allowsHitTesting(false) // Allow touches to pass through to the ScrollView
     }
 }

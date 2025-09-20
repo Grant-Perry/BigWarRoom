@@ -64,7 +64,8 @@ struct ChoppedBenchSection: View {
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, 20) // 🔥 IMPROVED: Better horizontal padding
+        .padding(.vertical, 16)   // 🔥 IMPROVED: Better vertical padding
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.blue.opacity(0.05))

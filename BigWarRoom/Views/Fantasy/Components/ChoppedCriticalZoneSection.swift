@@ -32,6 +32,7 @@ struct ChoppedCriticalZoneSection: View {
                     
                     Text("ELIMINATION IMMINENT")
                         .font(.system(size: 10, weight: .bold))
+						
                         .foregroundColor(.gray)
                         .tracking(2)
                 }
@@ -50,7 +51,8 @@ struct ChoppedCriticalZoneSection: View {
                     week: week
                 )
             }
-            
+			.padding(.horizontal, 18)
+
             // Elimination ceremony button
             if choppedLeaderboardViewModel.shouldShowEliminationCeremonyButton {
                 Button(action: {
@@ -74,7 +76,6 @@ struct ChoppedCriticalZoneSection: View {
                 }
             }
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 20)
         .background(
             RoundedRectangle(cornerRadius: 16)

@@ -45,6 +45,6 @@ struct ChoppedChampionSection: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 4) // Reduced top padding to tighten gap
-        .padding(.bottom, 20)
+        .padding(.bottom, 5)
     }
 }

@@ -13,12 +13,12 @@ struct ChoppedBattleRoyaleHeader: View {
     let pulseAnimation: Bool
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 4) {
             // Main title with dramatic effect - USE LEAGUE NAME
             HStack {
                 Text("💀")
                     .font(.system(size: 32))
-                    .scaleEffect(pulseAnimation ? 1.2 : 1.0)
+                    .scaleEffect(pulseAnimation ? 1.5 : 0.9)
                     .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulseAnimation)
                 
                 VStack {
@@ -186,7 +186,7 @@ struct ChoppedBattleRoyaleHeader: View {
                 .shadow(color: .orange.opacity(0.3), radius: 4, x: 0, y: 2)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 20)
         .padding(.vertical, 24)
         .background(
             // Main header background with apocalyptic gradients

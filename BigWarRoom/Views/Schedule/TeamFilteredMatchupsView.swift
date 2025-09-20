@@ -543,24 +543,34 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - Matchup Detail Sheet (reuse Mission Control)
     private func buildMatchupDetailSheet(for matchup: UnifiedMatchup) -> some View {
-        let configuredViewModel = matchup.createConfiguredFantasyViewModel()
-        
-        if matchup.isChoppedLeague {
-            return AnyView(
-                ChoppedLeaderboardView(
-                    choppedSummary: matchup.choppedSummary!,
-                    leagueName: matchup.league.league.name,
-                    leagueID: matchup.league.league.id
-                )
-            )
-        } else {
-            return AnyView(
-                FantasyMatchupDetailView(
-                    matchup: matchup.fantasyMatchup!,
-                    fantasyViewModel: configuredViewModel,
-                    leagueName: matchup.league.league.name
-                )
-            )
+        // 🔥 FIXED: Wrap in NavigationView for proper layout, title, and dismiss controls.
+        // This provides the correct full-width context for the content view.
+        NavigationView {
+            Group {
+                if matchup.isChoppedLeague {
+                    ChoppedLeaderboardView(
+                        choppedSummary: matchup.choppedSummary!,
+                        leagueName: matchup.league.league.name,
+                        leagueID: matchup.league.league.id
+                    )
+                } else {
+                    let configuredViewModel = matchup.createConfiguredFantasyViewModel()
+                    FantasyMatchupDetailView(
+                        matchup: matchup.fantasyMatchup!,
+                        fantasyViewModel: configuredViewModel,
+                        leagueName: matchup.league.league.name
+                    )
+                }
+            }
+            .navigationTitle(matchup.league.league.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") {
+                        showingMatchupDetail = nil // Dismisses the sheet
+                    }
+                }
+            }
         }
     }
     

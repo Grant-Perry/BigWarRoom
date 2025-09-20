@@ -113,8 +113,8 @@ struct SurvivalCard: View {
                     .foregroundColor(.gray.opacity(0.7))
                     .tracking(1)
             }
+			.padding(.horizontal, 18)
         }
-        .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 12)

@@ -35,7 +35,7 @@ struct ChampionCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 
-                Spacer()
+//                Spacer()
                 
                 Text("👑")
                     .font(.system(size: 20))
@@ -99,7 +99,7 @@ struct ChampionCard: View {
                             )
                         )
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
+                        .minimumScaleFactor(0.5)
                     
                     Text("POINTS")
                         .font(.system(size: 8, weight: .bold))
@@ -112,10 +112,10 @@ struct ChampionCard: View {
                         .foregroundColor(.yellow.opacity(0.7))
                         .tracking(1)
                 }
+				.padding(.horizontal, 16)
                 .frame(minWidth: 60)
             }
         }
-        .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: 16)

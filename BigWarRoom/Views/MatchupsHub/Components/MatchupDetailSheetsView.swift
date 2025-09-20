@@ -27,15 +27,28 @@ struct MatchupDetailSheetsView: View {
 /// Sheet for chopped league details
 private struct ChoppedLeagueDetailSheet: View {
     let matchup: UnifiedMatchup
+    @Environment(\.dismiss) private var dismiss // Add dismiss environment
     
     var body: some View {
-        if let choppedSummary = matchup.choppedSummary {
-            ChoppedLeaderboardView(
-                choppedSummary: choppedSummary,
-                leagueName: matchup.league.league.name,
-                leagueID: matchup.league.league.leagueID
-            )
-            .padding(.horizontal, 24) // Add the padding at the TOP LEVEL
+        // 🔥 FIXED: The sheet content MUST be wrapped in a NavigationView to get a proper layout context.
+        // This was the root cause of the inconsistent sizing from this specific entry point.
+        NavigationView {
+            if let choppedSummary = matchup.choppedSummary {
+                ChoppedLeaderboardView(
+                    choppedSummary: choppedSummary,
+                    leagueName: matchup.league.league.name,
+                    leagueID: matchup.league.league.leagueID
+                )
+                .navigationTitle(matchup.league.league.name)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button("Done") {
+                            dismiss()
+                        }
+                    }
+                }
+            }
         }
     }
 }

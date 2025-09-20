@@ -151,12 +151,12 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         }
         
         // Strategy 3: Look for patterns like "Lamarvelous" or "King"
-        if let lamarRanking = choppedSummary.rankings.first(where: { 
-            $0.team.ownerName.lowercased().contains("lamar") ||
-            $0.team.ownerName.lowercased().contains("king")
-        }) {
-            return lamarRanking
-        }
+//        if let lamarRanking = choppedSummary.rankings.first(where: { 
+//            $0.team.ownerName.lowercased().contains("lamar") ||
+//            $0.team.ownerName.lowercased().contains("king")
+//        }) {
+//            return lamarRanking
+//        }
         
         // Fallback: Return first team
         return choppedSummary.rankings.first
@@ -165,20 +165,21 @@ class ChoppedLeaderboardViewModel: ObservableObject {
     /// Your rank display (e.g., "1ST", "2ND", "3RD")
     var myRankDisplay: String {
         guard let myTeam = myTeamRanking else { return "?" }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
         
-        let rank = myTeam.rank
-        switch rank {
-        case 1:
-            return "1ST"
-        case 2:
-            return "2ND"  
-        case 3:
-            return "3RD"
-        default:
-            return "\(rank)TH"
+        // Ensure rank is treated as NSNumber for the formatter
+        let rankNumber = NSNumber(value: myTeam.rank)
+        
+        // Format and make uppercase to match the UI style
+        if let formattedRank = formatter.string(from: rankNumber) {
+            return formattedRank.uppercased()
         }
+        
+        // Fallback for safety, though it should never be needed
+        return "\(myTeam.rank)TH"
     }
-    
+
     /// Your score display with formatting (handle pre-game state)
     var myScoreDisplay: String {
         guard let myTeam = myTeamRanking else { return "--" }
@@ -193,17 +194,29 @@ class ChoppedLeaderboardViewModel: ObservableObject {
         
         switch myTeam.eliminationStatus {
         case .champion:
-            return .yellow
+            return .gpYellow
         case .safe:
-            return .green
+            return .gpGreen
         case .warning:
-            return .blue
+            return .gpBlue
         case .danger:
-            return .orange
+            return .gpOrange
         case .critical:
-            return .red
+            return .gpRedPink
         case .eliminated:
             return .gray
+        }
+    }
+
+   var myForeColor: Color {
+        guard let myTeam = myTeamRanking else { return .gray }
+        guard hasWeekStarted else { return .gray }
+        
+        switch myTeam.eliminationStatus {
+		   case .champion, .safe:
+			  return .black
+		   case .warning, .danger, .critical, .eliminated:
+			  return .gpWhite
         }
     }
     

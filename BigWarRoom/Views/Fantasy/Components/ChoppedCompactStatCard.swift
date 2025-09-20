@@ -15,7 +15,7 @@ struct ChoppedCompactStatCard: View {
     let color: Color
     
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text(title)
                 .font(.system(size: 8, weight: .bold))
                 .foregroundColor(.gray)
@@ -38,9 +38,9 @@ struct ChoppedCompactStatCard: View {
                 .foregroundColor(.gray)
                 .tracking(0.3)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
+        .padding(.vertical, 3)
         .padding(.horizontal, 6)
+		.frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(
