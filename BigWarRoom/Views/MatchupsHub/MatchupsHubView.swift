@@ -24,10 +24,6 @@ struct MatchupsHubView: View {
     @State internal var refreshing = false
     @State internal var cardAnimationStagger: Double = 0
     
-    // MARK: - Micro Mode States
-    @State internal var microMode = false
-    @State internal var expandedCardId: String? = nil
-    
     // MARK: - Battles Section State
     @State internal var battlesMinimized = false
     @State internal var poweredByExpanded = true
@@ -43,6 +39,17 @@ struct MatchupsHubView: View {
     @State internal var countdownTimer: Timer?
     @State internal var refreshTimer: Timer?
     @State internal var justMeModeTimer: Timer?
+    
+    // MARK: - Computed Properties for State Access
+    private var microMode: Bool {
+        get { matchupsHubViewModel.microModeEnabled }
+        set { matchupsHubViewModel.microModeEnabled = newValue }
+    }
+
+    private var expandedCardId: String? {
+        get { matchupsHubViewModel.expandedCardId }
+        set { matchupsHubViewModel.expandedCardId = newValue }
+    }
     
     // MARK: - Body
     var body: some View {

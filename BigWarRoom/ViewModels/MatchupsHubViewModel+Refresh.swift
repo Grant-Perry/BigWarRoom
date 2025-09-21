@@ -139,6 +139,11 @@ extension MatchupsHubViewModel {
         // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
         guard !isLoading else { return }
         
+        // 🔥 PRESERVE Just Me Mode state during refresh
+        let wasMicroModeEnabled = microModeEnabled
+        let preservedExpandedCardId = expandedCardId
+        let wasBannerVisible = justMeModeBannerVisible // NEW: Preserve banner state
+        
         // Clear loading guards before starting fresh refresh
         loadingLock.lock()
         currentlyLoadingLeagues.removeAll()
@@ -146,12 +151,24 @@ extension MatchupsHubViewModel {
         
         // BACKGROUND REFRESH: Update data without showing loading screen
         await refreshMatchupsInBackground()
+        
+        // 🔥 RESTORE Just Me Mode state after refresh
+        await MainActor.run {
+            microModeEnabled = wasMicroModeEnabled
+            expandedCardId = preservedExpandedCardId
+            justMeModeBannerVisible = wasBannerVisible // NEW: Restore banner state
+        }
     }
     
     /// Background refresh that doesn't disrupt the UI
-    /// 🔥 FIXED: Uses selected week instead of current week
+    /// 🔥 FIXED: Preserves UI state during refresh
     private func refreshMatchupsInBackground() async {
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
+        // 🔥 PRESERVE UI state before refresh
+        let preservedMicroMode = microModeEnabled
+        let preservedExpandedCard = expandedCardId
+        let preservedBannerVisible = justMeModeBannerVisible // NEW: Preserve banner
         
         await MainActor.run {
             // Only update timestamp, don't change isLoading or show loading screen
@@ -177,6 +194,13 @@ extension MatchupsHubViewModel {
             
         } catch {
             // x Print("⚠️ BACKGROUND REFRESH: Failed to refresh leagues: \(error)")
+        }
+        
+        // 🔥 RESTORE UI state after refresh
+        await MainActor.run {
+            microModeEnabled = preservedMicroMode
+            expandedCardId = preservedExpandedCard
+            justMeModeBannerVisible = preservedBannerVisible // NEW: Restore banner
         }
     }
     

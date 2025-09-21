@@ -13,6 +13,7 @@ struct MatchupsHubMatchupsSectionView: View {
     let sortByWinning: Bool
     let dualViewMode: Bool
     let microMode: Bool
+    let justMeModeBannerVisible: Bool
     let refreshCountdown: Double
     let autoRefreshEnabled: Bool
     let sortedMatchups: [UnifiedMatchup]
@@ -21,6 +22,7 @@ struct MatchupsHubMatchupsSectionView: View {
     let onSortToggle: () -> Void
     let onDualViewToggle: () -> Void
     let onMicroModeToggle: () -> Void
+    let onAutoRefreshToggle: () -> Void
     let onRefreshTapped: () -> Void
     let onShowDetail: (UnifiedMatchup) -> Void
     let onMicroCardTap: (String) -> Void
@@ -40,7 +42,8 @@ struct MatchupsHubMatchupsSectionView: View {
                 onSortToggle: onSortToggle,
                 onDualViewToggle: onDualViewToggle,
                 onMicroModeToggle: onMicroModeToggle,
-                onRefreshTapped: onRefreshTapped
+                onRefreshTapped: onRefreshTapped,
+                onAutoRefreshToggle: onAutoRefreshToggle
             )
             
             // Conditional sections
@@ -48,7 +51,8 @@ struct MatchupsHubMatchupsSectionView: View {
                 PoweredByBrandingView()
             }
             
-            if microMode {
+            // Show banner only when explicitly visible, not when microMode is on
+            if justMeModeBannerVisible {
                 JustMeModeBannerView()
             }
             

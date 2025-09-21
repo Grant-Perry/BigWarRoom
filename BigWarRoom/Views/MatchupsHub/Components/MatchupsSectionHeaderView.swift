@@ -20,6 +20,7 @@ struct MatchupsSectionHeaderView: View {
     let onDualViewToggle: () -> Void
     let onMicroModeToggle: () -> Void
     let onRefreshTapped: () -> Void
+    let onAutoRefreshToggle: () -> Void
     
     var body: some View {
         HStack {
@@ -33,9 +34,11 @@ struct MatchupsSectionHeaderView: View {
                 sortByWinning: sortByWinning,
                 dualViewMode: dualViewMode,
                 microMode: microMode,
+                autoRefreshEnabled: autoRefreshEnabled,
                 onSortToggle: onSortToggle,
                 onDualViewToggle: onDualViewToggle,
-                onMicroModeToggle: onMicroModeToggle
+                onMicroModeToggle: onMicroModeToggle,
+                onAutoRefreshToggle: onAutoRefreshToggle
             )
             
             // Timer dial
@@ -48,6 +51,7 @@ struct MatchupsSectionHeaderView: View {
             .scaleEffect(0.8)
         }
         .padding(.horizontal, 20)
+        .padding(.top, 8) // 🔥 ADDED: Just a bit of breathing room at the top
     }
 }
 
@@ -74,9 +78,11 @@ private struct ControlTogglesRow: View {
     let sortByWinning: Bool
     let dualViewMode: Bool
     let microMode: Bool
+    let autoRefreshEnabled: Bool // NEW: Auto-refresh state
     let onSortToggle: () -> Void
     let onDualViewToggle: () -> Void
     let onMicroModeToggle: () -> Void
+    let onAutoRefreshToggle: () -> Void // NEW: Auto-refresh toggle
     
     var body: some View {
         HStack {
@@ -96,6 +102,16 @@ private struct ControlTogglesRow: View {
                 subtitle: "View",
                 color: dualViewMode ? .blue : .orange,
                 onToggle: onDualViewToggle
+            )
+            
+            Spacer()
+            
+            // 🔥 MOVED: Auto-refresh toggle now next to Dual View
+            ToggleControlView(
+                title: autoRefreshEnabled ? "On" : "Off",
+                subtitle: "Auto-refresh",
+                color: autoRefreshEnabled ? .gpGreen : .gpRedPink,
+                onToggle: onAutoRefreshToggle
             )
             
             Spacer()

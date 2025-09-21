@@ -79,12 +79,15 @@ extension MatchupsHubView {
     private func startJustMeModeTimer() {
         stopJustMeModeTimer() // Clean up any existing timer
         
+        // Only start timer if Just Me mode is enabled
+        guard matchupsHubViewModel.microModeEnabled else { return }
+        
         justMeModeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
             Task { @MainActor in
-                // Auto-collapse Just Me Mode banner after 5 seconds
+                // 🔥 FIXED: Only hide the banner, don't turn off Just Me mode
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                    microMode = false
-                    expandedCardId = nil
+                    matchupsHubViewModel.justMeModeBannerVisible = false
+                    // DON'T turn off microModeEnabled - let user do that manually!
                 }
             }
         }
@@ -101,10 +104,10 @@ extension MatchupsHubView {
         impactFeedback.impactOccurred()
         
         withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-            if expandedCardId == cardId {
-                expandedCardId = nil
+            if matchupsHubViewModel.expandedCardId == cardId {
+                matchupsHubViewModel.expandedCardId = nil
             } else {
-                expandedCardId = cardId
+                matchupsHubViewModel.expandedCardId = cardId
             }
         }
     }
@@ -157,12 +160,15 @@ extension MatchupsHubView {
         impactFeedback.impactOccurred()
         
         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-            microMode.toggle()
-            if !microMode {
-                expandedCardId = nil // Collapse any expanded cards when exiting micro mode
-                stopJustMeModeTimer() // Stop timer if manually toggled off
+            matchupsHubViewModel.microModeEnabled.toggle()
+            if !matchupsHubViewModel.microModeEnabled {
+                // When turning off Just Me mode, also hide banner and collapse cards
+                matchupsHubViewModel.expandedCardId = nil 
+                matchupsHubViewModel.justMeModeBannerVisible = false
+                stopJustMeModeTimer() 
             } else {
-                // Start 5-second auto-collapse timer when Just Me Mode is activated
+                // When turning on Just Me mode, show banner and start auto-dismiss timer
+                matchupsHubViewModel.justMeModeBannerVisible = true
                 startJustMeModeTimer()
             }
         }
@@ -172,8 +178,23 @@ extension MatchupsHubView {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-            dualViewMode.toggle()
+        // 🔥 FIXED: If in Just Me mode, exit Just Me and force single view
+        if matchupsHubViewModel.microModeEnabled {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                // Exit Just Me mode
+                matchupsHubViewModel.microModeEnabled = false
+                matchupsHubViewModel.expandedCardId = nil
+                matchupsHubViewModel.justMeModeBannerVisible = false
+                stopJustMeModeTimer()
+                
+                // Force single view (not dual)
+                dualViewMode = false
+            }
+        } else {
+            // Normal toggle when not in Just Me mode
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                dualViewMode.toggle()
+            }
         }
     }
     

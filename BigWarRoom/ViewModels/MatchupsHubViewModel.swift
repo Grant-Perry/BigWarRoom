@@ -15,15 +15,20 @@ final class MatchupsHubViewModel: ObservableObject {
     
     // MARK: - Published Properties
     @Published var myMatchups: [UnifiedMatchup] = []
-    @Published var isLoading: Bool = false
-    @Published var currentLoadingLeague: String = ""
-    @Published var loadingProgress: Double = 0.0
-    @Published var errorMessage: String?
-    @Published var lastUpdateTime: Date?
-    @Published var autoRefreshEnabled: Bool = true
+    @Published var isLoading = false
+    @Published var lastUpdateTime = Date()
+    @Published var autoRefreshEnabled = true
+
+    // MARK: - Just Me Mode State (Persistent across refreshes)
+    @Published var microModeEnabled = false
+    @Published var expandedCardId: String? = nil
+    @Published var justMeModeBannerVisible = false // NEW: Separate banner visibility
     
     // MARK: - Loading State Management
     @Published var loadingStates: [String: LeagueLoadingState] = [:]
+    @Published var errorMessage: String? = nil
+    @Published var currentLoadingLeague: String = ""
+    @Published var loadingProgress: Double = 0.0
     internal var totalLeagueCount: Int = 0
     internal var loadedLeagueCount: Int = 0
     
@@ -74,19 +79,47 @@ final class MatchupsHubViewModel: ObservableObject {
     
     /// Sort matchups by winning/losing status
     func sortedMatchups(sortByWinning: Bool) -> [UnifiedMatchup] {
-        if sortByWinning {
-            return myMatchups.sorted { matchup1, matchup2 in
-                let score1 = matchup1.myTeam?.currentScore ?? 0
-                let score2 = matchup2.myTeam?.currentScore ?? 0
-                return score1 > score2
-            }
-        } else {
-            return myMatchups.sorted { matchup1, matchup2 in
-                let score1 = matchup1.myTeam?.currentScore ?? 0
-                let score2 = matchup2.myTeam?.currentScore ?? 0
-                return score1 < score2
+        // 🔥 FIXED: Separate eliminated chopped leagues from active matchups
+        var activeMatchups: [UnifiedMatchup] = []
+        var eliminatedMatchups: [UnifiedMatchup] = []
+        
+        for matchup in myMatchups {
+            if matchup.isMyManagerEliminated {
+                eliminatedMatchups.append(matchup) // Eliminated - goes to end
+            } else {
+                activeMatchups.append(matchup) // Active - participates in sorting
             }
         }
+        
+        // Sort only the active matchups
+        let sortedActiveMatchups: [UnifiedMatchup]
+        if sortByWinning {
+            // 🔥 FIXED: Sort by actual winning status, not raw scores!
+            sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
+                let isWinning1 = getWinningStatusForMatchup(matchup1)
+                let isWinning2 = getWinningStatusForMatchup(matchup2)
+                
+                // Winners first, losers second
+                if isWinning1 != isWinning2 {
+                    return isWinning1 // Winners (true) come before losers (false)
+                }
+                
+                // If both winning or both losing, sort by score differential for tiebreaking
+                let scoreDiff1 = matchup1.scoreDifferential ?? 0
+                let scoreDiff2 = matchup2.scoreDifferential ?? 0
+                return scoreDiff1 > scoreDiff2 // Higher differential first
+            }
+        } else {
+            // "Losing" sort - show lowest scores first (for finding trouble spots)
+            sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
+                let score1 = matchup1.myTeam?.currentScore ?? 0
+                let score2 = matchup2.myTeam?.currentScore ?? 0
+                return score1 < score2 // Lowest scores first when sorting by "losing"
+            }
+        }
+        
+        // 🔥 ALWAYS append eliminated matchups at the end (no sorting)
+        return sortedActiveMatchups + eliminatedMatchups
     }
     
     /// Count of live matchups

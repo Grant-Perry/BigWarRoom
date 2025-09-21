@@ -29,11 +29,10 @@ struct MatchupsHubHeroHeaderView: View {
                 onWeekPickerTapped: onWeekPickerTapped
             )
             
-            LastUpdateInfoView(
+            // 🔥 MOVED: Last Update info now goes between stat boxes and controls
+            CompactLastUpdateView(
                 lastUpdateTime: lastUpdateTime,
-                autoRefreshEnabled: autoRefreshEnabled,
-                timeAgoString: timeAgoString,
-                onAutoRefreshToggle: onAutoRefreshToggle
+                timeAgoString: timeAgoString
             )
         }
         .padding(.horizontal, 20)
@@ -47,6 +46,40 @@ struct MatchupsHubHeroHeaderView: View {
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
+        )
+    }
+}
+
+// MARK: - Supporting Components
+
+/// Compact last update display (no auto-refresh toggle)
+private struct CompactLastUpdateView: View {
+    let lastUpdateTime: Date?
+    let timeAgoString: String?
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.gpGreen)
+            
+            if let timeAgoString {
+                Text("Last Update: \(timeAgoString)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+            } else {
+                Text("Ready to load your battles")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.black.opacity(0.2))
         )
     }
 }

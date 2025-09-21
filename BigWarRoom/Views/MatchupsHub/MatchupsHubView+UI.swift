@@ -39,7 +39,7 @@ extension MatchupsHubView {
             connectedLeaguesCount: matchupsHubViewModel.connectedLeaguesCount,
             lastUpdateTime: matchupsHubViewModel.lastUpdateTime,
             autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
-            timeAgoString: matchupsHubViewModel.lastUpdateTime.map { matchupsHubViewModel.timeAgo($0) },
+            timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
             onWeekPickerTapped: showWeekPicker,
             onAutoRefreshToggle: toggleAutoRefresh
         )
@@ -50,11 +50,12 @@ extension MatchupsHubView {
             poweredByExpanded: $poweredByExpanded,
             sortByWinning: sortByWinning,
             dualViewMode: dualViewMode,
-            microMode: microMode,
+            microMode: matchupsHubViewModel.microModeEnabled,
+            justMeModeBannerVisible: matchupsHubViewModel.justMeModeBannerVisible,
             refreshCountdown: refreshCountdown,
             autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             sortedMatchups: sortedMatchups,
-            expandedCardId: expandedCardId,
+            expandedCardId: matchupsHubViewModel.expandedCardId,
             onPoweredByToggle: {
                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
                     poweredByExpanded.toggle()
@@ -63,6 +64,7 @@ extension MatchupsHubView {
             onSortToggle: toggleSortOrder,
             onDualViewToggle: toggleDualViewMode,
             onMicroModeToggle: toggleMicroMode,
+            onAutoRefreshToggle: toggleAutoRefresh,
             onRefreshTapped: {
                 Task {
                     await handlePullToRefresh()
@@ -72,7 +74,7 @@ extension MatchupsHubView {
             onMicroCardTap: handleMicroCardTap,
             onExpandedCardDismiss: {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {
-                    expandedCardId = nil
+                    matchupsHubViewModel.expandedCardId = nil
                 }
             },
             getWinningStatus: matchupsHubViewModel.getWinningStatusForMatchup

@@ -95,7 +95,7 @@ final class SuggestionEngine {
                 draft: draft,
                 picks: picks,
                 draftRosters: draftRosters,
-                limit: 25
+                limit: 25 // number of picks
             )
             return result
         } catch {

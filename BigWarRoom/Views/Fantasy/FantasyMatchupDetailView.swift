@@ -59,10 +59,7 @@ struct FantasyMatchupDetailView: View {
 			// Header with navigation and countdown
 			navigationHeader
 
-			// Matchup details title
-			matchupDetailsTitle
-
-			// Fantasy detail header with team comparison - NO OPACITY HERE
+			// Fantasy detail header with team comparison - moved up closer to navigation
 			FantasyDetailHeaderView(
 			   leagueName: leagueName,
 			   matchup: matchup,
@@ -84,11 +81,11 @@ struct FantasyMatchupDetailView: View {
 				  }
 			   }
 			)
-			.padding(.horizontal, 32) // EVEN MORE horizontal padding
-			.padding(.top, 16) // More top spacing from "Matchup Details"
-			.padding(.bottom, 20) // More bottom spacing before "Active Roster"
+			.padding(.horizontal, 32)
+			.padding(.top, 8) // 🔥 REDUCED: Much less top padding since title is gone
+			.padding(.bottom, 16) // 🔥 REDUCED: Less bottom padding to move roster up
 
-			// Roster content
+			// Roster content - now much closer to the top
 			rosterScrollView
 		 }
 	  }
@@ -160,10 +157,9 @@ struct FantasyMatchupDetailView: View {
 			// Circular countdown timer
 		 RefreshCountdownTimerView()
 	  }
-	  .padding(.horizontal, 32) // EVEN MORE horizontal padding for header
+	  .padding(.horizontal, 32)
 	  .padding(.top, 8)
 	  .onAppear {
-			// DEBUG: Help troubleshoot the logo issue
 		 print("🐛 NavigationHeader - fantasyViewModel: \(fantasyViewModel != nil ? "exists" : "nil")")
 		 if let selectedLeague = fantasyViewModel?.selectedLeague {
 			print("🐛 NavigationHeader - Selected league source: \(selectedLeague.source.rawValue)")
@@ -171,19 +167,6 @@ struct FantasyMatchupDetailView: View {
 			print("🐛 NavigationHeader - No selected league available")
 		 }
 	  }
-   }
-
-   private var matchupDetailsTitle: some View {
-	  HStack {
-		 Text("Matchup Details")
-			.font(.title2)
-			.fontWeight(.bold)
-
-		 Spacer()
-	  }
-	  .padding(.horizontal, 32) // EVEN MORE horizontal padding for title
-	  .padding(.top, 12) // Added top padding
-	  .padding(.bottom, 4) // Added bottom padding for separation
    }
 
    private var rosterScrollView: some View {
@@ -198,7 +181,7 @@ struct FantasyMatchupDetailView: View {
 			}
 		 }
 		 .padding(.top, 8)
-		 .padding(.horizontal, 32) // EVEN MORE horizontal padding for roster content
+		 .padding(.horizontal, 32)
 	  }
    }
 
