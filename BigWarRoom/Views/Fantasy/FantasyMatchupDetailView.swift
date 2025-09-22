@@ -181,7 +181,6 @@ struct FantasyMatchupDetailView: View {
 			}
 		 }
 		 .padding(.top, 8)
-		 .padding(.horizontal, 32)
 	  }
    }
 

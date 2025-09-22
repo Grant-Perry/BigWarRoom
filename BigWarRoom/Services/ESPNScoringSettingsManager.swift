@@ -155,12 +155,9 @@ final class ScoringSettingsManager: ObservableObject {
     
     // MARK: - 🔥 NEW: Smart Filtering Based on Real League Data
     
-    /// Aggressive filtering based on real ESPN league analysis
+    /// Perform smart filtering based on real ESPN league analysis
     /// Removes template noise that never appears in actual leagues
     private func performSmartFiltering(rawSettings: [String: Double], leagueID: String) -> [String: Double] {
-        print("🎯 SMART FILTERING: League \(leagueID)")
-        print("   Input: \(rawSettings.count) raw ESPN rules")
-        
         var filteredRules: [String: Double] = [:]
         
         // Define template noise that never appears in real leagues
@@ -193,53 +190,41 @@ final class ScoringSettingsManager: ObservableObject {
             
             // RULE 1: Hard filter - Never include template noise
             if templateNoise.contains(statKey) {
-                print("   🚫 TEMPLATE NOISE: \(statKey) = \(points) (never used in real leagues)")
                 continue
             }
             
             // RULE 2: Zero points - Explicitly disabled, don't include
             if points == 0.0 {
-                print("   ⭕ DISABLED: \(statKey) = \(points) (explicitly set to 0)")
                 continue
             }
             
             // RULE 3: Rarely used stats with tiny values - Filter out
             if rarelyUsed.contains(statKey) && abs(points) < 0.1 {
-                print("   🔍 LOW VALUE RARE: \(statKey) = \(points) (likely template)")
                 continue
             }
             
             // RULE 4: Negative scoring with tiny values - Filter out (except fumbles/INTs)
             if points < 0 && abs(points) < 0.5 && !statKey.contains("fum") && !statKey.contains("int") {
-                print("   ➖ TINY NEGATIVE: \(statKey) = \(points) (likely template)")
                 continue
             }
             
             // RULE 5: Very small positive values that don't make fantasy sense
             if points > 0 && points < 0.01 {
-                print("   🔬 MICROSCOPIC: \(statKey) = \(points) (too small to matter)")
                 continue
             }
             
             // RULE 6: Include everything else that passes the filters
             filteredRules[statKey] = points
-            print("   ✅ KEPT: \(statKey) = \(points)")
         }
-        
-        print("   OUTPUT: \(filteredRules.count) filtered rules (removed \(rawSettings.count - filteredRules.count) template noise)")
         
         return filteredRules
     }
     
     /// Extract ESPN scoring settings from existing ESPNLeague data
     func registerESPNScoringSettings(from espnLeague: ESPNLeague, leagueID: String) {
-        print("🎯 ScoringManager: Processing ESPN scoring for league \(leagueID) - SILVER BULLET IMPLEMENTED")
-
         // Directly use authoritative ESPN API scoringItems -- no overrides, no filtering, full trust
         if let scoringSettings = espnLeague.scoringSettings,
            let scoringItems = scoringSettings.scoringItems {
-
-            print("🎯 ESPN API: Found \(scoringItems.count) scoring items - processing ALL with FULL TRUST")
 
             var trustedSettings: [String: Double] = [:]
 
@@ -249,32 +234,23 @@ final class ScoringSettingsManager: ObservableObject {
                 if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                     if points != 0.0 {
                         trustedSettings[sleeperKey] = points
-                        print("   ✅ TRUSTED: \(sleeperKey) = \(points) pts (statId: \(statId))")
-                    } else {
-                        print("   ⏭️ SKIPPED: \(sleeperKey) = 0.0 pts (explicitly disabled)")
                     }
 
                     // Handle position-specific overrides (like DST scoring)
                     if let overrides = item.pointsOverrides, !overrides.isEmpty {
-                        print("   🔧 \(overrides.count) position overrides for \(sleeperKey)")
                         for (positionKey, overridePoints) in overrides {
                             if positionKey == "16" { // DST
                                 let dstKey = "\(sleeperKey)_dst"
                                 trustedSettings[dstKey] = overridePoints
-                                print("     ✅ DST Override: \(dstKey) = \(overridePoints) pts")
                             }
                         }
                     }
-                } else {
-                    print("   ⚠️ UNMAPPED: ESPN statId \(statId) = \(points) pts (no mapper entry)")
                 }
             }
 
             espnScoringSettings[leagueID] = trustedSettings
             validatedESPNScoringSettings[leagueID] = trustedSettings
             leagueScoringBasis[leagueID] = "ESPN Silver Bullet (Authoritative JSON: \(scoringItems.count) raw → \(trustedSettings.count) mapped)"
-
-            print("🎯 SILVER BULLET APPLIED: League \(leagueID) now uses ESPN JSON exclusively.")
             return
         }
 
@@ -283,7 +259,6 @@ final class ScoringSettingsManager: ObservableObject {
            let nestedScoring = settings.scoringSettings,
            let scoringItems = nestedScoring.scoringItems {
 
-            print("🎯 ESPN NESTED: Using \(scoringItems.count) scoring items with FULL TRUST")
             var trustedSettings: [String: Double] = [:]
 
             for item in scoringItems {
@@ -291,7 +266,6 @@ final class ScoringSettingsManager: ObservableObject {
                 if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                     if points != 0.0 {
                         trustedSettings[sleeperKey] = points
-                        print("   ✅ NESTED TRUSTED: \(sleeperKey) = \(points) pts")
                     }
                 }
             }
@@ -299,28 +273,20 @@ final class ScoringSettingsManager: ObservableObject {
             espnScoringSettings[leagueID] = trustedSettings
             validatedESPNScoringSettings[leagueID] = trustedSettings
             leagueScoringBasis[leagueID] = "ESPN Silver Bullet (Nested JSON: \(scoringItems.count) raw → \(trustedSettings.count) mapped)"
-            print("🎯 NESTED SILVER BULLET applied for league \(leagueID).")
             return
         }
 
         // No scoring settings found
         leagueScoringBasis[leagueID] = "ESPN API - No scoring settings found"
-        print("❌ NO SCORING DATA: League \(leagueID)")
     }
     
     // MARK: - 🔥 NEW: Differential Analysis System
     
     /// Perform differential analysis to determine active scoring rules
     private func performDifferentialAnalysis(rawSettings: [String: Double], leagueID: String) -> [String: Double] {
-        print("🔬 DIFFERENTIAL ANALYSIS: League \(leagueID)")
-        print("   Input: \(rawSettings.count) raw ESPN rules")
-        
         // Step 1: Detect league type (PPR, Half-PPR, Standard)
         let leagueType = detectLeagueType(from: rawSettings)
         let baseline = getBaseline(for: leagueType)
-        
-        print("   Detected Type: \(leagueType)")
-        print("   Baseline: \(baseline.count) rules")
         
         // Step 2: Apply differential logic
         var validatedRules: [String: Double] = [:]
@@ -335,20 +301,11 @@ final class ScoringSettingsManager: ObservableObject {
             
             if analysis.isActive {
                 validatedRules[statKey] = rawPoints
-                print("   ✅ ACTIVE: \(statKey) = \(rawPoints) (\(analysis.reason))")
-            } else {
-                print("   ❌ FILTERED: \(statKey) = \(rawPoints) (\(analysis.reason))")
             }
         }
         
         // Step 3: Add missing core stats if league has them at 0 but baseline doesn't
-        let missingCoreStats = addMissingCoreStats(validatedRules: &validatedRules, baseline: baseline, rawSettings: rawSettings)
-        if !missingCoreStats.isEmpty {
-            print("   🔧 ADDED MISSING: \(missingCoreStats)")
-        }
-        
-        print("   OUTPUT: \(validatedRules.count) validated rules")
-        print("   CONFIDENCE: \(calculateConfidence(validatedRules: validatedRules, baseline: baseline))")
+        let _ = addMissingCoreStats(validatedRules: &validatedRules, baseline: baseline, rawSettings: rawSettings)
         
         return validatedRules
     }
@@ -523,12 +480,6 @@ final class ScoringSettingsManager: ObservableObject {
             confidence = "POOR"
         }
         
-        print("🔬 VALIDATION: \(player.fullName)")
-        print("   Our Calc: \(String(format: "%.2f", ourCalculation))")
-        print("   ESPN Total: \(String(format: "%.2f", espnAppliedTotal))")
-        print("   Discrepancy: \(String(format: "%.2f", discrepancy))")
-        print("   Confidence: \(confidence)")
-        
         return DifferentialValidationResult(
             success: success,
             ourCalculation: ourCalculation,
@@ -550,25 +501,16 @@ final class ScoringSettingsManager: ObservableObject {
     private func convertESPNScoringItems(_ scoringItems: [ESPNScoringItem]) -> [String: Double] {
         var convertedSettings: [String: Double] = [:]
         
-        print("🔄 Converting \(scoringItems.count) ESPN scoring items:")
-        
         for item in scoringItems {
             guard let statId = item.statId,
                   let points = item.points else { continue }
             
             if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
-                
-                // 🔥 REMOVED: Old filtering logic - let differential analysis handle this
-                // if shouldFilterOutStat(...) { continue }
-                
                 // Include ALL rules for differential analysis (let the algorithm decide)
                 convertedSettings[sleeperKey] = points
-                print("   → ESPN \(statId) -> \(sleeperKey) = \(points) pts")
                 
                 // Handle pointsOverrides
                 if let overrides = item.pointsOverrides, !overrides.isEmpty {
-                    print("   🔧 ESPN \(statId) has pointsOverrides: \(overrides)")
-                    
                     // Check if this is position-specific scoring
                     let isPositionSpecific = overrides.keys.allSatisfy { key in
                         if let positionId = Int(key) {
@@ -578,7 +520,6 @@ final class ScoringSettingsManager: ObservableObject {
                     }
                     
                     if isPositionSpecific {
-                        print("      🎯 Position-specific rule detected - skipping general application")
                         continue
                     }
                     
@@ -593,13 +534,9 @@ final class ScoringSettingsManager: ObservableObject {
                         handleGeneralOverrides(statId: statId, sleeperKey: sleeperKey, overrides: overrides, convertedSettings: &convertedSettings)
                     }
                 }
-            } else {
-                let statName = ESPNStatIDMapper.getStatDisplayName(for: statId)
-                print("   ⚠️ ESPN \(statId) (\(statName)) = \(points) pts - NO MAPPING")
             }
         }
         
-        print("🔄 Raw conversion complete: \(convertedSettings.count) mapped rules (before differential analysis)")
         return convertedSettings
     }
     
@@ -607,8 +544,6 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Handle field goal distance-based scoring overrides
     private func handleFieldGoalDistanceOverrides(overrides: [String: Double], convertedSettings: inout [String: Double]) {
-        print("      🎯 Processing FG distance overrides:")
-        
         // ESPN typically uses distance ranges as keys in pointsOverrides
         // Example: {"0-19": 3.0, "20-29": 3.0, "30-39": 3.0, "40-49": 4.0, "50+": 5.0}
         
@@ -618,29 +553,22 @@ final class ScoringSettingsManager: ObservableObject {
             switch normalizedKey {
             case "0-19", "0_19":
                 convertedSettings["fgm_0_19"] = points
-                print("        0-19 yards: \(points) pts")
             case "20-29", "20_29":
                 convertedSettings["fgm_20_29"] = points
-                print("        20-29 yards: \(points) pts")
             case "30-39", "30_39":
                 convertedSettings["fgm_30_39"] = points
-                print("        30-39 yards: \(points) pts")
             case "40-49", "40_49":
                 convertedSettings["fgm_40_49"] = points
-                print("        40-49 yards: \(points) pts")
             case "50+", "50_plus", "50":
                 convertedSettings["fgm_50p"] = points
-                print("        50+ yards: \(points) pts")
             default:
-                print("        Unknown FG distance key: \(distanceKey) = \(points) pts")
+                break // Unknown FG distance key
             }
         }
     }
     
     /// Handle position-specific scoring overrides (e.g., TE premium)
     private func handlePositionSpecificOverrides(statId: Int, overrides: [String: Double], convertedSettings: inout [String: Double]) {
-        print("      🎯 Processing position-specific overrides:")
-        
         // ESPN uses position IDs or abbreviations as keys in pointsOverrides
         // Example for receptions: {"TE": 1.5, "RB": 0.5, "WR": 1.0}
         
@@ -650,34 +578,25 @@ final class ScoringSettingsManager: ObservableObject {
             switch normalizedPosition {
             case "TE":
                 convertedSettings["rec_te"] = points
-                print("        TE receptions: \(points) pts")
             case "RB":
                 convertedSettings["rec_rb"] = points
-                print("        RB receptions: \(points) pts")
             case "WR":
                 convertedSettings["rec_wr"] = points
-                print("        WR receptions: \(points) pts")
             case "QB":
                 convertedSettings["rec_qb"] = points
-                print("        QB receptions: \(points) pts (rare)")
             default:
-                print("        Unknown position key: \(positionKey) = \(points) pts")
+                break // Unknown position key
             }
         }
     }
     
     /// Handle other general overrides - but filter out position-specific ones
     private func handleGeneralOverrides(statId: Int, sleeperKey: String, overrides: [String: Double], convertedSettings: inout [String: Double]) {
-        print("      🔧 Processing general overrides for \(sleeperKey):")
-        
         for (key, points) in overrides {
-            // 🔥 FIXED: Skip position-specific overrides (numeric keys 1-20 are positions)
+            // Skip position-specific overrides (numeric keys 1-20 are positions)
             if let positionId = Int(key), positionId >= 1 && positionId <= 20 {
-                print("        ⏭️ Skipping position-specific override: \(key) (position ID)")
                 continue
             }
-            
-            print("        \(key): \(points) pts")
             
             // Create a combined key for non-position-specific advanced rules
             let advancedKey = "\(sleeperKey)_\(key.lowercased())"
@@ -737,19 +656,14 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Register Sleeper scoring settings from existing SleeperLeague data
     func registerSleeperScoringSettings(from sleeperLeague: SleeperLeague, leagueID: String) {
-        print("🎯 ScoringManager: Extracting Sleeper scoring for league \(leagueID)")
-        
         if let scoringSettings = sleeperLeague.scoringSettings {
             sleeperScoringSettings[leagueID] = scoringSettings
             leagueScoringBasis[leagueID] = "Sleeper API - league data (\(scoringSettings.count) rules)"
-            
-            print("✅ BASIS: League \(leagueID) - \(leagueScoringBasis[leagueID]!)")
             return
         }
         
         // No scoring settings found
         leagueScoringBasis[leagueID] = "Sleeper API - No scoring settings found"
-        print("❌ BASIS: League \(leagueID) - \(leagueScoringBasis[leagueID]!)")
     }
     
     // MARK: - Validation
@@ -764,7 +678,6 @@ final class ScoringSettingsManager: ObservableObject {
         // Get scoring settings for this league
         guard let scoringSettings = getScoringSettings(for: leagueID, source: source) else {
             let basis = getScoringBasis(for: leagueID)
-            print("❌ VALIDATION: No scoring settings for \(source) league \(leagueID) - Basis: \(basis)")
             
             return PointsValidationResult(
                 player: player,
@@ -793,9 +706,6 @@ final class ScoringSettingsManager: ObservableObject {
         
         // Debug print for validation
         let basis = getScoringBasis(for: leagueID)
-        print("🔍 VALIDATION: \(player.fullName) in \(source) league \(leagueID)")
-        print("   Basis: \(basis)")
-        print("   API: \(apiPoints), Calculated: \(calculatedPoints), Discrepancy: \(discrepancy)")
         
         return PointsValidationResult(
             player: player,
@@ -999,7 +909,6 @@ final class ScoringSettingsManager: ObservableObject {
         sleeperScoringSettings.removeAll()
         validatedESPNScoringSettings.removeAll()
         leagueScoringBasis.removeAll()
-        print("🧹 ScoringManager: All scoring settings cleared")
     }
 }
 

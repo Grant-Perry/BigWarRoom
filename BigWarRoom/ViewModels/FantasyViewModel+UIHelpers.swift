@@ -329,7 +329,7 @@ extension FantasyViewModel {
             Text("Active Roster")
                 .font(.headline)
                 .foregroundColor(.white)
-                .padding(.horizontal)
+                .padding(.horizontal, 16) // Increased title padding
             
             HStack(alignment: .top, spacing: 24) {
                 // 🔥 FIXED: Home Team Active Roster (Left column - to match header)
@@ -408,7 +408,7 @@ extension FantasyViewModel {
                         )
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16) // 🔥 INCREASED: More padding around player cards
         }
     }
     
@@ -422,7 +422,7 @@ extension FantasyViewModel {
             Text("Bench")
                 .font(.headline)
                 .foregroundColor(.white)
-                .padding(.horizontal)
+                .padding(.horizontal, 16) // Increased title padding
             
             HStack(alignment: .top, spacing: 24) {
                 // 🔥 FIXED: Home Team Bench (Left column - to match header)
@@ -489,7 +489,7 @@ extension FantasyViewModel {
                         )
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16) // 🔥 INCREASED: More padding around player cards
         }
     }
 }

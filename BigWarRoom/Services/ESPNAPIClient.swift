@@ -153,15 +153,15 @@ final class ESPNAPIClient: DraftAPIClient {
             // x Print("🗓️ Debug - League season from API: \(espnLeague.seasonId ?? -1)")
             
             // 🔥 NEW: Debug scoring settings data
-            print("🎯 DEBUG SCORING SETTINGS:")
-            print("   League scoringSettings: \(espnLeague.scoringSettings != nil ? "EXISTS" : "NIL")")
+//            print("🎯 DEBUG SCORING SETTINGS:")
+//            print("   League scoringSettings: \(espnLeague.scoringSettings != nil ? "EXISTS" : "NIL")")
             if let scoringSettings = espnLeague.scoringSettings {
-                print("   scoringItems count: \(scoringSettings.scoringItems?.count ?? 0)")
+//                print("   scoringItems count: \(scoringSettings.scoringItems?.count ?? 0)")
                 if let items = scoringSettings.scoringItems, !items.isEmpty {
-                    print("   First few scoring items:")
+//                    print("   First few scoring items:")
                     for (index, item) in items.prefix(5).enumerated() {
                         let statName = ESPNStatIDMapper.getStatDisplayName(for: item.statId ?? -1)
-                        print("     [\(index)] Stat \(item.statId ?? -1): \(statName) = \(item.points ?? 0.0) pts")
+//                        print("     [\(index)] Stat \(item.statId ?? -1): \(statName) = \(item.points ?? 0.0) pts")
                     }
                 } else {
                     print("   No scoringItems found!")

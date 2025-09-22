@@ -254,10 +254,11 @@ struct UnifiedMatchup: Identifiable {
             viewModel.selectLeague(league)
         }
         
-        // If we have matchup data, set it directly to avoid refetching
-        if let matchup = fantasyMatchup {
-            viewModel.matchups = [matchup]
-        }
+        // 🔥 FIXED: Don't set just the single matchup - let selectLeague fetch ALL matchups
+        // The selectLeague method will call fetchMatchups() and populate viewModel.matchups with all league matchups
+        // if let matchup = fantasyMatchup {
+        //     viewModel.matchups = [matchup]  // OLD: Only single matchup
+        // }
         
         // If we have chopped data, set it
         if let chopped = choppedSummary {
