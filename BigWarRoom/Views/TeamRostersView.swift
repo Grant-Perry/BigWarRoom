@@ -589,7 +589,8 @@ struct TeamRosterDetailView: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NFLTeamRosterView(teamCode: teamCode)
+        // 🔥 REPLACED: Use new EnhancedNFLTeamRosterView instead of basic NFLTeamRosterView
+        EnhancedNFLTeamRosterView(teamCode: teamCode)
     }
 }
 
