@@ -15,6 +15,7 @@ struct NonMicroTeamSection: View {
     let dualViewMode: Bool
     let scoreAnimation: Bool
     let isLiveGame: Bool
+    @ObservedObject var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 NEW: Access to FantasyViewModel
     
     private var isTeamWinning: Bool {
         if isMyTeam {
@@ -72,11 +73,14 @@ struct NonMicroTeamSection: View {
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
             
-            // Record (only show in Dual view)
-            if dualViewMode, let record = team.record {
-                Text(record.displayString)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.gray)
+            // 🔥 NEW: Record (only show in Dual view AND only if not empty - Sleeper only)
+            if dualViewMode {
+                let teamRecord = fantasyViewModel.getManagerRecord(managerID: team.id)
+                if !teamRecord.isEmpty {
+                    Text(teamRecord)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.gray)
+                }
             }
         }
         .frame(maxWidth: .infinity)

@@ -50,14 +50,14 @@ struct MatchupsHubView: View {
         get { matchupsHubViewModel.expandedCardId }
         set { matchupsHubViewModel.expandedCardId = newValue }
     }
-    
+
     // MARK: - Body
     var body: some View {
         NavigationView {
             ZStack {
                 buildBackgroundView()
-                
-                // Show the black loading screen with league loading indicators
+
+                // Show league loading and hero/minibar progress IMMEDIATELY
                 if matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty {
                     buildLoadingStateView()
                 } else if matchupsHubViewModel.myMatchups.isEmpty && !matchupsHubViewModel.isLoading {

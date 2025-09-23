@@ -21,7 +21,7 @@ struct MatchupsHubLoadingProgressBarView: View {
                         .fill(Color.gray.opacity(0.3))
                         .frame(height: 12)
                     
-                    // Progress fill with gradient
+                    // Colorful linear gradient progress fill!
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
@@ -30,24 +30,7 @@ struct MatchupsHubLoadingProgressBarView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geometry.size.width * max(0.05, progress), height: 12)
-                        .animation(.easeInOut(duration: 0.5), value: progress)
-                    
-                    // Shimmer effect
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                colors: [.clear, .white.opacity(0.6), .clear],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(height: 12)
-                        .offset(x: -geometry.size.width + (geometry.size.width * 2 * progress))
-                        .animation(
-                            .linear(duration: 2.0).repeatForever(autoreverses: false),
-                            value: progress
-                        )
+                        .frame(width: max(8, geometry.size.width * progress), height: 12)
                 }
             }
             .frame(height: 12)
@@ -63,9 +46,11 @@ struct MatchupsHubLoadingProgressBarView: View {
                 Text("\(Int(progress * 100))%")
                     .font(.system(size: 14, weight: .bold, design: .monospaced))
                     .foregroundColor(.gpGreen)
-                    .animation(.easeInOut(duration: 0.3), value: progress)
             }
         }
         .frame(maxWidth: 300)
+        .onChange(of: progress) { oldValue, newValue in
+            print("🔥 PROGRESS BAR: Progress \(oldValue) → \(newValue), width will be \(max(8, 300 * newValue)) pixels")
+        }
     }
 }

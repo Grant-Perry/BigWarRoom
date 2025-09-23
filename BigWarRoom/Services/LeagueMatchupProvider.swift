@@ -40,6 +40,7 @@ final class LeagueMatchupProvider {
     private var rosterIDToManagerID: [Int: String] = [:]
     private var userIDs: [String: String] = [:]
     private var userAvatars: [String: URL] = [:]
+    private var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record lookup
     
     // MARK: -> Dependencies
     private let playerDirectoryStore = PlayerDirectoryStore.shared
@@ -57,76 +58,102 @@ final class LeagueMatchupProvider {
     
     /// Identify the authenticated user's team ID in this league
     func identifyMyTeamID() async -> String? {
+        print("🔍 TEAM ID: Starting identification for \(league.league.name) (\(league.source))")
+        
         if league.source == .sleeper {
             if let rosterID = await getCurrentUserRosterID() {
                 let teamID = String(rosterID)
+                print("✅ TEAM ID: Found Sleeper team ID '\(teamID)' for \(league.league.name)")
                 return teamID
+            } else {
+                print("❌ TEAM ID: Failed to find Sleeper roster ID for \(league.league.name)")
             }
         } else if league.source == .espn {
             if let teamID = await getESPNUserTeamID() {
+                print("✅ TEAM ID: Found ESPN team ID '\(teamID)' for \(league.league.name)")
                 return teamID
+            } else {
+                print("❌ TEAM ID: Failed to find ESPN team ID for \(league.league.name)")
             }
         }
         
+        print("❌ TEAM ID: No team ID found for \(league.league.name)")
         return nil
     }
     
     /// Get current user's roster ID for Sleeper leagues
     private func getCurrentUserRosterID() async -> Int? {
-        guard !sleeperCredentials.currentUserID.isEmpty else {
+        let currentUserID = sleeperCredentials.currentUserID
+        print("🔍 SLEEPER ROSTER: CurrentUserID = '\(currentUserID)'")
+        print("🔍 SLEEPER ROSTER: League ID = '\(league.league.leagueID)'")
+        
+        guard !currentUserID.isEmpty else {
+            print("❌ SLEEPER ROSTER: CurrentUserID is empty!")
             return nil
         }
         
         do {
+            print("🔍 SLEEPER ROSTER: Fetching rosters...")
             let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
-            let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
+            print("🔍 SLEEPER ROSTER: Fetched \(rosters.count) rosters")
+            
+            for roster in rosters {
+                print("   - Roster \(roster.rosterID): Owner '\(roster.ownerID ?? "nil")'")
+            }
+            
+            let userRoster = rosters.first { $0.ownerID == currentUserID }
             
             if let userRoster = userRoster {
+                print("✅ SLEEPER ROSTER: Found my roster ID: \(userRoster.rosterID)")
                 return userRoster.rosterID
             } else {
+                print("❌ SLEEPER ROSTER: No roster found for user ID '\(currentUserID)'")
                 return nil
             }
         } catch {
+            print("❌ SLEEPER ROSTER: API Error: \(error)")
             return nil
         }
     }
     
     /// Get current user's team ID for ESPN leagues - WITH DEBUG LOGGING
     private func getESPNUserTeamID() async -> String? {
-//        print("🔍 ESPN TEAM IDENTIFICATION for league: \(league.league.name)")
-//        print("   - League ID: \(league.league.leagueID)")
-//        print("   - My ESPN ID (GpESPNID): \(AppConstants.GpESPNID)")
+        let myESPNID = AppConstants.GpESPNID
+        print("🔍 ESPN TEAM: Starting identification for league: \(league.league.name)")
+        print("   - League ID: \(league.league.leagueID)")
+        print("   - My ESPN ID (GpESPNID): \(myESPNID)")
         
         do {
+            print("🔍 ESPN TEAM: Fetching ESPN league data...")
             let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            let myESPNID = AppConstants.GpESPNID
-            
-//            print("   - ESPN League data fetched successfully")
+            print("✅ ESPN TEAM: ESPN League data fetched successfully")
             
             if let teams = espnLeague.teams {
-//                print("   - Found \(teams.count) teams in league:")
+                print("🔍 ESPN TEAM: Found \(teams.count) teams in league:")
                 
                 for team in teams {
                     let managerName = espnLeague.getManagerName(for: team.owners)
-//                    print("     - Team \(team.id): '\(managerName)' (Owners: \(team.owners ?? []))")
+                    print("     - Team \(team.id): '\(managerName)' (Owners: \(team.owners ?? []))")
                     
                     if let owners = team.owners {
-//                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
+                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
                         if owners.contains(myESPNID) {
-//                            print("✅ MATCH FOUND! My team ID is: \(team.id)")
+                            print("✅ ESPN TEAM: MATCH FOUND! My team ID is: \(team.id)")
                             return String(team.id)
                         }
+                    } else {
+                        print("       - No owners found for team \(team.id)")
                     }
                 }
                 
-                print("❌ NO MATCH: My ESPN ID '\(myESPNID)' was not found in any team owners")
+                print("❌ ESPN TEAM: NO MATCH - My ESPN ID '\(myESPNID)' was not found in any team owners")
             } else {
-                print("❌ NO TEAMS: espnLeague.teams is nil")
+                print("❌ ESPN TEAM: espnLeague.teams is nil")
             }
             
             return nil
         } catch {
-            print("❌ ESPN API ERROR: \(error)")
+            print("❌ ESPN TEAM: API ERROR: \(error)")
             return nil
         }
     }
@@ -298,14 +325,14 @@ final class LeagueMatchupProvider {
                     id: String(player.id),
                     sleeperID: nil,
                     espnID: String(player.id),
-                    firstName: extractFirstName(from: player.fullName),
-                    lastName: extractLastName(from: player.fullName),
+                    firstName: player.fullName.firstName,
+                    lastName: player.fullName.lastName,
                     position: positionString(entry.lineupSlotId),
                     team: player.nflTeamAbbreviation,
                     jerseyNumber: nil,
                     currentPoints: weeklyScore,
                     projectedPoints: weeklyScore * 1.1,
-                    gameStatus: createMockGameStatus(),
+                    gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
                     isStarter: [0, 2, 3, 4, 5, 6, 23, 16, 17].contains(entry.lineupSlotId),
                     lineupSlot: positionString(entry.lineupSlotId)
                 )
@@ -400,6 +427,9 @@ final class LeagueMatchupProvider {
         do {
             let (data, _) = try await URLSession.shared.data(from: rostersURL)
             let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            
+            // 🔥 NEW: Store rosters for record lookup
+            sleeperRosters = rosters
             
             var newRosterMapping: [Int: String] = [:]
             for roster in rosters {
@@ -542,7 +572,7 @@ final class LeagueMatchupProvider {
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: playerScore,
                         projectedPoints: playerScore * 1.1,
-                        gameStatus: createMockGameStatus(),
+                        gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: playerTeam),
                         isStarter: isStarter,
                         lineupSlot: sleeperPlayer.position
                     )
@@ -552,11 +582,25 @@ final class LeagueMatchupProvider {
             }
         }
         
+        // 🔥 NEW: Get roster record data
+        let rosterRecord: TeamRecord? = {
+            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }),
+               let wins = roster.wins,
+               let losses = roster.losses {
+                return TeamRecord(
+                    wins: wins,
+                    losses: losses,
+                    ties: roster.ties ?? 0
+                )
+            }
+            return nil
+        }()
+        
         return FantasyTeam(
             id: String(matchupResponse.rosterID),
             name: managerName,
             ownerName: managerName,
-            record: nil,
+            record: rosterRecord,
             avatar: avatarURL?.absoluteString,
             currentScore: matchupResponse.points,
             projectedScore: matchupResponse.projectedPoints,
@@ -628,17 +672,6 @@ final class LeagueMatchupProvider {
         return 0.5 + (difference / 100.0) * 0.3
     }
     
-    private func extractFirstName(from fullName: String?) -> String? {
-        guard let fullName = fullName else { return nil }
-        return String(fullName.split(separator: " ").first ?? "")
-    }
-    
-    private func extractLastName(from fullName: String?) -> String? {
-        guard let fullName = fullName else { return nil }
-        let components = fullName.split(separator: " ")
-        return components.count > 1 ? String(components.last!) : nil
-    }
-    
     private func positionString(_ lineupSlotId: Int) -> String {
         switch lineupSlotId {
         case 0: return "QB"
@@ -650,17 +683,6 @@ final class LeagueMatchupProvider {
         case 23: return "FLEX"
         default: return "BN"
         }
-    }
-    
-    private func createMockGameStatus() -> GameStatus {
-        return GameStatus(
-            status: "pregame",
-            startTime: Calendar.current.date(byAdding: .hour, value: 2, to: Date()),
-            timeRemaining: nil,
-            quarter: nil,
-            homeScore: nil,
-            awayScore: nil
-        )
     }
     
     // 🔥 NEW: Sync ESPN data to main FantasyViewModel for score breakdowns

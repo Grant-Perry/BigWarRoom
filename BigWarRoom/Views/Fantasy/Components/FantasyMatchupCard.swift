@@ -10,6 +10,7 @@ import SwiftUI
 /// Fantasy Matchup Card component
 struct FantasyMatchupCard: View {
     let matchup: FantasyMatchup
+    @ObservedObject var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 NEW: Access to FantasyViewModel
     
     var body: some View {
         VStack(spacing: 0) {
@@ -34,7 +35,8 @@ struct FantasyMatchupCard: View {
                 MatchupTeamSectionView(
                     team: matchup.awayTeam,
                     score: matchup.awayTeam.currentScoreString,
-                    isHome: false
+                    isHome: false,
+                    fantasyViewModel: fantasyViewModel  // 🔥 NEW: Pass FantasyViewModel
                 )
                 
                 // VS divider  
@@ -57,7 +59,8 @@ struct FantasyMatchupCard: View {
                 MatchupTeamSectionView(
                     team: matchup.homeTeam,
                     score: matchup.homeTeam.currentScoreString,
-                    isHome: true
+                    isHome: true,
+                    fantasyViewModel: fantasyViewModel  // 🔥 NEW: Pass FantasyViewModel
                 )
             }
             .padding(.horizontal, 16)
@@ -79,6 +82,7 @@ struct MatchupTeamSectionView: View {
     let team: FantasyTeam
     let score: String
     let isHome: Bool
+    let fantasyViewModel: FantasyViewModel  // 🔥 NEW: Access to FantasyViewModel
     
     var body: some View {
         VStack(spacing: 8) {
@@ -92,16 +96,13 @@ struct MatchupTeamSectionView: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
                 
-                if let record = team.record {
-                    Text(record.displayString)
+                // 🔥 NEW: Only show record if not empty (Sleeper only)
+                let teamRecord = fantasyViewModel.getManagerRecord(managerID: team.id)
+                if !teamRecord.isEmpty {
+                    Text(teamRecord)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.gray)
                 }
-                
-                Text("PF: \(team.record?.wins ?? 0)nd • PA: \(team.record?.losses ?? 0)nd")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
             }
             
             // Score

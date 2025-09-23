@@ -107,7 +107,7 @@ struct FantasyMatchupDetailView: View {
 		 Button(action: {
 			dismiss()
 		 }) {
-			Image(systemName: "chevron.left")
+			Image(systemName: "xmark") // 🔥 CHANGED: X instead of left chevron
 			   .font(.system(size: 18, weight: .medium))
 			   .foregroundColor(.white)
 			   .frame(width: 44, height: 44)

@@ -75,6 +75,7 @@ final class FantasyViewModel: ObservableObject {
     @Published var rosterIDToManagerID: [Int: String] = [:]
     @Published var userIDs: [String: String] = [:]
     @Published var userAvatars: [String: URL] = [:]
+    @Published var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record lookup
     
     // MARK: -> Picker Options
     let availableWeeks = Array(1...18)
@@ -254,6 +255,7 @@ final class FantasyViewModel: ObservableObject {
         rosterIDToManagerID.removeAll()
         userIDs.removeAll()
         userAvatars.removeAll()
+        sleeperRosters.removeAll()  // 🔥 NEW: Clear roster data
     }
     
     // MARK: -> Auto Refresh Setup

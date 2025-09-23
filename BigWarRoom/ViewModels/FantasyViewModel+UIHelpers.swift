@@ -17,36 +17,63 @@ extension FantasyViewModel {
         return homeScore / (homeScore + awayScore)
     }
     
-    /// Create mock game status for testing
-    func createMockGameStatus() -> GameStatus {
-        let statuses = ["pregame", "live", "postgame", "bye"]
-        let randomStatus = statuses.randomElement() ?? "pregame"
-        
-        return GameStatus(
-            status: randomStatus,
-            startTime: Calendar.current.date(byAdding: .hour, value: Int.random(in: 1...6), to: Date()),
-            timeRemaining: randomStatus == "live" ? "14:32" : nil,
-            quarter: randomStatus == "live" ? "2nd" : nil,
-            homeScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil,
-            awayScore: randomStatus != "pregame" ? Int.random(in: 0...35) : nil
-        )
-    }
-    
     /// Get score for a team in a matchup
     func getScore(for matchup: FantasyMatchup, teamIndex: Int) -> Double {
         let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
         return team.currentScore ?? 0.0
     }
     
-    /// Get manager record for display with real ESPN data
+    /// Get manager record for display with REAL league data 
     func getManagerRecord(managerID: String) -> String {
+        print("🔍 RECORD DEBUG: Looking for managerID '\(managerID)' in \(matchups.count) matchups")
+        
+        // 🔥 NEW: For Sleeper leagues, don't show any records for ESPN teams
         if let selectedLeague = selectedLeague, selectedLeague.source == .espn {
-            if let teamID = Int(managerID),
-               let record = espnTeamRecords[teamID] {
-                return "\(record.wins)-\(record.losses) • Rank: 2nd"
+            print("🔍 RECORD DEBUG: ESPN league detected - hiding records")
+            return ""  // Don't show any record for ESPN leagues
+        }
+        
+        // First, try to find the team in current matchups to get their record
+        for matchup in matchups {
+            let homeTeam = matchup.homeTeam
+            let awayTeam = matchup.awayTeam
+            
+            var targetTeam: FantasyTeam? = nil
+            
+            if homeTeam.id == managerID {
+                targetTeam = homeTeam
+                print("🔍 RECORD DEBUG: Found as HOME team - \(homeTeam.ownerName)")
+            } else if awayTeam.id == managerID {
+                targetTeam = awayTeam
+                print("🔍 RECORD DEBUG: Found as AWAY team - \(awayTeam.ownerName)")
+            }
+            
+            if let team = targetTeam {
+                // Use the team's record if available
+                if let record = team.record {
+                    let wins = record.wins
+                    let losses = record.losses
+                    let recordString = record.displayString
+                    
+                    print("🔍 RECORD DEBUG: Team record found - \(recordString)")
+                    
+                    // Calculate league rank based on wins/losses
+                    let leagueRank = calculateLeagueRank(for: team)
+                    let rankSuffix = getRankSuffix(leagueRank)
+                    
+                    print("🔍 RECORD DEBUG: League rank calculated - \(leagueRank)\(rankSuffix)")
+                    
+                    return "\(recordString) • Rank: \(leagueRank)\(rankSuffix)"
+                } else {
+                    print("🔍 RECORD DEBUG: Team found but record is nil")
+                }
             }
         }
-        return "0-0 • Rank: 2nd"
+        
+        print("🔍 RECORD DEBUG: All methods failed, returning empty string for non-ESPN leagues")
+        
+        // For Sleeper leagues, return empty string instead of fake data
+        return ""
     }
     
     /// Get score difference text for VS section
@@ -490,6 +517,112 @@ extension FantasyViewModel {
                 }
             }
             .padding(.horizontal, 16) // 🔥 INCREASED: More padding around player cards
+        }
+    }
+    
+    /// Calculate league rank based on current matchups and records
+    private func calculateLeagueRank(for targetTeam: FantasyTeam) -> Int {
+        var allTeams: [FantasyTeam] = []
+        
+        // Collect all teams from all matchups
+        for matchup in matchups {
+            allTeams.append(matchup.homeTeam)
+            allTeams.append(matchup.awayTeam)
+        }
+        
+        // Remove duplicates based on team ID
+        var uniqueTeams: [FantasyTeam] = []
+        var seenIDs = Set<String>()
+        
+        for team in allTeams {
+            if !seenIDs.contains(team.id) {
+                uniqueTeams.append(team)
+                seenIDs.insert(team.id)
+            }
+        }
+        
+        // Sort teams by record (wins first, then win percentage)
+        let sortedTeams = uniqueTeams.sorted { team1, team2 in
+            guard let record1 = team1.record, let record2 = team2.record else {
+                // Teams without records go to the bottom
+                return team1.record != nil
+            }
+            
+            // First sort by wins
+            if record1.wins != record2.wins {
+                return record1.wins > record2.wins
+            }
+            
+            // Then by win percentage (fewer losses is better)
+            let totalGames1 = record1.wins + record1.losses + (record1.ties ?? 0)
+            let totalGames2 = record2.wins + record2.losses + (record2.ties ?? 0)
+            
+            if totalGames1 > 0 && totalGames2 > 0 {
+                let winPct1 = Double(record1.wins) / Double(totalGames1)
+                let winPct2 = Double(record2.wins) / Double(totalGames2)
+                return winPct1 > winPct2
+            }
+            
+            return record1.losses < record2.losses
+        }
+        
+        // Find the target team's position
+        for (index, team) in sortedTeams.enumerated() {
+            if team.id == targetTeam.id {
+                return index + 1  // Rank is 1-based
+            }
+        }
+        
+        return sortedTeams.count  // Last place if not found
+    }
+    
+    /// Calculate league rank for ESPN teams using espnTeamRecords
+    private func calculateESPNLeagueRank(for teamID: Int) -> Int {
+        let allRecords = Array(espnTeamRecords.values)
+        
+        guard let targetRecord = espnTeamRecords[teamID] else {
+            return allRecords.count
+        }
+        
+        // Sort all records by wins, then by win percentage
+        let sortedRecords = allRecords.sorted { record1, record2 in
+            // First sort by wins
+            if record1.wins != record2.wins {
+                return record1.wins > record2.wins
+            }
+            
+            // Then by win percentage
+            let totalGames1 = record1.wins + record1.losses + (record1.ties ?? 0)
+            let totalGames2 = record2.wins + record2.losses + (record2.ties ?? 0)
+            
+            if totalGames1 > 0 && totalGames2 > 0 {
+                let winPct1 = Double(record1.wins) / Double(totalGames1)
+                let winPct2 = Double(record2.wins) / Double(totalGames2)
+                return winPct1 > winPct2
+            }
+            
+            return record1.losses < record2.losses
+        }
+        
+        // Find the target record's position
+        for (index, record) in sortedRecords.enumerated() {
+            if record.wins == targetRecord.wins && 
+               record.losses == targetRecord.losses && 
+               record.ties == targetRecord.ties {
+                return index + 1  // Rank is 1-based
+            }
+        }
+        
+        return sortedRecords.count  // Last place if not found
+    }
+    
+    /// Get ordinal suffix for rank (1st, 2nd, 3rd, 4th, etc.)
+    private func getRankSuffix(_ rank: Int) -> String {
+        switch rank {
+        case 1: return "st"
+        case 2: return "nd" 
+        case 3: return "rd"
+        default: return "th"
         }
     }
 }

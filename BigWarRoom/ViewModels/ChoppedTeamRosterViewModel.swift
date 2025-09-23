@@ -363,7 +363,7 @@ class ChoppedTeamRosterViewModel: ObservableObject {
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: calculatePlayerPoints(playerID: playerID),
                         projectedPoints: nil,
-                        gameStatus: createMockGameStatus(),
+                        gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: true,
                         lineupSlot: sleeperPlayer.position
                     )
@@ -390,7 +390,7 @@ class ChoppedTeamRosterViewModel: ObservableObject {
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: calculatePlayerPoints(playerID: playerID),
                         projectedPoints: nil,
-                        gameStatus: createMockGameStatus(),
+                        gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: false,
                         lineupSlot: sleeperPlayer.position
                     )
@@ -456,11 +456,6 @@ class ChoppedTeamRosterViewModel: ObservableObject {
         }
         
         return nil
-    }
-    
-    /// Create mock game status
-    private func createMockGameStatus() -> GameStatus {
-        return GameStatus(status: "live")
     }
     
     // MARK: - ADD: New Methods for Real League Scoring

@@ -114,10 +114,17 @@ struct LeagueLoadingRow: View {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(Color.gray.opacity(0.3))
                                     .frame(height: 4)
-                                
+
+                                // Gradient fill!
                                 RoundedRectangle(cornerRadius: 2)
-                                    .fill(state.status.color)
-                                    .frame(width: geometry.size.width * state.progress, height: 4)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.gpGreen, .blue, .purple],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: max(2, geometry.size.width * state.progress), height: 4)
                                     .animation(.easeInOut(duration: 0.3), value: state.progress)
                             }
                         }

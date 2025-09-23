@@ -83,6 +83,9 @@ extension FantasyViewModel {
             let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
             // x Print("📋 SLEEPER ROSTERS: Decoded \(rosters.count) rosters")
             
+            // 🔥 NEW: Store rosters in main FantasyViewModel for record lookup
+            sleeperRosters = rosters
+            
             var newRosterMapping: [Int: String] = [:]
             
             for roster in rosters {
@@ -271,7 +274,7 @@ extension FantasyViewModel {
         }
     }
     
-    /// Create Sleeper fantasy team with real projected points from API
+    /// Create Sleeper fantasy team with real projected points from API AND ROSTER RECORD
     func createSleeperFantasyTeam(
         matchupResponse: SleeperMatchupResponse,
         managerName: String,
@@ -298,7 +301,7 @@ extension FantasyViewModel {
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: playerScore,
                         projectedPoints: playerProjected,
-                        gameStatus: createMockGameStatus(),
+                        gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: isStarter,
                         lineupSlot: sleeperPlayer.position
                     )
@@ -326,11 +329,32 @@ extension FantasyViewModel {
             }
         }
         
+        // 🔥 NEW: Get roster record data
+        let rosterRecord: TeamRecord? = {
+            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }) {
+                // 🔥 FIX: Use roster.settings for wins/losses/ties, not root level properties
+                let wins = roster.settings?.wins ?? roster.wins ?? 0
+                let losses = roster.settings?.losses ?? roster.losses ?? 0
+                let ties = roster.settings?.ties ?? roster.ties ?? 0
+                
+                print("🎯 SLEEPER RECORD: Roster \(roster.rosterID) -> \(wins)-\(losses)-\(ties)")
+                
+                return TeamRecord(
+                    wins: wins,
+                    losses: losses,
+                    ties: ties
+                )
+            }
+            
+            print("⚠️ SLEEPER RECORD: No roster found for rosterID \(matchupResponse.rosterID)")
+            return nil
+        }()
+        
         return FantasyTeam(
             id: String(matchupResponse.rosterID),
             name: finalManagerName,
             ownerName: finalManagerName,
-            record: nil,
+            record: rosterRecord,
             avatar: avatarString,
             currentScore: matchupResponse.points,
             projectedScore: matchupResponse.projectedPoints,

@@ -136,10 +136,13 @@ struct FantasyDetailHeaderView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record
-                Text(fantasyViewModel?.getManagerRecord(managerID: matchup.homeTeam.id) ?? "0-0")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                // Record - only show if not empty
+                let homeRecord = fantasyViewModel?.getManagerRecord(managerID: matchup.homeTeam.id) ?? ""
+                if !homeRecord.isEmpty {
+                    Text(homeRecord)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                }
                 
                 // SCORE and YET TO PLAY stack - no extra spacing
                 VStack(spacing: 1) {
@@ -219,10 +222,13 @@ struct FantasyDetailHeaderView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record
-                Text(fantasyViewModel?.getManagerRecord(managerID: matchup.awayTeam.id) ?? "0-0")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+                // Record - only show if not empty
+                let awayRecord = fantasyViewModel?.getManagerRecord(managerID: matchup.awayTeam.id) ?? ""
+                if !awayRecord.isEmpty {
+                    Text(awayRecord)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                }
                 
                 // SCORE and YET TO PLAY stack - no extra spacing
                 VStack(spacing: 1) {
@@ -311,19 +317,11 @@ struct FantasyDetailHeaderView: View {
             // Only count starters
             guard player.isStarter else { return false }
             
-            // Only count players with 0 points
-            guard (player.currentPoints ?? 0.0) == 0.0 else { return false }
-            
-            // Check if player has actually played by looking at game status
-            // If gameStatus is nil, assume they haven't played yet
-            if let gameStatus = player.gameStatus {
-                // If they have a game status and it's not "Final", they're yet to play
-                let gameStatusString = gameStatus.status.lowercased()
-                return !gameStatusString.contains("final") && !gameStatusString.contains("post")
-            }
-            
-            // If no game status available, assume they're yet to play if they have 0 points
-            return true
+            // Use GameStatusService for authoritative "yet to play" calculation
+            return GameStatusService.shared.isPlayerYetToPlay(
+                playerTeam: player.team,
+                currentPoints: player.currentPoints
+            )
         }.count
     }
 }

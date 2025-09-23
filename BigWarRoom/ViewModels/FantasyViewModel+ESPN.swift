@@ -293,14 +293,14 @@ extension FantasyViewModel {
                     id: String(player.id),
                     sleeperID: nil,
                     espnID: String(player.id),
-                    firstName: extractFirstName(from: player.fullName),
-                    lastName: extractLastName(from: player.fullName),
+                    firstName: player.fullName.firstName,
+                    lastName: player.fullName.lastName,
                     position: positionString(entry.lineupSlotId),
                     team: player.nflTeamAbbreviation,
                     jerseyNumber: nil,
                     currentPoints: weeklyScore,
                     projectedPoints: weeklyScore * 1.1,
-                    gameStatus: createMockGameStatus(),
+                    gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
                     isStarter: [0, 2, 3, 4, 5, 6, 23, 16, 17].contains(entry.lineupSlotId),
                     lineupSlot: positionString(entry.lineupSlotId)
                 )
@@ -355,19 +355,6 @@ extension FantasyViewModel {
             roster: fantasyPlayers,
             rosterID: espnTeam.id
         )
-    }
-    
-    /// Extract first name from full name
-    private func extractFirstName(from fullName: String?) -> String? {
-        guard let fullName = fullName else { return nil }
-        return String(fullName.split(separator: " ").first ?? "")
-    }
-    
-    /// Extract last name from full name
-    private func extractLastName(from fullName: String?) -> String? {
-        guard let fullName = fullName else { return nil }
-        let components = fullName.split(separator: " ")
-        return components.count > 1 ? String(components.last!) : nil
     }
     
     /// Convert ESPN lineup slot ID to position string
