@@ -32,6 +32,17 @@ struct MoreTabView: View {
                     // Features List
                     ScrollView {
                         VStack(spacing: 12) {
+                            // War Room - MOVED FROM MAIN TAB
+                            NavigationLink(destination: DraftRoomView(viewModel: viewModel, selectedTab: .constant(4))) {
+                                MoreRowView(
+                                    icon: "person.2.fill",
+                                    iconColor: .gpPostBot,
+                                    title: "War Room",
+                                    subtitle: "Draft room and live draft tracking"
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
                             // App Features
                             NavigationLink(destination: FeaturesView()) {
                                 MoreRowView(

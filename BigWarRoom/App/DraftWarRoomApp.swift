@@ -45,11 +45,11 @@ struct DraftWarRoomMainView: View {
                             }
                             .tag(0)
                         
-                        // WAR ROOM TAB (was Draft Room)
-                        DraftRoomView(viewModel: viewModel, selectedTab: $selectedTab)
+                        // TEAM ROSTERS TAB (replaces War Room)
+                        TeamRostersView()
                             .tabItem {
-                                Image(systemName: "person.2.fill")
-                                Text("War Room")
+                                Image(systemName: "person.3.fill")
+                                Text("Team Rosters")
                             }
                             .tag(1)
                         
@@ -69,7 +69,7 @@ struct DraftWarRoomMainView: View {
                             }
                             .tag(3)
                         
-                        // MORE TAB - Contains additional features AND settings
+                        // MORE TAB - Contains additional features AND settings (now includes War Room)
                         MoreTabView(viewModel: viewModel)
                             .tabItem {
                                 Image(systemName: "ellipsis")
@@ -79,8 +79,8 @@ struct DraftWarRoomMainView: View {
                     }
                     .preferredColorScheme(.dark)
                     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
-                        // Switch to War Room tab
-                        selectedTab = 1
+                        // Switch to More tab (where War Room now lives)
+                        selectedTab = 4
                     }
                     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
                         // Switch to Mission Control tab
