@@ -27,14 +27,7 @@ struct SleeperSetupView: View {
                     }
                 )
                 
-                // Quick Setup Section
-                QuickSetupSectionView(
-                    onDefaultCredentialsTapped: {
-                        sleeperSetupViewModel.fillDefaultCredentials()
-                    }
-                )
-                
-                // Credentials Section
+                // 🔥 REORDERED: Credentials Section FIRST (moved before Quick Setup)
                 CredentialsSectionView(
                     username: $sleeperSetupViewModel.username,
                     userID: $sleeperSetupViewModel.userID,
@@ -47,6 +40,13 @@ struct SleeperSetupView: View {
                     },
                     onValidateCredentials: {
                         sleeperSetupViewModel.validateCredentials()
+                    }
+                )
+                
+                // Quick Setup Section (moved after credentials)
+                QuickSetupSectionView(
+                    onDefaultCredentialsTapped: {
+                        sleeperSetupViewModel.fillDefaultCredentials()
                     }
                 )
                 

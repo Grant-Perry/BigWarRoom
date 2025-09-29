@@ -23,9 +23,8 @@ struct AllLivePlayersView: View {
     
     // 🔥 UI STATE ONLY - No business logic
     @State private var animatedPlayers: [String] = []
-    @State private var selectedMatchup: UnifiedMatchup?
-    @State private var showingMatchupDetail = false
     @State private var sortHighToLow = true
+    @State private var showingWeekPicker = false
     
     // 🔥 PERFORMANCE: Task management for better lifecycle control
     @State private var loadTask: Task<Void, Never>?
@@ -45,6 +44,7 @@ struct AllLivePlayersView: View {
                     AllLivePlayersHeaderView(
                         viewModel: allLivePlayersViewModel,
                         sortHighToLow: $sortHighToLow,
+                        showingWeekPicker: $showingWeekPicker,
                         onAnimationReset: resetAnimations
                     )
                     
@@ -64,10 +64,9 @@ struct AllLivePlayersView: View {
         .onDisappear {
             cancelTasks()
         }
-        .sheet(isPresented: $showingMatchupDetail) {
-            if let matchup = selectedMatchup {
-                MatchupDetailSheet(matchup: matchup)
-            }
+        // 🔥 DEATH TO SHEETS: Remove sheet for matchup detail - using NavigationLink instead
+        .sheet(isPresented: $showingWeekPicker) {
+            WeekPickerView(isPresented: $showingWeekPicker)
         }
         // 🔥 FIXED: Listen for sort changes and reset animations
         .onChange(of: allLivePlayersViewModel.sortChangeID) { _, _ in
@@ -105,7 +104,7 @@ struct AllLivePlayersView: View {
                 AllLivePlayersListView(
                     viewModel: allLivePlayersViewModel,
                     animatedPlayers: $animatedPlayers,
-                    onPlayerTap: handlePlayerTap
+                    onPlayerTap: handlePlayerTap // 🔥 Keep this for now - will change to NavigationLink in list view
                 )
             )
         }
@@ -121,10 +120,10 @@ struct AllLivePlayersView: View {
         }
     }
     
-    /// Handle player tap - open matchup detail
+    /// Handle player tap - DEPRECATED: Will be replaced with NavigationLink
     private func handlePlayerTap(_ matchup: UnifiedMatchup) {
-        selectedMatchup = matchup
-        showingMatchupDetail = true
+        // 🔥 DEATH TO SHEETS: This will be replaced with NavigationLink in the list view
+        print("🔥 DEBUG: Player tap - should use NavigationLink instead of sheet")
     }
     
     /// Refresh data with task management

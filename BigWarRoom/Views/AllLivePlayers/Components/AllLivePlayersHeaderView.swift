@@ -12,6 +12,7 @@ import Combine
 struct AllLivePlayersHeaderView: View {
     @ObservedObject var viewModel: AllLivePlayersViewModel
     @Binding var sortHighToLow: Bool
+    @Binding var showingWeekPicker: Bool
     let onAnimationReset: () -> Void
     
     // Timer states for actual refresh cycle - using @State to prevent full view redraws
@@ -21,6 +22,9 @@ struct AllLivePlayersHeaderView: View {
     
     // 🔥 FIX: Maintain stable manager info during refreshes
     @State private var stableManager: ManagerInfo?
+    
+    // 🔥 NEW: Week picker state - now passed as binding
+    @StateObject private var weekManager = WeekSelectionManager.shared
     
     var body: some View {
         VStack(spacing: 12) {
@@ -38,7 +42,7 @@ struct AllLivePlayersHeaderView: View {
                 )
             }
             
-            // Controls row with position filter and sort controls
+            // Controls row with position filter, sort controls, and week picker
             HStack(spacing: 6) {
                 PlayerPositionFilterView(
                     viewModel: viewModel,
@@ -52,6 +56,29 @@ struct AllLivePlayersHeaderView: View {
                 )
                 
                 Spacer()
+                
+                // 🔥 NEW: Week picker button (same style as Mission Control)
+                Button(action: {
+                    showingWeekPicker = true
+                }) {
+                    HStack(spacing: 4) {
+                        Text("Week")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        
+                        Text("\(weekManager.selectedWeek)")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.gpGreen.opacity(0.1))
+                    .foregroundColor(.gpGreen)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
             }
             
             // Stats Summary
@@ -82,6 +109,12 @@ struct AllLivePlayersHeaderView: View {
             // 🔥 FIX: Update stable manager when new data is available
             if let newManager = viewModel.firstAvailableManager {
                 stableManager = newManager
+            }
+        }
+        .onChange(of: weekManager.selectedWeek) { _, _ in
+            // 🔥 NEW: Refresh data when week changes
+            Task {
+                await performRefreshWithReset()
             }
         }
     }

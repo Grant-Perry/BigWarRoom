@@ -26,8 +26,12 @@ extension MatchupsHubViewModel {
         do {
             // Step 1: Load all available leagues
             await updateLoadingState("Loading available leagues...")
+            
+            // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
+            let sleeperUserID = SleeperCredentialsManager.shared.getUserIdentifier()
+            
             await unifiedLeagueManager.fetchAllLeagues(
-                sleeperUserID: AppConstants.GpSleeperID,
+                sleeperUserID: sleeperUserID,
                 season: getCurrentYear()
             )
             

@@ -169,14 +169,20 @@ struct FantasyPlayer: Identifiable, Codable {
     
     /// Single source of truth for live status using NFLGameDataService
     var isLive: Bool {
-        guard let team = self.team else { return false }
+        guard let team = self.team else { 
+//            print("🚨 DEBUG isLive: No team for player \(fullName)")
+            return false 
+        }
         
         // Use NFLGameDataService as the authoritative source
         if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+//            print("🚨 DEBUG isLive: \(fullName) (\(team)) - Game Status: '\(gameInfo.gameStatus)', isLive: \(gameInfo.isLive)")
             return gameInfo.isLive
+        } else {
+//            print("🚨 DEBUG isLive: \(fullName) (\(team)) - NO GAME INFO FOUND")
+//            print("🚨 DEBUG isLive: Available teams in gameData: \(Array(NFLGameDataService.shared.gameData.keys))")
+            return false
         }
-        
-        return false
     }
     
     /// Full player name

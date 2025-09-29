@@ -19,22 +19,29 @@ struct MatchupCardsGridView: View {
     let getWinningStatus: (UnifiedMatchup) -> Bool
     
     var body: some View {
-        LazyVGrid(
-            columns: gridColumns,
-            spacing: gridSpacing
-        ) {
-            ForEach(sortedMatchups, id: \.id) { matchup in
-                MatchupCardViewBuilder(
-                    matchup: matchup,
-                    microMode: microMode,
-                    expandedCardId: expandedCardId,
-                    isWinning: getWinningStatus(matchup),
-                    onShowDetail: {
-                        onShowDetail(matchup)
-                    },
-                    onMicroCardTap: onMicroCardTap,
-                    dualViewMode: dualViewMode
-                )
+        Group {
+            // 🔥 NEW: Handle empty matchups with a friendly message
+            if sortedMatchups.isEmpty {
+                NoMatchupsThisWeekView()
+            } else {
+                LazyVGrid(
+                    columns: gridColumns,
+                    spacing: gridSpacing
+                ) {
+                    ForEach(sortedMatchups, id: \.id) { matchup in
+                        MatchupCardViewBuilder(
+                            matchup: matchup,
+                            microMode: microMode,
+                            expandedCardId: expandedCardId,
+                            isWinning: getWinningStatus(matchup),
+                            onShowDetail: {
+                                onShowDetail(matchup)
+                            },
+                            onMicroCardTap: onMicroCardTap,
+                            dualViewMode: dualViewMode
+                        )
+                    }
+                }
             }
         }
         .padding(.horizontal, 24) // Increased from 20 to 24 to prevent edge clipping
@@ -91,10 +98,12 @@ struct ExpandedCardOverlayView: View {
             
             NonMicroCardView(
                 matchup: expandedMatchup,
-                isWinning: getWinningStatus(expandedMatchup)
-            ) {
-                onShowDetail(expandedMatchup)
-            }
+                isWinning: getWinningStatus(expandedMatchup),
+                onTap: {
+                    onShowDetail(expandedMatchup)
+                },
+                dualViewMode: true
+            )
             .frame(width: UIScreen.main.bounds.width * 0.6, height: 205)
             .overlay(expandedCardBorder)
             .zIndex(1000)
@@ -118,5 +127,85 @@ struct ExpandedCardOverlayView: View {
                 ),
                 lineWidth: 3
             )
+    }
+}
+
+// MARK: - No Matchups This Week View
+
+/// Friendly message when user has services connected but no matchups
+struct NoMatchupsThisWeekView: View {
+    @StateObject private var weekManager = WeekSelectionManager.shared
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 16) {
+                Image(systemName: "calendar.circle")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                
+                VStack(spacing: 8) {
+                    Text("No Matchups This Week")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text("Week \(weekManager.selectedWeek)")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(12)
+                }
+                
+                VStack(spacing: 4) {
+                    Text("Your leagues might be:")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(spacing: 2) {
+                        Text("• Not active yet for this week")
+                        Text("• Finished for the season")
+                        Text("• On a bye week")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.leading)
+                }
+            }
+            
+            HStack(spacing: 12) {
+                // Quick week navigation
+                if weekManager.selectedWeek > 1 {
+                    Button("← Week \(weekManager.selectedWeek - 1)") {
+                        weekManager.selectWeek(weekManager.selectedWeek - 1)
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                
+                if weekManager.selectedWeek < 18 {
+                    Button("Week \(weekManager.selectedWeek + 1) →") {
+                        weekManager.selectWeek(weekManager.selectedWeek + 1)
+                    }
+                    .font(.caption)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(8)
+                }
+            }
+        }
+        .padding(40)
+        .multilineTextAlignment(.center)
     }
 }

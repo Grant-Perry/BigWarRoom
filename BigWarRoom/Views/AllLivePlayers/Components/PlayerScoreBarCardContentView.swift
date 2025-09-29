@@ -168,36 +168,25 @@ struct PlayerScoreBarCardContentView: View {
     
     // MARK: - ADD: Score Breakdown Helper Methods
     
-    /// Creates score breakdown from current player stats
+    /// Creates score breakdown from current player stats - UNIFIED WITH FantasyPlayerCard
     private func createScoreBreakdown() -> PlayerScoreBreakdown? {
+        print("🐛 DEBUG: PlayerScoreBarCardContentView createScoreBreakdown called")
+        
         guard let sleeperPlayer = getSleeperPlayerData() else {
+            print("🐛 DEBUG: No sleeperPlayer data")
             return nil
         }
         
-        // Get stats from viewModel
+        // Get stats from AllLivePlayersViewModel (same as FantasyPlayerCard)
         guard let stats = viewModel.playerStats[sleeperPlayer.playerID],
               !stats.isEmpty else {
+            print("🐛 DEBUG: No player stats found")
             return nil
         }
         
-        // 🔥 NEW: Debug Josh Allen specifically
-        if playerEntry.player.fullName.contains("Josh Allen") {
-            print("🎯 JOSH ALLEN STATS DEBUG:")
-            print("   League: \(playerEntry.leagueName)")
-            print("   Score: \(playerEntry.currentScore)")
-            print("   Sleeper ID: \(sleeperPlayer.playerID)")
-            print("   Stats count: \(stats.count)")
-            
-            // Show key stats
-            let keyStats = ["pass_yd", "pass_td", "pass_int", "rush_yd", "rush_td", "rec", "rec_yd", "pts_ppr", "pts_std"]
-            for statKey in keyStats {
-                if let value = stats[statKey], value > 0 {
-                    print("     \(statKey): \(value)")
-                }
-            }
-        }
+        print("🐛 DEBUG: Found \(stats.count) player stats")
         
-        // Convert LivePlayerEntry to FantasyPlayer for breakdown
+        // Convert LivePlayerEntry to FantasyPlayer for breakdown (same as before)
         let fantasyPlayer = FantasyPlayer(
             id: playerEntry.id,
             sleeperID: sleeperPlayer.playerID,
@@ -214,33 +203,96 @@ struct PlayerScoreBarCardContentView: View {
             lineupSlot: playerEntry.position
         )
         
-        // 🔥 FIXED: Create consistent league context
+        // 🔥 NEW: Use standardized ScoreBreakdownFactory interface (SAME AS FantasyPlayerCard)
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
-        let leagueID = playerEntry.matchup.league.league.id
+        
+        // 🔥 CRITICAL FIX: Try to find the actual league context like FantasyPlayerCard does
+        var leagueContext: LeagueContext? = nil
+        var leagueName: String? = nil
+        
+        // Try to get the league from the matchup's league info
+        let matchupLeague = playerEntry.matchup.league
+        let leagueID = matchupLeague.league.id
         let source: LeagueSource = playerEntry.leagueSource.uppercased() == "ESPN" ? .espn : .sleeper
         
-        print("🎯 DEBUG: Creating score breakdown for \(fantasyPlayer.fullName)")
-        print("   League: \(playerEntry.leagueName) (ID: \(leagueID))")
-        print("   Source: \(source)")
-        print("   Score: \(playerEntry.currentScore)")
+        // 🔥 CRITICAL DEBUG: Log what we're trying to find
+        print("🎯 SCORING DEBUG: League ID: \(leagueID)")
+        print("🎯 SCORING DEBUG: Source: \(source)")
+        print("🎯 SCORING DEBUG: League Name: \(playerEntry.leagueName)")
         
-        let leagueContext = LeagueContext(
+        // 🔥 CRITICAL FIX: Try to find scoring settings directly from the league object first
+        var customScoringSettings: [String: Double]? = nil
+        
+        if source == .espn, let espnLeague = matchupLeague.league as? ESPNLeague {
+            // Extract scoring settings directly from the league object
+            if let scoringSettings = espnLeague.scoringSettings,
+               let scoringItems = scoringSettings.scoringItems {
+                print("🎯 SCORING DIRECT: Found ESPN scoring settings in league object (\(scoringItems.count) items)")
+                
+                var directSettings: [String: Double] = [:]
+                for item in scoringItems {
+                    guard let statId = item.statId, let points = item.points else { continue }
+                    if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
+                        if points != 0.0 {
+                            directSettings[sleeperKey] = points
+                        }
+                    }
+                }
+                
+                if !directSettings.isEmpty {
+                    customScoringSettings = directSettings
+                    print("🎯 SCORING DIRECT: Extracted \(directSettings.count) scoring rules directly from league")
+                    print("🎯 SCORING DIRECT: Sample rules: \(Array(directSettings.prefix(5)))")
+                }
+            }
+        } else if source == .sleeper, let sleeperLeague = matchupLeague.league as? SleeperLeague {
+            // Extract scoring settings directly from Sleeper league object
+            if let sleeperScoringSettings = sleeperLeague.scoringSettings, !sleeperScoringSettings.isEmpty {
+                customScoringSettings = sleeperScoringSettings
+                print("🎯 SCORING DIRECT: Found Sleeper scoring settings in league object (\(sleeperScoringSettings.count) rules)")
+            }
+        }
+        
+        // 🔥 FALLBACK: Try ScoringSettingsManager if direct extraction failed
+        if customScoringSettings == nil {
+            if let managerSettings = ScoringSettingsManager.shared.getScoringSettings(for: leagueID, source: source) {
+                customScoringSettings = managerSettings
+                print("🎯 SCORING FALLBACK: Found settings in ScoringSettingsManager (\(managerSettings.count) rules)")
+            } else {
+                print("🎯 SCORING FALLBACK: NO settings found in ScoringSettingsManager")
+            }
+        }
+        
+        leagueContext = LeagueContext(
             leagueID: leagueID,
             source: source,
             isChopped: playerEntry.matchup.isChoppedLeague,
-            customScoringSettings: nil
+            customScoringSettings: customScoringSettings // 🔥 CRITICAL: Pass the direct scoring settings
         )
+        leagueName = playerEntry.leagueName
         
-        // Use standardized breakdown factory
-        return ScoreBreakdownFactory.createBreakdown(
+        print("🔥 DEBUG: Using unified scoring - League: \(playerEntry.leagueName), Source: \(source)")
+        print("🔥 DEBUG: Custom scoring settings: \(customScoringSettings?.count ?? 0) rules")
+        
+        // 🔥 CRITICAL: Use same exact interface as FantasyPlayerCard
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: fantasyPlayer,
             week: selectedWeek,
-            localStatsProvider: nil, // AllLivePlayersViewModel will be used via StatsFacade
+            localStatsProvider: nil, // Stats will be found via StatsFacade -> AllLivePlayersViewModel
             leagueContext: leagueContext
-        ).withLeagueName(playerEntry.leagueName) // 🔥 NEW: Add league name
+        )
+        
+        // 🔥 NEW: Add league name to breakdown (same as FantasyPlayerCard)
+        let finalBreakdown = leagueName != nil ? breakdown.withLeagueName(leagueName!) : breakdown
+        
+        print("🔥 DEBUG: Created breakdown with hasRealScoringData: \(finalBreakdown.hasRealScoringData)")
+        print("🔥 DEBUG: Breakdown total: \(finalBreakdown.totalScore)")
+        print("🔥 DEBUG: Breakdown items: \(finalBreakdown.items.count)")
+        
+        return finalBreakdown
     }
     
-    /// Creates empty breakdown for players with no stats
+    /// Creates empty breakdown for players with no stats - SAME AS FantasyPlayerCard
     private func createEmptyBreakdown() -> PlayerScoreBreakdown {
         // Convert LivePlayerEntry to FantasyPlayer
         let fantasyPlayer = FantasyPlayer(
@@ -265,7 +317,7 @@ struct PlayerScoreBarCardContentView: View {
             week: selectedWeek,
             items: [],
             totalScore: playerEntry.currentScore,
-            isChoppedLeague: false // All Live Players - not chopped
+            isChoppedLeague: playerEntry.matchup.isChoppedLeague
         )
     }
     

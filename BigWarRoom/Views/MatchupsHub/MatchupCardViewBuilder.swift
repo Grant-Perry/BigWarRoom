@@ -66,10 +66,11 @@ struct MatchupCardViewBuilder: View {
         NonMicroCardView(
             matchup: matchup,
             isWinning: isWinning,
+            onTap: {
+                onShowDetail()
+            },
             dualViewMode: dualViewMode // 🔥 NEW: Pass dualViewMode to NonMicroCardView
-        ) {
-            onShowDetail()
-        }
+        )
         .padding(.bottom, dualViewMode ? 44 : 20) // 🔥 NEW: Increase bottom padding for Single view (was 16, now 20)
     }
     

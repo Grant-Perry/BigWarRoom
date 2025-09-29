@@ -42,15 +42,15 @@ final class UnifiedLeagueManager: ObservableObject {
     
     // MARK: -> Fetch All Leagues
     
-    /// Fetch leagues from both Sleeper and ESPN
+    /// Fetch leagues from both Sleeper and ESPN - with username resolution
     func fetchAllLeagues(sleeperUserID: String? = nil, season: String = "2025") async {
         // x// x Print("🔍 UnifiedLeagueManager: fetchAllLeagues - Sleeper ID: \(sleeperUserID ?? "nil"), Season: \(season)")
         
         await withTaskGroup(of: Void.self) { group in
-            // Fetch Sleeper leagues if user ID provided
-            if let userID = sleeperUserID {
+            // Fetch Sleeper leagues if user identifier provided
+            if let userIdentifier = sleeperUserID {
                 group.addTask { [weak self] in
-                    await self?.fetchSleeperLeagues(userID: userID, season: season)
+                    await self?.fetchSleeperLeaguesWithIdentifier(userIdentifier: userIdentifier, season: season)
                 }
             }
             
@@ -80,21 +80,26 @@ final class UnifiedLeagueManager: ObservableObject {
         }
     }
     
-    /// Fetch Sleeper leagues for a user
-    func fetchSleeperLeagues(userID: String, season: String = "2025") async {
+    /// 🔥 NEW: Fetch Sleeper leagues with username or userID resolution
+    func fetchSleeperLeaguesWithIdentifier(userIdentifier: String, season: String = "2025") async {
         isLoadingSleeperLeagues = true
         defer { isLoadingSleeperLeagues = false }
         
-        // x// x Print("🔵 UnifiedLeagueManager: Fetching Sleeper leagues for user \(userID), season \(season)")
+        print("🔵 UnifiedLeagueManager: Resolving Sleeper identifier '\(userIdentifier)' for season \(season)")
         
         do {
-            let leagues = try await sleeperClient.fetchLeagues(userID: userID, season: season)
-            // x// x Print("🔵 UnifiedLeagueManager: Sleeper API returned \(leagues.count) leagues")
+            // First, resolve the identifier to get the user and userID
+            let user = try await sleeperClient.fetchUser(username: userIdentifier)
+            print("✅ UnifiedLeagueManager: Resolved '\(userIdentifier)' to user ID: \(user.userID)")
+            
+            // Now fetch leagues using the resolved user ID
+            let leagues = try await sleeperClient.fetchLeagues(userID: user.userID, season: season)
+            print("🔵 UnifiedLeagueManager: Sleeper API returned \(leagues.count) leagues for \(user.displayName ?? userIdentifier)")
             
             // Show ALL leagues, not just ones with active drafts
             // Users might want to see completed leagues too
             let sleeperWrappers = leagues.map { league in
-                // x// x Print("   • Sleeper League: \(league.name) (Draft ID: \(league.draftID ?? "none"), Status: \(league.status.displayName))")
+                print("   • Sleeper League: \(league.name) (Draft ID: \(league.draftID ?? "none"), Status: \(league.status.displayName))")
                 return LeagueWrapper(
                     id: "sleeper_\(league.id)",
                     league: league,
@@ -107,11 +112,16 @@ final class UnifiedLeagueManager: ObservableObject {
             allLeagues.removeAll { $0.source == .sleeper }
             allLeagues.append(contentsOf: sleeperWrappers)
             
-            // x// x Print("✅ UnifiedLeagueManager: Added \(sleeperWrappers.count) Sleeper leagues")
+            print("✅ UnifiedLeagueManager: Added \(sleeperWrappers.count) Sleeper leagues for \(user.displayName ?? userIdentifier)")
             
         } catch {
-            // x// x Print("❌ UnifiedLeagueManager: Failed to fetch Sleeper leagues for \(season): \(error)")
+            print("❌ UnifiedLeagueManager: Failed to fetch Sleeper leagues for '\(userIdentifier)' (\(season)): \(error)")
         }
+    }
+    
+    /// Fetch Sleeper leagues for a user ID (kept for backward compatibility)
+    func fetchSleeperLeagues(userID: String, season: String = "2025") async {
+        await fetchSleeperLeaguesWithIdentifier(userIdentifier: userID, season: season)
     }
     
     /// Fetch ESPN leagues

@@ -83,6 +83,7 @@ final class FantasyViewModel: ObservableObject {
     
     // MARK: -> Dependencies
     private let unifiedLeagueManager = UnifiedLeagueManager()
+    private let sleeperCredentials = SleeperCredentialsManager.shared // 🔥 NEW: Add Sleeper credentials manager
     let playerDirectoryStore = PlayerDirectoryStore.shared
     var sharedDraftRoomViewModel: DraftRoomViewModel?
     var refreshTimer: Timer?
@@ -302,8 +303,11 @@ final class FantasyViewModel: ObservableObject {
     // MARK: -> Load Leagues
     /// Load available leagues on app start
     func loadLeagues() async {
+        // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
+        let sleeperUserID = sleeperCredentials.getUserIdentifier()
+        
         await unifiedLeagueManager.fetchAllLeagues(
-            sleeperUserID: AppConstants.GpSleeperID, 
+            sleeperUserID: sleeperUserID,
             season: AppConstants.currentSeasonYear
         )
     }

@@ -786,16 +786,20 @@ struct ScoreBreakdownFactory {
         
         // Try to get actual league scoring settings
         if let context = leagueContext {
-            if context.isChopped, let customScoring = context.customScoringSettings {
+            // 🔥 CRITICAL FIX: Priority 1 - Use customScoringSettings if provided (regardless of league type)
+            if let customScoring = context.customScoringSettings, !customScoring.isEmpty {
                 scoringSettings = customScoring
-                confidenceLevel = "Custom League Rules"
+                confidenceLevel = context.isChopped ? "Custom Chopped League Rules" : "Direct League Rules"
+                print("🔥 PRIORITY 1: Using custom scoring settings (\(customScoring.count) rules)")
             }
+            // Priority 2 - Try ScoringSettingsManager as fallback
             else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(
                 for: context.leagueID, 
                 source: context.source
             ) {
                 scoringSettings = leagueScoring
                 confidenceLevel = "League Rules (\(context.source == .espn ? "ESPN" : "SLEEPER"))"
+                print("🔥 PRIORITY 2: Using ScoringSettingsManager (\(leagueScoring.count) rules)")
             }
         }
         
@@ -803,6 +807,7 @@ struct ScoreBreakdownFactory {
         if scoringSettings.isEmpty {
             scoringSettings = getEstimatedSleeperScoring()
             confidenceLevel = "Standard PPR Estimates"
+            print("🔥 FALLBACK: Using estimated scoring (\(scoringSettings.count) rules)")
         }
         
         print("🎯 Creating consistent breakdown for \(player.fullName)")

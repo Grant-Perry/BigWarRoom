@@ -47,48 +47,55 @@ struct FantasyMatchupDetailView: View {
 	  let awayTeamIsWinning = awayTeamScore > homeTeamScore
 	  let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
-	  ZStack {
-		 // BG7 background
-		 Image("BG7")
-			.resizable()
-			.aspectRatio(contentMode: .fill)
-			.opacity(0.35)
-			.ignoresSafeArea(.all)
-		 
-		 VStack(spacing: 0) {
-			// Header with navigation and countdown
-			navigationHeader
+	  // 🔥 FIXED: Proper background that doesn't interfere with touch targets
+	  VStack(spacing: 0) {
+		 // Header with navigation and countdown - ALWAYS on top
+		 navigationHeader
+		    .zIndex(100) // 🔥 CRITICAL: Ensure buttons are always on top
+		    .background(Color.clear) // 🔥 Ensure no background blocking
 
-			// Fantasy detail header with team comparison - moved up closer to navigation
-			FantasyDetailHeaderView(
-			   leagueName: leagueName,
-			   matchup: matchup,
-			   awayTeamIsWinning: awayTeamIsWinning,
-			   homeTeamIsWinning: homeTeamIsWinning,
-			   fantasyViewModel: fantasyViewModel,
-			   sortingMethod: sortingMethod,
-			   sortHighToLow: sortHighToLow,
-			   onSortingMethodChanged: { method in
-				  withAnimation(.easeInOut(duration: 0.3)) {
-					 sortingMethod = method
-					 // Reset sort direction to logical default for each method
-					 sortHighToLow = (method == .score) // Score: High-Low, others: A-Z
-				  }
-			   },
-			   onSortDirectionChanged: {
-				  withAnimation(.easeInOut(duration: 0.3)) {
-					 sortHighToLow.toggle()
-				  }
+		 // Fantasy detail header with team comparison - moved up closer to navigation
+		 FantasyDetailHeaderView(
+		    leagueName: leagueName,
+		    matchup: matchup,
+		    awayTeamIsWinning: awayTeamIsWinning,
+		    homeTeamIsWinning: homeTeamIsWinning,
+		    fantasyViewModel: fantasyViewModel,
+		    sortingMethod: sortingMethod,
+		    sortHighToLow: sortHighToLow,
+		    onSortingMethodChanged: { method in
+			   withAnimation(.easeInOut(duration: 0.3)) {
+				  sortingMethod = method
+				  // Reset sort direction to logical default for each method
+				  sortHighToLow = (method == .score) // Score: High-Low, others: A-Z
 			   }
-			)
-			.padding(.horizontal, 32)
-			.padding(.top, 8) // 🔥 REDUCED: Much less top padding since title is gone
-			.padding(.bottom, 16) // 🔥 REDUCED: Less bottom padding to move roster up
+		    },
+		    onSortDirectionChanged: {
+			   withAnimation(.easeInOut(duration: 0.3)) {
+				  sortHighToLow.toggle()
+			   }
+		    }
+		 )
+		 .padding(.horizontal, 16) // 🔥 FIXED: Reduced padding to prevent clipping
+		 .padding(.top, 8)
+		 .padding(.bottom, 16)
+		 .zIndex(99) // High z-index but below navigation
 
-			// Roster content - now much closer to the top
-			rosterScrollView
-		 }
+		 // Roster content - now much closer to the top
+		 rosterScrollView
+		    .zIndex(1) // Normal z-index for content
 	  }
+	  .background(
+	     // 🔥 FIXED: Background that doesn't interfere with touch targets
+	     ZStack {
+		    Color.black // Base background
+		    Image("BG7")
+			   .resizable()
+			   .aspectRatio(contentMode: .fill)
+			   .opacity(0.35)
+		 }
+		 .ignoresSafeArea(.container, edges: .bottom) // Only ignore bottom safe area
+	  )
 	  .navigationBarHidden(true)
 	  .navigationBarBackButtonHidden(true)
 	  .preferredColorScheme(.dark)
@@ -111,9 +118,11 @@ struct FantasyMatchupDetailView: View {
 			   .font(.system(size: 18, weight: .medium))
 			   .foregroundColor(.white)
 			   .frame(width: 44, height: 44)
-			   .background(Color.gray.opacity(0.2))
+			   .background(Color.black.opacity(0.7)) // 🔥 FIXED: Darker background for better visibility
 			   .clipShape(Circle())
 		 }
+		 .contentShape(Rectangle()) // 🔥 CRITICAL: Ensure entire button area is tappable
+		 .zIndex(101) // 🔥 Highest z-index to ensure it's always clickable
 
 		 Spacer()
 
@@ -156,9 +165,11 @@ struct FantasyMatchupDetailView: View {
 
 			// Circular countdown timer
 		 RefreshCountdownTimerView()
+		    .zIndex(100) // Ensure timer is also clickable if it has interactions
 	  }
-	  .padding(.horizontal, 32)
+	  .padding(.horizontal, 16) // 🔥 FIXED: Consistent padding to prevent clipping
 	  .padding(.top, 8)
+	  .background(Color.clear) // 🔥 CRITICAL: Transparent background so touches pass through
 	  .onAppear {
 		 print("🐛 NavigationHeader - fantasyViewModel: \(fantasyViewModel != nil ? "exists" : "nil")")
 		 if let selectedLeague = fantasyViewModel?.selectedLeague {
@@ -181,7 +192,9 @@ struct FantasyMatchupDetailView: View {
 			}
 		 }
 		 .padding(.top, 8)
+		 .padding(.horizontal, 8) // 🔥 ADDED: Prevent content from touching screen edges
 	  }
+	  .clipped() // 🔥 ADDED: Ensure content doesn't extend beyond bounds
    }
 
 	  // MARK: - Simplified Roster View (Fallback)

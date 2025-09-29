@@ -350,6 +350,32 @@ final class SettingsViewModel: ObservableObject {
         // Force UI update by triggering objectWillChange
         objectWillChange.send()
     }
+    
+    // 🔥 NEW: Individual Disconnect Methods
+    
+    func disconnectESPN() {
+        espnCredentials.clearCredentials()
+        
+        clearResultMessage = "✅ ESPN Fantasy disconnected!\n\nYour ESPN credentials and league connections have been removed."
+        showingClearResult = true
+        
+        // Force UI refresh
+        objectWillChange.send()
+        
+        NSLog("🔌 ESPN disconnected by user")
+    }
+    
+    func disconnectSleeper() {
+        sleeperCredentials.clearCredentials()
+        
+        clearResultMessage = "✅ Sleeper Fantasy disconnected!\n\nYour Sleeper credentials and league connections have been removed."
+        showingClearResult = true
+        
+        // Force UI refresh
+        objectWillChange.send()
+        
+        NSLog("🔌 Sleeper disconnected by user")
+    }
 }
 
 // Create a typealias for backward compatibility

@@ -17,20 +17,20 @@ final class GameStatusService {
     /// This replaces all the createMockGameStatus() bullshit with actual data
     func getGameStatus(for playerTeam: String?) -> GameStatus? {
         guard let team = playerTeam, !team.isEmpty else {
-            print("⚠️ GAME STATUS: No team provided - cannot determine game status")
+//            print("⚠️ GAME STATUS: No team provided - cannot determine game status")
             return nil
         }
         
         // Use NFLGameDataService to get real game info
         guard let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) else {
-            print("⚠️ GAME STATUS: No game info found for team \(team)")
+//            print("⚠️ GAME STATUS: No game info found for team \(team)")
             return nil
         }
         
         // Convert NFLGameInfo to GameStatus
         let gameStatus = GameStatus(from: gameInfo)
         
-        print("✅ GAME STATUS: Team \(team) -> Status: \(gameStatus.status), Time: \(gameStatus.timeString)")
+//        print("✅ GAME STATUS: Team \(team) -> Status: \(gameStatus.status), Time: \(gameStatus.timeString)")
         
         return gameStatus
     }
@@ -43,7 +43,7 @@ final class GameStatusService {
         }
         
         // Fallback: Default to pregame status instead of random mock data
-        print("🔥 GAME STATUS FALLBACK: Using pregame status for unknown team '\(playerTeam ?? "nil")'")
+//        print("🔥 GAME STATUS FALLBACK: Using pregame status for unknown team '\(playerTeam ?? "nil")'")
         
         return GameStatus(
             status: "pregame",
@@ -64,7 +64,7 @@ final class GameStatusService {
         guard let gameStatus = getGameStatus(for: playerTeam) else {
             // If we can't determine game status, assume they haven't played
             // This should be rare with proper data
-            print("⚠️ YET TO PLAY: Cannot determine game status for team '\(playerTeam ?? "nil")' - assuming yet to play")
+//            print("⚠️ YET TO PLAY: Cannot determine game status for team '\(playerTeam ?? "nil")' - assuming yet to play")
             return true
         }
         
@@ -79,7 +79,7 @@ final class GameStatusService {
         
         let yetToPlay = hasZeroPoints && gameNotFinal
         
-        print("🎯 YET TO PLAY: Team \(playerTeam ?? "nil"), Points: \(points), Status: \(status) -> Yet to play: \(yetToPlay)")
+//        print("🎯 YET TO PLAY: Team \(playerTeam ?? "nil"), Points: \(points), Status: \(status) -> Yet to play: \(yetToPlay)")
         
         return yetToPlay
     }

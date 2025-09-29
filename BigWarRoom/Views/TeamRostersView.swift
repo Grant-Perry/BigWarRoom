@@ -10,9 +10,11 @@ import SwiftUI
 struct TeamRostersView: View {
     @StateObject private var viewModel = TeamRostersViewModel()
     @StateObject private var nflGameService = NFLGameDataService.shared
+    @StateObject private var weekManager = WeekSelectionManager.shared
     @State private var selectedTeam: String = "SF"
     @State private var showingRoster = false
     @State private var hoveredTeam: String? = nil
+    @State private var showingWeekPicker = false
     
     private let nflTeams = [
         "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
@@ -35,6 +37,10 @@ struct TeamRostersView: View {
                         .padding(.top, 10)
                         .padding(.bottom, 20)
                     
+                    // 🔥 NEW: Week header with picker
+                    weekHeaderSection
+                        .padding(.bottom, 16)
+                    
                     clockInterface
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(.top, -30)
@@ -47,6 +53,13 @@ struct TeamRostersView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showingRoster) {
             TeamRosterDetailView(teamCode: selectedTeam)
+        }
+        .sheet(isPresented: $showingWeekPicker) {
+            WeekPickerView(isPresented: $showingWeekPicker)
+        }
+        .onChange(of: weekManager.selectedWeek) { _, _ in
+            // 🔥 NEW: Refresh NFL game data when week changes
+            nflGameService.fetchGameData(forWeek: weekManager.selectedWeek, forceRefresh: true)
         }
     }
     
@@ -62,6 +75,64 @@ struct TeamRostersView: View {
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
                 .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    // 🔥 NEW: Week header section
+    private var weekHeaderSection: some View {
+        HStack {
+            Spacer()
+            
+            Button(action: {
+                showingWeekPicker = true
+            }) {
+                HStack(spacing: 8) {
+                    Text("Week")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                    
+                    Text("\(weekManager.selectedWeek)")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.gpGreen.opacity(0.3),
+                                    Color.blue.opacity(0.3)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.gpGreen.opacity(0.6),
+                                            Color.blue.opacity(0.6)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                        .shadow(color: .gpGreen.opacity(0.2), radius: 8, x: 0, y: 4)
+                )
+            }
+            
+            Spacer()
         }
         .padding(.horizontal, 20)
     }

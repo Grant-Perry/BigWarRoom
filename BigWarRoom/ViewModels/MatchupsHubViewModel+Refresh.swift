@@ -181,8 +181,11 @@ extension MatchupsHubViewModel {
             NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear, forceRefresh: true)
             
             // Step 1: Refresh available leagues quietly
+            // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
+            let sleeperUserID = SleeperCredentialsManager.shared.getUserIdentifier()
+            
             await unifiedLeagueManager.fetchAllLeagues(
-                sleeperUserID: AppConstants.GpSleeperID,
+                sleeperUserID: sleeperUserID,
                 season: getCurrentYear()
             )
             

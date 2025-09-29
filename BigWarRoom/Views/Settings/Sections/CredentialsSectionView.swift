@@ -10,7 +10,7 @@ import SwiftUI
 /// Component handling Sleeper credentials input and validation
 struct CredentialsSectionView: View {
     @Binding var username: String
-    @Binding var userID: String  
+    @Binding var userID: String  // Keep binding for compatibility but hide the UI
     @Binding var selectedSeason: String
     let hasValidCredentials: Bool
     let canSaveCredentials: Bool
@@ -20,19 +20,13 @@ struct CredentialsSectionView: View {
     
     var body: some View {
         Section {
-            // Username input section
-            UsernameInputSection(username: $username)
-            
-            // OR separator
-            OrSeparator()
-            
-            // User ID input section
-            UserIDInputSection(userID: $userID)
+            // Username input section - ONLY field needed
+            UsernameInputSection(username: $username, onConnectTapped: onSaveCredentials, canConnect: canSaveCredentials)
             
             // Season picker section
             SeasonPickerSection(selectedSeason: $selectedSeason)
             
-            // Action buttons
+            // Action buttons (keep existing for backward compatibility)
             CredentialsActionsRow(
                 hasValidCredentials: hasValidCredentials,
                 canSaveCredentials: canSaveCredentials,
@@ -43,7 +37,7 @@ struct CredentialsSectionView: View {
         } header: {
             Text("Sleeper Authentication")
         } footer: {
-            Text("Enter either your username OR user ID - not both. Sleeper automatically discovers all your leagues!")
+            Text("Enter your Sleeper username. The app will automatically discover all your leagues!")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -52,9 +46,11 @@ struct CredentialsSectionView: View {
 
 // MARK: - Supporting Components
 
-/// Username input component
+/// Username input component with Connect button
 private struct UsernameInputSection: View {
     @Binding var username: String
+    let onConnectTapped: () -> Void
+    let canConnect: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -62,39 +58,29 @@ private struct UsernameInputSection: View {
                 .font(.subheadline)
                 .foregroundColor(.secondary)
             
-            TextField("Your Sleeper username (e.g., YourUsername)", text: $username)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-        }
-    }
-}
-
-/// OR separator component
-private struct OrSeparator: View {
-    var body: some View {
-        Text("OR")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity, alignment: .center)
-    }
-}
-
-/// User ID input component
-private struct UserIDInputSection: View {
-    @Binding var userID: String
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Sleeper User ID")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            TextField("Your Sleeper User ID (e.g., 123456789)", text: $userID)
-                .textFieldStyle(.roundedBorder)
-                .autocapitalization(.none)
-                .autocorrectionDisabled()
-                .keyboardType(.numberPad)
+            VStack(spacing: 12) {
+                TextField("Enter your Sleeper username (e.g., costanzaphoto)", text: $username)
+                    .textFieldStyle(.roundedBorder)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+                
+                // 🔥 NEW: Connect button right under username field
+                HStack {
+                    Button("Connect") {
+                        onConnectTapped()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canConnect)
+                    
+                    Spacer()
+                    
+                    if !canConnect {
+                        Text("Enter username to connect")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
 }

@@ -25,11 +25,9 @@ extension FantasyViewModel {
     
     /// Get manager record for display with REAL league data 
     func getManagerRecord(managerID: String) -> String {
-        print("🔍 RECORD DEBUG: Looking for managerID '\(managerID)' in \(matchups.count) matchups")
-        
+
         // 🔥 NEW: For Sleeper leagues, don't show any records for ESPN teams
         if let selectedLeague = selectedLeague, selectedLeague.source == .espn {
-            print("🔍 RECORD DEBUG: ESPN league detected - hiding records")
             return ""  // Don't show any record for ESPN leagues
         }
         
@@ -42,10 +40,8 @@ extension FantasyViewModel {
             
             if homeTeam.id == managerID {
                 targetTeam = homeTeam
-                print("🔍 RECORD DEBUG: Found as HOME team - \(homeTeam.ownerName)")
             } else if awayTeam.id == managerID {
                 targetTeam = awayTeam
-                print("🔍 RECORD DEBUG: Found as AWAY team - \(awayTeam.ownerName)")
             }
             
             if let team = targetTeam {
@@ -55,22 +51,18 @@ extension FantasyViewModel {
                     let losses = record.losses
                     let recordString = record.displayString
                     
-                    print("🔍 RECORD DEBUG: Team record found - \(recordString)")
-                    
+
                     // Calculate league rank based on wins/losses
                     let leagueRank = calculateLeagueRank(for: team)
                     let rankSuffix = getRankSuffix(leagueRank)
                     
-                    print("🔍 RECORD DEBUG: League rank calculated - \(leagueRank)\(rankSuffix)")
-                    
+
                     return "\(recordString) • Rank: \(leagueRank)\(rankSuffix)"
                 } else {
-                    print("🔍 RECORD DEBUG: Team found but record is nil")
                 }
             }
         }
         
-        print("🔍 RECORD DEBUG: All methods failed, returning empty string for non-ESPN leagues")
         
         // For Sleeper leagues, return empty string instead of fake data
         return ""
@@ -89,11 +81,11 @@ extension FantasyViewModel {
             Text("Active Roster")
                 .font(.headline)
                 .foregroundColor(.white)
-                .padding(.horizontal)
+                .padding(.horizontal, 20) // 🔥 INCREASED: More title padding
             
             HStack(alignment: .top, spacing: 24) { // 🔥 MORE horizontal spacing: 20 → 24
                 // Away Team Active Roster (Left column - teamIndex 0)
-                VStack(spacing: 16) { // 🔥 MUCH MORE spacing between cards: 12 → 16
+                VStack(spacing: 30) { // 🔥 MUCH MORE spacing between cards: 12 → 16
                     let awayActiveRoster = getRoster(for: matchup, teamIndex: 0, isBench: false)
                     ForEach(awayActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -168,7 +160,7 @@ extension FantasyViewModel {
                         )
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20) // 🔥 INCREASED: More padding around player cards (was just .padding(.horizontal))
         }
     }
     
@@ -178,7 +170,7 @@ extension FantasyViewModel {
             Text("Bench")
                 .font(.headline)
                 .foregroundColor(.white)
-                .padding(.horizontal)
+                .padding(.horizontal, 20) // 🔥 INCREASED: More title padding
             
             HStack(alignment: .top, spacing: 24) { // 🔥 MORE horizontal spacing: 20 → 24
                 // Away Team Bench (Left column - teamIndex 0)
@@ -245,7 +237,7 @@ extension FantasyViewModel {
                         )
                 }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 20) // 🔥 INCREASED: More padding around player cards (was just .padding(.horizontal))
         }
     }
     

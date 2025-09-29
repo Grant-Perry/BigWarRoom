@@ -14,6 +14,7 @@ struct TeamFilteredMatchupsView: View {
     let awayTeam: String
     let homeTeam: String
     let gameData: ScheduleGame? // 🔥 NEW: Pass actual game data to avoid NFLGameDataService lookup
+    let rootDismiss: (() -> Void)? // 🔥 NEW: Optional closure to dismiss entire sheet stack
     
     // MARK: - ViewModels
     @StateObject private var viewModel: TeamFilteredMatchupsViewModel
@@ -27,11 +28,15 @@ struct TeamFilteredMatchupsView: View {
     @State private var microMode = false
     @State private var expandedCardId: String? = nil
     
+    // 🔥 FIXED: Team roster navigation state - SIMPLIFIED TO PREVENT LOOPS
+    @State private var showingTeamRoster: String?
+    
     // MARK: - Initialization
-    init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel, gameData: ScheduleGame? = nil) {
+    init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel, gameData: ScheduleGame? = nil, rootDismiss: (() -> Void)? = nil) {
         self.awayTeam = awayTeam
         self.homeTeam = homeTeam
         self.gameData = gameData // 🔥 NEW: Store actual game data
+        self.rootDismiss = rootDismiss // 🔥 NEW: Store root dismiss closure
         self._viewModel = StateObject(wrappedValue: TeamFilteredMatchupsViewModel(matchupsHubViewModel: matchupsHubViewModel))
     }
     
@@ -79,6 +84,12 @@ struct TeamFilteredMatchupsView: View {
         }
         .sheet(item: $showingMatchupDetail) { matchup in
             buildMatchupDetailSheet(for: matchup)
+        }
+        .sheet(item: Binding<TeamRosterSheetInfo?>(
+            get: { showingTeamRoster.map { TeamRosterSheetInfo(teamCode: $0) } },
+            set: { showingTeamRoster = $0?.teamCode }
+        )) { teamInfo in
+            buildTeamRosterSheet(for: teamInfo.teamCode)
         }
     }
     
@@ -255,10 +266,33 @@ struct TeamFilteredMatchupsView: View {
     // MARK: - Filtered Header
     private func buildFilteredHeader() -> some View {
         VStack(spacing: 16) {
-            // Close button
+            // Close button - X dismisses current sheet only
             HStack {
+                // 🔥 NEW: DONE button to collapse entire sheet stack
+                if let rootDismiss = rootDismiss {
+                    Button(action: { rootDismiss() }) {
+                        Text("DONE")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.15))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                                    )
+                            )
+                    }
+                } else {
+                    // Spacer when no DONE button
+                    Color.clear.frame(width: 60, height: 32)
+                }
+                
                 Spacer()
                 
+                // X button - dismisses current sheet only
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .medium))
@@ -284,14 +318,20 @@ struct TeamFilteredMatchupsView: View {
                 HStack(spacing: 24) {
                     // Away team section
                     VStack(spacing: 4) { // Reduced spacing from 6 to 4
-                        ZStack {
-                            TeamLogoView(teamCode: awayTeam, size: 140)
-							  .scaleEffect(0.75)
-                                .clipped()
+                        Button(action: {
+                            print("🏈 SCHEDULE: Tapped away team logo for \(awayTeam)")
+                            showTeamRoster(for: awayTeam)
+                        }) {
+                            ZStack {
+                                TeamLogoView(teamCode: awayTeam, size: 140)
+                                    .scaleEffect(0.75)
+                                    .clipped()
+                            }
+                            .frame(width: 90, height: 60) // Increased width from 80 to 90
+                            .clipShape(Rectangle())
+                            .offset(x: -10, y: -8) // Bleed off leading and top edges
                         }
-                        .frame(width: 90, height: 60) // Increased width from 80 to 90
-                        .clipShape(Rectangle())
-                        .offset(x: -10, y: -8) // Bleed off leading and top edges
+                        .buttonStyle(PlainButtonStyle())
                         
                         // Away team name - centered and smaller font
                         Text(getTeamName(for: awayTeam))
@@ -308,26 +348,32 @@ struct TeamFilteredMatchupsView: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                     
-                    // Game info section (VS + score/status)
-                    VStack(spacing: 4) {
+                    // Game info section (VS + score/status) - MOVED SCORES HERE
+                    VStack(spacing: 6) {
                         Text("vs")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white.opacity(0.8))
                         
-                        // Game score and status
+                        // Game score and status - REPOSITIONED AND ENHANCED
                         buildGameInfo()
                     }
                     
                     // Home team section
                     VStack(spacing: 4) { // Reduced spacing from 6 to 4
-                        ZStack {
-                            TeamLogoView(teamCode: homeTeam, size: 140)
-							  .scaleEffect(0.75)
-                                .clipped()
+                        Button(action: {
+                            print("🏈 SCHEDULE: Tapped home team logo for \(homeTeam)")
+                            showTeamRoster(for: homeTeam)
+                        }) {
+                            ZStack {
+                                TeamLogoView(teamCode: homeTeam, size: 140)
+                                    .scaleEffect(0.75)
+                                    .clipped()
+                            }
+                            .frame(width: 90, height: 60) // Increased width from 80 to 90
+                            .clipShape(Rectangle())
+                            .offset(x: 10, y: -8) // Bleed off trailing and top edges
                         }
-                        .frame(width: 90, height: 60) // Increased width from 80 to 90
-                        .clipShape(Rectangle())
-                        .offset(x: 10, y: -8) // Bleed off trailing and top edges
+                        .buttonStyle(PlainButtonStyle())
                         
                         // Home team name - centered and smaller font
                         Text(getTeamName(for: homeTeam))
@@ -390,7 +436,7 @@ struct TeamFilteredMatchupsView: View {
         return false
     }
     
-    // MARK: - Game Info Display
+    // MARK: - Game Info Display - REVERTED TO ORIGINAL
     private func buildGameInfo() -> some View {
         Group {
             // 🔥 FIXED: Use passed gameData first, then fallback to service lookup
@@ -580,7 +626,23 @@ struct TeamFilteredMatchupsView: View {
         await viewModel.refresh()
         refreshing = false
     }
+    
+    // MARK: - Team Roster Navigation - REVERTED TO WORKING APPROACH
+    private func showTeamRoster(for teamCode: String) {
+        print("🏈 FILTERED MATCHUPS: Opening team roster for \(teamCode)")
+        
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        showingTeamRoster = teamCode
+    }
+    
+    private func buildTeamRosterSheet(for teamCode: String) -> some View {
+        // 🔥 FIXED: Pass the rootDismiss to team roster so DONE button works from there too
+        EnhancedNFLTeamRosterView(teamCode: teamCode, rootDismiss: rootDismiss ?? { dismiss() })
+    }
 }
+
 
 #Preview("Team Filtered Matchups - With Data") {
     TeamFilteredMatchupsView(

@@ -46,6 +46,31 @@ final class MatchupsHubViewModel: ObservableObject {
     // MARK: - Initialization
     init() {
         setupAutoRefresh()
+        
+        // 🔥 NEW: Subscribe to Sleeper credentials changes for automatic refresh
+        sleeperCredentials.$hasValidCredentials
+            .dropFirst() // Skip initial value
+            .removeDuplicates()
+            .debounce(for: .seconds(1), scheduler: DispatchQueue.main) // Debounce rapid changes
+            .sink { [weak self] _ in
+                print("🔄 Sleeper credentials changed - refreshing leagues...")
+                Task { @MainActor in
+                    await self?.manualRefresh()
+                }
+            }
+            .store(in: &cancellables)
+        
+        sleeperCredentials.$currentUsername
+            .dropFirst() // Skip initial value
+            .removeDuplicates()
+            .debounce(for: .seconds(1), scheduler: DispatchQueue.main) // Debounce rapid changes
+            .sink { [weak self] newUsername in
+                print("🔄 Sleeper username changed to '\(newUsername)' - refreshing leagues...")
+                Task { @MainActor in
+                    await self?.manualRefresh()
+                }
+            }
+            .store(in: &cancellables)
     }
     
     deinit {

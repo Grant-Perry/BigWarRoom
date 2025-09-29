@@ -15,7 +15,14 @@ struct NonMicroTeamSection: View {
     let dualViewMode: Bool
     let scoreAnimation: Bool
     let isLiveGame: Bool
-    @ObservedObject var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 NEW: Access to FantasyViewModel
+    
+    // 🔥 NEW: Team roster navigation callback
+    var onTeamLogoTap: ((String) -> Void)? = nil
+    
+    // 🔥 FIXED: Get fantasy view model reference without state observation to prevent re-render loops
+    private var fantasyViewModel: FantasyViewModel {
+        FantasyViewModel.shared
+    }
     
     private var isTeamWinning: Bool {
         if isMyTeam {
@@ -25,9 +32,20 @@ struct NonMicroTeamSection: View {
         }
     }
     
+    // 🔥 NEW: Extract NFL team code from fantasy team roster for team logo tapping
+    private var nflTeamCode: String? {
+        // Get the most common NFL team from the roster
+        let teamCounts = Dictionary(grouping: team.roster) { player in
+            player.team?.uppercased() ?? "UNK"
+        }.mapValues { $0.count }
+        
+        // Find the team with the most players
+        return teamCounts.max(by: { $0.value < $1.value })?.key
+    }
+    
     var body: some View {
         VStack(spacing: dualViewMode ? 6 : 3) {
-            // Avatar
+            // Avatar with optional team logo tap
             Group {
                 if let avatarURL = team.avatarURL {
                     AsyncImage(url: avatarURL) { image in
@@ -47,6 +65,10 @@ struct NonMicroTeamSection: View {
                                 lineWidth: isTeamWinning ? 2 : 1
                             )
                     )
+                    .onTapGesture {
+                        // 🔥 NEW: Handle avatar tap for team roster
+                        handleTeamTap()
+                    }
                 } else {
                     NonMicroTeamInitials(team: team, isWinning: isTeamWinning)
                         .frame(width: dualViewMode ? 45 : 32, height: dualViewMode ? 45 : 32)
@@ -57,6 +79,10 @@ struct NonMicroTeamSection: View {
                                     lineWidth: isTeamWinning ? 2 : 1
                                 )
                         )
+                        .onTapGesture {
+                            // 🔥 NEW: Handle initials tap for team roster
+                            handleTeamTap()
+                        }
                 }
             }
             
@@ -84,5 +110,25 @@ struct NonMicroTeamSection: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+    
+    // 🔥 NEW: Handle team tap with intelligent NFL team detection
+    private func handleTeamTap() {
+        // Add haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // Determine which NFL team to show
+        if let teamCode = nflTeamCode {
+            print("🏈 TEAM TAP: Opening roster for NFL team \(teamCode) (detected from \(team.ownerName)'s roster)")
+            onTeamLogoTap?(teamCode)
+        } else {
+            print("🏈 TEAM TAP: Could not determine NFL team for \(team.ownerName)")
+            // For fallback, try the first starter's team
+            if let firstStarterTeam = team.roster.first(where: { $0.isStarter })?.team?.uppercased() {
+                print("🏈 TEAM TAP: Fallback to first starter's team: \(firstStarterTeam)")
+                onTeamLogoTap?(firstStarterTeam)
+            }
+        }
     }
 }

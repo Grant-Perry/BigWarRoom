@@ -15,6 +15,10 @@ struct TeamDepthChartView: View {
     @StateObject private var teamAssets = TeamAssetManager.shared
     @State private var isExpanded: Bool = false // Changed to false for initial minimized state
     
+    // 🏈 PLAYER NAVIGATION: Remove sheet states, use NavigationLink instead
+    // BEFORE: Used sheet presentation which failed for nested sheets
+    // AFTER: Use NavigationLink for proper nested navigation
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Collapsible Header
@@ -71,6 +75,7 @@ struct TeamDepthChartView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(overlayBorder)
         .shadow(color: (team?.primaryColor ?? Color.gpBlue).opacity(0.2), radius: 4, x: 0, y: 2)
+        // 🏈 PLAYER NAVIGATION: Remove sheet - using NavigationLinks instead
     }
     
     // MARK: - Content Views
@@ -82,6 +87,7 @@ struct TeamDepthChartView: View {
                     PositionGroupView(
                         positionData: positionData,
                         team: team
+                        // 🏈 PLAYER NAVIGATION: Remove tap handler - using NavigationLinks instead
                     )
                 }
             }
@@ -101,6 +107,8 @@ struct TeamDepthChartView: View {
         }
         .padding(.vertical, 8)
     }
+    
+    // 🏈 PLAYER NAVIGATION: Remove tap handler - no longer needed
     
     // MARK: - Background and Styling (Same as Live Game Stats)
     
@@ -147,6 +155,7 @@ struct TeamDepthChartView: View {
 private struct PositionGroupView: View {
     let positionData: DepthChartData
     let team: NFLTeam?
+    // 🏈 PLAYER NAVIGATION: Remove tap handler parameter - using NavigationLinks instead
     
     @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
@@ -184,7 +193,8 @@ private struct PositionGroupView: View {
                     ForEach(positionData.players, id: \.player.playerID) { depthPlayer in
                         DepthChartPlayerRowView(
                             depthPlayer: depthPlayer,
-                            team: team
+                            team: team,
+                            onTap: nil // 🏈 PLAYER NAVIGATION: Remove tap handler - using NavigationLinks instead
                         )
                     }
                 }

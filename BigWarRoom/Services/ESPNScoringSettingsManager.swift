@@ -704,9 +704,6 @@ final class ScoringSettingsManager: ObservableObject {
             status = .validated
         }
         
-        // Debug print for validation
-        let basis = getScoringBasis(for: leagueID)
-        
         return PointsValidationResult(
             player: player,
             apiPoints: apiPoints,
@@ -775,22 +772,22 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Print all registered scoring bases for debugging
     func printAllScoringBases() {
-        print("📊 ALL SCORING BASES:")
+        DebugLogger.scoring("ALL SCORING BASES:", level: .info)
         
         // ESPN leagues
-        print("   ESPN Leagues:")
+        DebugLogger.scoring("ESPN Leagues:", level: .info)
         for (leagueID, basis) in leagueScoringBasis.filter({ espnScoringSettings[$0.key] != nil }) {
             let rawCount = espnScoringSettings[leagueID]?.count ?? 0
             let validatedCount = validatedESPNScoringSettings[leagueID]?.count ?? 0
-            print("     \(leagueID): \(basis)")
-            print("       Raw: \(rawCount) → Validated: \(validatedCount)")
+            DebugLogger.scoring("  \(leagueID): \(basis)", level: .info)
+            DebugLogger.scoring("    Raw: \(rawCount) → Validated: \(validatedCount)", level: .info)
         }
         
         // Sleeper leagues  
-        print("   Sleeper Leagues:")
+        DebugLogger.scoring("Sleeper Leagues:", level: .info)
         for (leagueID, basis) in leagueScoringBasis.filter({ sleeperScoringSettings[$0.key] != nil }) {
             let ruleCount = sleeperScoringSettings[leagueID]?.count ?? 0
-            print("     \(leagueID): \(basis) -> \(ruleCount) rules")
+            DebugLogger.scoring("  \(leagueID): \(basis) -> \(ruleCount) rules", level: .info)
         }
         
         // Failed leagues
@@ -799,9 +796,9 @@ final class ScoringSettingsManager: ObservableObject {
         }
         
         if !failedLeagues.isEmpty {
-            print("   Failed Leagues:")
+            DebugLogger.scoring("Failed Leagues:", level: .warning)
             for (leagueID, basis) in failedLeagues {
-                print("     \(leagueID): \(basis)")
+                DebugLogger.scoring("  \(leagueID): \(basis)", level: .warning)
             }
         }
     }
@@ -810,37 +807,37 @@ final class ScoringSettingsManager: ObservableObject {
     func printDifferentialAnalysisDetails(for leagueID: String) {
         guard let rawSettings = espnScoringSettings[leagueID],
               let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            print("❌ No data for league \(leagueID)")
+            DebugLogger.error("No data for league \(leagueID)", category: .scoring)
             return
         }
         
-        print("🔬 DIFFERENTIAL ANALYSIS DETAILS: League \(leagueID)")
-        print("   Raw Rules: \(rawSettings.count)")
-        print("   Validated Rules: \(validatedSettings.count)")
-        print("   Filtered Out: \(rawSettings.count - validatedSettings.count)")
+        DebugLogger.scoring("DIFFERENTIAL ANALYSIS DETAILS: League \(leagueID)", level: .info)
+        DebugLogger.scoring("Raw Rules: \(rawSettings.count)", level: .info)
+        DebugLogger.scoring("Validated Rules: \(validatedSettings.count)", level: .info)
+        DebugLogger.scoring("Filtered Out: \(rawSettings.count - validatedSettings.count)", level: .info)
         
-        print("\n✅ VALIDATED RULES:")
+        DebugLogger.scoring("VALIDATED RULES:", level: .info)
         for (statKey, points) in validatedSettings.sorted(by: { $0.key < $1.key }) {
             let isCore = ESPNScoringBaselines.coreStats.contains(statKey) ? " (CORE)" : ""
-            print("     \(statKey): \(points)\(isCore)")
+            DebugLogger.scoring("  \(statKey): \(points)\(isCore)", level: .info)
         }
         
-        print("\n❌ FILTERED OUT:")
+        DebugLogger.scoring("FILTERED OUT:", level: .info)
         let filteredOut = rawSettings.filter { validatedSettings[$0.key] == nil }
         for (statKey, points) in filteredOut.sorted(by: { $0.key < $1.key }) {
-            print("     \(statKey): \(points)")
+            DebugLogger.scoring("  \(statKey): \(points)", level: .info)
         }
         
-        print("\n🎯 LEAGUE TYPE ANALYSIS:")
+        DebugLogger.scoring("LEAGUE TYPE ANALYSIS:", level: .info)
         let leagueType = detectLeagueType(from: rawSettings)
-        print("     Detected: \(leagueType)")
+        DebugLogger.scoring("  Detected: \(leagueType)", level: .info)
         let receptionPoints = rawSettings["rec"] ?? 0.0
-        print("     Reception Points: \(receptionPoints)")
+        DebugLogger.scoring("  Reception Points: \(receptionPoints)", level: .info)
     }
     
     /// 🔥 NEW: Test differential analysis against known players
     func testDifferentialAnalysis(for leagueID: String) {
-        print("🧪 TESTING DIFFERENTIAL ANALYSIS: League \(leagueID)")
+        DebugLogger.scoring("TESTING DIFFERENTIAL ANALYSIS: League \(leagueID)", level: .info)
         
         // Create test players with known stats
         let testScenarios = [
@@ -876,7 +873,7 @@ final class ScoringSettingsManager: ObservableObject {
         ]
         
         guard let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            print("❌ No validated settings for league \(leagueID)")
+            DebugLogger.error("No validated settings for league \(leagueID)", category: .scoring)
             return
         }
         
@@ -885,13 +882,13 @@ final class ScoringSettingsManager: ObservableObject {
             let inRange = calculatedPoints >= scenario.expectedRange.0 && calculatedPoints <= scenario.expectedRange.1
             let status = inRange ? "✅ PASS" : "❌ FAIL"
             
-            print("   \(status) \(scenario.name): \(String(format: "%.2f", calculatedPoints)) pts (expected: \(scenario.expectedRange.0)-\(scenario.expectedRange.1))")
+            DebugLogger.scoring("\(status) \(scenario.name): \(String(format: "%.2f", calculatedPoints)) pts (expected: \(scenario.expectedRange.0)-\(scenario.expectedRange.1))", level: .info)
             
             // Show breakdown
             for (statKey, statValue) in scenario.stats {
                 if let pointsPerStat = validatedSettings[statKey] {
                     let points = calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: pointsPerStat)
-                    print("     \(statKey): \(statValue) × \(pointsPerStat) = \(String(format: "%.2f", points))")
+                    DebugLogger.scoring("  \(statKey): \(statValue) × \(pointsPerStat) = \(String(format: "%.2f", points))", level: .info)
                 }
             }
         }
@@ -909,6 +906,7 @@ final class ScoringSettingsManager: ObservableObject {
         sleeperScoringSettings.removeAll()
         validatedESPNScoringSettings.removeAll()
         leagueScoringBasis.removeAll()
+        DebugLogger.scoring("All scoring settings cleared", level: .info)
     }
 }
 

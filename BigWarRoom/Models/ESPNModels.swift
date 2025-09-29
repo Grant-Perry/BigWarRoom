@@ -66,7 +66,6 @@ struct ESPNLeague: Codable, Identifiable {
             let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
             
             if !firstName.isEmpty && !lastName.isEmpty && fullName != " " {
-                // x// x Print("     🎯 Using firstName + lastName: '\(fullName)'")
                 return fullName
             }
             
@@ -76,19 +75,16 @@ struct ESPNLeague: Codable, Identifiable {
                !displayName.lowercased().hasPrefix("espnfan"),
                !displayName.lowercased().hasPrefix("team "),
                displayName.count > 3 {
-                // x// x Print("     🎯 Using meaningful displayName: '\(displayName)'")
                 return displayName
             }
             
             // Priority 3: Fall back to displayName even if generic (better than nothing)
             if let displayName = member.displayName, !displayName.isEmpty {
-                // x// x Print("     ⚠️ Using generic displayName: '\(displayName)'")
                 return displayName
             }
         }
         
         // Final fallback
-        // x// x Print("     ❌ No member found, using fallback")
         return "Manager \(firstOwnerID.suffix(8))"
     }
     

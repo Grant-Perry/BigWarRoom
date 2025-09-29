@@ -15,6 +15,46 @@ struct AppSettingsView: View {
     var body: some View {
         NavigationView {
             List {
+                // MARK: -> Quick Navigation
+                Section {
+                    Button {
+                        NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
+                    } label: {
+                        HStack(spacing: 12) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.gpGreen.opacity(0.1))
+                                    .frame(width: 28, height: 28)
+                                
+                                Image(systemName: "target")
+                                    .foregroundColor(Color.gpGreen)
+                                    .font(.system(size: 16, weight: .semibold))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Go to Mission Control")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(Color.gpGreen)
+                                
+                                Text("View your fantasy matchups and leagues")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: "arrow.right")
+                                .foregroundColor(Color.gpGreen)
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                    }
+                } header: {
+                    Text("Navigation")
+                } footer: {
+                    Text("Connected to your leagues? Head to Mission Control to view matchups!")
+                }
+                
                 // MARK: -> Service Configuration
                 Section {
                     // ESPN Section
@@ -41,6 +81,20 @@ struct AppSettingsView: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.system(size: 16))
+                                
+                                // 🔥 FIX: Disconnect button inside NavigationLink - use onTapGesture to prevent navigation
+                                Button("Disconnect") {
+                                    viewModel.disconnectESPN()
+                                }
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(6)
+                                .onTapGesture {
+                                    viewModel.disconnectESPN()
+                                }
                             }
                         }
                     }
@@ -69,6 +123,20 @@ struct AppSettingsView: View {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.system(size: 16))
+                                
+                                // 🔥 FIX: Disconnect button inside NavigationLink - use onTapGesture to prevent navigation
+                                Button("Disconnect") {
+                                    viewModel.disconnectSleeper()
+                                }
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(6)
+                                .onTapGesture {
+                                    viewModel.disconnectSleeper()
+                                }
                             }
                         }
                     }
@@ -382,6 +450,18 @@ struct AppSettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.automatic)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Mission Control") {
+                        // 🔥 NEW: Navigate back to Mission Control using existing notification system
+                        NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
+                    }
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(Color.gpGreen)
+                }
+            }
             .onAppear {
                 // 🔥 FIX: Refresh status when returning from setup views
                 viewModel.refreshConnectionStatus()

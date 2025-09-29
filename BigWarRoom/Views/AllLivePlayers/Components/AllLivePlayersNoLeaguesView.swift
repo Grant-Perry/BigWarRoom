@@ -117,31 +117,8 @@ struct AllLivePlayersNoLeaguesView: View {
                     .foregroundColor(.orange)
             }
             
-            // 🔥 REFRESH BUTTON - Moved here from toolbar
-            Button(action: {
-                refreshData()
-            }) {
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.title2)
-                    Text("Refresh")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.blue)
-                        .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
-                )
-            }
-            .scaleEffect(pulseAnimation ? 1.05 : 1.0)
-            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: pulseAnimation)
-            
             VStack(spacing: 16) {
-                Text("No Leagues Connected")
+                Text("Loading Leagues...")
                     .font(.title2)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -181,6 +158,37 @@ struct AllLivePlayersNoLeaguesView: View {
                         .shadow(color: .blue.opacity(0.2), radius: 4, x: 0, y: 2)
                 )
             }
+            
+            // 🔥 REFRESH BUTTON - Much smaller and less prominent, moved to bottom
+            HStack {
+                Spacer()
+                
+                Button(action: {
+                    refreshData()
+                }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                        Text("Refresh Data")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(.systemGray6).opacity(0.3))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color(.systemGray5).opacity(0.5), lineWidth: 0.5)
+                            )
+                    )
+                }
+                
+                Spacer()
+            }
+            .padding(.top, 12)
         }
     }
     

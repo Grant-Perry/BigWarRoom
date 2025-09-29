@@ -29,7 +29,7 @@ extension FantasyViewModel {
                 }
                 sleeperLeagueSettings = convertedSettings
                 
-                print("🎯 SLEEPER SCORING: Loaded \(scoringSettings.count) rules for league \(leagueID)")
+                DebugLogger.scoring("Loaded \(scoringSettings.count) rules for league \(leagueID)")
                 
                 // 🔥 FIX: Register the scoring settings with ScoringSettingsManager
                 ScoringSettingsManager.shared.registerSleeperScoringSettings(
@@ -37,13 +37,13 @@ extension FantasyViewModel {
                     leagueID: leagueID
                 )
                 
-                print("✅ SLEEPER SCORING: Registered with ScoringSettingsManager for league \(leagueID)")
+                DebugLogger.scoring("Registered with ScoringSettingsManager for league \(leagueID)", level: .info)
             } else {
-                print("⚠️ SLEEPER SCORING: No scoring settings found for league \(leagueID)")
+                DebugLogger.warning("No scoring settings found for league \(leagueID)", category: .scoring)
             }
             
         } catch {
-            print("❌ SLEEPER SCORING: Error fetching league \(leagueID): \(error)")
+            DebugLogger.error("Error fetching Sleeper league \(leagueID): \(error)", category: .api)
         }
     }
     
@@ -64,24 +64,21 @@ extension FantasyViewModel {
     /// Fetch Sleeper league users and rosters
     func fetchSleeperLeagueUsersAndRosters(leagueID: String) async {
         guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/rosters") else { 
-            // x Print("❌ SLEEPER ROSTERS: Invalid URL for league \(leagueID)")
+            DebugLogger.error("Invalid URL for Sleeper rosters league \(leagueID)", category: .api)
             return 
         }
         
-        // x Print("🌐 SLEEPER ROSTERS: Fetching roster data for league \(leagueID)")
-        // x Print("🔗 SLEEPER ROSTERS: URL = \(rostersURL)")
+        DebugLogger.api("Fetching Sleeper roster data for league \(leagueID)")
         
         do {
             let (data, response) = try await URLSession.shared.data(from: rostersURL)
             
             if let httpResponse = response as? HTTPURLResponse {
-                // x Print("📡 SLEEPER ROSTERS: HTTP Status \(httpResponse.statusCode)")
+                DebugLogger.api("Sleeper rosters HTTP Status \(httpResponse.statusCode)")
             }
             
-            // x Print("📊 SLEEPER ROSTERS: Received \(data.count) bytes")
-            
             let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
-            // x Print("📋 SLEEPER ROSTERS: Decoded \(rosters.count) rosters")
+            DebugLogger.api("Decoded \(rosters.count) Sleeper rosters")
             
             // 🔥 NEW: Store rosters in main FantasyViewModel for record lookup
             sleeperRosters = rosters
@@ -91,61 +88,54 @@ extension FantasyViewModel {
             for roster in rosters {
                 if let ownerID = roster.ownerID {
                     newRosterMapping[roster.rosterID] = ownerID
-                    // x Print("🔗 SLEEPER ROSTER: Roster \(roster.rosterID) -> Owner \(ownerID)")
                 } else {
-                    // x Print("⚠️ SLEEPER ROSTER: Roster \(roster.rosterID) has no owner!")
+                    DebugLogger.warning("Sleeper roster \(roster.rosterID) has no owner!", category: .fantasy)
                 }
             }
             
             rosterIDToManagerID = newRosterMapping
-            // x Print("✅ SLEEPER ROSTERS: Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
+            DebugLogger.fantasy("Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
             
             // Now fetch the user display names
             await fetchSleeperUsers(leagueID: leagueID)
             
         } catch {
-            // x Print("❌ SLEEPER ROSTERS: Error - \(error)")
+            DebugLogger.error("Sleeper rosters fetch error: \(error)", category: .api)
         }
     }
     
     /// Fetch Sleeper users
     private func fetchSleeperUsers(leagueID: String) async {
         guard let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/users") else { 
-            // x Print("❌ SLEEPER USERS: Invalid URL for league \(leagueID)")
+            DebugLogger.error("Invalid URL for Sleeper users league \(leagueID)", category: .api)
             return 
         }
         
-        // x Print("🌐 SLEEPER USERS: Fetching user data for league \(leagueID)")
-        // x Print("🔗 SLEEPER USERS: URL = \(usersURL)")
+        DebugLogger.api("Fetching Sleeper user data for league \(leagueID)")
         
         do {
             let (data, response) = try await URLSession.shared.data(from: usersURL)
             
             if let httpResponse = response as? HTTPURLResponse {
-                // x Print("📡 SLEEPER USERS: HTTP Status \(httpResponse.statusCode)")
+                DebugLogger.api("Sleeper users HTTP Status \(httpResponse.statusCode)")
                 if httpResponse.statusCode != 200 {
-                    // x Print("❌ SLEEPER USERS: Bad HTTP status \(httpResponse.statusCode)")
+                    DebugLogger.error("Bad HTTP status \(httpResponse.statusCode) for Sleeper users", category: .api)
                     return
                 }
             }
             
-            // x Print("📊 SLEEPER USERS: Received \(data.count) bytes")
-            
             let users = try JSONDecoder().decode([SleeperUser].self, from: data)
-            // x Print("👥 SLEEPER USERS: Decoded \(users.count) users")
+            DebugLogger.api("Decoded \(users.count) Sleeper users")
             
             var newUserIDs: [String: String] = [:]
             var newUserAvatars: [String: URL] = [:]
             
-            for (index, user) in users.enumerated() {
-                // x Print("👤 SLEEPER USER \(index): ID=\(user.userID), Display='\(user.displayName)', Username='\(user.username ?? "nil")'")
-                
+            for user in users {
                 newUserIDs[user.userID] = user.displayName
                 
                 if let avatar = user.avatar {
                     let avatarURL = URL(string: "https://sleepercdn.com/avatars/\(avatar)")
                     newUserAvatars[user.userID] = avatarURL
-                    // x Print("🎭 SLEEPER AVATAR: User \(user.userID) has avatar \(avatar)")
                 }
             }
             
@@ -153,39 +143,34 @@ extension FantasyViewModel {
             userIDs = newUserIDs
             userAvatars = newUserAvatars
             
-            // x Print("✅ SLEEPER USERS: Successfully populated userIDs with \(userIDs.count) entries")
-            // x Print("📋 SLEEPER USERS: Final userIDs = \(userIDs)")
+            DebugLogger.fantasy("Successfully populated userIDs with \(userIDs.count) entries")
             
         } catch {
-            // x Print("❌ SLEEPER USERS: Decoding error - \(error)")
-            if let decodingError = error as? DecodingError {
-                // x Print("🔍 SLEEPER USERS: Decoding details - \(decodingError)")
-            }
+            DebugLogger.error("Sleeper users decoding error: \(error)", category: .api)
         }
     }
     
     /// Fetch real Sleeper matchups
     func fetchSleeperMatchups(leagueID: String, week: Int) async {
-        // x Print("🔍 SLEEPER MATCHUPS: Fetching for league \(leagueID) week \(week)")
+        DebugLogger.fantasy("Fetching Sleeper matchups for league \(leagueID) week \(week)")
         
         guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
-            // x Print("❌ SLEEPER MATCHUPS: Invalid URL")
+            DebugLogger.error("Invalid URL for Sleeper matchups", category: .api)
             return
         }
         
         do {
-            // x Print("📡 SLEEPER MATCHUPS: Making API call...")
             let (data, response) = try await URLSession.shared.data(from: url)
             
             if let httpResponse = response as? HTTPURLResponse {
-                // x Print("📡 SLEEPER MATCHUPS: HTTP Status \(httpResponse.statusCode)")
+                DebugLogger.api("Sleeper matchups HTTP Status \(httpResponse.statusCode)")
             }
             
             let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
-            // x Print("📊 SLEEPER MATCHUPS: Received \(sleeperMatchups.count) matchups")
+            DebugLogger.fantasy("Received \(sleeperMatchups.count) Sleeper matchups")
             
             if sleeperMatchups.isEmpty {
-                // x Print("🔥 CHOPPED DETECTION: No matchups found for week \(week) - checking if this is a chopped league")
+                DebugLogger.fantasy("No matchups found for week \(week) - checking if this is a chopped league", level: .info)
                 
                 detectedAsChoppedLeague = true
                 hasActiveRosters = true
@@ -201,18 +186,18 @@ extension FantasyViewModel {
                 return
             }
             
-            // x Print("🏈 SLEEPER MATCHUPS: Processing \(sleeperMatchups.count) regular matchups")
+            DebugLogger.fantasy("Processing \(sleeperMatchups.count) regular Sleeper matchups")
             await processSleeperMatchupsWithProjections(sleeperMatchups, leagueID: leagueID)
             
         } catch {
-            // x Print("❌ SLEEPER MATCHUPS: API Error - \(error.localizedDescription)")
+            DebugLogger.error("Sleeper matchups API Error: \(error.localizedDescription)", category: .api)
             errorMessage = "Failed to fetch Sleeper matchups: \(error.localizedDescription)"
         }
     }
     
     /// Process real Sleeper matchups with projected points
     func processSleeperMatchupsWithProjections(_ sleeperMatchups: [SleeperMatchupResponse], leagueID: String) async {
-        // x Print("🏈 Processing \(sleeperMatchups.count) REAL Sleeper matchups with projections")
+        DebugLogger.fantasy("Processing \(sleeperMatchups.count) REAL Sleeper matchups with projections")
         
         let groupedMatchups = Dictionary(grouping: sleeperMatchups, by: { $0.matchupID ?? 0 })
         var processedMatchups: [FantasyMatchup] = []
@@ -235,8 +220,6 @@ extension FantasyViewModel {
             
             let awayProjected = team1.projectedPoints ?? 0.0
             let homeProjected = team2.projectedPoints ?? 0.0
-            
-            // x Print("📊 REAL PROJECTIONS - Away: \(String(format: "%.2f", awayScore)) pts (\(String(format: "%.2f", awayProjected)) proj) | Home: \(String(format: "%.2f", homeScore)) pts (\(String(format: "%.2f", homeProjected)) proj)")
             
             let awayTeam = createSleeperFantasyTeam(
                 matchupResponse: team1,
@@ -264,13 +247,11 @@ extension FantasyViewModel {
             )
             
             processedMatchups.append(fantasyMatchup)
-            
-            // x Print("✅ Sleeper matchup: \(awayManagerName) (\(String(format: "%.2f", awayScore))) vs \(homeManagerName) (\(String(format: "%.2f", homeScore)))")
         }
         
         if !processedMatchups.isEmpty {
             matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
-            // x Print("🎯 Processed \(processedMatchups.count) REAL Sleeper matchups with accurate projections")
+            DebugLogger.fantasy("Processed \(processedMatchups.count) REAL Sleeper matchups with accurate projections", level: .info)
         }
     }
     
@@ -337,7 +318,7 @@ extension FantasyViewModel {
                 let losses = roster.settings?.losses ?? roster.losses ?? 0
                 let ties = roster.settings?.ties ?? roster.ties ?? 0
                 
-                print("🎯 SLEEPER RECORD: Roster \(roster.rosterID) -> \(wins)-\(losses)-\(ties)")
+                DebugLogger.fantasy("Sleeper record: Roster \(roster.rosterID) -> \(wins)-\(losses)-\(ties)")
                 
                 return TeamRecord(
                     wins: wins,
@@ -346,7 +327,7 @@ extension FantasyViewModel {
                 )
             }
             
-            print("⚠️ SLEEPER RECORD: No roster found for rosterID \(matchupResponse.rosterID)")
+            DebugLogger.warning("No roster found for rosterID \(matchupResponse.rosterID)", category: .fantasy)
             return nil
         }()
         
@@ -382,10 +363,10 @@ extension FantasyViewModel {
     
     /// Validate Chopped league detection in background
     func validateChoppedLeagueDetection(leagueID: String, week: Int) async {
-        // x Print("🔍 CHOPPED VALIDATION: Checking rosters for league \(leagueID)")
+        DebugLogger.fantasy("Validating chopped league detection - checking rosters for league \(leagueID)")
         
         guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/rosters") else {
-            // x Print("❌ CHOPPED VALIDATION: Invalid rosters URL")
+            DebugLogger.error("Invalid rosters URL for chopped validation", category: .api)
             return
         }
         
@@ -393,14 +374,13 @@ extension FantasyViewModel {
             let (data, _) = try await URLSession.shared.data(from: rostersURL)
             let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
             
-            // x Print("📊 CHOPPED VALIDATION: Found \(rosters.count) rosters")
+            DebugLogger.fantasy("Found \(rosters.count) rosters for chopped validation")
             
             if !rosters.isEmpty {
-                // x Print("🔥 CHOPPED VALIDATED: \(rosters.count) active rosters confirmed - this is definitely a Chopped league!")
+                DebugLogger.fantasy("\(rosters.count) active rosters confirmed - this is definitely a Chopped league!", level: .info)
                 
                 await MainActor.run {
                     hasActiveRosters = true
-                    // x Print("🔥 CHOPPED: Updated hasActiveRosters = \(hasActiveRosters)")
                 }
                 
                 isLoadingChoppedData = true
@@ -410,7 +390,7 @@ extension FantasyViewModel {
                 )
                 isLoadingChoppedData = false
             } else {
-                // x Print("❌ CHOPPED DETECTION FAILED: No rosters found - reverting detection")
+                DebugLogger.warning("Chopped detection failed: No rosters found - reverting detection", category: .fantasy)
                 await MainActor.run {
                     detectedAsChoppedLeague = false
                     hasActiveRosters = false
@@ -419,7 +399,7 @@ extension FantasyViewModel {
             }
             
         } catch {
-            // x Print("⚠️ CHOPPED VALIDATION ERROR: \(error) - keeping detection as is")
+            DebugLogger.warning("Chopped validation error: \(error) - keeping detection as is", category: .fantasy)
         }
     }
 }

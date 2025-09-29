@@ -37,7 +37,7 @@ struct AppConstants {
     static let ESPN_AUTH = "{\"swid\":\"\(SWID)\"}"
 
     // Sleeper Default User Configuration
-    static let SleeperUser = "Lamarvelous_King"
+    static let SleeperUser = "Gp0"
     
     // Sleeper IDs - kept for backward compatibility but BigWarRoom gets leagues dynamically
     static let GpManagerID = "1117588009542615040"

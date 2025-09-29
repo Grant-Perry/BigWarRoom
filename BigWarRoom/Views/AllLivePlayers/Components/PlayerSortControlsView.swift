@@ -15,13 +15,8 @@ struct PlayerSortControlsView: View {
     
     var body: some View {
         HStack(spacing: 2) {
-            // Sort method selector
+            // Sort method selector - REMOVE "Sort:" label
             HStack(spacing: 2) {
-                Text("Sort:")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                
                 Menu {
                     ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                         Button(action: {
@@ -93,4 +88,5 @@ struct PlayerSortControlsView: View {
         sortHighToLow: .constant(true),
         onSortChange: {}
     )
+    .padding()
 }

@@ -235,13 +235,11 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
     private func hasPlayersFromTeams(in matchup: UnifiedMatchup, teams: Set<String>) -> Bool {
         // Only get players from YOUR team's roster - not opponent's
         guard let myTeam = matchup.myTeam else {
-            print("🔍 PLAYER DEBUG: No myTeam found, returning false")
             return false
         }
 
         let myPlayers = myTeam.roster
         
-        print("🔍 PLAYER DEBUG: Checking only MY \(myPlayers.count) players for normalized teams \(teams)")
 
         var foundTeams: Set<String> = []
         var playerTeamCounts: [String: Int] = [:]
@@ -259,10 +257,6 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
 
             return teams.contains(playerTeam)
         }
-
-        print("🔍 PLAYER DEBUG: Found normalized teams in MY roster: \(foundTeams)")
-        print("🔍 PLAYER DEBUG: MY player team distribution (normalized): \(playerTeamCounts)")
-        print("🔍 PLAYER DEBUG: Has matching players in MY team: \(hasMatchingPlayers)")
 
         return hasMatchingPlayers
     }

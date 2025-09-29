@@ -14,6 +14,10 @@ struct NFLScheduleView: View {
     @StateObject private var weekManager = WeekSelectionManager.shared // Use shared week manager
     @State private var showingWeekPicker = false
     
+    // 🔥 NEW: Sheet state for team filtered matchups
+    @State private var showingTeamMatchups = false
+    @State private var selectedGame: ScheduleGame?
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -36,6 +40,21 @@ struct NFLScheduleView: View {
             .sheet(isPresented: $viewModel.showingGameDetail) {
                 if let game = viewModel.selectedGame {
                     GameDetailView(game: game)
+                }
+            }
+            // 🔥 NEW: Team matchups sheet with proper rootDismiss
+            .sheet(isPresented: $showingTeamMatchups) {
+                if let game = selectedGame {
+                    TeamFilteredMatchupsView(
+                        awayTeam: game.awayTeam,
+                        homeTeam: game.homeTeam,
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        gameData: game,
+                        rootDismiss: { 
+                            showingTeamMatchups = false 
+                            selectedGame = nil
+                        }
+                    )
                 }
             }
             // Replace WeekPickerSheet with Mission Control's WeekPickerView
@@ -213,14 +232,14 @@ struct NFLScheduleView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.games, id: \.id) { game in
-                    NavigationLink(destination: TeamFilteredMatchupsView(
-                        awayTeam: game.awayTeam,
-                        homeTeam: game.homeTeam,
-                        matchupsHubViewModel: matchupsHubViewModel,
-                        gameData: game
-                    )) {
+                    // 🔥 CHANGED: Use Button instead of NavigationLink for sheet presentation
+                    Button(action: {
+                        selectedGame = game
+                        showingTeamMatchups = true
+                        print("🔗 Card tapped: \(game.awayTeam) vs \(game.homeTeam)")
+                    }) {
                         ScheduleGameCard(game: game) {
-                            print("🔗 Card tapped: \(game.awayTeam) vs \(game.homeTeam)")
+                            // Card action is handled by the button now
                         }
                         .frame(maxWidth: .infinity)
                         .frame(width: UIScreen.main.bounds.width * 0.8)

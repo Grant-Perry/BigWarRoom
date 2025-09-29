@@ -10,7 +10,7 @@ import SwiftUI
 struct PlayerScoreBarCardView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     let animateIn: Bool
-    let onTap: (() -> Void)?
+    let onTap: (() -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     
     // 🔥 NEW: Get stats from parent view model
     @ObservedObject var viewModel: AllLivePlayersViewModel
@@ -26,20 +26,19 @@ struct PlayerScoreBarCardView: View {
     private let scoreBarOpacity: Double = 0.35 // Score bar transparency
     
     var body: some View {
-        Button(action: {
-            onTap?()
-        }) {
-            // Use the extracted content component
-            PlayerScoreBarCardContentView(
-                playerEntry: playerEntry,
-                scoreBarWidth: scoreBarWidth,
-                cardHeight: cardHeight,
-                formattedPlayerName: formattedPlayerName,
-                playerScoreColor: playerScoreColor,
-                viewModel: viewModel
-            )
+        // 🔥 DEATH TO SHEETS: Conditionally wrap in Button only if onTap provided
+        Group {
+            if let onTap = onTap {
+                // Use Button for tap handling
+                Button(action: onTap) {
+                    cardContent
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // No Button wrapper - for use with NavigationLink
+                cardContent
+            }
         }
-        .buttonStyle(PlainButtonStyle())
         .id(playerEntry.id) // Force view refresh
         .overlay(
             // LIVE border around the entire card
@@ -82,6 +81,18 @@ struct PlayerScoreBarCardView: View {
                 scoreBarWidth = newWidth
             }
         }
+    }
+    
+    // 🔥 DEATH TO SHEETS: Extract card content to reusable computed property
+    private var cardContent: some View {
+        PlayerScoreBarCardContentView(
+            playerEntry: playerEntry,
+            scoreBarWidth: scoreBarWidth,
+            cardHeight: cardHeight,
+            formattedPlayerName: formattedPlayerName,
+            playerScoreColor: playerScoreColor,
+            viewModel: viewModel
+        )
     }
     
     // MARK: - Computed Properties (DATA ONLY - No Views)

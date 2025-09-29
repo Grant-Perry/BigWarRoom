@@ -14,6 +14,9 @@ struct NonMicroMatchupContent: View {
     let dualViewMode: Bool
     let scoreAnimation: Bool
     
+    // 🔥 NEW: Team roster navigation callback
+    var onTeamLogoTap: ((String) -> Void)? = nil
+    
     private var isLiveGame: Bool {
         return matchup.isLive
     }
@@ -38,7 +41,8 @@ struct NonMicroMatchupContent: View {
                         isWinning: isWinning,
                         dualViewMode: dualViewMode,
                         scoreAnimation: scoreAnimation,
-                        isLiveGame: isLiveGame
+                        isLiveGame: isLiveGame,
+                        onTeamLogoTap: onTeamLogoTap
                     )
                 }
                 
@@ -56,7 +60,8 @@ struct NonMicroMatchupContent: View {
                         isWinning: isWinning,
                         dualViewMode: dualViewMode,
                         scoreAnimation: scoreAnimation,
-                        isLiveGame: isLiveGame
+                        isLiveGame: isLiveGame,
+                        onTeamLogoTap: onTeamLogoTap
                     )
                 }
             }

@@ -32,6 +32,17 @@ struct MoreTabView: View {
                     // Features List
                     ScrollView {
                         VStack(spacing: 12) {
+                            // 🔥 NEW: Player Search - FIRST ITEM
+                            NavigationLink(destination: PlayerSearchView()) {
+                                MoreRowView(
+                                    icon: "person.crop.circle",
+                                    iconColor: .gpGreen,
+                                    title: "Player Search",
+                                    subtitle: "Search and view detailed player stats"
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
                             // War Room - MOVED FROM MAIN TAB
                             NavigationLink(destination: DraftRoomView(viewModel: viewModel, selectedTab: .constant(4))) {
                                 MoreRowView(

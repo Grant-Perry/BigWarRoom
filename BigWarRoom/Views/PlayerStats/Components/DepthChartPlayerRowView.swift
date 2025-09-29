@@ -11,43 +11,61 @@ import SwiftUI
 struct DepthChartPlayerRowView: View {
     let depthPlayer: DepthChartPlayer
     let team: NFLTeam?
+    // 🏈 PLAYER NAVIGATION: Keep onTap optional for backward compatibility
+    let onTap: (() -> Void)?
     
     var body: some View {
-        HStack(spacing: 14) {
-            // Enhanced depth position number with gradient - use component
-            DepthChartPlayerRowDepthCircleView(depthPlayer: depthPlayer)
-            
-            // Enhanced player headshot with glow - use component
-            DepthChartPlayerRowImageView(depthPlayer: depthPlayer, team: team)
-            
-            // Enhanced player info section - use component
-            DepthChartPlayerRowInfoSectionView(depthPlayer: depthPlayer)
-            
-            Spacer(minLength: 0)
+        // 🏈 PLAYER NAVIGATION: Use NavigationLink instead of Button for nested navigation
+        // BEFORE: Button with sheet presentation (failed for nested sheets)  
+        // AFTER: NavigationLink for proper nested navigation
+        NavigationLink(
+            destination: PlayerStatsCardView(
+                player: depthPlayer.player,
+                team: NFLTeam.team(for: depthPlayer.player.team ?? "")
+            )
+        ) {
+            HStack(spacing: 14) {
+                // Enhanced depth position number with gradient - use component
+                DepthChartPlayerRowDepthCircleView(depthPlayer: depthPlayer)
+                
+                // Enhanced player headshot with glow - use component
+                DepthChartPlayerRowImageView(depthPlayer: depthPlayer, team: team)
+                
+                // Enhanced player info section - use component
+                DepthChartPlayerRowInfoSectionView(depthPlayer: depthPlayer)
+                
+                Spacer(minLength: 0)
+                
+                // 🏈 PLAYER NAVIGATION: Keep navigation indicator
+                Image(systemName: "chevron.right")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                DepthChartPlayerRowBackgroundView(
+                    depthPlayer: depthPlayer,
+                    positionColor: positionColor
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                DepthChartPlayerRowBorderView(
+                    depthPlayer: depthPlayer,
+                    positionColor: positionColor
+                )
+            )
+            .shadow(
+                color: depthPlayer.isCurrentPlayer ? Color.gpGreen.opacity(0.3) : Color.black.opacity(0.2),
+                radius: depthPlayer.isCurrentPlayer ? 6 : 3,
+                x: 0,
+                y: depthPlayer.isCurrentPlayer ? 3 : 2
+            )
+            .scaleEffect(depthPlayer.isCurrentPlayer ? 1.02 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: depthPlayer.isCurrentPlayer)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            DepthChartPlayerRowBackgroundView(
-                depthPlayer: depthPlayer,
-                positionColor: positionColor
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            DepthChartPlayerRowBorderView(
-                depthPlayer: depthPlayer,
-                positionColor: positionColor
-            )
-        )
-        .shadow(
-            color: depthPlayer.isCurrentPlayer ? Color.gpGreen.opacity(0.3) : Color.black.opacity(0.2),
-            radius: depthPlayer.isCurrentPlayer ? 6 : 3,
-            x: 0,
-            y: depthPlayer.isCurrentPlayer ? 3 : 2
-        )
-        .scaleEffect(depthPlayer.isCurrentPlayer ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: depthPlayer.isCurrentPlayer)
+        .buttonStyle(PlainButtonStyle()) // 🏈 PLAYER NAVIGATION: Keep plain style for NavigationLink
     }
     
     // MARK: - Computed Properties (Data Only)
@@ -84,13 +102,16 @@ struct DepthChartPlayerRowView: View {
     
     let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
     
-    return DepthChartPlayerRowView(
-        depthPlayer: DepthChartPlayer(
-            player: mockPlayer,
-            depth: 1,
-            isCurrentPlayer: true
-        ),
-        team: nil
-    )
-    .padding()
+    return NavigationView {
+        DepthChartPlayerRowView(
+            depthPlayer: DepthChartPlayer(
+                player: mockPlayer,
+                depth: 1,
+                isCurrentPlayer: true
+            ),
+            team: nil,
+            onTap: nil
+        )
+        .padding()
+    }
 }

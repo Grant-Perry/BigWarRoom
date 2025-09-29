@@ -197,7 +197,6 @@ struct ScheduleGameCard: View {
     // Helper function to get team record
     private func getTeamRecord(for teamCode: String) -> String {
         let record = standingsService.getTeamRecord(for: teamCode)
-        print("🏈 Getting record for \(teamCode): \(record)") // Debug line
         return record
     }
 }

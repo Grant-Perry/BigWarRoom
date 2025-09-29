@@ -40,7 +40,8 @@ final class SleeperSetupViewModel: ObservableObject {
     }
     
     var canSaveCredentials: Bool {
-        !username.isEmpty || !userID.isEmpty
+        // 🔥 FIX: Only require username, ignore user ID
+        !username.isEmpty
     }
     
     var isSetupComplete: Bool {
@@ -57,7 +58,8 @@ final class SleeperSetupViewModel: ObservableObject {
     
     func fillDefaultCredentials() {
         username = AppConstants.SleeperUser
-        userID = AppConstants.GpSleeperID
+        // 🔥 FIX: Don't auto-fill user ID - let the system resolve it
+        userID = ""
         selectedSeason = "2025"
         
         // 🔥 FIX: Auto-save when using default credentials
@@ -69,11 +71,21 @@ final class SleeperSetupViewModel: ObservableObject {
     func saveCredentials() {
         guard canSaveCredentials else { return }
         
+        print("🔥 SleeperSetupViewModel.saveCredentials() called:")
+        print("   - Username to save: '\(username)'")
+        print("   - UserID to save: '\(userID)'")
+        print("   - Season: '\(selectedSeason)'")
+        
         credentialsManager.saveCredentials(
             username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-            userID: userID.trimmingCharacters(in: .whitespacesAndNewlines),
+            userID: "", // 🔥 FIX: Always save empty user ID - let system resolve from username
             season: selectedSeason
         )
+        
+        print("🔥 After save, checking credentials manager state:")
+        print("   - currentUsername: '\(credentialsManager.currentUsername)'")
+        print("   - currentUserID: '\(credentialsManager.currentUserID)'")
+        print("   - hasValidCredentials: \(credentialsManager.hasValidCredentials)")
         
         // Show success feedback
         clearResultMessage = "✅ Sleeper credentials saved successfully!"
@@ -187,7 +199,8 @@ final class SleeperSetupViewModel: ObservableObject {
         // Load from credentials manager, not hardcoded AppConstants
         if credentialsManager.hasValidCredentials {
             username = credentialsManager.currentUsername
-            userID = credentialsManager.currentUserID
+            // 🔥 FIX: Don't load user ID into the UI field - keep it hidden
+            userID = ""
             selectedSeason = credentialsManager.selectedSeason
         }
         // Don't auto-fill with Gp's credentials - let users enter their own

@@ -41,48 +41,55 @@ struct WeekPickerView: View {
                     dismissPicker()
                 }
             
-            VStack(spacing: 0) {
-                // Header with year picker
-                pickerHeader
+            // 🔥 FIX: Add proper vertical centering for sheet presentation
+            VStack {
+                Spacer()
                 
-                // Week grid
-                weekGrid
-                
-                // Footer actions
-                pickerFooter
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 450) // Increased height for year picker
-            .background(
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.black.opacity(0.95),
-                                Color.gray.opacity(0.1),
-                                Color.black.opacity(0.95)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 24)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6), .gpGreen.opacity(0.6)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 2
+                VStack(spacing: 0) {
+                    // Header with year picker
+                    pickerHeader
+                    
+                    // Week grid
+                    weekGrid
+                    
+                    // Footer actions
+                    pickerFooter
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 450) // Increased height for year picker
+                .background(
+                    RoundedRectangle(cornerRadius: 24)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.95),
+                                    Color.gray.opacity(0.1),
+                                    Color.black.opacity(0.95)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
                             )
-                    )
-                    .shadow(color: .gpGreen.opacity(0.3), radius: 20, x: 0, y: 10)
-            )
-            .padding(.horizontal, 20)
-            .scaleEffect(animateIn ? 1.0 : 0.8)
-            .opacity(animateIn ? 1.0 : 0.0)
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateIn)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6), .gpGreen.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 2
+                                )
+                        )
+                        .shadow(color: .gpGreen.opacity(0.3), radius: 20, x: 0, y: 10)
+                )
+                .padding(.horizontal, 20)
+                .scaleEffect(animateIn ? 1.0 : 0.8)
+                .opacity(animateIn ? 1.0 : 0.0)
+                .animation(.spring(response: 0.6, dampingFraction: 0.8), value: animateIn)
+                
+                Spacer()
+            }
         }
         .onAppear {
             animateIn = true

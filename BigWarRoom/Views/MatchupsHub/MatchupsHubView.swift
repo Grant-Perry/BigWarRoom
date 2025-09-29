@@ -15,6 +15,10 @@ struct MatchupsHubView: View {
     // MARK: - Week Selection (SSOT)
     @StateObject internal var weekManager = WeekSelectionManager.shared
     
+    // 🔥 NEW: Service Credential Managers for Connection Status
+    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
+    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
+    
     // MARK: - Navigation State
     @State internal var showingMatchupDetail: UnifiedMatchup?
     @State internal var showingSettings = false
@@ -57,12 +61,17 @@ struct MatchupsHubView: View {
             ZStack {
                 buildBackgroundView()
 
+                // 🔥 FIXED: Only show empty state if user has NO service connections
+                let hasAnyService = espnCredentials.hasValidCredentials || sleeperCredentials.hasValidCredentials
+
                 // Show league loading and hero/minibar progress IMMEDIATELY
                 if matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty {
                     buildLoadingStateView()
-                } else if matchupsHubViewModel.myMatchups.isEmpty && !matchupsHubViewModel.isLoading {
+                } else if !hasAnyService && !matchupsHubViewModel.isLoading {
+                    // Only show empty state if user has NO services connected
                     buildEmptyStateView()
                 } else {
+                    // Show content even if no matchups but user has services connected
                     buildContentView()
                 }
             }

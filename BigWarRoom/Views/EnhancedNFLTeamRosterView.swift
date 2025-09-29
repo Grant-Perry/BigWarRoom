@@ -18,6 +18,7 @@ import SwiftUI
 /// - Position badges and live indicators
 struct EnhancedNFLTeamRosterView: View {
     let teamCode: String
+    let rootDismiss: (() -> Void)? // 🔥 NEW: Optional root dismiss action
     
     // FIXED: Define enum first
     enum ActiveSheet: Identifiable {
@@ -44,8 +45,9 @@ struct EnhancedNFLTeamRosterView: View {
     // FIXED: Consolidated sheet approach to avoid conflicts
     @State private var activeSheet: ActiveSheet? = nil
     
-    init(teamCode: String) {
+    init(teamCode: String, rootDismiss: (() -> Void)? = nil) {
         self.teamCode = teamCode
+        self.rootDismiss = rootDismiss
         self._viewModel = StateObject(wrappedValue: NFLTeamRosterViewModel(teamCode: teamCode))
     }
     
@@ -68,7 +70,11 @@ struct EnhancedNFLTeamRosterView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        dismiss()
+                        if let rootDismiss = rootDismiss {
+                            rootDismiss()
+                        } else {
+                            dismiss()
+                        }
                     }
                     .foregroundColor(.white)
                 }
@@ -86,21 +92,11 @@ struct EnhancedNFLTeamRosterView: View {
                     team: NFLTeam.team(for: player.team ?? "")
                 )
             case .opponentRoster(let teamCode):
-                NavigationView {
-                    EnhancedNFLTeamRosterView(teamCode: teamCode)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Close") {
-                                    activeSheet = nil
-                                }
-                                .foregroundColor(.white)
-                            }
-                        }
-                }
-                .onAppear {
-                    print("🔥 OPPONENT ROSTER SHEET APPEARED: \(teamCode)")
-                }
+                // 🔥 FIXED: Pass rootDismiss to close entire sheet stack
+                EnhancedNFLTeamRosterView(teamCode: teamCode, rootDismiss: rootDismiss)
+                    .onAppear {
+                        print("🔥 OPPONENT ROSTER SHEET APPEARED: \(teamCode)")
+                    }
             }
         }
     }
@@ -154,6 +150,27 @@ struct EnhancedNFLTeamRosterView: View {
     private var enhancedRosterContentView: some View {
         ScrollView {
             LazyVStack(spacing: 20) {
+                // 🔥 FIXED: Add close button at the top of content
+                HStack {
+                    Spacer()
+                    
+                    Button(action: { 
+                        // Close entire sheet stack if rootDismiss is available
+                        if let rootDismiss = rootDismiss {
+                            rootDismiss()
+                        } else {
+                            dismiss()
+                        }
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.white.opacity(0.8))
+                            .background(Circle().fill(Color.black.opacity(0.6)))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                
                 // Enhanced team header
                 enhancedTeamHeaderCard
                     .padding(.horizontal, 16)
@@ -223,74 +240,74 @@ struct EnhancedNFLTeamRosterView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
-                        if let gameInfo = getGameInfo() {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(gameInfo.isLive ? "LIVE" : "FINAL")
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(gameInfo.isLive ? .red : .green)
-                                
-                                Text(gameInfo.scoreDisplay)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
                     }
                 }
                 
                 Spacer()
             }
             
-            // Game status bar (if available)
+            // Game status bar (if available) - ENHANCED WITH MOVED FINAL/SCORE
             if let gameInfo = getGameInfo() {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Week 3 • \(gameInfo.gameTime)")
+                        Text("Week 3 • FINAL") // Static for now
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         
-                        // FIXED: Only logo version - NO TEXT
-                        Button(action: {
-                            let opponentCode = gameInfo.opponent
-                            print("🔥 SETTING ACTIVE SHEET TO OPPONENT ROSTER: \(opponentCode)")
-                            activeSheet = .opponentRoster(opponentCode)
-                        }) {
-                            HStack(spacing: 8) {
-                                Text("vs")
-                                    .font(.title3)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                
-                                // FIXED: Opponent team logo with proper button behavior
+                        // FIXED: vs section with opponent logo only
+                        HStack(spacing: 12) {
+                            Text("vs")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            
+                            // FIXED: Opponent team logo with proper button behavior
+                            Button(action: {
+                                let opponentCode = gameInfo.opponent
+                                print("🔥 SETTING ACTIVE SHEET TO OPPONENT ROSTER: \(opponentCode)")
+                                activeSheet = .opponentRoster(opponentCode)
+                            }) {
                                 TeamLogoView(teamCode: gameInfo.opponent, size: 40)
                                     .clipShape(Circle())
                                     .overlay(
                                         Circle()
                                             .stroke(Color.white.opacity(0.3), lineWidth: 1)
                                     )
-                                    .allowsHitTesting(false) // CRITICAL: Logo doesn't intercept taps
                             }
-                            .contentShape(Rectangle()) // CRITICAL: Entire HStack is tappable
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
                     
                     Spacer()
                     
-                    if gameInfo.isLive {
-                        HStack(spacing: 8) {
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 8, height: 8)
-                                .opacity(0.8)
-                                .scaleEffect(1.2)
+                    // 🔥 MOVED: Game score and status to trailing side
+                    VStack(alignment: .trailing, spacing: 4) {
+                        // Score display with larger font and win/lose colors
+                        HStack(spacing: 6) {
+                            Text("\(gameInfo.actualAwayScore)")
+                                .font(.system(size: 24, weight: .bold)) // Larger font
+                                .foregroundColor(gameInfo.actualAwayScore > gameInfo.actualHomeScore ? .gpGreen : .gpRedPink)
                             
-                            Text("LIVE")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.red)
+                            Text("-")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                            
+                            Text("\(gameInfo.actualHomeScore)")
+                                .font(.system(size: 24, weight: .bold)) // Larger font
+                                .foregroundColor(gameInfo.actualHomeScore > gameInfo.actualAwayScore ? .gpGreen : .gpRedPink)
                         }
+                        
+                        // FINAL/LIVE status
+                        Text(gameInfo.isLive ? "LIVE" : "FINAL")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(gameInfo.isLive ? .red : .white.opacity(0.8))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(
+                                gameInfo.isLive ? 
+                                AnyView(Capsule().fill(Color.red.opacity(0.2))) :
+                                AnyView(Color.clear)
+                            )
                     }
                 }
                 .padding(.horizontal, 16)
@@ -390,6 +407,22 @@ struct EnhancedNFLTeamRosterView: View {
     
     private var enhancedErrorView: some View {
         VStack(spacing: 25) {
+            // 🔥 FIXED: Add close button at the top
+            HStack {
+                Spacer()
+                
+                Button(action: { if let rootDismiss = rootDismiss { rootDismiss() } else { dismiss() } }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.white.opacity(0.7))
+                        .background(Circle().fill(Color.black.opacity(0.5)))
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            
+            Spacer()
+            
             ZStack {
                 Circle()
                     .fill(Color.red.opacity(0.2))
@@ -417,7 +450,8 @@ struct EnhancedNFLTeamRosterView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 20)
                 } else {
-                    Text("All players with 0.0 points have been filtered out from this completed game")
+                    // 🔥 FIXED: More accurate message that doesn't assume game is completed
+                    Text("All contributing players are currently filtered out. This could be due to incomplete data or the game hasn't started yet.")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -425,17 +459,38 @@ struct EnhancedNFLTeamRosterView: View {
                 }
             }
             
-            Button("Try Again") {
-                Task {
-                    await viewModel.loadTeamRoster()
+            // Buttons row
+            HStack(spacing: 16) {
+                // Close button
+                Button("Close") {
+                    if let rootDismiss = rootDismiss {
+                        rootDismiss()
+                    } else {
+                        dismiss()
+                    }
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.gray.opacity(0.3))
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .fontWeight(.semibold)
+                
+                // Try Again button  
+                Button("Try Again") {
+                    Task {
+                        await viewModel.loadTeamRoster()
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(getTeamColor())
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .fontWeight(.semibold)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 12)
-            .background(getTeamColor())
-            .foregroundColor(.white)
-            .cornerRadius(12)
-            .fontWeight(.semibold)
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

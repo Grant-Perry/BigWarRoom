@@ -58,60 +58,67 @@ final class LeagueMatchupProvider {
     
     /// Identify the authenticated user's team ID in this league
     func identifyMyTeamID() async -> String? {
-        print("🔍 TEAM ID: Starting identification for \(league.league.name) (\(league.source))")
+//        print("🔍 TEAM ID: Starting identification for \(league.league.name) (\(league.source))")
         
         if league.source == .sleeper {
             if let rosterID = await getCurrentUserRosterID() {
                 let teamID = String(rosterID)
-                print("✅ TEAM ID: Found Sleeper team ID '\(teamID)' for \(league.league.name)")
+//                print("✅ TEAM ID: Found Sleeper team ID '\(teamID)' for \(league.league.name)")
                 return teamID
             } else {
-                print("❌ TEAM ID: Failed to find Sleeper roster ID for \(league.league.name)")
+//                print("❌ TEAM ID: Failed to find Sleeper roster ID for \(league.league.name)")
             }
         } else if league.source == .espn {
             if let teamID = await getESPNUserTeamID() {
-                print("✅ TEAM ID: Found ESPN team ID '\(teamID)' for \(league.league.name)")
+//                print("✅ TEAM ID: Found ESPN team ID '\(teamID)' for \(league.league.name)")
                 return teamID
             } else {
-                print("❌ TEAM ID: Failed to find ESPN team ID for \(league.league.name)")
+//                print("❌ TEAM ID: Failed to find ESPN team ID for \(league.league.name)")
             }
         }
         
-        print("❌ TEAM ID: No team ID found for \(league.league.name)")
+//        print("❌ TEAM ID: No team ID found for \(league.league.name)")
         return nil
     }
     
     /// Get current user's roster ID for Sleeper leagues
     private func getCurrentUserRosterID() async -> Int? {
-        let currentUserID = sleeperCredentials.currentUserID
-        print("🔍 SLEEPER ROSTER: CurrentUserID = '\(currentUserID)'")
-        print("🔍 SLEEPER ROSTER: League ID = '\(league.league.leagueID)'")
+        // 🔥 FIX: Use username resolution instead of empty currentUserID
+        guard let username = sleeperCredentials.getUserIdentifier() else {
+            return nil
+        }
         
-        guard !currentUserID.isEmpty else {
-            print("❌ SLEEPER ROSTER: CurrentUserID is empty!")
+
+        // Resolve username to user ID if needed
+        let resolvedUserID: String
+        do {
+            if username.allSatisfy({ $0.isNumber }) {
+                // Already a user ID
+                resolvedUserID = username
+            } else {
+                // It's a username, resolve to user ID
+                let user = try await SleeperAPIClient.shared.fetchUser(username: username)
+                resolvedUserID = user.userID
+            }
+        } catch {
             return nil
         }
         
         do {
-            print("🔍 SLEEPER ROSTER: Fetching rosters...")
             let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
-            print("🔍 SLEEPER ROSTER: Fetched \(rosters.count) rosters")
-            
+
             for roster in rosters {
                 print("   - Roster \(roster.rosterID): Owner '\(roster.ownerID ?? "nil")'")
             }
             
-            let userRoster = rosters.first { $0.ownerID == currentUserID }
+            let userRoster = rosters.first { $0.ownerID == resolvedUserID }
             
             if let userRoster = userRoster {
-                print("✅ SLEEPER ROSTER: Found my roster ID: \(userRoster.rosterID)")
                 return userRoster.rosterID
             } else {
-                print("❌ SLEEPER ROSTER: No roster found for user ID '\(currentUserID)'")
                 return nil
             }
         } catch {
-            print("❌ SLEEPER ROSTER: API Error: \(error)")
             return nil
         }
     }
@@ -119,41 +126,27 @@ final class LeagueMatchupProvider {
     /// Get current user's team ID for ESPN leagues - WITH DEBUG LOGGING
     private func getESPNUserTeamID() async -> String? {
         let myESPNID = AppConstants.GpESPNID
-        print("🔍 ESPN TEAM: Starting identification for league: \(league.league.name)")
-        print("   - League ID: \(league.league.leagueID)")
-        print("   - My ESPN ID (GpESPNID): \(myESPNID)")
-        
+
         do {
-            print("🔍 ESPN TEAM: Fetching ESPN league data...")
             let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            print("✅ ESPN TEAM: ESPN League data fetched successfully")
-            
+
             if let teams = espnLeague.teams {
-                print("🔍 ESPN TEAM: Found \(teams.count) teams in league:")
-                
+
                 for team in teams {
                     let managerName = espnLeague.getManagerName(for: team.owners)
-                    print("     - Team \(team.id): '\(managerName)' (Owners: \(team.owners ?? []))")
-                    
+
                     if let owners = team.owners {
-                        print("       - Checking if my ESPN ID '\(myESPNID)' is in owners: \(owners)")
                         if owners.contains(myESPNID) {
-                            print("✅ ESPN TEAM: MATCH FOUND! My team ID is: \(team.id)")
                             return String(team.id)
                         }
                     } else {
-                        print("       - No owners found for team \(team.id)")
                     }
                 }
                 
-                print("❌ ESPN TEAM: NO MATCH - My ESPN ID '\(myESPNID)' was not found in any team owners")
             } else {
-                print("❌ ESPN TEAM: espnLeague.teams is nil")
             }
-            
             return nil
         } catch {
-            print("❌ ESPN TEAM: API ERROR: \(error)")
             return nil
         }
     }
@@ -195,22 +188,16 @@ final class LeagueMatchupProvider {
     
     /// Find user's matchup by team ID - WITH DEBUG LOGGING
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
-//        print("🔍 FINDING MY MATCHUP with team ID: \(myTeamID)")
-//        print("   - Available matchups: \(matchups.count)")
-        
+
         for matchup in matchups {
-//            print("   - Matchup: \(matchup.homeTeam.ownerName) (ID: \(matchup.homeTeam.id)) vs \(matchup.awayTeam.ownerName) (ID: \(matchup.awayTeam.id))")
-            
+
             if matchup.homeTeam.id == myTeamID {
-//                print("✅ FOUND: I am the HOME team (\(matchup.homeTeam.ownerName))")
                 return matchup
             } else if matchup.awayTeam.id == myTeamID {
-//                print("✅ FOUND: I am the AWAY team (\(matchup.awayTeam.ownerName))")
                 return matchup
             }
         }
         
-//        print("❌ NOT FOUND: No matchup found for my team ID '\(myTeamID)'")
         return nil
     }
     
@@ -691,7 +678,6 @@ final class LeagueMatchupProvider {
         
         await MainActor.run {
             FantasyViewModel.shared.currentESPNLeague = espnLeague
-//            print("✅ SYNC: Synced ESPN league data to main FantasyViewModel for score breakdowns")
         }
     }
 }
