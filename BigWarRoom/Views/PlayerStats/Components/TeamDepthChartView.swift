@@ -13,8 +13,8 @@ struct TeamDepthChartView: View {
     let team: NFLTeam?
     
     @StateObject private var teamAssets = TeamAssetManager.shared
-    @State private var isExpanded: Bool = false // Changed to false for initial minimized state
-    
+    @State private var isExpanded: Bool = true 
+
     // 🏈 PLAYER NAVIGATION: Remove sheet states, use NavigationLink instead
     // BEFORE: Used sheet presentation which failed for nested sheets
     // AFTER: Use NavigationLink for proper nested navigation
