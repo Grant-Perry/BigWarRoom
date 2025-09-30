@@ -20,7 +20,8 @@ struct MatchupsHubView: View {
     @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
     
     // MARK: - Navigation State
-    @State internal var showingMatchupDetail: UnifiedMatchup?
+    // 🏈 NAVIGATION FREEDOM: Remove showingMatchupDetail - using NavigationLinks instead
+    // @State internal var showingMatchupDetail: UnifiedMatchup?
     @State internal var showingSettings = false
     @State internal var showingWeekPicker = false
     
@@ -57,40 +58,38 @@ struct MatchupsHubView: View {
 
     // MARK: - Body
     var body: some View {
-        NavigationView {
-            ZStack {
-                buildBackgroundView()
+        // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent TabView provides it
+        // BEFORE: NavigationView { ... }
+        // AFTER: Direct content - NavigationView provided by parent TabView
+        ZStack {
+            buildBackgroundView()
 
-                // 🔥 FIXED: Only show empty state if user has NO service connections
-                let hasAnyService = espnCredentials.hasValidCredentials || sleeperCredentials.hasValidCredentials
+            // 🔥 FIXED: Only show empty state if user has NO service connections
+            let hasAnyService = espnCredentials.hasValidCredentials || sleeperCredentials.hasValidCredentials
 
-                // Show league loading and hero/minibar progress IMMEDIATELY
-                if matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty {
-                    buildLoadingStateView()
-                } else if !hasAnyService && !matchupsHubViewModel.isLoading {
-                    // Only show empty state if user has NO services connected
-                    buildEmptyStateView()
-                } else {
-                    // Show content even if no matchups but user has services connected
-                    buildContentView()
-                }
-            }
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .onAppear {
-                loadInitialData()
-                startPeriodicRefresh()
-            }
-            .onDisappear {
-                stopPeriodicRefresh()
-                stopJustMeModeTimer()
-            }
-            .refreshable {
-                await handlePullToRefresh()
+            // Show league loading and hero/minibar progress IMMEDIATELY
+            if matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty {
+                buildLoadingStateView()
+            } else if !hasAnyService && !matchupsHubViewModel.isLoading {
+                // Only show empty state if user has NO services connected
+                buildEmptyStateView()
+            } else {
+                // Show content even if no matchups but user has services connected
+                buildContentView()
             }
         }
-        .sheet(item: $showingMatchupDetail) { matchup in
-            buildMatchupDetailSheet(for: matchup)
+        .navigationTitle("")
+        .navigationBarHidden(true)
+        .onAppear {
+            loadInitialData()
+            startPeriodicRefresh()
+        }
+        .onDisappear {
+            stopPeriodicRefresh()
+            stopJustMeModeTimer()
+        }
+        .refreshable {
+            await handlePullToRefresh()
         }
         .sheet(isPresented: $showingSettings) {
             AppSettingsView()

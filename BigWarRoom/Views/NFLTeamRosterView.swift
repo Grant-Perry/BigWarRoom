@@ -21,10 +21,6 @@ struct NFLTeamRosterView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: NFLTeamRosterViewModel
     
-    // Player stats sheet
-    @State private var selectedPlayer: SleeperPlayer?
-    @State private var showStats = false
-    
     // MARK: - Initialization
     
     init(teamCode: String) {
@@ -60,14 +56,6 @@ struct NFLTeamRosterView: View {
         .preferredColorScheme(.dark)
         .task {
             await viewModel.loadTeamRoster()
-        }
-        .sheet(isPresented: $showStats) {
-            if let player = selectedPlayer {
-                PlayerStatsCardView(
-                    player: player,
-                    team: NFLTeam.team(for: player.team ?? "")
-                )
-            }
         }
     }
     
@@ -190,10 +178,7 @@ struct NFLTeamRosterView: View {
                     NFLPlayerCard(
                         player: player,
                         viewModel: viewModel,
-                        onPlayerTap: { selectedPlayer in
-                            self.selectedPlayer = selectedPlayer
-                            self.showStats = true
-                        }
+                        onPlayerTap: nil
                     )
                 }
             }
@@ -264,66 +249,75 @@ struct NFLTeamRosterView: View {
 struct NFLPlayerCard: View {
     let player: SleeperPlayer
     let viewModel: NFLTeamRosterViewModel
-    let onPlayerTap: (SleeperPlayer) -> Void
+    let onPlayerTap: ((SleeperPlayer) -> Void)?
     
     var body: some View {
-        Button(action: { onPlayerTap(player) }) {
-            HStack(spacing: 16) {
-                // Player image/position indicator
-                ZStack {
-                    Circle()
-                        .fill(getPositionColor(player.position ?? "").opacity(0.2))
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Circle()
-                                .stroke(getPositionColor(player.position ?? ""), lineWidth: 2)
-                        )
-                    
-                    Text(player.position ?? "?")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(getPositionColor(player.position ?? ""))
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    // Player name
-                    Text("\(player.firstName ?? "") \(player.lastName ?? "")")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    // Stats breakdown
-                    if let breakdown = viewModel.formatPlayerStatBreakdown(player), !breakdown.isEmpty {
-                        Text(breakdown)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                
-                Spacer()
-                
-                // Points
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(String(format: "%.1f", viewModel.getPlayerPoints(for: player) ?? 0.0))
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(getPointsColor())
-                    
-                    Text("pts")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.black.opacity(0.3))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+        NavigationLink(
+            destination: PlayerStatsCardView(
+                player: player,
+                team: NFLTeam.team(for: player.team ?? "")
             )
+        ) {
+            cardContent
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var cardContent: some View {
+        HStack(spacing: 16) {
+            // Player image/position indicator
+            ZStack {
+                Circle()
+                    .fill(getPositionColor(player.position ?? "").opacity(0.2))
+                    .frame(width: 50, height: 50)
+                    .overlay(
+                        Circle()
+                            .stroke(getPositionColor(player.position ?? ""), lineWidth: 2)
+                    )
+                
+                Text(player.position ?? "?")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(getPositionColor(player.position ?? ""))
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                // Player name
+                Text("\(player.firstName ?? "") \(player.lastName ?? "")")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                // Stats breakdown
+                if let breakdown = viewModel.formatPlayerStatBreakdown(player), !breakdown.isEmpty {
+                    Text(breakdown)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            
+            Spacer()
+            
+            // Points
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.1f", viewModel.getPlayerPoints(for: player) ?? 0.0))
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(getPointsColor())
+                
+                Text("pts")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.3))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
     }
     
     private func getPositionColor(_ position: String) -> Color {
@@ -347,6 +341,8 @@ struct NFLPlayerCard: View {
 }
 
 #Preview("NFL Team Roster") {
-    NFLTeamRosterView(teamCode: "KC")
-        .preferredColorScheme(.dark)
+    NavigationView {
+        NFLTeamRosterView(teamCode: "KC")
+            .preferredColorScheme(.dark)
+    }
 }

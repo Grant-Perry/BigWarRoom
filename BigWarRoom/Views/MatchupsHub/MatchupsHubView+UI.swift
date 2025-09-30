@@ -70,7 +70,9 @@ extension MatchupsHubView {
                     await handlePullToRefresh()
                 }
             },
-            onShowDetail: showMatchupDetail,
+            // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLinks handle navigation directly
+            // BEFORE: onShowDetail: showMatchupDetail,
+            // AFTER: Components use NavigationLinks instead of callbacks
             onMicroCardTap: handleMicroCardTap,
             onExpandedCardDismiss: {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {

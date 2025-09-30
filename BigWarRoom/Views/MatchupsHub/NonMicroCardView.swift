@@ -10,7 +10,8 @@ import SwiftUI
 struct NonMicroCardView: View {
     let matchup: UnifiedMatchup
     let isWinning: Bool
-    let onTap: () -> Void
+    // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
+    // let onTap: () -> Void
     
     // Accept dualViewMode parameter to make cards more compact in Single view
     var dualViewMode: Bool = true
@@ -21,9 +22,10 @@ struct NonMicroCardView: View {
     @State private var eliminatedPulse: Bool = false
     
     var body: some View {
-        Button(action: {
-            handleTap()
-        }) {
+        // 🏈 NAVIGATION FREEDOM: Remove Button wrapper - NavigationLink handles taps
+        // BEFORE: Button(action: { handleTap() }) { ... }
+        // AFTER: Direct content - NavigationLink in parent handles navigation
+        VStack {
             // Conditional content: Show eliminated state or regular card
             if matchup.isMyManagerEliminated {
                 NonMicroEliminatedContent(
@@ -40,8 +42,10 @@ struct NonMicroCardView: View {
                 )
             }
         }
-        .buttonStyle(PlainButtonStyle())
         .scaleEffect(cardScale)
+        // 🏈 NAVIGATION FREEDOM: Remove onTapGesture - conflicts with NavigationLink
+        // BEFORE: .onTapGesture { handleTapFeedback() }
+        // AFTER: NavigationLink handles all tap interactions
         .onAppear {
             if matchup.isLive {
                 startLiveAnimations()
@@ -55,7 +59,8 @@ struct NonMicroCardView: View {
     
     // MARK: - Animation & Interaction
     
-    private func handleTap() {
+    // 🏈 NAVIGATION FREEDOM: Simplified tap feedback without preventing NavigationLink
+    private func handleTapFeedback() {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
@@ -67,7 +72,7 @@ struct NonMicroCardView: View {
             withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                 cardScale = 1.0
             }
-            onTap()
+            // 🏈 NAVIGATION FREEDOM: Don't call onTap() - NavigationLink handles navigation
         }
     }
     

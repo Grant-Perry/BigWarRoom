@@ -44,15 +44,23 @@ extension String {
 /// - State management for dismiss
 /// - 🔧 BLANK SHEET FIX: Loading states and progress indication
 /// - 🔧 BLANK SHEET FIX: Error handling and recovery
+/// - 🏈 PLAYER NAVIGATION: Mutable player state for depth chart navigation
 /// 
 /// All business logic has been moved to PlayerStatsViewModel
 /// All UI components have been extracted to separate, reusable view files
 struct PlayerStatsCardView: View {
-    let player: SleeperPlayer
-    let team: NFLTeam?
+    // 🏈 PLAYER NAVIGATION: Convert to mutable state for updating current player
+    @State private var currentPlayer: SleeperPlayer
+    @State private var currentTeam: NFLTeam?
     
     @Environment(\.dismiss) private var dismiss
     @StateObject private var playerStatsViewModel = PlayerStatsViewModel()
+    
+    // 🏈 PLAYER NAVIGATION: Keep original initializer for external navigation
+    init(player: SleeperPlayer, team: NFLTeam?) {
+        self._currentPlayer = State(initialValue: player)
+        self._currentTeam = State(initialValue: team)
+    }
     
     var body: some View {
         // 🔧 BLANK SHEET FIX: CRITICAL CHANGE - Conditional view rendering
@@ -63,19 +71,19 @@ struct PlayerStatsCardView: View {
                 // 🔧 BLANK SHEET FIX: Show loading view instead of blank screen
                 // This displays player info + loading spinner immediately when sheet opens
                 PlayerStatsLoadingView(
-                    player: player,
-                    team: team,
+                    player: currentPlayer,
+                    team: currentTeam,
                     loadingMessage: playerStatsViewModel.loadingMessage
                 )
                 .onAppear {
-                    print("🔧 UI DEBUG: Showing PlayerStatsLoadingView for \(player.fullName)")
+                    print("🔧 UI DEBUG: Showing PlayerStatsLoadingView for \(currentPlayer.fullName)")
                     print("🔧 UI DEBUG: Loading message: '\(playerStatsViewModel.loadingMessage)'")
                 }
             } else {
                 // 🔧 BLANK SHEET FIX: Show main content once loaded (even with partial data after timeout)
                 mainContentView
                     .onAppear {
-                        print("🔧 UI DEBUG: Showing mainContentView for \(player.fullName)")
+                        print("🔧 UI DEBUG: Showing mainContentView for \(currentPlayer.fullName)")
                     }
                     .overlay(alignment: .top) {
                         // 🔧 BLANK SHEET FIX: Show timeout warning banner if loading failed but we have partial data
@@ -92,19 +100,30 @@ struct PlayerStatsCardView: View {
                 }
             }
         }
-        .task {
+        .task(id: currentPlayer.playerID) { // 🏈 PLAYER NAVIGATION: Re-run task when player changes
             // 🔧 BLANK SHEET FIX: Initialize ViewModel with player data
             // This triggers the loading process which will set isLoadingPlayerData = true
-            print("🔧 UI DEBUG: .task called for \(player.fullName)")
+            print("🔧 UI DEBUG: .task called for \(currentPlayer.fullName)")
             print("🔧 UI DEBUG: Initial isLoadingPlayerData = \(playerStatsViewModel.isLoadingPlayerData)")
-            playerStatsViewModel.setupPlayer(player)
+            playerStatsViewModel.setupPlayer(currentPlayer)
         }
         .onAppear {
-            print("🔧 UI DEBUG: PlayerStatsCardView appeared for \(player.fullName)")
+            print("🔧 UI DEBUG: PlayerStatsCardView appeared for \(currentPlayer.fullName)")
         }
         .onDisappear {
-            print("🔧 UI DEBUG: PlayerStatsCardView disappeared for \(player.fullName)")
+            print("🔧 UI DEBUG: PlayerStatsCardView disappeared for \(currentPlayer.fullName)")
         }
+    }
+    
+    // 🏈 PLAYER NAVIGATION: Callback to update current player from depth chart
+    private func updateCurrentPlayer(_ newPlayer: SleeperPlayer) {
+        print("🏈 NAVIGATION DEBUG: Updating current player from \(currentPlayer.fullName) to \(newPlayer.fullName)")
+        
+        // Update the current player and team
+        currentPlayer = newPlayer
+        currentTeam = NFLTeam.team(for: newPlayer.team ?? "")
+        
+        // ViewModel will automatically reload due to task(id: currentPlayer.playerID)
     }
     
     // MARK: - 🔧 BLANK SHEET FIX: Timeout Warning Banner
@@ -150,30 +169,31 @@ struct PlayerStatsCardView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     // Header with player image and basic info
-                    PlayerStatsHeaderView(player: player, team: team)
+                    PlayerStatsHeaderView(player: currentPlayer, team: currentTeam)
                         .padding(.horizontal, 24) // Much more padding to header
                     
                     // Live stats section
                     PlayerLiveStatsView(
                         playerStatsData: playerStatsViewModel.playerStatsData,
-                        team: team,
+                        team: currentTeam,
                         isLoading: playerStatsViewModel.isLoadingStats
                     )
                     .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Rostered section
-                    PlayerRosteredSectionView(player: player, team: team)
+                    PlayerRosteredSectionView(player: currentPlayer, team: currentTeam)
                         .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Team depth chart section
                     TeamDepthChartView(
                         depthChartData: playerStatsViewModel.depthChartData,
-                        team: team
+                        team: currentTeam,
+                        onPlayerTap: updateCurrentPlayer // 🏈 PLAYER NAVIGATION: Pass callback down
                     )
                     .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Player details section
-                    PlayerDetailsInfoView(player: player)
+                    PlayerDetailsInfoView(player: currentPlayer)
                         .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Fantasy analysis section

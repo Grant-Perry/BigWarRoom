@@ -70,11 +70,12 @@ struct RosterView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $rosterViewModel.showingPlayerStats) {
-            if let player = rosterViewModel.selectedPlayerForStats,
-               let team = NFLTeam.team(for: player.team ?? "") {
-                PlayerStatsCardView(player: player, team: team)
-            }
-        }
+        // 🔥 DEATH TO SHEETS: Remove PlayerStatsCardView sheet - using NavigationLink instead
+        // BEFORE: .sheet(isPresented: $rosterViewModel.showingPlayerStats) {
+        //     if let player = rosterViewModel.selectedPlayerForStats,
+        //        let team = NFLTeam.team(for: player.team ?? "") {
+        //         PlayerStatsCardView(player: player, team: team)
+        //     }
+        // }
     }
 }

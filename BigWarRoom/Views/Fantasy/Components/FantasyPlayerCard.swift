@@ -18,6 +18,7 @@ struct FantasyPlayerCard: View {
     @StateObject private var viewModel = FantasyPlayerViewModel()
     
     @State private var showingScoreBreakdown = false
+    @State private var showingPlayerDetail = false // 🔥 FIX: Add dedicated player detail state
     
     var body: some View {
         VStack {
@@ -47,8 +48,9 @@ struct FantasyPlayerCard: View {
             .background(buildCardBackground())
             .overlay(buildCardBorder())
             .clipShape(RoundedRectangle(cornerRadius: 15))
+            // 🔥 FIX: Replace background NavigationLink with onTapGesture for player detail
             .onTapGesture {
-                viewModel.showingPlayerDetail = true
+                showingPlayerDetail = true
             }
             .onAppear {
                 viewModel.configurePlayer(player)
@@ -57,7 +59,8 @@ struct FantasyPlayerCard: View {
                 // Refresh game data when app becomes active
             }
         }
-        .sheet(isPresented: $viewModel.showingPlayerDetail) {
+        // 🔥 FIX: Use sheet for player details to match score breakdown pattern
+        .sheet(isPresented: $showingPlayerDetail) {
             NavigationView {
                 if let sleeperPlayer = viewModel.getSleeperPlayerData(for: player) {
                     PlayerStatsCardView(

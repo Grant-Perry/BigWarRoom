@@ -16,57 +16,87 @@ struct NFLScheduleView: View {
     
     // 🔥 NEW: Sheet state for team filtered matchups
     @State private var showingTeamMatchups = false
+    // 🔥 NEW: Navigation state for team filtered matchups  
     @State private var selectedGame: ScheduleGame?
+    // 🔥 NUCLEAR: Use NavigationPath for programmatic navigation
+    @State private var navigationPath = NavigationPath()
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // FOX-style background
-                foxStyleBackground
-                    .ignoresSafeArea()
+        // 🏈 NAVIGATION FREEDOM: Remove NavigationStack - parent TabView provides it
+        ZStack {
+            // FOX-style background
+            foxStyleBackground
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header Section
+                scheduleHeader
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
                 
-                VStack(spacing: 0) {
-                    // Header Section
-                    scheduleHeader
-                        .padding(.top, 12)
-                        .padding(.bottom, 16)
-                    
-                    // Games List
-                    gamesList
-                }
-                
+                // Games List
+                gamesList
             }
-            .navigationBarHidden(true)
-            .sheet(isPresented: $viewModel.showingGameDetail) {
-                if let game = viewModel.selectedGame {
-                    GameDetailView(game: game)
-                }
-            }
-            // 🔥 NEW: Team matchups sheet with proper rootDismiss
-            .sheet(isPresented: $showingTeamMatchups) {
-                if let game = selectedGame {
-                    TeamFilteredMatchupsView(
-                        awayTeam: game.awayTeam,
-                        homeTeam: game.homeTeam,
-                        matchupsHubViewModel: matchupsHubViewModel,
-                        gameData: game,
-                        rootDismiss: { 
-                            showingTeamMatchups = false 
-                            selectedGame = nil
-                        }
-                    )
-                }
-            }
-            // Replace WeekPickerSheet with Mission Control's WeekPickerView
-            .sheet(isPresented: $showingWeekPicker) {
-                WeekPickerView(isPresented: $showingWeekPicker)
-            }
-            // Sync with shared week manager
-            .onChange(of: weekManager.selectedWeek) { _, newWeek in
-                viewModel.selectWeek(newWeek)
+            
+        }
+        .navigationBarHidden(true)
+        .sheet(isPresented: $viewModel.showingGameDetail) {
+            if let game = viewModel.selectedGame {
+                GameDetailView(game: game)
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
+        // 🏈 NAVIGATION: Add destination handlers for Schedule tab - moved from AppEntryView
+        .navigationDestination(for: String.self) { value in
+            if value.hasPrefix("TEST_") {
+                // Simple test view with no async operations
+                VStack {
+                    Text("TEST VIEW")
+                        .font(.largeTitle)
+                        .foregroundColor(.white)
+                    
+                    Text("Team: \(String(value.dropFirst(5)))")
+                        .font(.title2)
+                        .foregroundColor(.white)
+                    
+                    Text("If you can see this without bounce-back, navigation works!")
+                        .font(.body)
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                    
+                    Button("Go Back") {
+                        navigationPath.removeLast()
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.ignoresSafeArea())
+                .navigationBarHidden(true)
+            } else {
+                EnhancedNFLTeamRosterView(teamCode: value)
+            }
+        }
+        .navigationDestination(for: SleeperPlayer.self) { player in
+            PlayerStatsCardView(
+                player: player,
+                team: NFLTeam.team(for: player.team ?? "")
+            )
+        }
+        // 🏈 NAVIGATION FREEDOM: Remove sheet - using NavigationLink instead
+        // BEFORE: .sheet(isPresented: $showingTeamMatchups) { TeamFilteredMatchupsView(...) }
+        // AFTER: NavigationLinks in game cards handle navigation
+        .sheet(isPresented: $showingWeekPicker) {
+            WeekPickerView(isPresented: $showingWeekPicker)
+        }
+        // Sync with shared week manager
+        .onChange(of: weekManager.selectedWeek) { _, newWeek in
+            viewModel.selectWeek(newWeek)
+        }
         .onAppear {
             print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
             // Sync initial week
@@ -232,14 +262,15 @@ struct NFLScheduleView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.games, id: \.id) { game in
-                    // 🔥 CHANGED: Use Button instead of NavigationLink for sheet presentation
-                    Button(action: {
-                        selectedGame = game
-                        showingTeamMatchups = true
-                        print("🔗 Card tapped: \(game.awayTeam) vs \(game.homeTeam)")
-                    }) {
+                    // 🏈 NAVIGATION FREEDOM: Use NavigationLink instead of Button + sheet
+                    NavigationLink(destination: TeamFilteredMatchupsView(
+                        awayTeam: game.awayTeam,
+                        homeTeam: game.homeTeam,
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        gameData: game
+                    )) {
                         ScheduleGameCard(game: game) {
-                            // Card action is handled by the button now
+                            // NavigationLink handles navigation
                         }
                         .frame(maxWidth: .infinity)
                         .frame(width: UIScreen.main.bounds.width * 0.8)

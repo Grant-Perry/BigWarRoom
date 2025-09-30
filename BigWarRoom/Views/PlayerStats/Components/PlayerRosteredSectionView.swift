@@ -167,8 +167,13 @@ private struct RosteredLeagueRow: View {
     let matchup: UnifiedMatchup
     
     @Environment(\.dismiss) private var dismiss
+    // 🏈 NAVIGATION FREEDOM: Remove sheet state - using NavigationLink instead
+    // @State private var showingMatchupDetail = false
     
     var body: some View {
+        // 🏈 NAVIGATION FREEDOM: Use NavigationLink instead of Button + sheet
+        // BEFORE: Button with sheet presentation
+        // AFTER: NavigationLink for proper navigation with tab bar visibility
         NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
             HStack(spacing: 8) {
                 // Platform logo (ESPN or Sleeper)
@@ -229,6 +234,8 @@ private struct RosteredLeagueRow: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
         }
         .buttonStyle(PlainButtonStyle())
+        // 🏈 NAVIGATION FREEDOM: Remove sheet - using NavigationLink instead
+        // .sheet(isPresented: $showingMatchupDetail) { MatchupDetailSheetsView(matchup: matchup) }
     }
     
     // MARK: - Computed Properties
