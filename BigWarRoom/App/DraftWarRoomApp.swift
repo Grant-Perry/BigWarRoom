@@ -38,44 +38,55 @@ struct DraftWarRoomMainView: View {
                 ZStack(alignment: .bottomTrailing) {
                     TabView(selection: $selectedTab) {
                         // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
-                        MatchupsHubView()
-                            .tabItem {
-                                Image(systemName: "target")
-                                Text("Mission Control")
-                            }
-                            .tag(0)
+                        // 🏈 NAVIGATION FREEDOM: Use NavigationStack instead of deprecated NavigationView
+                        NavigationStack {
+                            MatchupsHubView()
+                        }
+                        .tabItem {
+                            Image(systemName: "target")
+                            Text("Mission Control")
+                        }
+                        .tag(0)
                         
                         // TEAM ROSTERS TAB (replaces War Room)
-                        TeamRostersView()
-                            .tabItem {
-                                Image(systemName: "person.3.fill")
-                                Text("Team Rosters")
-                            }
-                            .tag(1)
+                        NavigationStack {
+                            TeamRostersView()
+                        }
+                        .tabItem {
+                            Image(systemName: "person.3.fill")
+                            Text("Team Rosters")
+                        }
+                        .tag(1)
                         
                         // NFL SCHEDULE TAB
-                        NFLScheduleView()
-                            .tabItem {
-                                Image(systemName: "calendar.circle.fill")
-                                Text("Schedule")
-                            }
-                            .tag(2)
+                        NavigationStack {
+                            NFLScheduleView()
+                        }
+                        .tabItem {
+                            Image(systemName: "calendar.circle.fill")
+                            Text("Schedule")
+                        }
+                        .tag(2)
                         
                         // All Live Players Tab
-                        AllLivePlayersView()
-                            .tabItem {
-                                Image(systemName: "chart.bar.fill")
-                                Text("Live Players")
-                            }
-                            .tag(3)
+                        NavigationStack {
+                            AllLivePlayersView()
+                        }
+                        .tabItem {
+                            Image(systemName: "chart.bar.fill")
+                            Text("Live Players")
+                        }
+                        .tag(3)
                         
                         // MORE TAB - Contains additional features AND settings (now includes War Room)
-                        MoreTabView(viewModel: viewModel)
-                            .tabItem {
-                                Image(systemName: "ellipsis")
-                                Text("More")
-                            }
-                            .tag(4)
+                        NavigationStack {
+                            MoreTabView(viewModel: viewModel)
+                        }
+                        .tabItem {
+                            Image(systemName: "ellipsis")
+                            Text("More")
+                        }
+                        .tag(4)
                     }
                     .preferredColorScheme(.dark)
                     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in

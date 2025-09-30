@@ -47,14 +47,41 @@ struct FantasyMatchupDetailView: View {
 	  let awayTeamIsWinning = awayTeamScore > homeTeamScore
 	  let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
-	  // 🔥 FIXED: Proper background that doesn't interfere with touch targets
-	  VStack(spacing: 0) {
-		 // Header with navigation and countdown - ALWAYS on top
-		 navigationHeader
-		    .zIndex(100) // 🔥 CRITICAL: Ensure buttons are always on top
-		    .background(Color.clear) // 🔥 Ensure no background blocking
+	  // 🔥 FIX: Only add background when NOT embedded in LeagueMatchupsTabView
+	  if isEmbeddedInTabView {
+		 // Embedded in LeagueMatchupsTabView - no background, content only
+		 contentView
+	  } else {
+		 // Standalone - add background
+		 ZStack {
+			// Background
+			ZStack {
+				Color.black
+				Image("BG7")
+					.resizable()
+					.aspectRatio(contentMode: .fill)
+					.opacity(0.35)
+			}
+			.ignoresSafeArea(.all)
+			
+			// Content
+			contentView
+		 }
+		 .navigationBarHidden(true)
+		 .navigationBarBackButtonHidden(true)
+		 .preferredColorScheme(.dark)
+	  }
+   }
 
-		 // Fantasy detail header with team comparison - moved up closer to navigation
+   // 🔥 FIX: Extract content to separate view with proper padding
+   private var contentView: some View {
+	  let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
+	  let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
+	  let awayTeamIsWinning = awayTeamScore > homeTeamScore
+	  let homeTeamIsWinning = homeTeamScore > awayTeamScore
+	  
+	  return VStack(spacing: 0) {
+		 // Fantasy detail header with team comparison
 		 FantasyDetailHeaderView(
 		    leagueName: leagueName,
 		    matchup: matchup,
@@ -76,29 +103,17 @@ struct FantasyMatchupDetailView: View {
 			   }
 		    }
 		 )
-		 .padding(.horizontal, 16) // 🔥 FIXED: Reduced padding to prevent clipping
+		 .padding(.horizontal, 16)
 		 .padding(.top, 8)
 		 .padding(.bottom, 16)
-		 .zIndex(99) // High z-index but below navigation
+		 .zIndex(99)
 
-		 // Roster content - now much closer to the top
+		 // Roster content
 		 rosterScrollView
-		    .zIndex(1) // Normal z-index for content
+		    .zIndex(1)
 	  }
-	  .background(
-	     // 🔥 FIXED: Background that doesn't interfere with touch targets
-	     ZStack {
-		    Color.black // Base background
-		    Image("BG7")
-			   .resizable()
-			   .aspectRatio(contentMode: .fill)
-			   .opacity(0.35)
-		 }
-		 .ignoresSafeArea(.container, edges: .bottom) // Only ignore bottom safe area
-	  )
-	  .navigationBarHidden(true)
-	  .navigationBarBackButtonHidden(true)
-	  .preferredColorScheme(.dark)
+	  // 🔥 FIX: Add proper safe area padding to prevent clipping
+	  .padding(.horizontal, isEmbeddedInTabView ? 0 : 0) // Let individual components handle their own padding
 	  .onAppear {
 		 handleViewAppearance()
 	  }
@@ -107,77 +122,10 @@ struct FantasyMatchupDetailView: View {
 	  }
    }
 
-	  // MARK: - View Components
-
-   private var navigationHeader: some View {
-	  HStack {
-		 Button(action: {
-			dismiss()
-		 }) {
-			Image(systemName: "xmark") // 🔥 CHANGED: X instead of left chevron
-			   .font(.system(size: 18, weight: .medium))
-			   .foregroundColor(.white)
-			   .frame(width: 44, height: 44)
-			   .background(Color.black.opacity(0.7)) // 🔥 FIXED: Darker background for better visibility
-			   .clipShape(Circle())
-		 }
-		 .contentShape(Rectangle()) // 🔥 CRITICAL: Ensure entire button area is tappable
-		 .zIndex(101) // 🔥 Highest z-index to ensure it's always clickable
-
-		 Spacer()
-
-			// League name and week info with platform logo
-		 VStack(spacing: 2) {
-			HStack(spacing: 8) {
-				  // Platform logo based on league source - CUSTOM SIZED LOGOS
-			   if let selectedLeague = fantasyViewModel?.selectedLeague {
-				  Group {
-					 switch selectedLeague.source {
-						case .sleeper:
-							  // CUSTOM Sleeper logo that respects our size
-						   Image("sleeperLogo")
-							  .resizable()
-							  .scaledToFit()
-
-						case .espn:
-							  // CUSTOM ESPN logo that respects our size
-						   Image("espnLogo")
-							  .resizable()
-							  .scaledToFit()
-					 }
-				  }
-				  .frame(width: logoSize, height: logoSize) // This will now work properly
-			   }
-
-			   Text(leagueName)
-				  .font(.system(size: 20, weight: .bold))
-				  .foregroundColor(.white)
-				  .lineLimit(1)
-			}
-
-			Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
-			   .font(.system(size: 16, weight: .semibold))
-			   .italic()
-			   .foregroundColor(.gray)
-		 }
-
-		 Spacer()
-
-			// Circular countdown timer
-		 RefreshCountdownTimerView()
-		    .zIndex(100) // Ensure timer is also clickable if it has interactions
-	  }
-	  .padding(.horizontal, 16) // 🔥 FIXED: Consistent padding to prevent clipping
-	  .padding(.top, 8)
-	  .background(Color.clear) // 🔥 CRITICAL: Transparent background so touches pass through
-	  .onAppear {
-		 print("🐛 NavigationHeader - fantasyViewModel: \(fantasyViewModel != nil ? "exists" : "nil")")
-		 if let selectedLeague = fantasyViewModel?.selectedLeague {
-			print("🐛 NavigationHeader - Selected league source: \(selectedLeague.source.rawValue)")
-		 } else {
-			print("🐛 NavigationHeader - No selected league available")
-		 }
-	  }
+   // 🔥 FIX: Detect if this view is embedded in LeagueMatchupsTabView
+   private var isEmbeddedInTabView: Bool {
+	  // Check if the parent view has fantasyViewModel (indicating it's from LeagueMatchupsTabView)
+	  return fantasyViewModel != nil
    }
 
    private var rosterScrollView: some View {
@@ -192,9 +140,10 @@ struct FantasyMatchupDetailView: View {
 			}
 		 }
 		 .padding(.top, 8)
-		 .padding(.horizontal, 8) // 🔥 ADDED: Prevent content from touching screen edges
+		 // 🔥 FIX: Increase horizontal padding to prevent clipping
+		 .padding(.horizontal, 16) // Increased from 8 to 16
 	  }
-	  .clipped() // 🔥 ADDED: Ensure content doesn't extend beyond bounds
+	  .clipped()
    }
 
 	  // MARK: - Simplified Roster View (Fallback)
@@ -218,7 +167,8 @@ struct FantasyMatchupDetailView: View {
 					 teamIndex: 1, // Home team index
 					 isBench: false
 				  )
-				  .padding(.horizontal)
+				  // 🔥 FIX: Reduce horizontal padding to prevent double padding
+				  .padding(.horizontal, 8) // Reduced from default
 			   }
 			}
 		 }
@@ -239,7 +189,8 @@ struct FantasyMatchupDetailView: View {
 					 teamIndex: 0, // Away team index
 					 isBench: false
 				  )
-				  .padding(.horizontal)
+				  // 🔥 FIX: Reduce horizontal padding to prevent double padding
+				  .padding(.horizontal, 8) // Reduced from default
 			   }
 			}
 		 }

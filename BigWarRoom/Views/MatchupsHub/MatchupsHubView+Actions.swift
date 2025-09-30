@@ -127,12 +127,13 @@ extension MatchupsHubView {
         showingSettings = true
     }
     
-    func showMatchupDetail(_ matchup: UnifiedMatchup) {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        showingMatchupDetail = matchup
-    }
+    // 🏈 NAVIGATION FREEDOM: Remove showMatchupDetail - using NavigationLinks instead
+    // func showMatchupDetail(_ matchup: UnifiedMatchup) {
+    //     let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+    //     impactFeedback.impactOccurred()
+    //     
+    //     showingMatchupDetail = matchup
+    // }
     
     // MARK: - Week Selection Actions
     func onWeekSelected(_ week: Int) {

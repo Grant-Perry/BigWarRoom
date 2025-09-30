@@ -12,7 +12,8 @@ struct MatchupCardViewBuilder: View {
     let microMode: Bool
     let expandedCardId: String?
     let isWinning: Bool
-    let onShowDetail: () -> Void
+    // 🏈 NAVIGATION FREEDOM: Remove callback - using NavigationLinks instead
+    // let onShowDetail: () -> Void
     let onMicroCardTap: (String) -> Void
     
     // 🔥 NEW: Accept dualViewMode parameter to make cards compact in Single view
@@ -48,13 +49,28 @@ struct MatchupCardViewBuilder: View {
             shadowRadius: cardProperties.shadowRadius,
             onTap: {
                 if matchup.isChoppedLeague {
-                    onShowDetail()
+                    // 🏈 NAVIGATION FREEDOM: NavigationLink will handle navigation
+                    // Chopped leagues navigate to detail
                 } else {
+                    // Regular leagues can still expand in micro mode
                     onMicroCardTap(matchup.id)
                 }
             },
             isEliminated: cardProperties.isEliminated,
-            eliminationWeek: cardProperties.eliminationWeek
+            eliminationWeek: cardProperties.eliminationWeek,
+            matchup: matchup,
+            isWinning: isWinning
+        )
+        .background(
+            // 🏈 NAVIGATION FREEDOM: Add NavigationLink overlay for chopped leagues
+            Group {
+                if matchup.isChoppedLeague {
+                    NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+                        Color.clear
+                    }
+                    .buttonStyle(CardPressButtonStyle()) // 🔥 NEW: Add press feedback to micro cards too
+                }
+            }
         )
         .frame(height: 120)
         .padding(.bottom, 8)
@@ -63,15 +79,25 @@ struct MatchupCardViewBuilder: View {
     // MARK: -> Non-Micro Card
     
     private var nonMicroCardView: some View {
-        NonMicroCardView(
-            matchup: matchup,
-            isWinning: isWinning,
-            onTap: {
-                onShowDetail()
-            },
-            dualViewMode: dualViewMode // 🔥 NEW: Pass dualViewMode to NonMicroCardView
+        // 🏈 NAVIGATION FREEDOM: Wrap with NavigationLink instead of using onTap callback
+        NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+            NonMicroCardView(
+                matchup: matchup,
+                isWinning: isWinning,
+                // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
+                // onTap: { },
+                dualViewMode: dualViewMode
+            )
+        }
+        .buttonStyle(CardPressButtonStyle()) // 🔥 NEW: Custom button style with immediate feedback
+        .simultaneousGesture(
+            // 🏈 NAVIGATION FREEDOM: Add tap feedback to NavigationLink
+            TapGesture().onEnded { _ in
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium) // Changed from light to medium
+                impactFeedback.impactOccurred()
+            }
         )
-        .padding(.bottom, dualViewMode ? 44 : 20) // 🔥 NEW: Increase bottom padding for Single view (was 16, now 20)
+        .padding(.bottom, dualViewMode ? 44 : 20)
     }
     
     // MARK: -> Properties Calculation
@@ -179,6 +205,21 @@ struct MatchupCardViewBuilder: View {
 }
 
 // MARK: -> Supporting Structures
+
+// 🔥 NEW: Custom button style for immediate visual feedback
+private struct CardPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .shadow(
+                color: configuration.isPressed ? Color.gpGreen.opacity(0.6) : Color.black.opacity(0.3),
+                radius: configuration.isPressed ? 12 : 4,
+                x: 0,
+                y: configuration.isPressed ? 8 : 2
+            )
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
 
 private struct MicroCardProperties {
     let leagueName: String

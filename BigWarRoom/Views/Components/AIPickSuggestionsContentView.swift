@@ -10,7 +10,7 @@ import SwiftUI
 /// Content section with smart recommendations
 struct AIPickSuggestionsContentView: View {
     let viewModel: DraftRoomViewModel
-    let onPlayerTap: (Player) -> Void
+    let onPlayerTap: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     let onLockPick: (Suggestion) -> Void
     let onAddToFeed: (Suggestion) -> Void
     
@@ -56,7 +56,7 @@ struct AIPickSuggestionsContentView: View {
                                 suggestion: suggestion,
                                 viewModel: viewModel,
                                 displayMode: .all,
-                                onPlayerTap: onPlayerTap,
+                                onPlayerTap: onPlayerTap, // 🔥 DEATH TO SHEETS: Pass nil for NavigationLink
                                 onLockPick: onLockPick,
                                 onAddToFeed: onAddToFeed
                             )
@@ -70,7 +70,7 @@ struct AIPickSuggestionsContentView: View {
                                 suggestion: suggestion,
                                 viewModel: viewModel,
                                 displayMode: .standard,
-                                onPlayerTap: onPlayerTap,
+                                onPlayerTap: onPlayerTap, // 🔥 DEATH TO SHEETS: Pass nil for NavigationLink
                                 onLockPick: onLockPick,
                                 onAddToFeed: onAddToFeed
                             )
@@ -87,7 +87,7 @@ struct AIPickSuggestionCardView: View {
     let suggestion: Suggestion
     let viewModel: DraftRoomViewModel
     let displayMode: DisplayMode
-    let onPlayerTap: (Player) -> Void
+    let onPlayerTap: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     let onLockPick: (Suggestion) -> Void
     let onAddToFeed: (Suggestion) -> Void
     
@@ -104,6 +104,81 @@ struct AIPickSuggestionCardView: View {
     }
     
     private func buildEnhancedCard() -> some View {
+        // 🔥 DEATH TO SHEETS: Use NavigationLink instead of onTapGesture
+        Group {
+            if let sleeperPlayer = findSleeperPlayerForSuggestion() {
+                NavigationLink(
+                    destination: PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: suggestion.player.team)
+                    )
+                ) {
+                    cardContent
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                cardContent // No navigation if can't find player
+            }
+        }
+        .contextMenu {
+            Button("Lock as My Pick") {
+                onLockPick(suggestion)
+            }
+            
+            Button("Add to Feed") {
+                onAddToFeed(suggestion)
+            }
+            
+            if findSleeperPlayerForSuggestion() != nil {
+                Button("View Stats") {
+                    onPlayerTap?(suggestion.player)
+                }
+            }
+        }
+    }
+    
+    private func buildEnhancedCardForAll() -> some View {
+        // 🔥 DEATH TO SHEETS: Use NavigationLink instead of onTapGesture
+        Group {
+            if let sleeperPlayer = findSleeperPlayerForSuggestion() {
+                NavigationLink(
+                    destination: PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: suggestion.player.team)
+                    )
+                ) {
+                    cardContentForAll
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                cardContentForAll // No navigation if can't find player
+            }
+        }
+        .onLongPressGesture(minimumDuration: 0.5) {
+            onLockPick(suggestion)
+            
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+        }
+        .contextMenu {
+            Button("Lock as My Pick") {
+                onLockPick(suggestion)
+            }
+            
+            Button("Add to Feed") {
+                onAddToFeed(suggestion)
+            }
+            
+            if findSleeperPlayerForSuggestion() != nil {
+                Button("View Stats") {
+                    onPlayerTap?(suggestion.player)
+                }
+            }
+        }
+    }
+    
+    // 🔥 DEATH TO SHEETS: Extract card content to reusable computed properties
+    private var cardContent: some View {
         HStack(spacing: 12) {
             // Player headshot - improved lookup logic
             playerImageForSuggestion()
@@ -133,25 +208,9 @@ struct AIPickSuggestionCardView: View {
             TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            onPlayerTap(suggestion.player)
-        }
-        .contextMenu {
-            Button("Lock as My Pick") {
-                onLockPick(suggestion)
-            }
-            
-            Button("Add to Feed") {
-                onAddToFeed(suggestion)
-            }
-            
-            Button("View Stats") {
-                onPlayerTap(suggestion.player)
-            }
-        }
     }
     
-    private func buildEnhancedCardForAll() -> some View {
+    private var cardContentForAll: some View {
         HStack(spacing: 16) {  
             // Player headshot with position number badge overlay
             ZStack(alignment: .topTrailing) {
@@ -201,28 +260,6 @@ struct AIPickSuggestionCardView: View {
             TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .onTapGesture {
-            onPlayerTap(suggestion.player)
-        }
-        .onLongPressGesture(minimumDuration: 0.5) {
-            onLockPick(suggestion)
-            
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-        }
-        .contextMenu {
-            Button("Lock as My Pick") {
-                onLockPick(suggestion)
-            }
-            
-            Button("Add to Feed") {
-                onAddToFeed(suggestion)
-            }
-            
-            Button("View Stats") {
-                onPlayerTap(suggestion.player)
-            }
-        }
     }
     
     // MARK: - Helper Components

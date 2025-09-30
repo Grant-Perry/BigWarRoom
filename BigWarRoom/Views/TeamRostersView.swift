@@ -12,9 +12,9 @@ struct TeamRostersView: View {
     @StateObject private var nflGameService = NFLGameDataService.shared
     @StateObject private var weekManager = WeekSelectionManager.shared
     @State private var selectedTeam: String = "SF"
-    @State private var showingRoster = false
     @State private var hoveredTeam: String? = nil
     @State private var showingWeekPicker = false
+    @State private var navigationPath = NavigationPath()
     
     private let nflTeams = [
         "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE",
@@ -24,7 +24,8 @@ struct TeamRostersView: View {
     ]
     
     var body: some View {
-        NavigationView {
+        // 🔥 PROPER NAVIGATION: Use NavigationStack with path for programmatic navigation
+        NavigationStack(path: $navigationPath) {
             ZStack {
                 Image("BG2")
                     .resizable()
@@ -49,17 +50,24 @@ struct TeamRostersView: View {
                 }
             }
             .navigationBarHidden(true)
-        }
-        .navigationViewStyle(StackNavigationViewStyle())
-        .sheet(isPresented: $showingRoster) {
-            TeamRosterDetailView(teamCode: selectedTeam)
-        }
-        .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(isPresented: $showingWeekPicker)
-        }
-        .onChange(of: weekManager.selectedWeek) { _, _ in
-            // 🔥 NEW: Refresh NFL game data when week changes
-            nflGameService.fetchGameData(forWeek: weekManager.selectedWeek, forceRefresh: true)
+            .sheet(isPresented: $showingWeekPicker) {
+                WeekPickerView(isPresented: $showingWeekPicker)
+            }
+            // 🔥 ADD: Proper hierarchical navigation destination for team rosters
+            .navigationDestination(for: String.self) { teamCode in
+                EnhancedNFLTeamRosterView(teamCode: teamCode)
+            }
+            // 🔥 ADD: Navigation destination for player stats using SleeperPlayer directly
+            .navigationDestination(for: SleeperPlayer.self) { player in
+                PlayerStatsCardView(
+                    player: player,
+                    team: NFLTeam.team(for: player.team ?? "")
+                )
+            }
+            .onChange(of: weekManager.selectedWeek) { _, _ in
+                // 🔥 NEW: Refresh NFL game data when week changes
+                nflGameService.fetchGameData(forWeek: weekManager.selectedWeek, forceRefresh: true)
+            }
         }
     }
     
@@ -152,13 +160,12 @@ struct TeamRostersView: View {
                     size: centerSize,
                     displayTeamCode: displayTeam,
                     gameInfo: getGameInfo(for: displayTeam),
-                    onTeamTap: { tappedTeam in
-                        selectedTeam = tappedTeam
-                        showingRoster = true
+                    onTeamTap: { teamCode in
+                        navigationPath.append(teamCode)
                     }
                 )
                 .position(x: geometry.size.width / 2, y: geometry.size.height / 2)
-                .zIndex(100)
+                .zIndex(200)
                 
                 ForEach(Array(nflTeams.enumerated()), id: \.offset) { index, team in
                     let angle = Double(index) * (360.0 / Double(nflTeams.count)) - 90.0
@@ -214,6 +221,7 @@ struct TeamRostersView: View {
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                                 selectedTeam = team
                             }
+                            // Team roster navigation will be handled by NavigationLink logic
                         }
                         withAnimation(.interpolatingSpring(stiffness: 350, damping: 30)) {
                             hoveredTeam = nil
@@ -495,7 +503,8 @@ struct MiniScheduleCard: View {
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .zIndex(25000)
+                    .allowsHitTesting(true)
+                    .zIndex(30000)
                     
                     Rectangle()
                         .fill(Color.white.opacity(0.2))
@@ -600,7 +609,8 @@ struct MiniScheduleCard: View {
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .zIndex(25000)
+                    .allowsHitTesting(true)
+                    .zIndex(30000)
                 }
             }
             .frame(width: 240, height: 60)
@@ -655,16 +665,6 @@ struct MiniScheduleCard: View {
     }
 }
 
-struct TeamRosterDetailView: View {
-    let teamCode: String
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        // 🔥 REPLACED: Use new EnhancedNFLTeamRosterView instead of basic NFLTeamRosterView
-        EnhancedNFLTeamRosterView(teamCode: teamCode)
-    }
-}
-
 private func pointInGeometrySpace(_ point: CGPoint, in geometry: GeometryProxy) -> CGPoint {
     return point
 }
@@ -675,6 +675,17 @@ private func isTouchInCenterArea(point: CGPoint, geometry: GeometryProxy, center
     let distance = sqrt(pow(point.x - centerX, 2) + pow(point.y - centerY, 2))
     let centerRadius = centerSize / 2
     return distance <= centerRadius
+}
+
+// MARK: - SleeperPlayer Hashable Conformance
+extension SleeperPlayer: Hashable {
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(playerID)
+    }
+    
+    static func == (lhs: SleeperPlayer, rhs: SleeperPlayer) -> Bool {
+        return lhs.playerID == rhs.playerID
+    }
 }
 
 #Preview("Team Rosters") {

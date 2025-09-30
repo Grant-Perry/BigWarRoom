@@ -13,33 +13,35 @@ struct MatchupDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationView {
-            Group {
-                if matchup.isChoppedLeague {
-                    // Show Chopped league detail
+        // 🔥 FIX: Remove NavigationView wrapper since FantasyMatchupDetailView has its own navigation
+        Group {
+            if matchup.isChoppedLeague {
+                // Show Chopped league detail with NavigationView for proper navigation
+                NavigationView {
                     ChoppedLeaderboardView(
                         choppedSummary: matchup.choppedSummary!,
                         leagueName: matchup.league.league.name,
                         leagueID: matchup.league.league.leagueID
                     )
-                } else {
-                    // Show regular fantasy matchup detail
-                    FantasyMatchupDetailView(
-                        matchup: matchup.fantasyMatchup!,
-                        fantasyViewModel: matchup.createConfiguredFantasyViewModel(),
-                        leagueName: matchup.league.league.name
-                    )
-                }
-            }
-            .navigationTitle(matchup.league.league.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        dismiss()
+                    .navigationTitle(matchup.league.league.name)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button("Done") {
+                                dismiss()
+                            }
+                        }
                     }
                 }
+            } else {
+                // 🔥 FIX: Show fantasy matchup WITHOUT NavigationView wrapper
+                // FantasyMatchupDetailView handles its own navigation with custom header
+                FantasyMatchupDetailView(
+                    matchup: matchup.fantasyMatchup!,
+                    fantasyViewModel: matchup.createConfiguredFantasyViewModel(),
+                    leagueName: matchup.league.league.name
+                )
             }
         }
     }

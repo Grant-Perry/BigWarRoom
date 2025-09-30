@@ -33,10 +33,15 @@ extension MatchupsHubView {
     }
     
     func buildHeroHeaderView() -> some View {
-        MatchupsHubHeroHeaderView(
+        let winningCount = matchupsHubViewModel.winningMatchupsCount(from: matchupsHubViewModel.myMatchups)
+        let losingCount = matchupsHubViewModel.myMatchups.count - winningCount
+        
+        return MatchupsHubHeroHeaderView(
             matchupsCount: matchupsHubViewModel.myMatchups.count,
             selectedWeek: weekManager.selectedWeek,
             connectedLeaguesCount: matchupsHubViewModel.connectedLeaguesCount,
+            winningCount: winningCount,
+            losingCount: losingCount,
             lastUpdateTime: matchupsHubViewModel.lastUpdateTime,
             autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
@@ -70,7 +75,9 @@ extension MatchupsHubView {
                     await handlePullToRefresh()
                 }
             },
-            onShowDetail: showMatchupDetail,
+            // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLinks handle navigation directly
+            // BEFORE: onShowDetail: showMatchupDetail,
+            // AFTER: Components use NavigationLinks instead of callbacks
             onMicroCardTap: handleMicroCardTap,
             onExpandedCardDismiss: {
                 withAnimation(.spring(response: 0.8, dampingFraction: 0.7)) {

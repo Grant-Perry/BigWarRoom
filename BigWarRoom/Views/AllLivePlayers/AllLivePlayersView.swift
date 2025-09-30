@@ -30,33 +30,34 @@ struct AllLivePlayersView: View {
     @State private var loadTask: Task<Void, Never>?
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // BG6 background
-                Image("BG7")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(0.35)
-                    .ignoresSafeArea(.all)
+        // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent TabView provides it
+        // BEFORE: NavigationView { ... }
+        // AFTER: Direct content - NavigationView provided by parent TabView
+        ZStack {
+            // BG6 background
+            Image("BG7")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .opacity(0.35)
+                .ignoresSafeArea(.all)
+            
+            VStack(spacing: 0) {
+                // 🔥 CLEAN: Extracted header component
+                AllLivePlayersHeaderView(
+                    viewModel: allLivePlayersViewModel,
+                    sortHighToLow: $sortHighToLow,
+                    showingWeekPicker: $showingWeekPicker,
+                    onAnimationReset: resetAnimations
+                )
                 
-                VStack(spacing: 0) {
-                    // 🔥 CLEAN: Extracted header component
-                    AllLivePlayersHeaderView(
-                        viewModel: allLivePlayersViewModel,
-                        sortHighToLow: $sortHighToLow,
-                        showingWeekPicker: $showingWeekPicker,
-                        onAnimationReset: resetAnimations
-                    )
-                    
-                    // 🔥 CLEAN: Content based on state - no business logic here
-                    buildContentView()
-                }
+                // 🔥 CLEAN: Content based on state - no business logic here
+                buildContentView()
             }
-            .navigationTitle("All Rostered Players")
-            .navigationBarTitleDisplayMode(.inline)
-            .refreshable {
-                await performRefresh()
-            }
+        }
+        .navigationTitle("All Rostered Players")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            await performRefresh()
         }
         .task {
             await loadInitialData()

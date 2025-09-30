@@ -2,39 +2,41 @@
 //  MatchupsStatsOverviewView.swift
 //  BigWarRoom
 //
-//  Stats overview component showing matchups, week, and leagues count
+//  Stats overview component showing winning, losing, and leagues count
 //
 
 import SwiftUI
 
-/// Component displaying key stats in card format
+/// Component displaying key win/loss stats in card format
 struct MatchupsStatsOverviewView: View {
     let matchupsCount: Int
     let selectedWeek: Int
     let connectedLeaguesCount: Int
+    let winningCount: Int
+    let losingCount: Int
     let onWeekPickerTapped: () -> Void
     
     var body: some View {
         HStack(spacing: 0) {
             StatCardView(
-                value: "\(matchupsCount)",
-                label: "MATCHUPS",
+                value: "\(winningCount)",
+                label: "WINNING",
                 color: .gpGreen
             )
             
             Button(action: onWeekPickerTapped) {
                 StatCardView(
                     value: "WEEK \(selectedWeek)",
-                    label: "ACTIVE",
+                    label: "\(connectedLeaguesCount) LEAGUES",
                     color: .blue
                 )
             }
             .buttonStyle(PlainButtonStyle())
             
             StatCardView(
-                value: "\(connectedLeaguesCount)",
-                label: "LEAGUES",
-                color: .purple
+                value: "\(losingCount)",
+                label: "LOSING",
+                color: .gpRedPink
             )
         }
         .padding(.horizontal, 8)

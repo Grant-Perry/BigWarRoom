@@ -48,28 +48,11 @@ struct AllLivePlayersListView: View {
         }
     }
     
-    // 🔥 DEATH TO SHEETS: Build proper destination view instead of sheet
+    // 🔥 FIX: Build destination to use same loading flow as Mission Control
     @ViewBuilder
     private func buildDestinationView(for matchup: UnifiedMatchup) -> some View {
-        Group {
-            if matchup.isChoppedLeague {
-                // Show Chopped league detail
-                ChoppedLeaderboardView(
-                    choppedSummary: matchup.choppedSummary!,
-                    leagueName: matchup.league.league.name,
-                    leagueID: matchup.league.league.leagueID
-                )
-            } else {
-                // Show regular fantasy matchup detail
-                FantasyMatchupDetailView(
-                    matchup: matchup.fantasyMatchup!,
-                    fantasyViewModel: matchup.createConfiguredFantasyViewModel(),
-                    leagueName: matchup.league.league.name
-                )
-            }
-        }
-        .navigationTitle(matchup.league.league.name)
-        .navigationBarTitleDisplayMode(.inline)
+        // 🔥 FIX: Use MatchupDetailSheetsView for consistent loading experience
+        MatchupDetailSheetsView(matchup: matchup)
     }
     
     // 🔥 NEW: Determine if player should animate in

@@ -14,6 +14,10 @@ struct NonMicroCardContent: View {
     let dualViewMode: Bool
     let scoreAnimation: Bool
     
+    // 🔥 CELEBRATION: New parameters for celebration border
+    let isGamesFinished: Bool
+    let celebrationBorderPulse: Bool
+    
     var body: some View {
         VStack(spacing: dualViewMode ? 8 : 4) {
             // Compact header with league and status
@@ -39,16 +43,14 @@ struct NonMicroCardContent: View {
         .background(NonMicroCardBackground(matchup: matchup, backgroundColors: backgroundColors))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    LinearGradient(
-                        colors: overlayBorderColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: overlayBorderWidth
-                )
-                .opacity(overlayBorderOpacity)
+            // 🔥 CELEBRATION: Use celebration border if games finished, otherwise regular border
+            Group {
+                if isGamesFinished && !matchup.isMyManagerEliminated {
+                    celebrationBorderOverlay
+                } else {
+                    regularBorderOverlay
+                }
+            }
         )
         .shadow(
             color: shadowColor,
@@ -57,6 +59,114 @@ struct NonMicroCardContent: View {
             y: 2
         )
         .frame(height: dualViewMode ? 142 : 120)
+    }
+    
+    // MARK: - 🔥 CELEBRATION: Border Overlays
+    
+    /// Celebration border overlay for the entire card
+    private var celebrationBorderOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(
+                LinearGradient(
+                    colors: celebrationBorderColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: celebrationBorderPulse ? 4 : 3
+            )
+            .opacity(celebrationBorderPulse ? 0.9 : 0.7)
+            .shadow(
+                color: celebrationBorderShadowColor,
+                radius: celebrationBorderPulse ? 6 : 4,
+                x: 0,
+                y: 0
+            )
+            .animation(
+                .easeInOut(duration: 1.3).repeatForever(autoreverses: true),
+                value: celebrationBorderPulse
+            )
+    }
+    
+    /// Regular border overlay
+    private var regularBorderOverlay: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .stroke(
+                LinearGradient(
+                    colors: overlayBorderColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: overlayBorderWidth
+            )
+            .opacity(overlayBorderOpacity)
+    }
+    
+    /// 🔥 SIMPLE CHOPPED LOGIC: Win/Loss logic - not in last place = winning
+    private var isCelebrationWin: Bool {
+        if matchup.isChoppedLeague {
+            // 🔥 SIMPLE CHOPPED LOGIC: Win if NOT in chopping block (last place or bottom 2)
+            guard let ranking = matchup.myTeamRanking,
+                  let choppedSummary = matchup.choppedSummary else {
+                return isWinning // Fallback to regular logic
+            }
+            
+            // If I'm already eliminated from this league, it's definitely a loss
+            if matchup.isMyManagerEliminated {
+                return false
+            }
+            
+            let totalTeams = choppedSummary.rankings.count
+            let myRank = ranking.rank
+            
+            // 🔥 SIMPLE RULE:
+            // - 32+ player leagues: Bottom 2 get chopped = ranks (totalTeams-1) and totalTeams are losing
+            // - All other leagues: Bottom 1 gets chopped = rank totalTeams is losing
+            if totalTeams >= 32 {
+                // Bottom 2 positions are losing (last 2 places)
+                return myRank <= (totalTeams - 2)
+            } else {
+                // Bottom 1 position is losing (last place)
+                return myRank < totalTeams
+            }
+            
+        } else {
+            // Regular matchup logic - use existing win/loss determination
+            return isWinning
+        }
+    }
+    
+    /// Celebration border colors based on win/loss - works for both regular and chopped
+    private var celebrationBorderColors: [Color] {
+        if isCelebrationWin {
+            // Winning/Survived: .gpGreen + teal with more variety
+            return [
+                .gpGreen,
+                .teal,
+                .cyan,
+                .gpGreen.opacity(0.9),
+                .teal.opacity(0.8),
+                .gpGreen
+            ]
+        } else {
+            // Losing/Chopped: .gpRedPink + yellow with more drama
+            return [
+                .gpRedPink,
+                .yellow,
+                .orange,
+                .gpRedPink.opacity(0.9),
+                .yellow.opacity(0.8),
+                .gpRedPink
+            ]
+        }
+    }
+    
+    /// Border shadow color for extra drama
+    private var celebrationBorderShadowColor: Color {
+        if isCelebrationWin {
+            return .teal.opacity(0.6)
+        } else {
+            return .yellow.opacity(0.6)
+        }
     }
     
     // MARK: - Computed Styling Properties

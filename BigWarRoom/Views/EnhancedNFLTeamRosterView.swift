@@ -20,19 +20,6 @@ struct EnhancedNFLTeamRosterView: View {
     let teamCode: String
     let rootDismiss: (() -> Void)? // 🔥 NEW: Optional root dismiss action
     
-    // FIXED: Define enum first
-    enum ActiveSheet: Identifiable {
-        case playerStats(SleeperPlayer)
-        case opponentRoster(String)
-        
-        var id: String {
-            switch self {
-            case .playerStats(let player): return "stats-\(player.playerID ?? "unknown")"
-            case .opponentRoster(let team): return "roster-\(team)"
-            }
-        }
-    }
-    
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: NFLTeamRosterViewModel
     @StateObject private var nflGameService = NFLGameDataService.shared
@@ -41,9 +28,8 @@ struct EnhancedNFLTeamRosterView: View {
     @State private var sortingMethod: MatchupSortingMethod = .position
     @State private var sortHighToLow = false
     @State private var showContributingPlayers = true
-    
-    // FIXED: Consolidated sheet approach to avoid conflicts
-    @State private var activeSheet: ActiveSheet? = nil
+    // 🔥 FIX: Add navigation state for opponent team
+    @State private var navigateToTeam: String?
     
     init(teamCode: String, rootDismiss: (() -> Void)? = nil) {
         self.teamCode = teamCode
@@ -52,52 +38,45 @@ struct EnhancedNFLTeamRosterView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.black.ignoresSafeArea()
-                
-                if viewModel.isLoading {
-                    enhancedLoadingView
-                } else if !viewModel.filteredPlayers.isEmpty {
-                    enhancedRosterContentView
-                } else {
-                    enhancedErrorView
-                }
+        // 🔥 REMOVE: NavigationStack - This view is presented via NavigationLink from parent NavigationStack
+        // Nested NavigationStack breaks navigationDestination matching
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            if viewModel.isLoading {
+                enhancedLoadingView
+            } else if !viewModel.filteredPlayers.isEmpty {
+                enhancedRosterContentView
+            } else {
+                enhancedErrorView
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarHidden(true)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        if let rootDismiss = rootDismiss {
-                            rootDismiss()
-                        } else {
-                            dismiss()
-                        }
-                    }
-                    .foregroundColor(.white)
+        }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Done") {
+                    print("🏈 ROSTER DEBUG: Toolbar Done button tapped - using dismiss()")
+                    dismiss()
                 }
+                .foregroundColor(.white)
             }
         }
         .preferredColorScheme(.dark)
-        .task {
-            await viewModel.loadTeamRoster()
-        }
-        .sheet(item: $activeSheet) { sheet in
-            switch sheet {
-            case .playerStats(let player):
-                PlayerStatsCardView(
-                    player: player,
-                    team: NFLTeam.team(for: player.team ?? "")
-                )
-            case .opponentRoster(let teamCode):
-                // 🔥 FIXED: Pass rootDismiss to close entire sheet stack
-                EnhancedNFLTeamRosterView(teamCode: teamCode, rootDismiss: rootDismiss)
-                    .onAppear {
-                        print("🔥 OPPONENT ROSTER SHEET APPEARED: \(teamCode)")
-                    }
+        .onAppear {
+            // 🔥 FIX: Use onAppear instead of .task to prevent navigation conflicts
+            print("🏈 ROSTER DEBUG: EnhancedNFLTeamRosterView appeared for team \(teamCode)")
+            Task {
+                await viewModel.loadTeamRoster()
             }
+        }
+        .onDisappear {
+            print("🏈 ROSTER DEBUG: EnhancedNFLTeamRosterView disappeared for team \(teamCode)")
+        }
+        // 🔥 FIX: Add navigationDestination for opponent team navigation
+        .navigationDestination(item: $navigateToTeam) { teamCode in
+            EnhancedNFLTeamRosterView(teamCode: teamCode, rootDismiss: rootDismiss)
         }
     }
     
@@ -155,12 +134,8 @@ struct EnhancedNFLTeamRosterView: View {
                     Spacer()
                     
                     Button(action: { 
-                        // Close entire sheet stack if rootDismiss is available
-                        if let rootDismiss = rootDismiss {
-                            rootDismiss()
-                        } else {
-                            dismiss()
-                        }
+                        print("🏈 ROSTER DEBUG: Close button tapped - using dismiss()")
+                        dismiss()
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
@@ -261,11 +236,10 @@ struct EnhancedNFLTeamRosterView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                             
-                            // FIXED: Opponent team logo with proper button behavior
+                            // 🔥 FIXED: Use Button + state instead of NavigationLink
                             Button(action: {
-                                let opponentCode = gameInfo.opponent
-                                print("🔥 SETTING ACTIVE SHEET TO OPPONENT ROSTER: \(opponentCode)")
-                                activeSheet = .opponentRoster(opponentCode)
+                                print("🏈 OPPONENT TEAM: Button tapped for \(gameInfo.opponent)")
+                                navigateToTeam = gameInfo.opponent
                             }) {
                                 TeamLogoView(teamCode: gameInfo.opponent, size: 40)
                                     .clipShape(Circle())
@@ -382,10 +356,7 @@ struct EnhancedNFLTeamRosterView: View {
                         EnhancedNFLPlayerCard(
                             player: player,
                             teamCode: teamCode,
-                            viewModel: viewModel,
-                            onPlayerTap: { sleeperPlayer in
-                                activeSheet = .playerStats(sleeperPlayer)
-                            }
+                            viewModel: viewModel
                         )
                     }
                 }
@@ -411,7 +382,10 @@ struct EnhancedNFLTeamRosterView: View {
             HStack {
                 Spacer()
                 
-                Button(action: { if let rootDismiss = rootDismiss { rootDismiss() } else { dismiss() } }) {
+                Button(action: { 
+                    print("🏈 ROSTER DEBUG: Error view close button tapped - using dismiss()")
+                    dismiss() 
+                }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
                         .foregroundColor(.white.opacity(0.7))
@@ -463,11 +437,8 @@ struct EnhancedNFLTeamRosterView: View {
             HStack(spacing: 16) {
                 // Close button
                 Button("Close") {
-                    if let rootDismiss = rootDismiss {
-                        rootDismiss()
-                    } else {
-                        dismiss()
-                    }
+                    print("🏈 ROSTER DEBUG: Error view Close button tapped - using dismiss()")
+                    dismiss()
                 }
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
@@ -591,7 +562,6 @@ struct EnhancedNFLPlayerCard: View {
     let player: SleeperPlayer
     let teamCode: String
     let viewModel: NFLTeamRosterViewModel
-    let onPlayerTap: (SleeperPlayer) -> Void
     
     @State private var showingScoreBreakdown = false
     
@@ -732,9 +702,6 @@ struct EnhancedNFLPlayerCard: View {
                 .opacity(0.8)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14))
-        .onTapGesture {
-            onPlayerTap(player)
-        }
         .sheet(isPresented: $showingScoreBreakdown) {
             if let breakdown = createScoreBreakdown() {
                 ScoreBreakdownView(breakdown: breakdown)
@@ -750,17 +717,25 @@ struct EnhancedNFLPlayerCard: View {
     private var playerImageView: some View {
         Group {
             if let imageURL = player.headshotURL {
-                AsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 85, height: 85)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                } placeholder: {
+                // 🔥 ADD: NavigationLink for player image to navigate to player stats
+                NavigationLink(value: player) {
+                    AsyncImage(url: imageURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 85, height: 85)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    } placeholder: {
+                        playerImageFallback
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // 🔥 ADD: NavigationLink for fallback image to navigate to player stats
+                NavigationLink(value: player) {
                     playerImageFallback
                 }
-            } else {
-                playerImageFallback
+                .buttonStyle(PlainButtonStyle())
             }
         }
     }

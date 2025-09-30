@@ -172,12 +172,36 @@ final class MatchupsHubViewModel: ObservableObject {
         return matchups.filter { getWinningStatusForMatchup($0) }.count
     }
     
-    /// Get winning status for a matchup
+    /// 🔥 SIMPLE CHOPPED LOGIC: Get winning status for a matchup - not in last place = winning
     func getWinningStatusForMatchup(_ matchup: UnifiedMatchup) -> Bool {
         if matchup.isChoppedLeague {
-            guard let teamRanking = matchup.myTeamRanking else { return false }
-            return teamRanking.eliminationStatus == .champion || teamRanking.eliminationStatus == .safe
+            // 🔥 SIMPLE CHOPPED LOGIC: Win if NOT in chopping block (last place or bottom 2)
+            guard let ranking = matchup.myTeamRanking,
+                  let choppedSummary = matchup.choppedSummary else {
+                return false
+            }
+            
+            // If I'm already eliminated from this league, it's definitely a loss
+            if matchup.isMyManagerEliminated {
+                return false
+            }
+            
+            let totalTeams = choppedSummary.rankings.count
+            let myRank = ranking.rank
+            
+            // 🔥 SIMPLE RULE:
+            // - 32+ player leagues: Bottom 2 get chopped = ranks (totalTeams-1) and totalTeams are losing
+            // - All other leagues: Bottom 1 gets chopped = rank totalTeams is losing
+            if totalTeams >= 32 {
+                // Bottom 2 positions are losing (last 2 places)
+                return myRank <= (totalTeams - 2)
+            } else {
+                // Bottom 1 position is losing (last place)
+                return myRank < totalTeams
+            }
+            
         } else {
+            // Regular matchup logic - simple score comparison
             guard let myTeam = matchup.myTeam,
                   let opponentTeam = matchup.opponentTeam else {
                 return false

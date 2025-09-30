@@ -11,13 +11,14 @@ import SwiftUI
 struct TeamDepthChartView: View {
     let depthChartData: [String: DepthChartData]
     let team: NFLTeam?
+    let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Callback for player selection
     
     @StateObject private var teamAssets = TeamAssetManager.shared
-    @State private var isExpanded: Bool = true // Changed to false for initial minimized state
-
-    // 🏈 PLAYER NAVIGATION: Remove sheet states, use NavigationLink instead
+    @State private var isExpanded: Bool = true // 🏈 UX: Changed to true for initial expanded state
+    
+    // 🏈 PLAYER NAVIGATION: Remove sheet states, use callback instead
     // BEFORE: Used sheet presentation which failed for nested sheets
-    // AFTER: Use NavigationLink for proper nested navigation
+    // AFTER: Use callback to update parent view's player state
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -86,8 +87,8 @@ struct TeamDepthChartView: View {
                 if let positionData = depthChartData[position], !positionData.players.isEmpty {
                     PositionGroupView(
                         positionData: positionData,
-                        team: team
-                        // 🏈 PLAYER NAVIGATION: Remove tap handler - using NavigationLinks instead
+                        team: team,
+                        onPlayerTap: onPlayerTap // 🏈 PLAYER NAVIGATION: Pass callback down
                     )
                 }
             }
@@ -155,7 +156,7 @@ struct TeamDepthChartView: View {
 private struct PositionGroupView: View {
     let positionData: DepthChartData
     let team: NFLTeam?
-    // 🏈 PLAYER NAVIGATION: Remove tap handler parameter - using NavigationLinks instead
+    let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Accept callback
     
     @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
@@ -194,7 +195,7 @@ private struct PositionGroupView: View {
                         DepthChartPlayerRowView(
                             depthPlayer: depthPlayer,
                             team: team,
-                            onTap: nil // 🏈 PLAYER NAVIGATION: Remove tap handler - using NavigationLinks instead
+                            onTap: onPlayerTap != nil ? { onPlayerTap!(depthPlayer.player) } : nil // 🏈 PLAYER NAVIGATION: Convert to player callback
                         )
                     }
                 }

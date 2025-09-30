@@ -68,12 +68,14 @@ struct BigWarRoomModified: View {
                     .tag(1)
                 
                 // NFL SCHEDULE TAB
-                NFLScheduleView()
-                    .tabItem {
-                        Image(systemName: "calendar.circle.fill")
-                        Text("Schedule")
-                    }
-                    .tag(2)
+                NavigationStack {
+                    NFLScheduleView()
+                }
+                .tabItem {
+                    Image(systemName: "calendar.circle.fill")
+                    Text("Schedule")
+                }
+                .tag(2)
                 
                 // All Live Players Tab
                 AllLivePlayersView()

@@ -10,8 +10,6 @@ import SwiftUI
 
 struct AIPickSuggestionsView: View {
     @ObservedObject var viewModel: DraftRoomViewModel
-    @State private var selectedPlayerForStats: Player?
-    @State private var showingPlayerStats = false
     
     var body: some View {
         NavigationStack {
@@ -32,12 +30,6 @@ struct AIPickSuggestionsView: View {
             .navigationBarTitleDisplayMode(.large)
             .background(Color(.systemGroupedBackground))
         }
-        .sheet(isPresented: $showingPlayerStats) {
-            if let player = selectedPlayerForStats,
-               let sleeperPlayer = findSleeperPlayer(for: player) {
-                PlayerStatsCardView(player: sleeperPlayer, team: NFLTeam.team(for: player.team))
-            }
-        }
     }
     
     // MARK: - Builder Functions (NO COMPUTED VIEW PROPERTIES)
@@ -53,20 +45,13 @@ struct AIPickSuggestionsView: View {
     func buildSuggestionsContent() -> some View {
         AIPickSuggestionsContentView(
             viewModel: viewModel,
-            onPlayerTap: showPlayerStats,
+            onPlayerTap: nil,
             onLockPick: lockPlayerAsPick,
             onAddToFeed: addPlayerToFeed
         )
     }
     
     // MARK: - Event Handlers
-    
-    private func showPlayerStats(for player: Player) {
-        selectedPlayerForStats = player
-        DispatchQueue.main.async {
-            showingPlayerStats = true
-        }
-    }
     
     private func addPlayerToFeed(_ suggestion: Suggestion) {
         let currentFeed = viewModel.picksFeed.isEmpty ? "" : viewModel.picksFeed + ", "
@@ -138,5 +123,7 @@ extension SortMethod {
 }
 
 #Preview {
-    AIPickSuggestionsView(viewModel: DraftRoomViewModel())
+    NavigationView {
+        AIPickSuggestionsView(viewModel: DraftRoomViewModel())
+    }
 }

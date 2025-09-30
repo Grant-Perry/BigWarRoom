@@ -3,8 +3,6 @@ import SwiftUI
 struct TopSuggestionsSection: View {
     @ObservedObject var viewModel: DraftRoomViewModel
     @Binding var selectedTab: Int
-    @State private var selectedPlayerForStats: Player?
-    @State private var showingPlayerStats = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -26,12 +24,6 @@ struct TopSuggestionsSection: View {
                 loadingStateView
             } else {
                 suggestionsListView
-            }
-        }
-        .sheet(isPresented: $showingPlayerStats) {
-            if let player = selectedPlayerForStats,
-               let sleeperPlayer = viewModel.findSleeperPlayer(for: player) {
-                PlayerStatsCardView(player: sleeperPlayer, team: NFLTeam.team(for: player.team))
             }
         }
     }
@@ -56,10 +48,7 @@ struct TopSuggestionsSection: View {
                     CompactSuggestionCard(
                         suggestion: suggestion,
                         viewModel: viewModel,
-                        onShowStats: { player in
-                            selectedPlayerForStats = player
-                            showingPlayerStats = true
-                        }
+                        onShowStats: nil
                     )
                 }
             }

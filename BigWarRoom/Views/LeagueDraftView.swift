@@ -52,12 +52,13 @@ struct LeagueDraftView: View {
         .sheet(isPresented: $leagueDraftViewModel.showingRosterView) {
             RosterView(viewModel: draftRoomViewModel)
         }
-        .sheet(isPresented: $leagueDraftViewModel.showingPlayerStats) {
-            if let player = leagueDraftViewModel.selectedPlayerForStats,
-               let team = NFLTeam.team(for: player.team ?? "") {
-                PlayerStatsCardView(player: player, team: team)
-            }
-        }
+        // 🔥 DEATH TO SHEETS: Remove PlayerStatsCardView sheet - using NavigationLink instead
+        // BEFORE: .sheet(isPresented: $leagueDraftViewModel.showingPlayerStats) {
+        //     if let player = leagueDraftViewModel.selectedPlayerForStats,
+        //        let team = NFLTeam.team(for: player.team ?? "") {
+        //         PlayerStatsCardView(player: player, team: team)
+        //     }
+        // }
     }
     
     // MARK: - Draft Board Section

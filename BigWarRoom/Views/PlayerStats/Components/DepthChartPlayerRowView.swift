@@ -11,19 +11,16 @@ import SwiftUI
 struct DepthChartPlayerRowView: View {
     let depthPlayer: DepthChartPlayer
     let team: NFLTeam?
-    // 🏈 PLAYER NAVIGATION: Keep onTap optional for backward compatibility
+    // 🏈 PLAYER NAVIGATION: Use callback instead of NavigationLink to prevent nested navigation
     let onTap: (() -> Void)?
     
     var body: some View {
-        // 🏈 PLAYER NAVIGATION: Use NavigationLink instead of Button for nested navigation
-        // BEFORE: Button with sheet presentation (failed for nested sheets)  
-        // AFTER: NavigationLink for proper nested navigation
-        NavigationLink(
-            destination: PlayerStatsCardView(
-                player: depthPlayer.player,
-                team: NFLTeam.team(for: depthPlayer.player.team ?? "")
-            )
-        ) {
+        // 🏈 PLAYER NAVIGATION: Use Button with callback instead of NavigationLink
+        // BEFORE: NavigationLink to PlayerStatsCardView (caused navigation stack issues)
+        // AFTER: Button with callback to update parent view's player state
+        Button(action: {
+            onTap?()
+        }) {
             HStack(spacing: 14) {
                 // Enhanced depth position number with gradient - use component
                 DepthChartPlayerRowDepthCircleView(depthPlayer: depthPlayer)
@@ -36,7 +33,7 @@ struct DepthChartPlayerRowView: View {
                 
                 Spacer(minLength: 0)
                 
-                // 🏈 PLAYER NAVIGATION: Keep navigation indicator
+                // 🏈 PLAYER NAVIGATION: Keep navigation indicator for visual consistency
                 Image(systemName: "chevron.right")
                     .font(.caption2)
                     .foregroundColor(.white.opacity(0.4))
@@ -65,7 +62,8 @@ struct DepthChartPlayerRowView: View {
             .scaleEffect(depthPlayer.isCurrentPlayer ? 1.02 : 1.0)
             .animation(.easeInOut(duration: 0.2), value: depthPlayer.isCurrentPlayer)
         }
-        .buttonStyle(PlainButtonStyle()) // 🏈 PLAYER NAVIGATION: Keep plain style for NavigationLink
+        .buttonStyle(PlainButtonStyle()) // 🏈 PLAYER NAVIGATION: Keep plain style for clean appearance
+        .disabled(onTap == nil) // 🏈 PLAYER NAVIGATION: Disable if no callback provided
     }
     
     // MARK: - Computed Properties (Data Only)

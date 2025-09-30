@@ -85,7 +85,7 @@ struct CenterCircleCoordinatorView: View {
                     gameTime: "",
                     isLive: false,
                     isByeWeek: true,
-                    onTeamTap: { _ in }
+                    onTeamTap: onTeamTap
                 )
             } else {
                 MiniScheduleCard(
@@ -97,7 +97,7 @@ struct CenterCircleCoordinatorView: View {
                     gameTime: info.gameTime,
                     isLive: info.isLive,
                     isByeWeek: false,
-                    onTeamTap: { tapped in onTeamTap(tapped) }
+                    onTeamTap: onTeamTap
                 )
             }
         } else {
@@ -110,7 +110,7 @@ struct CenterCircleCoordinatorView: View {
                 gameTime: "",
                 isLive: false,
                 isByeWeek: false,
-                onTeamTap: { _ in }
+                onTeamTap: onTeamTap
             )
         }
     }

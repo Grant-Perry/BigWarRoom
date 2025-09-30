@@ -12,6 +12,8 @@ struct MatchupsHubHeroHeaderView: View {
     let matchupsCount: Int
     let selectedWeek: Int
     let connectedLeaguesCount: Int
+    let winningCount: Int
+    let losingCount: Int
     let lastUpdateTime: Date?
     let autoRefreshEnabled: Bool
     let timeAgoString: String?
@@ -26,6 +28,8 @@ struct MatchupsHubHeroHeaderView: View {
                 matchupsCount: matchupsCount,
                 selectedWeek: selectedWeek,
                 connectedLeaguesCount: connectedLeaguesCount,
+                winningCount: winningCount,
+                losingCount: losingCount,
                 onWeekPickerTapped: onWeekPickerTapped
             )
             

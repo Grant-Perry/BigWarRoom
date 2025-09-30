@@ -24,7 +24,8 @@ struct MatchupsHubMatchupsSectionView: View {
     let onMicroModeToggle: () -> Void
     let onAutoRefreshToggle: () -> Void
     let onRefreshTapped: () -> Void
-    let onShowDetail: (UnifiedMatchup) -> Void
+    // 🏈 NAVIGATION FREEDOM: Remove onShowDetail callback - using NavigationLinks instead
+    // let onShowDetail: (UnifiedMatchup) -> Void
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
@@ -66,7 +67,8 @@ struct MatchupsHubMatchupsSectionView: View {
                 microMode: microMode,
                 dualViewMode: dualViewMode,
                 expandedCardId: expandedCardId,
-                onShowDetail: onShowDetail,
+                // 🏈 NAVIGATION FREEDOM: Remove onShowDetail callback - using NavigationLinks instead
+                // onShowDetail: onShowDetail,
                 onMicroCardTap: onMicroCardTap,
                 onExpandedCardDismiss: onExpandedCardDismiss,
                 getWinningStatus: getWinningStatus

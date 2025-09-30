@@ -13,7 +13,8 @@ struct MatchupCardsGridView: View {
     let microMode: Bool
     let dualViewMode: Bool
     let expandedCardId: String?
-    let onShowDetail: (UnifiedMatchup) -> Void
+    // 🏈 NAVIGATION FREEDOM: Remove callback - using NavigationLinks instead
+    // let onShowDetail: (UnifiedMatchup) -> Void
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
@@ -34,9 +35,8 @@ struct MatchupCardsGridView: View {
                             microMode: microMode,
                             expandedCardId: expandedCardId,
                             isWinning: getWinningStatus(matchup),
-                            onShowDetail: {
-                                onShowDetail(matchup)
-                            },
+                            // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
+                            // onShowDetail: { onShowDetail(matchup) },
                             onMicroCardTap: onMicroCardTap,
                             dualViewMode: dualViewMode
                         )
@@ -53,7 +53,8 @@ struct MatchupCardsGridView: View {
                 expandedCardId: expandedCardId,
                 sortedMatchups: sortedMatchups,
                 getWinningStatus: getWinningStatus,
-                onShowDetail: onShowDetail,
+                // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
+                // onShowDetail: onShowDetail,
                 onDismiss: onExpandedCardDismiss
             )
         )
@@ -81,7 +82,8 @@ struct ExpandedCardOverlayView: View {
     let expandedCardId: String?
     let sortedMatchups: [UnifiedMatchup]
     let getWinningStatus: (UnifiedMatchup) -> Bool
-    let onShowDetail: (UnifiedMatchup) -> Void
+    // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
+    // let onShowDetail: (UnifiedMatchup) -> Void
     let onDismiss: () -> Void
     
     var body: some View {
@@ -96,14 +98,16 @@ struct ExpandedCardOverlayView: View {
                     }
                 }
             
-            NonMicroCardView(
-                matchup: expandedMatchup,
-                isWinning: getWinningStatus(expandedMatchup),
-                onTap: {
-                    onShowDetail(expandedMatchup)
-                },
-                dualViewMode: true
-            )
+            NavigationLink(destination: MatchupDetailSheetsView(matchup: expandedMatchup)) {
+                NonMicroCardView(
+                    matchup: expandedMatchup,
+                    isWinning: getWinningStatus(expandedMatchup),
+                    // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
+                    // onTap: { },
+                    dualViewMode: true
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
             .frame(width: UIScreen.main.bounds.width * 0.6, height: 205)
             .overlay(expandedCardBorder)
             .zIndex(1000)

@@ -60,11 +60,29 @@ struct MyRosterView: View {
                     } else {
                         VStack(spacing: 12) {
                             ForEach(Array(myRosterViewModel.benchPlayers.enumerated()), id: \.offset) { _, player in
-                                EnhancedPlayerCardView(
-                                    player: player,
-                                    sleeperPlayer: myRosterViewModel.findSleeperPlayer(for: player)
-                                ) {
-                                    myRosterViewModel.presentPlayerStats(for: player)
+                                // 🔥 DEATH TO SHEETS: Use NavigationLink instead of tap handler
+                                if let sleeperPlayer = myRosterViewModel.findSleeperPlayer(for: player) {
+                                    NavigationLink(
+                                        destination: PlayerStatsCardView(
+                                            player: sleeperPlayer,
+                                            team: NFLTeam.team(for: sleeperPlayer.team ?? "")
+                                        )
+                                    ) {
+                                        EnhancedPlayerCardView(
+                                            player: player,
+                                            sleeperPlayer: sleeperPlayer
+                                        ) {
+                                            // 🔥 DEATH TO SHEETS: Remove tap handler - NavigationLink handles it
+                                        }
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
+                                } else {
+                                    EnhancedPlayerCardView(
+                                        player: player,
+                                        sleeperPlayer: nil
+                                    ) {
+                                        // No navigation if can't find Sleeper player
+                                    }
                                 }
                             }
                         }
@@ -75,14 +93,15 @@ struct MyRosterView: View {
         }
         .navigationTitle("My Roster")
         .navigationBarTitleDisplayMode(.large)
-        .sheet(isPresented: $myRosterViewModel.showStats) {
-            if let selectedPlayer = myRosterViewModel.selectedPlayer {
-                PlayerStatsCardView(
-                    player: selectedPlayer,
-                    team: NFLTeam.team(for: selectedPlayer.team ?? "")
-                )
-            }
-        }
+        // 🔥 DEATH TO SHEETS: Remove PlayerStatsCardView sheet - using NavigationLink instead
+        // BEFORE: .sheet(isPresented: $myRosterViewModel.showStats) {
+        //     if let selectedPlayer = myRosterViewModel.selectedPlayer {
+        //         PlayerStatsCardView(
+        //             player: selectedPlayer,
+        //             team: NFLTeam.team(for: selectedPlayer.team ?? "")
+        //         )
+        //     }
+        // }
     }
     
     // MARK: - Roster Slot Row
@@ -94,11 +113,29 @@ struct MyRosterView: View {
                 .foregroundColor(.secondary)
             
             if let player {
-                EnhancedPlayerCardView(
-                    player: player,
-                    sleeperPlayer: myRosterViewModel.findSleeperPlayer(for: player)
-                ) {
-                    myRosterViewModel.presentPlayerStats(for: player)
+                // 🔥 DEATH TO SHEETS: Use NavigationLink instead of tap handler
+                if let sleeperPlayer = myRosterViewModel.findSleeperPlayer(for: player) {
+                    NavigationLink(
+                        destination: PlayerStatsCardView(
+                            player: sleeperPlayer,
+                            team: NFLTeam.team(for: sleeperPlayer.team ?? "")
+                        )
+                    ) {
+                        EnhancedPlayerCardView(
+                            player: player,
+                            sleeperPlayer: sleeperPlayer
+                        ) {
+                            // 🔥 DEATH TO SHEETS: Remove tap handler - NavigationLink handles it
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                } else {
+                    EnhancedPlayerCardView(
+                        player: player,
+                        sleeperPlayer: nil
+                    ) {
+                        // No navigation if can't find Sleeper player
+                    }
                 }
             } else {
                 EmptyRosterSlotView(position: label)

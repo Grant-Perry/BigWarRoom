@@ -22,14 +22,15 @@ struct TeamFilteredMatchupsView: View {
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - UI State (reusing Mission Control patterns)
-    @State private var showingMatchupDetail: UnifiedMatchup?
     @State private var refreshing = false
     @State private var sortByWinning = true
     @State private var microMode = false
     @State private var expandedCardId: String? = nil
+    // 🔥 NUCLEAR: Add navigation trigger state
+    @State private var navigateToTeam: String?
     
-    // 🔥 FIXED: Team roster navigation state - SIMPLIFIED TO PREVENT LOOPS
-    @State private var showingTeamRoster: String?
+    // 🔥 FIXED: Team roster navigation state - USE NAVIGATIONLINKS INSTEAD OF SHEETS
+    // @State private var showingTeamRoster: String?
     
     // MARK: - Initialization
     init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel, gameData: ScheduleGame? = nil, rootDismiss: (() -> Void)? = nil) {
@@ -42,54 +43,49 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - Body
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background changes based on loading state
-                buildBackgroundView()
-                
-                if viewModel.shouldShowLoadingState {
-                    buildLoadingView()
-                } else if !viewModel.hasMatchups {
-                    buildEmptyStateView()
-                } else {
-                    buildContentView()
-                }
-            }
-            .navigationTitle("")
-            .navigationBarHidden(true)
-            .onAppear {
-                print("🔍 SHEET DEBUG: TeamFilteredMatchupsView appeared")
-                print("🔍 SHEET DEBUG: Away team: \(awayTeam), Home team: \(homeTeam)")
-                print("🔍 SHEET DEBUG: Passed game data: \(gameData?.scoreDisplay ?? "nil")")
-                print("🔍 SHEET DEBUG: shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
-                
-                // Use the game object if available, otherwise fall back to team strings
-                if let gameData = gameData {
-                    print("🔍 SHEET DEBUG: Using passed game data for filtering")
-                    viewModel.filterMatchups(for: gameData)
-                } else {
-                    print("🔍 SHEET DEBUG: Falling back to team strings for filtering")
-                    viewModel.filterMatchups(awayTeam: awayTeam, homeTeam: homeTeam)
-                }
-                
-                print("🔍 SHEET DEBUG: After filterMatchups call - shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
-            }
-            .onDisappear {
-                print("🔍 SHEET DEBUG: TeamFilteredMatchupsView disappeared - clearing filter state")
-                viewModel.clearFilterState()
-            }
-            .refreshable {
-                await handlePullToRefresh()
+        // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent NavigationStack handles it
+        // BEFORE: NavigationView { ... }
+        // AFTER: Direct content - NavigationStack provided by parent tab
+        ZStack {
+            // Background changes based on loading state
+            buildBackgroundView()
+            
+            if viewModel.shouldShowLoadingState {
+                buildLoadingView()
+            } else if !viewModel.hasMatchups {
+                buildEmptyStateView()
+            } else {
+                buildContentView()
             }
         }
-        .sheet(item: $showingMatchupDetail) { matchup in
-            buildMatchupDetailSheet(for: matchup)
+        .navigationTitle("")
+        .navigationBarHidden(true)
+        // 🔥 NUCLEAR FIX: Remove onAppear/onDisappear to prevent navigation conflicts
+        // These async operations might be causing immediate navigation resets
+        // .onAppear { ... }
+        // .onDisappear { ... }
+        .onAppear {
+            print("🔍 SHEET DEBUG: TeamFilteredMatchupsView appeared")
+            print("🔍 SHEET DEBUG: Away team: \(awayTeam), Home team: \(homeTeam)")
+            print("🔍 SHEET DEBUG: Passed game data: \(gameData?.scoreDisplay ?? "nil")")
+            print("🔍 SHEET DEBUG: shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
+            
+            // Use the game object if available, otherwise fall back to team strings
+            if let gameData = gameData {
+                print("🔍 SHEET DEBUG: Using passed game data for filtering")
+                viewModel.filterMatchups(for: gameData)
+            } else {
+                print("🔍 SHEET DEBUG: Falling back to team strings for filtering")
+                viewModel.filterMatchups(awayTeam: awayTeam, homeTeam: homeTeam)
+            }
+            
+            print("🔍 SHEET DEBUG: After filterMatchups call - shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
         }
-        .sheet(item: Binding<TeamRosterSheetInfo?>(
-            get: { showingTeamRoster.map { TeamRosterSheetInfo(teamCode: $0) } },
-            set: { showingTeamRoster = $0?.teamCode }
-        )) { teamInfo in
-            buildTeamRosterSheet(for: teamInfo.teamCode)
+        .refreshable {
+            await handlePullToRefresh()
+        }
+        .navigationDestination(item: $navigateToTeam) { teamCode in
+            EnhancedNFLTeamRosterView(teamCode: teamCode)
         }
     }
     
@@ -108,62 +104,236 @@ struct TeamFilteredMatchupsView: View {
         ZStack {
             // BG3 background is handled by buildBackgroundView()
             
-            VStack(spacing: 24) {
+            VStack(spacing: 32) {
                 // Header with team logos (even during loading)
                 buildFilteredHeader()
                 
                 Spacer()
                 
-                // Main loading section
-                VStack(spacing: 20) {
-                    // Animated team logos during loading
-                    HStack(spacing: 32) {
-                        // Away team logo with pulse animation
-                        TeamLogoView(teamCode: awayTeam, size: 80)
-                            .frame(width: 80, height: 80)
-                            .scaleEffect(1.1)
-                            .opacity(0.9)
-                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: true)
+                // 🔥 SICK LOADING ANIMATION SECTION
+                VStack(spacing: 28) {
+                    // Epic animated team logos battle
+                    ZStack {
+                        // Background glow effects
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        getTeamColor(for: awayTeam).opacity(0.4),
+                                        getTeamColor(for: awayTeam).opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    center: .leading,
+                                    startRadius: 10,
+                                    endRadius: 100
+                                )
+                            )
+                            .frame(width: 200, height: 200)
+                            .blur(radius: 20)
+                            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: UUID())
                         
-                        // VS text with glow
-                        Text("vs")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                            .shadow(color: .white.opacity(0.3), radius: 8)
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        getTeamColor(for: homeTeam).opacity(0.4),
+                                        getTeamColor(for: homeTeam).opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    center: .trailing,
+                                    startRadius: 10,
+                                    endRadius: 100
+                                )
+                            )
+                            .frame(width: 200, height: 200)
+                            .blur(radius: 20)
+                            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0), value: UUID())
                         
-                        // Home team logo with pulse animation (offset timing)
-                        TeamLogoView(teamCode: homeTeam, size: 80)
-                            .frame(width: 80, height: 80)
-                            .scaleEffect(1.1)
-                            .opacity(0.9)
-                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.5), value: true)
+                        // Main logos with sick animations
+                        HStack(spacing: 40) {
+                            // Away team logo with multiple animation layers
+                            ZStack {
+                                // Pulsing ring effect
+                                Circle()
+                                    .stroke(getTeamColor(for: awayTeam), lineWidth: 3)
+                                    .frame(width: 110, height: 110)
+                                    .scaleEffect(1.2)
+                                    .opacity(0.6)
+                                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: UUID())
+                                
+                                // Inner glow ring with rotation
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                getTeamColor(for: awayTeam).opacity(0.8),
+                                                getTeamColor(for: awayTeam).opacity(0.3),
+                                                Color.clear
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
+                                    .frame(width: 95, height: 95)
+                                    .rotationEffect(.degrees(0))
+                                    .animation(.linear(duration: 3.0).repeatForever(), value: UUID())
+                                
+                                // Team logo with bounce and glow
+                                TeamLogoView(teamCode: awayTeam, size: 85)
+                                    .frame(width: 85, height: 85)
+                                    .scaleEffect(1.1)
+                                    .shadow(color: getTeamColor(for: awayTeam).opacity(0.8), radius: 15, x: 0, y: 0)
+                                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true), value: UUID())
+                            }
+                            
+                            // Epic VS with electricity effect
+                            ZStack {
+                                // Lightning background
+                                Text("VS")
+                                    .font(.system(size: 28, weight: .black, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .gpBlue.opacity(0.8), radius: 20, x: 0, y: 0)
+                                    .shadow(color: .gpGreen.opacity(0.6), radius: 10, x: 0, y: 0)
+                                    .scaleEffect(1.1)
+                                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: UUID())
+                                
+                                // Sparkling particles effect
+                                ForEach(0..<6, id: \.self) { index in
+                                    Circle()
+                                        .fill(Color.white.opacity(0.9))
+                                        .frame(width: 3, height: 3)
+                                        .offset(
+                                            x: cos(Double(index) * .pi / 3) * 25,
+                                            y: sin(Double(index) * .pi / 3) * 25
+                                        )
+                                        .scaleEffect(1.5)
+                                        .opacity(0.8)
+                                        .animation(
+                                            .easeInOut(duration: 1.0)
+                                            .repeatForever(autoreverses: true)
+                                            .delay(Double(index) * 0.2),
+                                            value: UUID()
+                                        )
+                                }
+                            }
+                            
+                            // Home team logo with multiple animation layers
+                            ZStack {
+                                // Pulsing ring effect
+                                Circle()
+                                    .stroke(getTeamColor(for: homeTeam), lineWidth: 3)
+                                    .frame(width: 110, height: 110)
+                                    .scaleEffect(1.2)
+                                    .opacity(0.6)
+                                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true).delay(0.7), value: UUID())
+                                
+                                // Inner glow ring with rotation
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [
+                                                getTeamColor(for: homeTeam).opacity(0.8),
+                                                getTeamColor(for: homeTeam).opacity(0.3),
+                                                Color.clear
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 2
+                                    )
+                                    .frame(width: 95, height: 95)
+                                    .rotationEffect(.degrees(180))
+                                    .animation(.linear(duration: 3.0).repeatForever().delay(1.5), value: UUID())
+                                
+                                // Team logo with bounce and glow
+                                TeamLogoView(teamCode: homeTeam, size: 85)
+                                    .frame(width: 85, height: 85)
+                                    .scaleEffect(1.1)
+                                    .shadow(color: getTeamColor(for: homeTeam).opacity(0.8), radius: 15, x: 0, y: 0)
+                                    .animation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true).delay(0.6), value: UUID())
+                            }
+                        }
                     }
                     
-                    // Glowing progress indicator
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                            .shadow(color: .white.opacity(0.3), radius: 8)
+                    // Epic progress section with multiple indicators
+                    VStack(spacing: 16) {
+                        // Main progress indicator with glow
+                        ZStack {
+                            // Outer glow ring
+                            Circle()
+                                .stroke(Color.gpBlue.opacity(0.3), lineWidth: 8)
+                                .frame(width: 60, height: 60)
+                                .blur(radius: 4)
+                            
+                            // Animated progress ring
+                            Circle()
+                                .trim(from: 0, to: 0.7)
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [.gpBlue, .gpGreen, .gpBlue],
+                                        center: .center
+                                    ),
+                                    style: StrokeStyle(lineWidth: 4, lineCap: .round)
+                                )
+                                .frame(width: 50, height: 50)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear(duration: 1.5).repeatForever(), value: UUID())
+                            
+                            // Center dot with pulse
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 8, height: 8)
+                                .scaleEffect(1.5)
+                                .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: UUID())
+                        }
                         
-                        Text("Loading your \(awayTeam) vs \(homeTeam) matchups...")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .multilineTextAlignment(.center)
-                            .shadow(color: .black.opacity(0.5), radius: 2)
+                        // Dynamic loading text with typewriter effect
+                        VStack(spacing: 8) {
+                            Text("Loading your \(awayTeam) vs \(homeTeam) matchups...")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                                .shadow(color: .black.opacity(0.5), radius: 2)
+                            
+                            // Animated status messages
+                            VStack(spacing: 4) {
+                                Text("🔍 Scanning fantasy rosters...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.gpBlue.opacity(0.9))
+                                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: UUID())
+                                
+                                Text("⚡ Processing league data...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.gpGreen.opacity(0.9))
+                                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0), value: UUID())
+                                
+                                Text("🏆 Building matchup analysis...")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.gpYellow.opacity(0.9))
+                                    .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(2.0), value: UUID())
+                            }
+                        }
                         
-                        // Subtle loading dots animation
-                        HStack(spacing: 8) {
-                            ForEach(0..<3, id: \.self) { index in
+                        // Epic loading dots with wave animation
+                        HStack(spacing: 12) {
+                            ForEach(0..<5, id: \.self) { index in
                                 Circle()
-                                    .fill(Color.white.opacity(0.7))
-                                    .frame(width: 8, height: 8)
-                                    .scaleEffect(1.2)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.gpBlue, .gpGreen],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .frame(width: 12, height: 12)
+                                    .scaleEffect(1.5)
+                                    .shadow(color: .gpBlue.opacity(0.6), radius: 8, x: 0, y: 0)
                                     .animation(
-                                        .easeInOut(duration: 0.6)
+                                        .easeInOut(duration: 0.8)
                                         .repeatForever(autoreverses: true)
-                                        .delay(Double(index) * 0.2),
-                                        value: true
+                                        .delay(Double(index) * 0.15),
+                                        value: UUID()
                                     )
                             }
                         }
@@ -173,18 +343,19 @@ struct TeamFilteredMatchupsView: View {
                 
                 Spacer()
                 
-                // Loading tips/info
-                VStack(spacing: 8) {
-                    Text("🔍 Analyzing fantasy rosters...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
+                // Bottom info with subtle glow
+                VStack(spacing: 10) {
+                    Text("⏱️ First load takes a moment...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .shadow(color: .gpBlue.opacity(0.3), radius: 4)
                     
-                    Text("This might take a moment if you have many leagues")
-                        .font(.system(size: 12, weight: .regular))
-                        .foregroundColor(.white.opacity(0.5))
+                    Text("Subsequent loads will be instant")
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
                 }
-                .padding(.bottom, 32)
+                .padding(.bottom, 40)
             }
             .padding(.horizontal, 20)
         }
@@ -317,36 +488,34 @@ struct TeamFilteredMatchupsView: View {
                 // Large team logos (styled like Schedule cards)
                 HStack(spacing: 24) {
                     // Away team section
-                    VStack(spacing: 4) { // Reduced spacing from 6 to 4
-                        Button(action: {
-                            print("🏈 SCHEDULE: Tapped away team logo for \(awayTeam)")
-                            showTeamRoster(for: awayTeam)
-                        }) {
+                    Button(action: {
+                        print("🏈 SUCCESS: Button tapped for \(awayTeam)")
+                        navigateToTeam = awayTeam // Remove TEST_ prefix for real navigation
+                    }) {
+                        VStack(spacing: 4) {
                             ZStack {
                                 TeamLogoView(teamCode: awayTeam, size: 140)
                                     .scaleEffect(0.75)
                                     .clipped()
                             }
-                            .frame(width: 90, height: 60) // Increased width from 80 to 90
+                            .frame(width: 90, height: 60)
                             .clipShape(Rectangle())
-                            .offset(x: -10, y: -8) // Bleed off leading and top edges
+                            .offset(x: -10, y: -8)
+                            
+                            Text(getTeamName(for: awayTeam))
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 90)
+                            
+                            Text(getTeamRecord(for: awayTeam))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Away team name - centered and smaller font
-                        Text(getTeamName(for: awayTeam))
-                            .font(.system(size: 14, weight: .bold)) // Reduced from 16 to 14
-                            .foregroundColor(.white)
-                            .lineLimit(2) // Allow 2 lines for city + team name
-                            .minimumScaleFactor(0.7)
-                            .multilineTextAlignment(.center) // Center the text
-                            .frame(width: 90) // Match logo width for centering
-                        
-                        // Away team record - reduced spacing
-                        Text(getTeamRecord(for: awayTeam))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
                     }
+                    .buttonStyle(PlainButtonStyle())
                     
                     // Game info section (VS + score/status) - MOVED SCORES HERE
                     VStack(spacing: 6) {
@@ -359,36 +528,34 @@ struct TeamFilteredMatchupsView: View {
                     }
                     
                     // Home team section
-                    VStack(spacing: 4) { // Reduced spacing from 6 to 4
-                        Button(action: {
-                            print("🏈 SCHEDULE: Tapped home team logo for \(homeTeam)")
-                            showTeamRoster(for: homeTeam)
-                        }) {
+                    Button(action: {
+                        print("🏈 SUCCESS: Button tapped for \(homeTeam)")
+                        navigateToTeam = homeTeam // Remove TEST_ prefix for real navigation
+                    }) {
+                        VStack(spacing: 4) {
                             ZStack {
                                 TeamLogoView(teamCode: homeTeam, size: 140)
                                     .scaleEffect(0.75)
                                     .clipped()
                             }
-                            .frame(width: 90, height: 60) // Increased width from 80 to 90
+                            .frame(width: 90, height: 60)
                             .clipShape(Rectangle())
-                            .offset(x: 10, y: -8) // Bleed off trailing and top edges
+                            .offset(x: 10, y: -8)
+                            
+                            Text(getTeamName(for: homeTeam))
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.7)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 90)
+                            
+                            Text(getTeamRecord(for: homeTeam))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // Home team name - centered and smaller font
-                        Text(getTeamName(for: homeTeam))
-                            .font(.system(size: 14, weight: .bold)) // Reduced from 16 to 14
-                            .foregroundColor(.white)
-                            .lineLimit(2) // Allow 2 lines for city + team name
-                            .minimumScaleFactor(0.7)
-                            .multilineTextAlignment(.center) // Center the text
-                            .frame(width: 90) // Match logo width for centering
-                        
-                        // Home team record - reduced spacing
-                        Text(getTeamRecord(for: homeTeam))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.7))
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
                 // Matchup count - changed to "Players in X matchups"
@@ -572,9 +739,7 @@ struct TeamFilteredMatchupsView: View {
                     microMode: microMode,
                     expandedCardId: expandedCardId,
                     isWinning: viewModel.getWinningStatusForMatchup(matchup),
-                    onShowDetail: {
-                        showingMatchupDetail = matchup
-                    },
+                    // 🔥 FIX: Use NavigationLink approach - no callback needed
                     onMicroCardTap: { cardId in
                         expandedCardId = (expandedCardId == cardId) ? nil : cardId
                     },
@@ -587,39 +752,6 @@ struct TeamFilteredMatchupsView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
     }
     
-    // MARK: - Matchup Detail Sheet (reuse Mission Control)
-    private func buildMatchupDetailSheet(for matchup: UnifiedMatchup) -> some View {
-        // 🔥 FIXED: Wrap in NavigationView for proper layout, title, and dismiss controls.
-        // This provides the correct full-width context for the content view.
-        NavigationView {
-            Group {
-                if matchup.isChoppedLeague {
-                    ChoppedLeaderboardView(
-                        choppedSummary: matchup.choppedSummary!,
-                        leagueName: matchup.league.league.name,
-                        leagueID: matchup.league.league.id
-                    )
-                } else {
-                    let configuredViewModel = matchup.createConfiguredFantasyViewModel()
-                    FantasyMatchupDetailView(
-                        matchup: matchup.fantasyMatchup!,
-                        fantasyViewModel: configuredViewModel,
-                        leagueName: matchup.league.league.name
-                    )
-                }
-            }
-            .navigationTitle(matchup.league.league.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Done") {
-                        showingMatchupDetail = nil // Dismisses the sheet
-                    }
-                }
-            }
-        }
-    }
-    
     // MARK: - Pull to Refresh
     private func handlePullToRefresh() async {
         refreshing = true
@@ -627,20 +759,16 @@ struct TeamFilteredMatchupsView: View {
         refreshing = false
     }
     
-    // MARK: - Team Roster Navigation - REVERTED TO WORKING APPROACH
-    private func showTeamRoster(for teamCode: String) {
-        print("🏈 FILTERED MATCHUPS: Opening team roster for \(teamCode)")
-        
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        showingTeamRoster = teamCode
-    }
+    // MARK: - Team Roster Navigation - REMOVE SHEET-BASED APPROACH
+    // Navigation now handled by NavigationLinks and parent navigationDestination
     
-    private func buildTeamRosterSheet(for teamCode: String) -> some View {
-        // 🔥 FIXED: Pass the rootDismiss to team roster so DONE button works from there too
-        EnhancedNFLTeamRosterView(teamCode: teamCode, rootDismiss: rootDismiss ?? { dismiss() })
+    // MARK: - Matchup Detail Sheet (commented out - using NavigationLinks instead)
+    /*
+    private func buildMatchupDetailSheet(for matchup: UnifiedMatchup) -> some View {
+        // 🔥 FIX: Use same loading flow as Mission Control
+        MatchupDetailSheetsView(matchup: matchup)
     }
+    */
 }
 
 

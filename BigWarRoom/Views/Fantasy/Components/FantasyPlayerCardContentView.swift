@@ -23,7 +23,7 @@ struct FantasyPlayerCardMainContentView: View {
     }
     
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) { // 🔥 FIX: Reduced spacing from 12 to 8 to give score area more room
             // Player headshot
             FantasyPlayerCardHeadshotView(
                 player: player,
@@ -37,18 +37,19 @@ struct FantasyPlayerCardMainContentView: View {
                 HStack(alignment: .bottom, spacing: 4) {
                     Spacer()
                     
-                    // UPDATED: Wrap score in button if tap action provided
+                    // 🔥 FIX: Wrap score in button if tap action provided with proper gesture handling
                     if let onScoreTap = onScoreTap {
-                        Button(action: onScoreTap) {
-                            scoreText
-                        }
-                        .buttonStyle(PlainButtonStyle())
+                        scoreText
+                            .onTapGesture {
+                                onScoreTap()
+                            }
+                            // 🔥 CRITICAL: Remove .allowsHitTesting and .zIndex that were blocking parent card taps
                     } else {
                         scoreText
                     }
                 }
                 .padding(.bottom, 36)
-                .padding(.trailing, 12)
+                .padding(.trailing, 4) // 🔥 FIXED: Reduced from 8 to 4 to give even more space
             }
             .zIndex(3)
         }
@@ -61,14 +62,20 @@ struct FantasyPlayerCardMainContentView: View {
             .font(.system(size: 22, weight: .black))
             .foregroundColor(.white)
             .lineLimit(1)
-            .minimumScaleFactor(0.6)
+            .minimumScaleFactor(0.5) // 🔥 FIXED: Lowered from 0.7 to 0.5 to prevent truncation
             .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
             .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
+            .padding(.horizontal, 4) // 🔥 FIXED: Reduced from 6 to 4 for more space
+            .padding(.vertical, 4)
+            .frame(minWidth: 70) // 🔥 FIXED: Increased from 60 to 70 for more space
             .overlay(
                 onScoreTap != nil ? 
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    .padding(-4)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1.5) // 🔥 FIX: Make border more visible
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.black.opacity(0.2)) // 🔥 FIX: Add subtle background to indicate tappable
+                    )
                 : nil
             )
     }

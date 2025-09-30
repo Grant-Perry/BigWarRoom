@@ -25,6 +25,12 @@ struct MicroCardBaseContentView: View {
     let shadowRadius: CGFloat
     let pulseOpacity: Double
     
+    // 🔥 CELEBRATION: New parameters for celebration
+    let isGamesFinished: Bool
+    let celebrationBorderPulse: Bool
+    let matchup: UnifiedMatchup
+    let isWinning: Bool
+    
     var body: some View {
         VStack(spacing: 8) {
             // League name
@@ -62,7 +68,12 @@ struct MicroCardBaseContentView: View {
                 borderWidth: borderWidth,
                 borderOpacity: borderOpacity,
                 shouldPulse: shouldPulse,
-                pulseOpacity: pulseOpacity
+                pulseOpacity: pulseOpacity,
+                isGamesFinished: isGamesFinished,
+                scoreColor: scoreColor,
+                celebrationBorderPulse: celebrationBorderPulse,
+                matchup: matchup,
+                isWinning: isWinning
             )
         )
         .shadow(
