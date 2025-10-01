@@ -2,17 +2,20 @@
 //  FantasyPlayerCardBackgroundView.swift
 //  BigWarRoom
 //
-//  Background components for FantasyPlayerCard
+//  🔥 PHASE 2 REFACTOR: Migrated to use UnifiedPlayerCardBackground
+//  Legacy components maintained for backward compatibility
 //
 
 import SwiftUI
 
-/// Background jersey number component
+/// **Legacy wrapper for UnifiedPlayerCardBackground - Fantasy Style**
 struct FantasyPlayerCardBackgroundJerseyView: View {
     let jerseyNumber: String
     let teamColor: Color
     
     var body: some View {
+        // This is now handled by UnifiedPlayerCardBackground with jerseyNumber parameter
+        // Keeping this as a simple fallback for any remaining references
         VStack {
             HStack {
                 Spacer()
@@ -31,7 +34,25 @@ struct FantasyPlayerCardBackgroundJerseyView: View {
     }
 }
 
-/// Team gradient background component
+/// **Unified Fantasy Background Wrapper**
+/// **Use this for new fantasy card implementations**
+struct UnifiedFantasyPlayerCardBackground: View {
+    let team: NFLTeam?
+    let jerseyNumber: String?
+    
+    var body: some View {
+        UnifiedPlayerCardBackground(
+            configuration: .fantasy(
+                team: team,
+                jerseyNumber: jerseyNumber
+            )
+        )
+    }
+}
+
+// MARK: - Legacy Components (Deprecated - Use UnifiedPlayerCardBackground instead)
+
+/// Team gradient background component - DEPRECATED
 struct FantasyPlayerCardTeamGradientView: View {
     let teamColor: Color
     
@@ -47,7 +68,7 @@ struct FantasyPlayerCardTeamGradientView: View {
     }
 }
 
-/// Card background component
+/// Card background component - DEPRECATED
 struct FantasyPlayerCardBackgroundStyleView: View {
     let teamColor: Color
     let shadowColor: Color
@@ -71,7 +92,7 @@ struct FantasyPlayerCardBackgroundStyleView: View {
     }
 }
 
-/// Card border component
+/// Card border component - DEPRECATED
 struct FantasyPlayerCardBorderView: View {
     let borderColors: [Color]
     let borderWidth: CGFloat

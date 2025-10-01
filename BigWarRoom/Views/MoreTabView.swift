@@ -32,7 +32,7 @@ struct MoreTabView: View {
                     // Features List
                     ScrollView {
                         VStack(spacing: 12) {
-                            // 🔥 NEW: Player Search - FIRST ITEM
+                            // Player Search
                             NavigationLink(destination: PlayerSearchView()) {
                                 MoreRowView(
                                     icon: "person.crop.circle",
@@ -43,7 +43,7 @@ struct MoreTabView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
-                            // War Room - MOVED FROM MAIN TAB
+                            // War Room
                             NavigationLink(destination: DraftRoomView(viewModel: viewModel, selectedTab: .constant(4))) {
                                 MoreRowView(
                                     icon: "person.2.fill",
@@ -130,31 +130,6 @@ struct MoreTabView: View {
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())
-                            
-                            // Debug/Testing Section (only show in debug mode)
-                            if AppConstants.debug {
-                                // Endpoint Validation Testing
-                                NavigationLink(destination: EndpointValidationTestView()) {
-                                    MoreRowView(
-                                        icon: "network",
-                                        iconColor: .yellow,
-                                        title: "🔧 Endpoint Validation",
-                                        subtitle: "Test API endpoints for scoring engine"
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                                
-                                // ESPN Fantasy Testing (existing)
-                                NavigationLink(destination: ESPNFantasyTestView()) {
-                                    MoreRowView(
-                                        icon: "testtube.2",
-                                        iconColor: .cyan,
-                                        title: "🧪 ESPN Fantasy Test",
-                                        subtitle: "ESPN API testing and debugging"
-                                    )
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)

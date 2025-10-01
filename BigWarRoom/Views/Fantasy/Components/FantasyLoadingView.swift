@@ -2,15 +2,18 @@
 //  FantasyLoadingView.swift
 //  BigWarRoom
 //
-//  Created by System on 1/27/2025.
+//  🔥 PHASE 2 REFACTOR: Migrated to use UnifiedLoadingView
+//  Simple loading view now uses unified system for consistency
 //
 
 import SwiftUI
 
-/// Loading view for Fantasy content
+/// **Fantasy Loading View** - Now using UnifiedLoadingSystem
+/// **Simple implementation maintained**
 struct FantasyLoadingView: View {
     var body: some View {
-        FantasyLoadingIndicator()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        UnifiedLoadingView(
+            configuration: .fantasy()
+        )
     }
 }

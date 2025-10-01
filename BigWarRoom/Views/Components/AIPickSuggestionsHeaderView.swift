@@ -2,12 +2,14 @@
 //  AIPickSuggestionsHeaderView.swift
 //  BigWarRoom
 //
-//  AI header section component for AIPickSuggestionsView
+//  🔥 PHASE 2 REFACTOR: Updated to use reusable header components
+//  Uses UnifiedStatusBadge and UnifiedHeaderBackground for DRY compliance
 //
 
 import SwiftUI
 
 /// AI header section with strategy engine info and draft context
+/// **Now using reusable header components**
 struct AIPickSuggestionsHeaderView: View {
     let viewModel: DraftRoomViewModel
     
@@ -34,15 +36,10 @@ struct AIPickSuggestionsHeaderView: View {
                 
                 if viewModel.isLiveMode {
                     VStack(spacing: 4) {
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(.green)
-                                .frame(width: 8, height: 8)
-                            Text("LIVE")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.green)
-                        }
+                        // 🔥 REFACTOR: Using UnifiedStatusBadge
+                        UnifiedStatusBadge(
+                            configuration: .liveStatus(count: viewModel.suggestions.count)
+                        )
                         
                         Text("\(viewModel.suggestions.count)")
                             .font(.title2)
@@ -71,52 +68,30 @@ struct AIPickSuggestionsHeaderView: View {
                     Spacer()
                     
                     if let myRosterID = viewModel.myRosterID {
-                        HStack(spacing: 4) {
-                            Text("Pick")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text("\(myRosterID)")
-                                .font(.callout)
-                                .fontWeight(.bold)
-                                .foregroundColor(.blue)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.blue.opacity(0.1))
-                        .clipShape(Capsule())
+                        // 🔥 REFACTOR: Using UnifiedStatusBadge
+                        UnifiedStatusBadge(
+                            configuration: StatusBadgeConfiguration(
+                                text: "Pick \(myRosterID)",
+                                color: .blue,
+                                font: .callout,
+                                fontWeight: .bold
+                            )
+                        )
                     }
                     
                     if viewModel.isMyTurn {
-                        HStack(spacing: 4) {
-                            Circle().fill(.red).frame(width: 6, height: 6)
-                            Text("YOUR TURN")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.red)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.red.opacity(0.1))
-                        .clipShape(Capsule())
+                        // 🔥 REFACTOR: Using UnifiedStatusBadge
+                        UnifiedStatusBadge(
+                            configuration: .yourTurn()
+                        )
                     }
                 }
             }
         }
         .padding()
+        // 🔥 REFACTOR: Using UnifiedHeaderBackground
         .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.purple.opacity(0.1),
-                    Color.blue.opacity(0.05)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.purple.opacity(0.2), lineWidth: 1)
+            UnifiedHeaderBackground(style: .dramatic(.purple, 16))
         )
     }
 }

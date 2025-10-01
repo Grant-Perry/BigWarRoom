@@ -60,7 +60,7 @@ struct NFLGameInfo {
     let gameStatus: String
     let gameTime: String
     let isLive: Bool
-    let isCompleted: Bool // 🔥 NEW: Track if ESPN says the game is actually completed
+    let isCompleted: Bool
     let startDate: Date?
     
     /// Formatted matchup string (e.g., "KC vs LAC")
@@ -78,9 +78,9 @@ struct NFLGameInfo {
         return "\(awayScore)-\(homeScore)"
     }
     
-    /// Game time display for player cards - FIXED to show proper format as requested by Gp
+    /// Game time display for player cards
     var formattedGameTime: String {
-        // 🔥 ULTRA CONSERVATIVE: If there are any stats/scores, assume LIVE unless we're 100% sure it's final
+        // Conservative: If there are any stats/scores, assume LIVE unless we're 100% sure it's final
         let hasScores = homeScore > 0 || awayScore > 0
         
         switch gameStatus.lowercased() {
@@ -130,13 +130,13 @@ struct NFLGameInfo {
             return "LIVE"
             
         case "post", "final":
-            // 🔥 FIX: Don't trust ESPN's 'post' status - if we have active stats, it's still LIVE
+            // Don't trust ESPN's 'post' status - if we have active stats, it's still LIVE
             if hasScores && !isCompleted {
                 // Game has scores but not marked as completed = still playing
                 return "LIVE"
             }
             
-            // 🔥 ADDITIONAL CHECK: Look for quarter/time indicators in gameTime
+            // Additional check: Look for quarter/time indicators in gameTime
             if gameTime.lowercased().contains("quarter") || 
                gameTime.lowercased().contains("q1") || 
                gameTime.lowercased().contains("q2") || 
@@ -155,7 +155,7 @@ struct NFLGameInfo {
             }
             
         default:
-            // 🔥 DEFAULT: If there are scores, assume LIVE
+            // Default: If there are scores, assume LIVE
             if hasScores {
                 return "LIVE"
             }
@@ -176,13 +176,13 @@ struct NFLGameInfo {
         return formattedGameTime
     }
     
-    /// Status color for UI - FIXED to handle pregame properly
+    /// Status color for UI
     var statusColor: Color {
         switch gameStatus.lowercased() {
         case "in", "live": return .red
         case "pre", "pregame": return .orange
         case "post", "final":
-            // 🔥 CRITICAL FIX: Only gray for games that ESPN marks as completed
+            // Only gray for games that ESPN marks as completed
             if isCompleted && (homeScore > 0 || awayScore > 0) {
                 return .gray
             } else {
@@ -205,40 +205,30 @@ class NFLGameDataService: ObservableObject {
     private var cacheTimestamp: Date?
     private let cacheExpiration: TimeInterval = 300 // 5 minutes
     
-    // 🔧 BLANK SHEET FIX: Add request deduplication to prevent API spam
+    // Request deduplication to prevent API spam
     private var pendingRequests: Set<String> = []
     private var lastRequestTimestamp: Date?
     private let minimumRequestInterval: TimeInterval = 2.0 // Minimum 2 seconds between requests
     
     private init() {}
     
-    /// 🔧 BLANK SHEET FIX: Enhanced fetch with deduplication and throttling
-    /// Fetch real NFL game data from ESPN API
+    /// Fetch real NFL game data from ESPN API with deduplication and throttling
     func fetchGameData(forWeek week: Int, year: Int? = nil, forceRefresh: Bool = false) {
         let currentYear = year ?? AppConstants.currentSeasonYearInt
         let requestKey = "\(week)_\(currentYear)"
         
-        // 🔧 BLANK SHEET FIX: Prevent duplicate requests
-        guard !pendingRequests.contains(requestKey) else {
-            print("🚨 DEBUG NFLGameData: Request already pending for Week \(week), Year \(currentYear) - skipping")
-            return
-        }
+        // Prevent duplicate requests
+        guard !pendingRequests.contains(requestKey) else { return }
         
-        // 🔧 BLANK SHEET FIX: Throttle requests to prevent spam
+        // Throttle requests to prevent spam
         if !forceRefresh, let lastRequest = lastRequestTimestamp,
-           Date().timeIntervalSince(lastRequest) < minimumRequestInterval {
-            print("🚨 DEBUG NFLGameData: Request throttled - too soon since last request")
-            return
-        }
-        
-        print("🚨 DEBUG NFLGameData: Fetching Week \(week) for Year \(currentYear)")
+           Date().timeIntervalSince(lastRequest) < minimumRequestInterval { return }
         
         // Check cache first
         if !forceRefresh, 
            let cache = cache,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration {
-            print("🚨 DEBUG NFLGameData: Using cached data")
             processGameData(cache)
             return
         }
@@ -250,9 +240,7 @@ class NFLGameDataService: ObservableObject {
             return
         }
         
-        print("🚨 DEBUG NFLGameData: API URL = \(url.absoluteString)")
-        
-        // 🔧 BLANK SHEET FIX: Track pending request and timestamp
+        // Track pending request and timestamp
         pendingRequests.insert(requestKey)
         lastRequestTimestamp = Date()
         
@@ -265,23 +253,21 @@ class NFLGameDataService: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink(
                 receiveCompletion: { [weak self] completion in
-                    // 🔧 BLANK SHEET FIX: Remove from pending requests
+                    // Remove from pending requests
                     self?.pendingRequests.remove(requestKey)
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
                         self?.errorMessage = "Failed to fetch NFL data: \(error.localizedDescription)"
-                        // x// x Print("🏈 NFLGameDataService Error: \(error)")
                     }
                 },
                 receiveValue: { [weak self] response in
-                    // 🔧 BLANK SHEET FIX: Remove from pending requests
+                    // Remove from pending requests
                     self?.pendingRequests.remove(requestKey)
                     
                     self?.cache = response
                     self?.cacheTimestamp = Date()
                     self?.processGameData(response)
-                    // x// x Print("🏈 Successfully fetched NFL data for Week \(week)")
                 }
             )
     }
@@ -304,11 +290,6 @@ class NFLGameDataService: ObservableObject {
             let gameTime = status.detail
             let isCompleted = status.completed
             let isLive = gameStatus == "in"
-            
-            // 🔥 DEBUG: Log what ESPN is actually returning
-            print("🏈 ESPN DEBUG: \(awayTeam) vs \(homeTeam)")
-            print("   Status: '\(gameStatus)', Completed: \(isCompleted), Detail: '\(gameTime)'")
-            print("   Scores: \(awayScore)-\(homeScore)")
             
             var startDate: Date?
             let isoFormatter = ISO8601DateFormatter()
@@ -341,14 +322,14 @@ class NFLGameDataService: ObservableObject {
         self.gameData = newGameData
     }
 
-    /// 🔧 BLANK SHEET FIX: Enhanced getGameInfo with better error handling
+    /// Get game info with enhanced error handling
     func getGameInfo(for team: String) -> NFLGameInfo? {
         let normalizedTeam = normalizeTeamAbbreviation(team.uppercased())
         let gameInfo = gameData[normalizedTeam]
         
-        // 🔧 BLANK SHEET FIX: If no data and not currently loading, trigger a fetch
+        // If no data and not currently loading, trigger a fetch
         if gameInfo == nil && !isLoading {
-            let currentWeek = NFLWeekCalculator.getCurrentWeek() // FIXED: Remove .shared, use static method directly
+            let currentWeek = NFLWeekCalculator.getCurrentWeek()
             // Only fetch if we haven't recently requested
             if lastRequestTimestamp == nil || 
                Date().timeIntervalSince(lastRequestTimestamp!) > minimumRequestInterval {
@@ -376,7 +357,6 @@ class NFLGameDataService: ObservableObject {
             // Only refresh if we have live games
             let hasLiveGames = self?.gameData.values.contains { $0.isLive } ?? false
             if hasLiveGames {
-                // x// x Print("🏈 NFL Live Update: Refreshing game data (every \(AppConstants.MatchupRefresh)s)")
                 self?.fetchGameData(forWeek: week, year: currentYear, forceRefresh: true)
             }
         }

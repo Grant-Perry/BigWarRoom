@@ -23,11 +23,6 @@ struct FantasySingleLeagueContentView: View {
                 fantasyViewModel: fantasyViewModel
             )
             
-            // Debug controls
-            FantasyDebugControls(
-                forceChoppedMode: $forceChoppedMode
-            )
-            
             // Main content
             if fantasyViewModel.isLoading || fantasyMatchupListViewModel.shouldShowLoadingState() {
                 FantasyLoadingView()
