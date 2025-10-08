@@ -116,35 +116,40 @@ final class MatchupsHubViewModel: ObservableObject {
             }
         }
         
-        // Sort only the active matchups
+        // Sort only the active matchups using unified margin logic
         let sortedActiveMatchups: [UnifiedMatchup]
         if sortByWinning {
-            // 🔥 FIXED: Sort by actual winning status, not raw scores!
+            // Winning sort: Highest margins first (best performance)
             sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
-                let isWinning1 = getWinningStatusForMatchup(matchup1)
-                let isWinning2 = getWinningStatusForMatchup(matchup2)
-                
-                // Winners first, losers second
-                if isWinning1 != isWinning2 {
-                    return isWinning1 // Winners (true) come before losers (false)
-                }
-                
-                // If both winning or both losing, sort by score differential for tiebreaking
-                let scoreDiff1 = matchup1.scoreDifferential ?? 0
-                let scoreDiff2 = matchup2.scoreDifferential ?? 0
-                return scoreDiff1 > scoreDiff2 // Higher differential first
+                let margin1 = getPerformanceMargin(for: matchup1)
+                let margin2 = getPerformanceMargin(for: matchup2)
+                return margin1 > margin2 // Higher margins first (more winning)
             }
         } else {
-            // "Losing" sort - show lowest scores first (for finding trouble spots)
+            // Losing sort: Lowest margins first (worst performance)
             sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
-                let score1 = matchup1.myTeam?.currentScore ?? 0
-                let score2 = matchup2.myTeam?.currentScore ?? 0
-                return score1 < score2 // Lowest scores first when sorting by "losing"
+                let margin1 = getPerformanceMargin(for: matchup1)
+                let margin2 = getPerformanceMargin(for: matchup2)
+                return margin1 < margin2 // Lower margins first (more losing)
             }
         }
         
         // 🔥 ALWAYS append eliminated matchups at the end (no sorting)
         return sortedActiveMatchups + eliminatedMatchups
+    }
+    
+    /// 🔥 NEW: Calculate unified performance margin for any matchup type
+    private func getPerformanceMargin(for matchup: UnifiedMatchup) -> Double {
+        if matchup.isChoppedLeague {
+            // Chopped leagues: Use safety margin (points above/below elimination line)
+            guard let ranking = matchup.myTeamRanking else { return 0.0 }
+            return ranking.pointsFromSafety
+        } else {
+            // Regular leagues: Use score differential vs opponent
+            guard let myScore = matchup.myTeam?.currentScore,
+                  let opponentScore = matchup.opponentTeam?.currentScore else { return 0.0 }
+            return myScore - opponentScore
+        }
     }
     
     /// Count of live matchups

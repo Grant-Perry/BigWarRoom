@@ -47,13 +47,21 @@ struct PlayerStatsHeaderView: View {
                     
                     // Jersey number
                     if let number = player.number {
-                        Text("#\(number)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.secondary.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        Text("\(number)")
+                            .font(.bebas(size: 44))
+                            .fontWeight(.black)
+                            .foregroundColor(team?.primaryColor ?? .primary)
+                            .shadow(color: team?.secondaryColor ?? .black, radius: 0, x: 2, y: 2)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(team?.backgroundColor ?? Color(.systemGray6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(team?.borderColor ?? Color(.systemGray4), lineWidth: 2)
+                                    )
+                            )
                     }
                 }
             }

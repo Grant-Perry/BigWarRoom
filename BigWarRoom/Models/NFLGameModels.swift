@@ -319,7 +319,9 @@ class NFLGameDataService: ObservableObject {
             newGameData[homeTeam] = gameInfo
             newGameData[awayTeam] = gameInfo
         }
-        self.gameData = newGameData
+        DispatchQueue.main.async { [weak self] in
+            self?.gameData = newGameData
+        }
     }
 
     /// Get game info with enhanced error handling
@@ -333,7 +335,9 @@ class NFLGameDataService: ObservableObject {
             // Only fetch if we haven't recently requested
             if lastRequestTimestamp == nil || 
                Date().timeIntervalSince(lastRequestTimestamp!) > minimumRequestInterval {
-                fetchGameData(forWeek: currentWeek)
+                DispatchQueue.main.async { [weak self] in
+                    self?.fetchGameData(forWeek: currentWeek)
+                }
             }
         }
         
