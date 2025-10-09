@@ -15,6 +15,7 @@ struct PlayerScoreBarCardContentView: View {
     let playerScoreColor: Color
     
     @ObservedObject var viewModel: AllLivePlayersViewModel
+    @StateObject private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
     
@@ -60,9 +61,21 @@ struct PlayerScoreBarCardContentView: View {
                     
                     Spacer() // Push score to bottom of this section
                     
-                    // Score info - UPDATED: Make tappable for score breakdown
+                    // Score info and watch button row
                     HStack(spacing: 8) {
-                        Spacer()
+                        // Watch toggle button
+                        Button(action: toggleWatch) {
+                            Image(systemName: isWatching ? "eye.fill" : "eye")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(isWatching ? .gpOrange : .gray)
+                                .frame(width: 24, height: 24)
+                                .background(
+                                    Circle()
+                                        .fill(isWatching ? Color.gpOrange.opacity(0.2) : Color.gray.opacity(0.1))
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .offset(y: -20) // Smaller offset to align with points without disappearing
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             HStack(spacing: 8) {
@@ -164,6 +177,50 @@ struct PlayerScoreBarCardContentView: View {
                     .presentationDragIndicator(.visible)
             }
         }
+    }
+    
+    // MARK: - Watch Functionality
+    
+    private var isWatching: Bool {
+        watchService.isWatching(playerEntry.player.id)
+    }
+    
+    private func toggleWatch() {
+        if isWatching {
+            watchService.unwatchPlayer(playerEntry.player.id)
+        } else {
+            // Create opponent references from the matchup context
+            let opponentRefs = createOpponentReferences()
+            
+            // Convert LivePlayerEntry to OpponentPlayer for watching
+            let opponentPlayer = OpponentPlayer(
+                id: UUID().uuidString,
+                player: playerEntry.player,
+                isStarter: playerEntry.isStarter,
+                currentScore: playerEntry.currentScore,
+                projectedScore: playerEntry.projectedScore,
+                threatLevel: .moderate, // Default threat level for personal players
+                matchupAdvantage: .neutral, // Neutral advantage for personal players
+                percentageOfOpponentTotal: 0.0 // Not applicable for personal players
+            )
+            
+            let success = watchService.watchPlayer(opponentPlayer, opponentReferences: opponentRefs)
+            if !success {
+                // TODO: Show alert about watch limit or other issues
+                print("Failed to watch player - possibly at limit")
+            }
+        }
+    }
+    
+    private func createOpponentReferences() -> [OpponentReference] {
+        // For All Live Players, we're watching our own players, so create a reference
+        // indicating this is for personal roster tracking
+        return [OpponentReference(
+            id: "personal_roster_\(playerEntry.matchup.id)",
+            opponentName: "Personal Roster",
+            leagueName: playerEntry.leagueName,
+            leagueSource: playerEntry.leagueSource.lowercased()
+        )]
     }
     
     // MARK: - ADD: Score Breakdown Helper Methods

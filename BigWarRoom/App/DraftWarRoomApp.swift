@@ -38,7 +38,6 @@ struct DraftWarRoomMainView: View {
                 ZStack(alignment: .bottomTrailing) {
                     TabView(selection: $selectedTab) {
                         // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
-                        // 🏈 NAVIGATION FREEDOM: Use NavigationStack instead of deprecated NavigationView
                         NavigationStack {
                             MatchupsHubView()
                         }
@@ -48,13 +47,13 @@ struct DraftWarRoomMainView: View {
                         }
                         .tag(0)
                         
-                        // TEAM ROSTERS TAB (replaces War Room)
+                        // INTELLIGENCE TAB - NEW OPPONENT ANALYSIS
                         NavigationStack {
-                            TeamRostersView()
+                            OpponentIntelligenceDashboardView()
                         }
                         .tabItem {
-                            Image(systemName: "person.3.fill")
-                            Text("Team Rosters")
+                            Image(systemName: "eye.circle.fill")
+                            Text("Intelligence")
                         }
                         .tag(1)
                         
@@ -78,7 +77,7 @@ struct DraftWarRoomMainView: View {
                         }
                         .tag(3)
                         
-                        // MORE TAB - Contains additional features AND settings (now includes War Room)
+                        // MORE TAB - Contains additional features AND settings (now includes Team Rosters)
                         NavigationStack {
                             MoreTabView(viewModel: viewModel)
                         }
@@ -91,7 +90,7 @@ struct DraftWarRoomMainView: View {
                     .preferredColorScheme(.dark)
                     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
                         // Switch to More tab (where War Room now lives)
-                        selectedTab = 4
+                        selectedTab = 5
                     }
                     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
                         // Switch to Mission Control tab

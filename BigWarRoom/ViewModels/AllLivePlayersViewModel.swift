@@ -11,7 +11,7 @@ import Combine
 
 @MainActor
 final class AllLivePlayersViewModel: ObservableObject {
-	  // 🔥 NEW: Shared singleton instance
+    // 🔥 NEW: Shared singleton instance
    static let shared = AllLivePlayersViewModel()
 
    @Published var allPlayers: [LivePlayerEntry] = []
@@ -24,9 +24,10 @@ final class AllLivePlayersViewModel: ObservableObject {
    @Published var sortingMethod: SortingMethod = .score
    @Published var showActiveOnly: Bool = false // Changed from includeCompletedGames
 
-	  // 🔥 NEW: Animation state management
+    // 🔥 NEW: Animation state management
    @Published var shouldResetAnimations = false
    @Published var sortChangeID = UUID()
+   @Published var lastUpdateTime = Date()
 
    @Published var medianScore: Double = 0.0
    @Published var scoreRange: Double = 0.0
@@ -34,17 +35,17 @@ final class AllLivePlayersViewModel: ObservableObject {
 
    @Published var positionTopScore: Double = 0.0
 
-	  // 🔥 NEW: Centralized player stats
+    // 🔥 NEW: Centralized player stats
    @Published var playerStats: [String: [String: Double]] = [:]
    @Published var statsLoaded: Bool = false
 
    let matchupsHubViewModel = MatchupsHubViewModel()
 
-	  // 🔥 NEW: Week selection subscription with debouncing
+    // 🔥 NEW: Week selection subscription with debouncing
    private var weekSubscription: AnyCancellable?
    private var debounceTask: Task<Void, Never>?
 
-	  // 🔥 PERFORMANCE: Batch update control
+    // 🔥 PERFORMANCE: Batch update control
    private var isBatchingUpdates = false
    
    // 🔧 BLANK SHEET FIX: Cache live game results to reduce API spam
@@ -52,7 +53,7 @@ final class AllLivePlayersViewModel: ObservableObject {
    private var liveGameCacheTimestamp: Date?
    private let liveGameCacheExpiration: TimeInterval = 30.0 // 30 second cache
 
-	  // 🔥 NEW: Private init for singleton
+    // 🔥 NEW: Private init for singleton
    private init() {
 		 // Subscribe to week changes to invalidate stats with debouncing
 	  subscribeToWeekChanges()
@@ -61,9 +62,9 @@ final class AllLivePlayersViewModel: ObservableObject {
 		 // No separate initialization needed
    }
 
-	  // MARK: - Business Logic (Moved from View)
+    // MARK: - Business Logic (Moved from View)
 
-	  /// Get the first available manager from loaded matchups
+    /// Get the first available manager from loaded matchups
    var firstAvailableManager: ManagerInfo? {
 	  for matchup in matchupsHubViewModel.myMatchups {
 		 if let myTeam = matchup.myTeam {
@@ -79,7 +80,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  return nil
    }
 
-	  /// Determine if a team is currently winning their matchup
+    /// Determine if a team is currently winning their matchup
    private func determineIfWinning(matchup: UnifiedMatchup, team: FantasyTeam) -> Bool {
 		 // For chopped leagues, use ranking logic
 	  if matchup.isChoppedLeague {
@@ -91,7 +92,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  return (team.currentScore ?? 0.0) > (opponent.currentScore ?? 0.0)
    }
 
-	  /// Get dynamic sort direction text based on current sorting method
+    /// Get dynamic sort direction text based on current sorting method
    var sortDirectionText: String {
 	  switch sortingMethod {
 		 case .score:
@@ -103,29 +104,29 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  }
    }
 
-	  /// Check if we have leagues connected but no players for current position
+    /// Check if we have leagues connected but no players for current position
    var hasLeaguesButNoPlayers: Bool {
 	  return !matchupsHubViewModel.myMatchups.isEmpty && filteredPlayers.isEmpty && !isLoading
    }
 
-	  /// Check if we have no leagues connected
+    /// Check if we have no leagues connected
    var hasNoLeagues: Bool {
 	  return matchupsHubViewModel.myMatchups.isEmpty
    }
 
-	  /// Get count of connected leagues for display
+    /// Get count of connected leagues for display
    var connectedLeaguesCount: Int {
 	  return matchupsHubViewModel.myMatchups.count
    }
 
-	  /// Apply current sorting direction to filtered players
+    /// Apply current sorting direction to filtered players
    func applySorting() {
 		 // 🔥 FIXED: Clear animation state when sorting changes
 	  triggerAnimationReset()
 	  applyPositionFilter() // Re-apply filter with current sort settings
    }
 
-	  // 🔥 NEW: Debounced week change subscription
+    // 🔥 NEW: Debounced week change subscription
    private func subscribeToWeekChanges() {
 	  weekSubscription = WeekSelectionManager.shared.$selectedWeek
 		 .removeDuplicates()
@@ -153,13 +154,13 @@ final class AllLivePlayersViewModel: ObservableObject {
 		 }
    }
 
-	  // 🔥 NEW: Cleanup method
+    // 🔥 NEW: Cleanup method
    deinit {
 	  debounceTask?.cancel()
 	  weekSubscription?.cancel()
    }
 
-	  // 🔥 NEW: Synchronous stats loading method for immediate access
+    // 🔥 NEW: Synchronous stats loading method for immediate access
    func loadStatsIfNeeded() {
 	  guard !statsLoaded else {
 		 return
@@ -169,7 +170,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  }
    }
 
-	  // MARK: - Player Position Filter
+    // MARK: - Player Position Filter
    enum PlayerPosition: String, CaseIterable, Identifiable {
 	  case all = "All"
 	  case qb = "QB"
@@ -184,7 +185,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  var displayName: String { rawValue }
    }
 
-	  // MARK: - Live Player Entry
+    // MARK: - Live Player Entry
    struct LivePlayerEntry: Identifiable {
 	  let id: String
 	  let player: FantasyPlayer
@@ -238,7 +239,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  }
    }
 
-	  // MARK: - Sorting Method
+    // MARK: - Sorting Method
    enum SortingMethod: String, CaseIterable, Identifiable {
 	  case score = "Score"
 	  case name = "Name"
@@ -249,9 +250,9 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  var displayName: String { rawValue }
    }
 
-	  // MARK: - Data Loading
+    // MARK: - Data Loading
 
-	  // 🔥 CLEANED UP: Ensure stats are loaded in loadAllPlayers
+    // 🔥 CLEANED UP: Ensure stats are loaded in loadAllPlayers
    func loadAllPlayers() async {
 	  isLoading = true
 	  errorMessage = nil
@@ -326,13 +327,13 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  isLoading = false
    }
 
-	  // 🔥 IMPROVED: Add method to force refresh stats
+    // 🔥 IMPROVED: Add method to force refresh stats
    func forceLoadStats() async {
 	  statsLoaded = false
 	  await loadPlayerStats()
    }
 
-	  // 🔥 IMPROVED: Non-blocking stats loading with better error handling
+    // 🔥 IMPROVED: Non-blocking stats loading with better error handling
    private func loadPlayerStats() async {
 		 // Prevent multiple concurrent loads
 	  guard !Task.isCancelled else { return }
@@ -378,7 +379,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  }
    }
 
-	  // 🔥 CRITICAL BUG FIX: Only extract players from MY teams, not opponent teams!
+    // 🔥 CRITICAL BUG FIX: Only extract players from MY teams, not opponent teams!
    private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
 	  var players: [LivePlayerEntry] = []
 
@@ -430,7 +431,7 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  return players
    }
 
-	  // MARK: - Filtering and Sorting
+    // MARK: - Filtering and Sorting
 
    func setPositionFilter(_ position: PlayerPosition) {
 	  selectedPosition = position
@@ -660,67 +661,68 @@ final class AllLivePlayersViewModel: ObservableObject {
 
 	  // 🔥 NEW: Surgical data update that doesn't trigger full UI refresh
    private func updatePlayerDataSurgically() async {
-	  var allPlayerEntries: [LivePlayerEntry] = []
+      var allPlayerEntries: [LivePlayerEntry] = []
 
-		 // Extract players from each matchup (with temporary values)
-	  for matchup in matchupsHubViewModel.myMatchups {
-		 let playersFromMatchup = extractPlayersFromMatchup(matchup)
-		 allPlayerEntries.append(contentsOf: playersFromMatchup)
-	  }
+         // Extract players from each matchup (with temporary values)
+      for matchup in matchupsHubViewModel.myMatchups {
+         let playersFromMatchup = extractPlayersFromMatchup(matchup)
+         allPlayerEntries.append(contentsOf: playersFromMatchup)
+      }
 
-		 // Only update if data actually changed
-	  guard !allPlayerEntries.isEmpty else { return }
+         // Only update if data actually changed
+      guard !allPlayerEntries.isEmpty else { return }
 
-		 // Calculate overall statistics
-	  let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
-	  let newTopScore = scores.first ?? 1.0
-	  let bottomScore = scores.last ?? 0.0
-	  let newScoreRange = newTopScore - bottomScore
+         // Calculate overall statistics
+      let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
+      let newTopScore = scores.first ?? 1.0
+      let bottomScore = scores.last ?? 0.0
+      let newScoreRange = newTopScore - bottomScore
 
-		 // Calculate median
-	  var newMedianScore: Double = 0.0
-	  if !scores.isEmpty {
-		 let mid = scores.count / 2
-		 newMedianScore = scores.count % 2 == 0 ?
-		 (scores[mid - 1] + scores[mid]) / 2 :
-		 scores[mid]
-	  }
+         // Calculate median
+      var newMedianScore: Double = 0.0
+      if !scores.isEmpty {
+         let mid = scores.count / 2
+         newMedianScore = scores.count % 2 == 0 ?
+         (scores[mid - 1] + scores[mid]) / 2 :
+         scores[mid]
+      }
 
-		 // Use adaptive scaling if there's a huge gap (top score is 3x+ median)
-	  let newUseAdaptiveScaling = newTopScore > (newMedianScore * 3)
+         // Use adaptive scaling if there's a huge gap (top score is 3x+ median)
+      let newUseAdaptiveScaling = newTopScore > (newMedianScore * 3)
 
-		 // Calculate quartiles for tier determination
-	  let quartiles = calculateQuartiles(from: scores)
+         // Calculate quartiles for tier determination
+      let quartiles = calculateQuartiles(from: scores)
 
-		 // 🔥 PERFORMANCE: Only update if values actually changed
-	  await performBatchUpdate {
-		 topScore = newTopScore
-		 scoreRange = newScoreRange
-		 medianScore = newMedianScore
-		 useAdaptiveScaling = newUseAdaptiveScaling
+         // 🔥 PERFORMANCE: Only update if values actually changed
+      await performBatchUpdate {
+         topScore = newTopScore
+         scoreRange = newScoreRange
+         medianScore = newMedianScore
+         useAdaptiveScaling = newUseAdaptiveScaling
+         lastUpdateTime = Date() // Update timestamp for watch service
 
-			// Update all players with proper percentages and tiers
-		 allPlayers = allPlayerEntries.map { entry in
-			let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: newTopScore)
-			let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+            // Update all players with proper percentages and tiers
+         allPlayers = allPlayerEntries.map { entry in
+            let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: newTopScore)
+            let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
 
-			return LivePlayerEntry(
-			   id: entry.id,
-			   player: entry.player,
-			   leagueName: entry.leagueName,
-			   leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
-			   currentScore: entry.currentScore,
-			   projectedScore: entry.projectedScore,
-			   isStarter: entry.isStarter,
-			   percentageOfTop: percentage,
-			   matchup: entry.matchup,
-			   performanceTier: tier
-			)
-		 }
+            return LivePlayerEntry(
+               id: entry.id,
+               player: entry.player,
+               leagueName: entry.leagueName,
+               leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
+               currentScore: entry.currentScore,
+               projectedScore: entry.projectedScore,
+               isStarter: entry.isStarter,
+               percentageOfTop: percentage,
+               matchup: entry.matchup,
+               performanceTier: tier
+            )
+         }
 
-			// Re-apply current filter
-		 applyPositionFilter()
-	  }
+            // Re-apply current filter
+         applyPositionFilter()
+      }
    }
 
 	  // 🔥 NEW: Batch update mechanism to reduce UI churn

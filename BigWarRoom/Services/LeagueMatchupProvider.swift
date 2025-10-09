@@ -645,12 +645,14 @@ final class LeagueMatchupProvider {
         }
         
         var totalScore = 0.0
+        
         for (statKey, statValue) in playerStats {
             if let scoring = scoringSettings[statKey] as? Double {
                 let points = statValue * scoring
                 totalScore += points
             }
         }
+        
         return totalScore
     }
     

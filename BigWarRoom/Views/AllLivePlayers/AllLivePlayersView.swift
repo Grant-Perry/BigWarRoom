@@ -20,11 +20,14 @@ import SwiftUI
 struct AllLivePlayersView: View {
     // 🔥 FIXED: Use shared instance instead of creating new one
     @ObservedObject private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
+    @StateObject private var watchService = PlayerWatchService.shared
     
     // 🔥 UI STATE ONLY - No business logic
     @State private var animatedPlayers: [String] = []
     @State private var sortHighToLow = true
     @State private var showingWeekPicker = false
+    @State private var showingFilters = false
+    @State private var showingWatchedPlayers = false
     
     // 🔥 PERFORMANCE: Task management for better lifecycle control
     @State private var loadTask: Task<Void, Never>?
@@ -34,7 +37,7 @@ struct AllLivePlayersView: View {
         // BEFORE: NavigationView { ... }
         // AFTER: Direct content - NavigationView provided by parent TabView
         ZStack {
-            // BG6 background
+            // BG7 background
             Image("BG7")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
@@ -47,7 +50,9 @@ struct AllLivePlayersView: View {
                     viewModel: allLivePlayersViewModel,
                     sortHighToLow: $sortHighToLow,
                     showingWeekPicker: $showingWeekPicker,
-                    onAnimationReset: resetAnimations
+                    onAnimationReset: resetAnimations,
+                    showingFilters: $showingFilters,
+                    showingWatchedPlayers: $showingWatchedPlayers
                 )
                 
                 // 🔥 CLEAN: Content based on state - no business logic here
@@ -56,6 +61,29 @@ struct AllLivePlayersView: View {
         }
         .navigationTitle("All Rostered Players")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Text("All Rostered Players")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    // Red notification badge with player count
+                    if allLivePlayersViewModel.filteredPlayers.count > 0 {
+                        Text("\(allLivePlayersViewModel.filteredPlayers.count)")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(minWidth: 24, minHeight: 24)
+                            .background(
+                                Circle()
+                                    .fill(.red)
+                            )
+                            .scaleEffect(allLivePlayersViewModel.filteredPlayers.count > 99 ? 0.8 : 1.0) // Scale down for large numbers
+                            .offset(x: -8, y: -5)
+                    }
+                }
+            }
+        }
         .refreshable {
             await performRefresh()
         }
@@ -69,9 +97,31 @@ struct AllLivePlayersView: View {
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(isPresented: $showingWeekPicker)
         }
+        .sheet(isPresented: $showingFilters) {
+            AllLivePlayersFiltersSheet(viewModel: allLivePlayersViewModel)
+        }
+        .sheet(isPresented: $showingWatchedPlayers) {
+            WatchedPlayersSheet(watchService: watchService)
+        }
         // 🔥 FIXED: Listen for sort changes and reset animations
         .onChange(of: allLivePlayersViewModel.sortChangeID) { _, _ in
             resetAnimations()
+        }
+        .onChange(of: allLivePlayersViewModel.lastUpdateTime) { _ in
+            // Update watched player scores when live players update
+            let allOpponentPlayers = allLivePlayersViewModel.allPlayers.compactMap { playerEntry in
+                OpponentPlayer(
+                    id: UUID().uuidString,
+                    player: playerEntry.player,
+                    isStarter: playerEntry.isStarter,
+                    currentScore: playerEntry.currentScore,
+                    projectedScore: playerEntry.projectedScore,
+                    threatLevel: .moderate,
+                    matchupAdvantage: .neutral,
+                    percentageOfOpponentTotal: 0.0
+                )
+            }
+            watchService.updateWatchedPlayerScores(allOpponentPlayers)
         }
     }
     

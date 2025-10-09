@@ -32,6 +32,17 @@ struct MoreTabView: View {
                     // Features List
                     ScrollView {
                         VStack(spacing: 12) {
+                            // Team Rosters - MOVED FROM MAIN TAB
+                            NavigationLink(destination: TeamRostersView()) {
+                                MoreRowView(
+                                    icon: "person.3.fill",
+                                    iconColor: .blue,
+                                    title: "Team Rosters",
+                                    subtitle: "View all team rosters across leagues"
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
                             // Player Search
                             NavigationLink(destination: PlayerSearchView()) {
                                 MoreRowView(

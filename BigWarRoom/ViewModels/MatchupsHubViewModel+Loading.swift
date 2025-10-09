@@ -181,9 +181,9 @@ extension MatchupsHubViewModel {
     
     /// Load matchup for a single league using isolated LeagueMatchupProvider
     internal func loadSingleLeagueMatchup(_ league: UnifiedLeagueManager.LeagueWrapper) async -> UnifiedMatchup? {
-        let leagueKey = "\(league.id)_\(getCurrentWeek())_\(getCurrentYear())"
-        
-        print("🔥 SINGLE LEAGUE: Starting to load league: \(league.league.name)")
+        let currentWeek = getCurrentWeek()
+        let currentYear = getCurrentYear()
+        let leagueKey = "\(league.id)_\(currentWeek)_\(currentYear)"
         
         // 🔥 FIX: Bulletproof race condition prevention with lock
         loadingLock.lock()
@@ -211,8 +211,8 @@ extension MatchupsHubViewModel {
             // 🔥 NEW APPROACH: Create isolated provider for this league
             let provider = LeagueMatchupProvider(
                 league: league, 
-                week: getCurrentWeek(), 
-                year: getCurrentYear()
+                week: currentWeek,  // Use the actual week
+                year: currentYear
             )
             
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.3)
