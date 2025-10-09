@@ -2,12 +2,12 @@
 //  MatchupsHubHeroHeaderView.swift
 //  BigWarRoom
 //
-//  Hero header section for MatchupsHub
+//  Clean minimal hero header for Mission Control redesign
 //
 
 import SwiftUI
 
-/// Hero header section for MatchupsHub
+/// Clean minimal hero header - no more visual assault
 struct MatchupsHubHeroHeaderView: View {
     let matchupsCount: Int
     let selectedWeek: Int
@@ -19,71 +19,27 @@ struct MatchupsHubHeroHeaderView: View {
     let timeAgoString: String?
     let onWeekPickerTapped: () -> Void
     let onAutoRefreshToggle: () -> Void
+    let onSettingsTapped: () -> Void
     
     var body: some View {
         VStack(spacing: 16) {
-            MissionControlHeaderView()
-            
-            MatchupsStatsOverviewView(
-                matchupsCount: matchupsCount,
+            // Minimal header with week selector and settings
+            MinimalHeaderView(
                 selectedWeek: selectedWeek,
-                connectedLeaguesCount: connectedLeaguesCount,
-                winningCount: winningCount,
-                losingCount: losingCount,
-                onWeekPickerTapped: onWeekPickerTapped
+                onWeekPickerTapped: onWeekPickerTapped,
+                onSettingsTapped: onSettingsTapped
             )
             
-            // 🔥 MOVED: Last Update info now goes between stat boxes and controls
-            CompactLastUpdateView(
+            // Clean dashboard summary card
+            DashboardSummaryCard(
+                winningCount: winningCount,
+                losingCount: losingCount,
+                connectedLeaguesCount: connectedLeaguesCount,
                 lastUpdateTime: lastUpdateTime,
                 timeAgoString: timeAgoString
             )
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .padding(.top, 12)
         .padding(.bottom, 8)
-        .background(
-            // Add semi-transparent background to entire hero section
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.4))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-        )
-    }
-}
-
-// MARK: - Supporting Components
-
-/// Compact last update display (no auto-refresh toggle)
-private struct CompactLastUpdateView: View {
-    let lastUpdateTime: Date?
-    let timeAgoString: String?
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.gpGreen)
-            
-            if let timeAgoString {
-                Text("Last Update: \(timeAgoString)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            } else {
-                Text("Ready to load your battles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.2))
-        )
     }
 }

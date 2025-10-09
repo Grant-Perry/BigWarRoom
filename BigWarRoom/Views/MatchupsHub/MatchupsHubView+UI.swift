@@ -46,7 +46,8 @@ extension MatchupsHubView {
             autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
             onWeekPickerTapped: showWeekPicker,
-            onAutoRefreshToggle: toggleAutoRefresh
+            onAutoRefreshToggle: toggleAutoRefresh,
+            onSettingsTapped: showSettings
         )
     }
     

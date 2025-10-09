@@ -2,12 +2,12 @@
 //  MatchupsHubMatchupsSectionView.swift
 //  BigWarRoom
 //
-//  Matchups section component for MatchupsHub
+//  Clean matchups section with collapsible advanced controls
 //
 
 import SwiftUI
 
-/// Matchups section for MatchupsHub
+/// Clean matchups section with hidden advanced controls
 struct MatchupsHubMatchupsSectionView: View {
     @Binding var poweredByExpanded: Bool
     let sortByWinning: Bool
@@ -24,51 +24,49 @@ struct MatchupsHubMatchupsSectionView: View {
     let onMicroModeToggle: () -> Void
     let onAutoRefreshToggle: () -> Void
     let onRefreshTapped: () -> Void
-    // 🏈 NAVIGATION FREEDOM: Remove onShowDetail callback - using NavigationLinks instead
-    // let onShowDetail: (UnifiedMatchup) -> Void
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
     
+    // State for collapsible advanced controls
+    @State private var advancedControlsExpanded = false
+    
     var body: some View {
         VStack(spacing: 20) {
-            MatchupsSectionHeaderView(
-                poweredByExpanded: poweredByExpanded,
+            // Advanced controls section (collapsible)
+            AdvancedControlsSection(
+                isExpanded: $advancedControlsExpanded,
                 sortByWinning: sortByWinning,
                 dualViewMode: dualViewMode,
                 microMode: microMode,
-                refreshCountdown: refreshCountdown,
                 autoRefreshEnabled: autoRefreshEnabled,
-                onPoweredByToggle: onPoweredByToggle,
+                refreshCountdown: refreshCountdown,
                 onSortToggle: onSortToggle,
                 onDualViewToggle: onDualViewToggle,
                 onMicroModeToggle: onMicroModeToggle,
-                onRefreshTapped: onRefreshTapped,
-                onAutoRefreshToggle: onAutoRefreshToggle
+                onAutoRefreshToggle: onAutoRefreshToggle,
+                onRefreshTapped: onRefreshTapped
             )
             
-            // Conditional sections
+            // Powered by branding (keep existing functionality)
             if poweredByExpanded {
                 PoweredByBrandingView()
             }
             
-            // Show banner only when explicitly visible, not when microMode is on
+            // Show banner only when explicitly visible
             if justMeModeBannerVisible {
                 JustMeModeBannerView()
             }
             
-            if !poweredByExpanded {
-                Color.clear.frame(height: 4)
-            }
+            // More breathing room before matchup cards
+            Color.clear.frame(height: 8)
             
-            // Matchup cards grid
+            // Matchup cards grid with more space
             MatchupCardsGridView(
                 sortedMatchups: sortedMatchups,
                 microMode: microMode,
                 dualViewMode: dualViewMode,
                 expandedCardId: expandedCardId,
-                // 🏈 NAVIGATION FREEDOM: Remove onShowDetail callback - using NavigationLinks instead
-                // onShowDetail: onShowDetail,
                 onMicroCardTap: onMicroCardTap,
                 onExpandedCardDismiss: onExpandedCardDismiss,
                 getWinningStatus: getWinningStatus
