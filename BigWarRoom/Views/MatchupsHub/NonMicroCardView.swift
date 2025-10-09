@@ -77,6 +77,14 @@ struct NonMicroCardView: View {
                 startMassiveCelebrationGlow()
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.8)) // Back to original 0.8
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color.gpRedPink.opacity(0.3), lineWidth: 1)
+                )
+        )
     }
     
     // MARK: - 🔥 CELEBRATION: Week-End Celebration Logic

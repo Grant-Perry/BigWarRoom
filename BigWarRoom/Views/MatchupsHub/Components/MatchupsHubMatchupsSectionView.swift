@@ -47,21 +47,12 @@ struct MatchupsHubMatchupsSectionView: View {
                 onAutoRefreshToggle: onAutoRefreshToggle
             )
             
-            // Conditional sections
+            // Powered by branding (keep existing functionality)
             if poweredByExpanded {
                 PoweredByBrandingView()
             }
             
-            // Show banner only when explicitly visible, not when microMode is on
-            if justMeModeBannerVisible {
-                JustMeModeBannerView()
-            }
-            
-            if !poweredByExpanded {
-                Color.clear.frame(height: 4)
-            }
-            
-            // Matchup cards grid
+            // Matchup cards grid - tight to the Advanced section
             MatchupCardsGridView(
                 sortedMatchups: sortedMatchups,
                 microMode: microMode,

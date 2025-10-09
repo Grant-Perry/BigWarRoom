@@ -75,16 +75,16 @@ struct MicroCardBackgroundView: View {
     
     private var backgroundGradient: LinearGradient {
         if isEliminated {
-            // 🔥 ELIMINATED GRADIENT: Use gpRedPink
+            // 🔥 ELIMINATED GRADIENT: Back to original opacity
             return LinearGradient(
-                colors: [Color.gpRedPink.opacity(0.8), Color.black.opacity(0.9)],
+                colors: [Color.gpRedPink.opacity(0.8), Color.black.opacity(0.9)], // Back to original 0.8/0.9
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
         } else {
-            // Regular purple gradient
+            // Regular purple gradient - back to original opacity
             return LinearGradient(
-                colors: [cardGrad.opacity(0.6), cardGrad.opacity(0.9)],
+                colors: [cardGrad.opacity(0.6), cardGrad.opacity(0.9)], // Back to original 0.6/0.9
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -104,7 +104,7 @@ struct MicroCardBackgroundView: View {
     
     private var darkenOverlay: some View {
         RoundedRectangle(cornerRadius: 8)
-            .fill(Color.black.opacity(isEliminated ? 0.3 : 0.3))
+            .fill(Color.black.opacity(0.3)) // Back to original 0.3
     }
     
     // 🔥 CELEBRATION: Celebration border overlay

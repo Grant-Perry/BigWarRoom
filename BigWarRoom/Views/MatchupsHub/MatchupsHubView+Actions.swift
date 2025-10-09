@@ -79,18 +79,15 @@ extension MatchupsHubView {
     private func startJustMeModeTimer() {
         stopJustMeModeTimer() // Clean up any existing timer
         
-        // Only start timer if Just Me mode is enabled
-        guard matchupsHubViewModel.microModeEnabled else { return }
+        // guard matchupsHubViewModel.microModeEnabled else { return }
         
-        justMeModeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
-            Task { @MainActor in
-                // 🔥 FIXED: Only hide the banner, don't turn off Just Me mode
-                withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                    matchupsHubViewModel.justMeModeBannerVisible = false
-                    // DON'T turn off microModeEnabled - let user do that manually!
-                }
-            }
-        }
+        // justMeModeTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { _ in
+        //     Task { @MainActor in
+        //         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+        //             matchupsHubViewModel.justMeModeBannerVisible = false
+        //         }
+        //     }
+        // }
     }
     
     func stopJustMeModeTimer() {
@@ -163,14 +160,14 @@ extension MatchupsHubView {
         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             matchupsHubViewModel.microModeEnabled.toggle()
             if !matchupsHubViewModel.microModeEnabled {
-                // When turning off Just Me mode, also hide banner and collapse cards
+                // When turning off Just Me mode, also collapse cards
                 matchupsHubViewModel.expandedCardId = nil 
-                matchupsHubViewModel.justMeModeBannerVisible = false
+                // matchupsHubViewModel.justMeModeBannerVisible = false
                 stopJustMeModeTimer() 
             } else {
-                // When turning on Just Me mode, show banner and start auto-dismiss timer
-                matchupsHubViewModel.justMeModeBannerVisible = true
-                startJustMeModeTimer()
+                // When turning on Just Me mode, just enable it - no banner
+                // matchupsHubViewModel.justMeModeBannerVisible = true
+                // startJustMeModeTimer()
             }
         }
     }
