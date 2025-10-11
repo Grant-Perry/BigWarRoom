@@ -154,28 +154,103 @@ final class OpponentIntelligenceService {
     /// - Parameter intelligence: Array of opponent intelligence containing my team rosters
     /// - Returns: Array of strategic recommendations for injured players
     private func generateInjuryAlerts(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
-        var alerts: [InjuryAlert] = []
+        print("🏥 INJURY SCAN: Using AllLivePlayersViewModel for consistent player data")
         
-        // Scan all my teams across all leagues
-        for intel in intelligence {
-            guard let myTeam = intel.matchup.myTeam else { continue }
+        // Use the same reliable data source as Live Players tab
+        let livePlayersViewModel = AllLivePlayersViewModel.shared
+        let allMyPlayers = livePlayersViewModel.allPlayers
+        
+        print("🏥 Found \(allMyPlayers.count) total players from AllLivePlayersViewModel")
+        
+        var playerInjuries: [String: InjuryAlert] = [:]
+        var totalPlayersScanned = 0
+        var totalStartersScanned = 0
+        var injuriesFound = 0
+        
+        // Scan all players from the Live Players data source
+        for playerEntry in allMyPlayers {
+            totalPlayersScanned += 1
             
-            // Check each player on my roster
-            for player in myTeam.roster {
-                if let injuryAlert = createInjuryAlert(
-                    player: player,
-                    leagueName: intel.leagueName,
-                    leagueSource: intel.leagueSource,
-                    myTeam: myTeam,
-                    matchup: intel.matchup
-                ) {
-                    alerts.append(injuryAlert)
-                }
+            // Log every player we're checking
+            let starterStatus = playerEntry.isStarter ? "STARTER" : "BENCH"
+            print("🏥 Checking: \(playerEntry.player.fullName) (\(starterStatus)) in \(playerEntry.leagueName)")
+            
+            if playerEntry.isStarter {
+                totalStartersScanned += 1
+            }
+            
+            // Check for injury status REGARDLESS of starter status initially
+            let isByeWeek = checkIfPlayerOnBye(player: playerEntry.player)
+            let sleeperInjuryStatus = getSleeperInjuryStatus(for: playerEntry.player)
+            
+            print("🏥 \(playerEntry.player.fullName) - BYE: \(isByeWeek), Injury Status: \(sleeperInjuryStatus ?? "None")")
+            
+            // Determine injury status type
+            guard let injuryStatusType = InjuryStatusType.from(
+                injuryStatus: sleeperInjuryStatus,
+                isByeWeek: isByeWeek
+            ) else {
+                continue // No concerning injury status
+            }
+            
+            injuriesFound += 1
+            print("🏥 INJURY FOUND: \(playerEntry.player.fullName) - Status: \(injuryStatusType.displayName) in \(playerEntry.leagueName)")
+            
+            // Create league roster entry
+            let leagueRoster = InjuryLeagueRoster(
+                leagueName: playerEntry.leagueName,
+                leagueSource: LeagueSource(rawValue: playerEntry.leagueSource) ?? .sleeper,
+                myTeam: playerEntry.matchup.myTeam!, // We know this exists from Live Players
+                matchup: playerEntry.matchup,
+                isStarterInThisLeague: playerEntry.isStarter
+            )
+            
+            // Use player name as consistent key to handle multi-league players
+            let playerKey = playerEntry.player.fullName.lowercased().replacingOccurrences(of: " ", with: "_")
+            
+            if var existingAlert = playerInjuries[playerKey] {
+                // Player already found in another league - add this league roster
+                var updatedLeagueRosters = existingAlert.leagueRosters
+                updatedLeagueRosters.append(leagueRoster)
+                
+                // Update the alert with combined league rosters
+                let isStarterAnywhere = updatedLeagueRosters.contains { $0.isStarterInThisLeague }
+                let priority = InjuryPriority.determine(status: injuryStatusType, isStarter: isStarterAnywhere)
+                
+                playerInjuries[playerKey] = InjuryAlert(
+                    player: existingAlert.player,
+                    injuryStatus: injuryStatusType,
+                    leagueRosters: updatedLeagueRosters,
+                    isStarter: isStarterAnywhere,
+                    priority: priority
+                )
+                
+                print("🏥 Updated \(playerEntry.player.fullName) - now in \(updatedLeagueRosters.count) leagues")
+            } else {
+                // First time seeing this player
+                let priority = InjuryPriority.determine(status: injuryStatusType, isStarter: playerEntry.isStarter)
+                
+                playerInjuries[playerKey] = InjuryAlert(
+                    player: playerEntry.player,
+                    injuryStatus: injuryStatusType,
+                    leagueRosters: [leagueRoster],
+                    isStarter: playerEntry.isStarter,
+                    priority: priority
+                )
+                
+                print("🏥 Created new entry for \(playerEntry.player.fullName)")
             }
         }
         
+        print("🏥 SCAN COMPLETE: \(totalPlayersScanned) total players, \(totalStartersScanned) starters, \(injuriesFound) injuries found")
+        
+        // Only create alerts for starters (ignore bench injuries)
+        let starterAlerts = playerInjuries.values.filter { $0.isStarter }
+        
+        print("🏥 FINAL RESULT: \(starterAlerts.count) injury alerts created for starters")
+        
         // Sort alerts by priority (BYE → IR → O → Q)
-        alerts.sort { alert1, alert2 in
+        let sortedAlerts = starterAlerts.sorted { alert1, alert2 in
             if alert1.priority.rawValue != alert2.priority.rawValue {
                 return alert1.priority.rawValue < alert2.priority.rawValue
             }
@@ -184,7 +259,7 @@ final class OpponentIntelligenceService {
         }
         
         // Convert to StrategicRecommendation objects
-        return alerts.map { $0.asStrategicRecommendation() }
+        return sortedAlerts.map { $0.asStrategicRecommendation() }
     }
     
     /// Create injury alert for a specific player if they have injury status
@@ -202,88 +277,70 @@ final class OpponentIntelligenceService {
         matchup: UnifiedMatchup
     ) -> InjuryAlert? {
         
-        // ONLY CARE ABOUT STARTERS - ignore bench players completely
-        guard player.isStarter else { return nil }
-        
-        // Check for BYE week first (highest priority)
-        let isByeWeek = checkIfPlayerOnBye(player: player)
-        
-        // Get injury status from Sleeper player directory
-        let sleeperInjuryStatus = getSleeperInjuryStatus(for: player)
-        
-        // Determine injury status type
-        guard let injuryStatusType = InjuryStatusType.from(
-            injuryStatus: sleeperInjuryStatus,
-            isByeWeek: isByeWeek
-        ) else {
-            return nil // No concerning injury status
-        }
-        
-        // Determine priority based on status and roster position
-        let priority = InjuryPriority.determine(
-            status: injuryStatusType,
-            isStarter: player.isStarter
-        )
-        
-        // We need to find the matchup for this league to include it
-        // For now, we'll create a basic alert without matchup reference
-        return InjuryAlert(
-            player: player,
-            injuryStatus: injuryStatusType,
-            leagueName: leagueName,
-            leagueSource: leagueSource,
-            myTeam: myTeam,
-            matchup: matchup, // Pass the actual matchup parameter
-            isStarter: player.isStarter,
-            priority: priority
-        )
-    }
-    
-    /// Check if player is on BYE week using game status service
-    /// - Parameter player: Fantasy player to check
-    /// - Returns: True if player's team is on BYE this week
-    private func checkIfPlayerOnBye(player: FantasyPlayer) -> Bool {
-        guard let team = player.team else { return false }
-        
-        // Use NFLGameDataService to check if team is on bye
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
-            return gameInfo.gameStatus.lowercased() == "bye"
-        }
-        
-        // Fallback: Check if player has 0 projected points (common BYE indicator)
-        if let projectedPoints = player.projectedPoints, projectedPoints == 0.0,
-           let currentPoints = player.currentPoints, currentPoints == 0.0 {
-            return true
-        }
-        
-        return false
+        return nil
     }
     
     /// Get injury status from Sleeper player directory
     /// - Parameter player: Fantasy player to lookup
     /// - Returns: Injury status string from Sleeper data, if available
     private func getSleeperInjuryStatus(for player: FantasyPlayer) -> String? {
+        var foundStatus: String? = nil
+        
         // Try to find Sleeper player data using various ID mappings
         if let sleeperID = player.sleeperID,
            let sleeperPlayer = PlayerDirectoryStore.shared.player(for: sleeperID) {
-            return sleeperPlayer.injuryStatus
+            foundStatus = sleeperPlayer.injuryStatus
+            print("🔍 Found \(player.fullName) injury status via SleeperID: \(foundStatus ?? "None")")
+            return foundStatus
         }
         
         // Try ESPN ID mapping to Sleeper
         if let espnID = player.espnID,
            let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnID) {
-            return sleeperPlayer.injuryStatus
+            foundStatus = sleeperPlayer.injuryStatus
+            print("🔍 Found \(player.fullName) injury status via ESPN ID: \(foundStatus ?? "None")")
+            return foundStatus
         }
         
         // Try name-based lookup as fallback - need to search through all players
         let allPlayers = PlayerDirectoryStore.shared.players
         for (_, sleeperPlayer) in allPlayers {
             if sleeperPlayer.fullName.lowercased() == player.fullName.lowercased() {
-                return sleeperPlayer.injuryStatus
+                foundStatus = sleeperPlayer.injuryStatus
+                print("🔍 Found \(player.fullName) injury status via name lookup: \(foundStatus ?? "None")")
+                return foundStatus
             }
         }
         
+        print("🔍 No injury status found for \(player.fullName) - SleeperID: \(player.sleeperID ?? "None"), ESPN ID: \(player.espnID ?? "None")")
         return nil
+    }
+    
+    /// Check if player is on BYE week using game status service
+    /// - Parameter player: Fantasy player to check
+    /// - Returns: True if player's team is on BYE this week
+    private func checkIfPlayerOnBye(player: FantasyPlayer) -> Bool {
+        guard let team = player.team else { 
+            print("🏈 \(player.fullName) - No team info available for BYE check")
+            return false 
+        }
+        
+        // Use NFLGameDataService to check if team is on bye
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            let isBye = gameInfo.gameStatus.lowercased() == "bye"
+            print("🏈 \(player.fullName) (\(team)) - Game status: \(gameInfo.gameStatus), BYE: \(isBye)")
+            return isBye
+        }
+        
+        // Fallback: Check if player has 0 projected points (common BYE indicator)
+        if let projectedPoints = player.projectedPoints, projectedPoints == 0.0,
+           let currentPoints = player.currentPoints, currentPoints == 0.0 {
+            print("🏈 \(player.fullName) (\(team)) - BYE detected via 0 points (Projected: \(projectedPoints), Current: \(currentPoints))")
+            return true
+        }
+        
+        print("🏈 \(player.fullName) (\(team)) - Not on BYE")
+        return false
     }
     
     // MARK: - Private Analysis Methods

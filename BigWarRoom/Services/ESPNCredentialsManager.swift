@@ -17,11 +17,13 @@ final class ESPNCredentialsManager: ObservableObject {
     @Published var hasValidCredentials: Bool = false
     @Published var currentSWID: String = ""
     @Published var leagueIDs: [String] = []
+    @Published var leagueTeamIDs: [String: String] = [:] // NEW: LeagueID -> TeamID mapping
     
     // MARK: - Keychain Keys
     private let swidKey = "ESPN_SWID"
     private let espnS2Key = "ESPN_S2"
     private let leagueIDsKey = "ESPN_LEAGUE_IDS"
+    private let leagueTeamIDsKey = "ESPN_LEAGUE_TEAM_IDS" // NEW: Store team IDs per league
     private let keychainService = "BigWarRoom_ESPN"
     
     private init() {
@@ -30,18 +32,20 @@ final class ESPNCredentialsManager: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Save ESPN credentials securely
-    func saveCredentials(swid: String, espnS2: String, leagueIDs: [String]) {
+    /// Save ESPN credentials securely with optional team IDs
+    func saveCredentials(swid: String, espnS2: String, leagueIDs: [String], leagueTeamIDs: [String: String] = [:]) {
         // Save to Keychain
         saveToKeychain(key: swidKey, value: swid)
         saveToKeychain(key: espnS2Key, value: espnS2)
         
-        // Save league IDs to UserDefaults (not sensitive)
+        // Save league IDs and team IDs to UserDefaults (not sensitive)
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
+        UserDefaults.standard.set(leagueTeamIDs, forKey: leagueTeamIDsKey)
         
         // Update published properties
         self.currentSWID = swid
         self.leagueIDs = leagueIDs
+        self.leagueTeamIDs = leagueTeamIDs
         self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
         
         // x// x Print("✅ ESPN credentials saved successfully")
@@ -52,9 +56,11 @@ final class ESPNCredentialsManager: ObservableObject {
         let swid = loadFromKeychain(key: swidKey) ?? ""
         let espnS2 = loadFromKeychain(key: espnS2Key) ?? ""
         let leagueIDs = UserDefaults.standard.stringArray(forKey: leagueIDsKey) ?? []
+        let leagueTeamIDs = UserDefaults.standard.dictionary(forKey: leagueTeamIDsKey) as? [String: String] ?? [:]
         
         self.currentSWID = swid
         self.leagueIDs = leagueIDs
+        self.leagueTeamIDs = leagueTeamIDs
         self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
         
         // 🔥 DEBUG: Log what we're loading
@@ -63,6 +69,7 @@ final class ESPNCredentialsManager: ObservableObject {
             // x Print("   SWID: '\(swid.isEmpty ? "EMPTY" : "HAS_VALUE")'")
             // x Print("   ESPN_S2: '\(espnS2.isEmpty ? "EMPTY" : "HAS_VALUE")'") 
             // x Print("   League IDs: \(leagueIDs.count)")
+            // x Print("   Team IDs: \(leagueTeamIDs.count)")
             // x Print("   hasValidCredentials: \(hasValidCredentials)")
         }
     }
@@ -78,14 +85,51 @@ final class ESPNCredentialsManager: ObservableObject {
         return swid?.isEmpty == false ? swid : nil
     }
     
+    /// Get team ID for a specific league
+    func getTeamID(for leagueID: String) -> String? {
+        return leagueTeamIDs[leagueID]
+    }
+    
+    /// Store team ID for a specific league
+    func setTeamID(_ teamID: String, for leagueID: String) {
+        leagueTeamIDs[leagueID] = teamID
+        UserDefaults.standard.set(leagueTeamIDs, forKey: leagueTeamIDsKey)
+        
+        print("✅ ESPN: Stored team ID '\(teamID)' for league '\(leagueID)'")
+    }
+    
+    /// Resolve and store team IDs for all configured leagues
+    func resolveAllTeamIDs() async {
+        guard hasValidCredentials else { return }
+        
+        print("🔍 ESPN: Resolving team IDs for \(leagueIDs.count) leagues...")
+        
+        for leagueID in leagueIDs {
+            do {
+                if let teamID = try await ESPNAPIClient.shared.getCurrentUserMemberID(leagueID: leagueID) {
+                    setTeamID(teamID, for: leagueID)
+                    print("✅ ESPN: Found team ID '\(teamID)' for league '\(leagueID)'")
+                } else {
+                    print("⚠️ ESPN: Could not find team ID for league '\(leagueID)'")
+                }
+            } catch {
+                print("❌ ESPN: Failed to get team ID for league '\(leagueID)': \(error)")
+            }
+        }
+        
+        print("✅ ESPN: Team ID resolution complete. Found \(leagueTeamIDs.count) team IDs.")
+    }
+    
     /// Clear all ESPN credentials
     func clearCredentials() {
         deleteFromKeychain(key: swidKey)
         deleteFromKeychain(key: espnS2Key)
         UserDefaults.standard.removeObject(forKey: leagueIDsKey)
+        UserDefaults.standard.removeObject(forKey: leagueTeamIDsKey) // Clear team IDs too
         
         currentSWID = ""
         leagueIDs = []
+        leagueTeamIDs = [:]
         hasValidCredentials = false
         
         // x// x Print("🗑️ ESPN credentials cleared")

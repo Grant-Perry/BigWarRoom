@@ -246,7 +246,8 @@ struct StrategicRecommendation: Identifiable {
     let priority: Priority
     let actionable: Bool
     let opponentTeam: FantasyTeam? // Include opponent team for avatar display
-    let matchup: UnifiedMatchup? // NEW: Include matchup for navigation to specific league
+    let matchup: UnifiedMatchup? // Single matchup for legacy compatibility
+    let injuryAlert: InjuryAlert? // NEW: Full injury alert data for multi-league navigation
     
     // Convenience init for backward compatibility
     init(type: RecommendationType, title: String, description: String, priority: Priority, actionable: Bool, opponentTeam: FantasyTeam?) {
@@ -257,6 +258,7 @@ struct StrategicRecommendation: Identifiable {
         self.actionable = actionable
         self.opponentTeam = opponentTeam
         self.matchup = nil
+        self.injuryAlert = nil
     }
     
     // Full init with matchup
@@ -268,6 +270,19 @@ struct StrategicRecommendation: Identifiable {
         self.actionable = actionable
         self.opponentTeam = opponentTeam
         self.matchup = matchup
+        self.injuryAlert = nil
+    }
+    
+    // NEW: Injury alert init with full injury data
+    init(type: RecommendationType, title: String, description: String, priority: Priority, actionable: Bool, injuryAlert: InjuryAlert) {
+        self.type = type
+        self.title = title
+        self.description = description
+        self.priority = priority
+        self.actionable = actionable
+        self.opponentTeam = nil
+        self.matchup = injuryAlert.leagueRosters.first?.matchup // First matchup for legacy compatibility
+        self.injuryAlert = injuryAlert
     }
     
     enum RecommendationType: String, CaseIterable {
@@ -307,31 +322,61 @@ struct StrategicRecommendation: Identifiable {
 
 // MARK: - Injury Status Alert Models
 
-/// Individual injury status alert for a rostered player
+/// Individual injury status alert for a rostered player (potentially across multiple leagues)
 struct InjuryAlert: Identifiable {
     let id = UUID()
     let player: FantasyPlayer
     let injuryStatus: InjuryStatusType
-    let leagueName: String
-    let leagueSource: LeagueSource
-    let myTeam: FantasyTeam
-    let matchup: UnifiedMatchup // Include matchup for navigation
-    let isStarter: Bool
+    let leagueRosters: [InjuryLeagueRoster] // NEW: All leagues where this player is rostered
+    let isStarter: Bool // True if starter in ANY of the leagues
     let priority: InjuryPriority
     
-    /// Generate recommendation description with league context
+    /// Generate recommendation description with all league contexts
     var alertDescription: String {
-        let leagueContext = "in \(leagueName)"
-        
+        let statusDescription: String
         switch injuryStatus {
         case .bye:
-            return "\(player.fullName) is on BYE Week \(leagueContext). Replace immediately - won't play this week."
+            statusDescription = "\(player.fullName) is on BYE Week"
         case .injuredReserve:
-            return "\(player.fullName) is on Injured Reserve (IR) \(leagueContext). Move to IR slot or find replacement."
+            statusDescription = "\(player.fullName) is on Injured Reserve (IR)"
         case .out:
-            return "\(player.fullName) status is O for game \(leagueContext). Replace immediately."
+            statusDescription = "\(player.fullName) status is O for game"
+        case .doubtful:
+            statusDescription = "\(player.fullName) is DOUBTFUL"
         case .questionable:
-            return "\(player.fullName) is QUESTIONABLE \(leagueContext). Keep an eye on them before their start."
+            statusDescription = "\(player.fullName) is QUESTIONABLE"
+        case .pup:
+            statusDescription = "\(player.fullName) is on PUP List"
+        case .nfi:
+            statusDescription = "\(player.fullName) is on NFI List"
+        }
+        
+        // Add league context
+        if leagueRosters.count == 1 {
+            let league = leagueRosters.first!
+            return "\(statusDescription) in \(league.leagueName). \(getActionText())"
+        } else {
+            let leagueNames = leagueRosters.map { $0.leagueName }.joined(separator: ", ")
+            return "\(statusDescription) in \(leagueRosters.count) leagues: \(leagueNames). \(getActionText())"
+        }
+    }
+    
+    private func getActionText() -> String {
+        switch injuryStatus {
+        case .bye:
+            return "Replace immediately - won't play this week."
+        case .injuredReserve:
+            return "Move to IR slot or find replacement."
+        case .out:
+            return "Replace immediately."
+        case .doubtful:
+            return "Very unlikely to play - prepare backup."
+        case .questionable:
+            return "Keep an eye on them before their start."
+        case .pup:
+            return "Expected out at least 6 weeks - find replacement."
+        case .nfi:
+            return "Non-football injury - monitor status updates."
         }
     }
     
@@ -343,9 +388,24 @@ struct InjuryAlert: Identifiable {
             description: alertDescription,
             priority: priority.strategicPriority,
             actionable: true,
-            opponentTeam: nil, // Injury alerts are about MY players, not opponents
-            matchup: matchup // Include matchup for FIX button navigation
+            injuryAlert: self // Pass the full InjuryAlert data
         )
+    }
+}
+
+/// League roster information for injured player
+struct InjuryLeagueRoster: Identifiable {
+    let id = UUID()
+    let leagueName: String
+    let leagueSource: LeagueSource
+    let myTeam: FantasyTeam
+    let matchup: UnifiedMatchup
+    let isStarterInThisLeague: Bool
+    
+    /// Display text for this league roster
+    var displayText: String {
+        let starterText = isStarterInThisLeague ? "STARTING" : "BENCH"
+        return "\(leagueName) (\(starterText))"
     }
 }
 
@@ -354,14 +414,20 @@ enum InjuryStatusType: String, CaseIterable {
     case bye = "BYE"
     case injuredReserve = "IR"
     case out = "O"
+    case doubtful = "D"
     case questionable = "Q"
+    case pup = "PUP"
+    case nfi = "NFI"
     
     var displayName: String {
         switch self {
         case .bye: return "BYE Week"
         case .injuredReserve: return "Injured Reserve"
-        case .out: return "OUT"
-        case .questionable: return "QUESTIONABLE"
+        case .out: return "Out"
+        case .doubtful: return "Doubtful"
+        case .questionable: return "Questionable"
+        case .pup: return "Physically Unable to Perform"
+        case .nfi: return "Non-Football Injury"
         }
     }
     
@@ -369,16 +435,19 @@ enum InjuryStatusType: String, CaseIterable {
         switch self {
         case .bye: return "Player on BYE Week"
         case .injuredReserve: return "Player on Injured Reserve"
-        case .out: return "Player OUT"
-        case .questionable: return "Player QUESTIONABLE"
+        case .out: return "Player Out"
+        case .doubtful: return "Player Doubtful"
+        case .questionable: return "Player Questionable"
+        case .pup: return "Player on PUP List"
+        case .nfi: return "Player on NFI List"
         }
     }
     
     var color: Color {
         switch self {
         case .bye: return .orange
-        case .injuredReserve: return .red
-        case .out: return .red
+        case .injuredReserve, .pup, .nfi: return .red
+        case .out, .doubtful: return .red
         case .questionable: return .yellow
         }
     }
@@ -388,7 +457,10 @@ enum InjuryStatusType: String, CaseIterable {
         case .bye: return "bed.double.fill"
         case .injuredReserve: return "cross.case.fill"
         case .out: return "xmark.circle.fill"
+        case .doubtful: return "exclamationmark.triangle.fill"
         case .questionable: return "questionmark.circle.fill"
+        case .pup: return "figure.walk.motion"
+        case .nfi: return "bandage.fill"
         }
     }
     
@@ -397,8 +469,10 @@ enum InjuryStatusType: String, CaseIterable {
         switch self {
         case .bye: return 1 // Most important - player definitely won't play
         case .injuredReserve: return 2 // Very important - long-term injury
-        case .out: return 3 // Important - definitely won't play this week
-        case .questionable: return 4 // Monitor - might play
+        case .pup, .nfi: return 3 // Long-term injuries
+        case .out: return 4 // Important - definitely won't play this week
+        case .doubtful: return 5 // Very unlikely to play
+        case .questionable: return 6 // Monitor - might play
         }
     }
     
@@ -413,9 +487,12 @@ enum InjuryStatusType: String, CaseIterable {
         guard let status = injuryStatus?.uppercased() else { return nil }
         
         switch status {
-        case "IR", "INJURED_RESERVE", "PUP": return .injuredReserve
+        case "IR", "INJURED_RESERVE": return .injuredReserve
         case "O", "OUT": return .out
-        case "Q", "QUESTIONABLE", "DOUBTFUL": return .questionable
+        case "D", "DOUBTFUL": return .doubtful
+        case "Q", "QUESTIONABLE": return .questionable
+        case "PUP", "PHYSICALLY_UNABLE_TO_PERFORM": return .pup
+        case "NFI", "NON_FOOTBALL_INJURY": return .nfi
         default: return nil
         }
     }
@@ -423,8 +500,8 @@ enum InjuryStatusType: String, CaseIterable {
 
 /// Priority levels for injury alerts
 enum InjuryPriority: Int, CaseIterable {
-    case urgent = 1    // BYE, IR, OUT in starting lineup
-    case attention = 2 // Q in starting lineup
+    case urgent = 1    // BYE, IR, OUT, PUP, NFI in starting lineup
+    case attention = 2 // D, Q in starting lineup
     case low = 3       // Should not occur with current logic (only starters)
     
     /// Convert to StrategicRecommendation priority
@@ -451,9 +528,9 @@ enum InjuryPriority: Int, CaseIterable {
         guard isStarter else { return .low }
         
         switch status {
-        case .bye, .injuredReserve, .out:
+        case .bye, .injuredReserve, .out, .pup, .nfi:
             return .urgent // Can't play = URGENT
-        case .questionable:
+        case .doubtful, .questionable:
             return .attention // Might not play = ATTENTION
         }
     }

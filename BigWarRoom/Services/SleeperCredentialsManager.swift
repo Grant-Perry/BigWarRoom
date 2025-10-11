@@ -83,6 +83,38 @@ final class SleeperCredentialsManager: ObservableObject {
         return nil
     }
     
+    /// Get numeric user ID for external URLs (like sleeper.com links)
+    func getNumericUserID() -> String? {
+        // Always return the numeric userID for URL generation
+        return currentUserID.isEmpty ? nil : currentUserID
+    }
+    
+    /// Save credentials with automatic userID resolution if needed
+    func saveCredentialsWithResolution(usernameOrID: String, season: String = "2025") async -> Bool {
+        do {
+            // Try to fetch user info to resolve username → userID
+            let user = try await SleeperAPIClient.shared.fetchUser(username: usernameOrID)
+            
+            // Determine what the user entered
+            let enteredUsername = user.displayName?.lowercased() == usernameOrID.lowercased() || user.username?.lowercased() == usernameOrID.lowercased()
+            
+            if enteredUsername {
+                // User entered a username, save both username and resolved userID
+                saveCredentials(username: usernameOrID, userID: user.userID, season: season)
+                print("✅ Resolved username '\(usernameOrID)' → userID '\(user.userID)'")
+            } else {
+                // User entered a userID, save it and try to get username
+                saveCredentials(username: user.username ?? "", userID: user.userID, season: season)
+                print("✅ Used userID '\(user.userID)' with username '\(user.username ?? "N/A")'")
+            }
+            
+            return true
+        } catch {
+            print("❌ Failed to resolve Sleeper credentials: \(error)")
+            return false
+        }
+    }
+    
     /// Clear all Sleeper credentials and cache
     func clearCredentials() {
         UserDefaults.standard.removeObject(forKey: usernameKey)

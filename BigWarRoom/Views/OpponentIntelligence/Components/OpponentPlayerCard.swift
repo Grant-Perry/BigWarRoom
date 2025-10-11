@@ -129,14 +129,20 @@ struct OpponentPlayerCard: View {
         }
         .padding(12)
         .background(
+            // Blur backdrop layer
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.3))
+                .fill(.thinMaterial) // iOS blur material
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.2)) // Light tint for transparency
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(isWatching ? Color.gpOrange.opacity(0.5) : player.threatLevel.color.opacity(0.3), lineWidth: isWatching ? 2 : 1)
                 )
         )
         .background(
+            // Outer glow effect
             RoundedRectangle(cornerRadius: 12)
                 .fill(
                     LinearGradient(
@@ -148,6 +154,7 @@ struct OpponentPlayerCard: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .blur(radius: 1)
         )
     }
     

@@ -18,6 +18,11 @@ struct OpponentIntelligenceDashboardView: View {
     @State private var showingWeekPicker = false
     @State private var showingWatchedPlayers = false
     @State private var selectedMatchup: UnifiedMatchup? // NEW: For matchup navigation
+    @State private var showInjuryAlerts = true // NEW: Collapsible section state
+    @State private var showThreatAlerts = true // NEW: Collapsible section state
+    @State private var showThreatMatrix = true // NEW: Collapsible section state
+    @State private var showConflictAlerts = true // NEW: Collapsible section state
+    @State private var showOpponentPlayers = true // NEW: Collapsible section state
     
     // #GoodNav: Mission Control-style controls (matching exactly)
     @State private var sortByWinning = true
@@ -71,20 +76,25 @@ struct OpponentIntelligenceDashboardView: View {
                         // Main content
                         ScrollView {
                             VStack(spacing: 16) {
-                                // Strategic recommendations
-                                if !viewModel.priorityRecommendations.isEmpty {
-                                    recommendationsSection
+                                // 1. PLAYER INJURY ALERTS (highest priority)
+                                if !viewModel.injuryAlerts.isEmpty {
+                                    playerInjuryAlertsSection
                                 }
                                 
-                                // Threat matrix
+                                // 2. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
+                                if !viewModel.nonInjuryRecommendations.isEmpty {
+                                    criticalThreatAlertsSection
+                                }
+                                
+                                // 3. THREAT MATRIX
                                 threatMatrixSection
                                 
-                                // Conflict alerts
+                                // 4. CONFLICT ALERTS
                                 if !viewModel.conflictPlayers.isEmpty {
                                     conflictsSection
                                 }
                                 
-                                // All opponent players
+                                // 5. ALL OPPONENT PLAYERS
                                 opponentPlayersSection
                             }
                             .padding(.horizontal, 16)
@@ -361,24 +371,37 @@ struct OpponentIntelligenceDashboardView: View {
         .padding(.bottom, 24)
     }
     
-    private var recommendationsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Strategic Insights")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-            }
-            
-            // Display recommendations with injury alerts first (they're highest priority)
-            ForEach(viewModel.priorityRecommendations.prefix(5), id: \.id) { recommendation in
-                // Use different card types based on recommendation type
-                if recommendation.type == .injuryAlert {
-                    InjuryAlertCard(recommendation: recommendation)
-                        .onTapGesture {
-                            handleRecommendationTap(recommendation)
+    // MARK: - New Collapsible Sections
+    
+    /// 1. Player Injury Alerts Section (highest priority)
+    private var playerInjuryAlertsSection: some View {
+        CollapsibleSection(
+            title: "🏥 Player Injury Alerts",
+            count: viewModel.injuryAlerts.count,
+            isExpanded: $showInjuryAlerts
+        ) {
+            LazyVStack(spacing: 12) {
+                ForEach(viewModel.injuryAlerts, id: \.id) { recommendation in
+                    InjuryAlertCard(
+                        recommendation: recommendation,
+                        onNavigateToMatchup: { matchup in
+                            selectedMatchup = matchup
                         }
-                } else {
+                    )
+                }
+            }
+        }
+    }
+    
+    /// 2. Critical Threat Alerts Section (non-injury strategic recommendations)
+    private var criticalThreatAlertsSection: some View {
+        CollapsibleSection(
+            title: "⚠️ Critical Threat Alerts",
+            count: viewModel.nonInjuryRecommendations.count,
+            isExpanded: $showThreatAlerts
+        ) {
+            LazyVStack(spacing: 12) {
+                ForEach(viewModel.nonInjuryRecommendations.prefix(5), id: \.id) { recommendation in
                     RecommendationCard(recommendation: recommendation)
                         .onTapGesture {
                             handleRecommendationTap(recommendation)
@@ -388,20 +411,13 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
+    /// 3. Enhanced Threat Matrix Section
     private var threatMatrixSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Threat Matrix")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Text("\(viewModel.filteredIntelligence.count) opponents")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            
+        CollapsibleSection(
+            title: "🎯 Threat Matrix",
+            count: viewModel.filteredIntelligence.count,
+            isExpanded: $showThreatMatrix
+        ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredIntelligence) { intelligence in
                     ThreatMatrixCard(intelligence: intelligence) {
@@ -413,20 +429,13 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
+    /// 4. Enhanced Conflicts Section
     private var conflictsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("⚠️ Player Conflicts")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Text("\(viewModel.conflictPlayers.count) conflicts")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-            }
-            
+        CollapsibleSection(
+            title: "⚔️ Player Conflicts",
+            count: viewModel.conflictPlayers.count,
+            isExpanded: $showConflictAlerts
+        ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.conflictPlayers.prefix(5)) { conflict in
                     ConflictAlertCard(conflict: conflict)
@@ -435,32 +444,13 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
+    /// 5. Enhanced Opponent Players Section
     private var opponentPlayersSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("All Opponent Players")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                Menu {
-                    ForEach(viewModel.availablePositions, id: \.self) { position in
-                        Button(position) {
-                            viewModel.setPositionFilter(position)
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Text(viewModel.selectedPosition)
-                            .font(.system(size: 14, weight: .medium))
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12))
-                    }
-                    .foregroundColor(.white.opacity(0.7))
-                }
-            }
-            
+        CollapsibleSection(
+            title: "👥 All Opponent Players",
+            count: viewModel.filteredOpponentPlayers.count,
+            isExpanded: $showOpponentPlayers
+        ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredOpponentPlayers.prefix(20)) { player in
                     OpponentPlayerCard(player: player)

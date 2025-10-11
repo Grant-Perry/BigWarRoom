@@ -131,14 +131,20 @@ struct ConflictAlertCard: View {
         }
         .padding(16)
         .background(
+            // Blur backdrop layer
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.5))
+                .fill(.thinMaterial) // iOS blur material
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.black.opacity(0.2)) // Light tint for transparency
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(conflict.severity.color.opacity(0.6), lineWidth: 1)
                 )
         )
         .background(
+            // Outer glow effect
             RoundedRectangle(cornerRadius: 16)
                 .fill(
                     LinearGradient(
@@ -150,6 +156,7 @@ struct ConflictAlertCard: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .blur(radius: 1)
         )
     }
     

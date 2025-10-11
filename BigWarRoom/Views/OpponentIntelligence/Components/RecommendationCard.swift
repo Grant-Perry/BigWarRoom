@@ -218,8 +218,13 @@ struct RecommendationCard: View {
         }
         .padding(12)
         .background(
+            // Blur backdrop layer
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.4))
+                .fill(.thinMaterial) // iOS blur material
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.black.opacity(0.2)) // Light tint for transparency
+                )
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(
@@ -231,15 +236,16 @@ struct RecommendationCard: View {
                 )
         )
         .background(
+            // Outer glow effect
             RoundedRectangle(cornerRadius: 12)
                 .fill(
                     LinearGradient(
                         colors: isCriticalThreatAlert ? [
                             Color.gpGreen.opacity(0.15),
-                            Color.gpGreen.opacity(0.08)
+                            Color.gpGreen.opacity(0.05)
                         ] : isPlayerConflict ? [
                             Color.gpPink.opacity(0.15),
-                            Color.gpPink.opacity(0.08)
+                            Color.gpPink.opacity(0.05)
                         ] : [
                             recommendation.priority.color.opacity(0.1),
                             recommendation.priority.color.opacity(0.05)
@@ -248,6 +254,7 @@ struct RecommendationCard: View {
                         endPoint: .bottomTrailing
                     )
                 )
+                .blur(radius: 1)
         )
     }
 }

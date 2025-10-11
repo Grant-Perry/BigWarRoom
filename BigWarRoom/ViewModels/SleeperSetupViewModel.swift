@@ -76,20 +76,33 @@ final class SleeperSetupViewModel: ObservableObject {
         print("   - UserID to save: '\(userID)'")
         print("   - Season: '\(selectedSeason)'")
         
-        credentialsManager.saveCredentials(
-            username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-            userID: "", // 🔥 FIX: Always save empty user ID - let system resolve from username
-            season: selectedSeason
-        )
+        // OLD: Direct save without resolution
+        // credentialsManager.saveCredentials(
+        //     username: username.trimmingCharacters(in: .whitespacesAndNewlines),
+        //     userID: "", // 🔥 FIX: Always save empty user ID - let system resolve from username
+        //     season: selectedSeason
+        // )
         
-        print("🔥 After save, checking credentials manager state:")
-        print("   - currentUsername: '\(credentialsManager.currentUsername)'")
-        print("   - currentUserID: '\(credentialsManager.currentUserID)'")
-        print("   - hasValidCredentials: \(credentialsManager.hasValidCredentials)")
-        
-        // Show success feedback
-        clearResultMessage = "✅ Sleeper credentials saved successfully!"
-        showingClearResult = true
+        // NEW: Use resolution method to ensure we get numeric userID
+        Task {
+            let success = await credentialsManager.saveCredentialsWithResolution(
+                usernameOrID: username.trimmingCharacters(in: .whitespacesAndNewlines),
+                season: selectedSeason
+            )
+            
+            await MainActor.run {
+                if success {
+                    clearResultMessage = "✅ Sleeper credentials saved and resolved successfully!"
+                    print("🔥 After save, checking credentials manager state:")
+                    print("   - currentUsername: '\(credentialsManager.currentUsername)'")
+                    print("   - currentUserID: '\(credentialsManager.currentUserID)'")
+                    print("   - hasValidCredentials: \(credentialsManager.hasValidCredentials)")
+                } else {
+                    clearResultMessage = "❌ Failed to save Sleeper credentials. Please check your username/ID."
+                }
+                showingClearResult = true
+            }
+        }
     }
     
     func validateCredentials() {

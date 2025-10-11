@@ -90,6 +90,29 @@ final class OpponentIntelligenceViewModel: ObservableObject {
         strategicRecommendations.filter { $0.priority == .critical || $0.priority == .high }
     }
     
+    /// Injury alerts only (separated from other recommendations)
+    var injuryAlerts: [StrategicRecommendation] {
+        strategicRecommendations.filter { $0.type == .injuryAlert }
+            .sorted { recommendation1, recommendation2 in
+                // Sort by priority first, then by injury status priority
+                if recommendation1.priority.rawValue != recommendation2.priority.rawValue {
+                    return recommendation1.priority.rawValue < recommendation2.priority.rawValue
+                }
+                
+                // Extract injury status for sorting
+                let status1 = recommendation1.injuryAlert?.injuryStatus.priorityRanking ?? 999
+                let status2 = recommendation2.injuryAlert?.injuryStatus.priorityRanking ?? 999
+                return status1 < status2
+            }
+    }
+    
+    /// Non-injury strategic recommendations (threat alerts, conflicts, opportunities)
+    var nonInjuryRecommendations: [StrategicRecommendation] {
+        strategicRecommendations.filter { $0.type != .injuryAlert }
+            .filter { $0.priority == .critical || $0.priority == .high }
+            .sorted { $0.priority.rawValue < $1.priority.rawValue }
+    }
+    
     /// Available positions for filtering
     var availablePositions: [String] {
         let positions = Set(allOpponentPlayers.map { $0.position })

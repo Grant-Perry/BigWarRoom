@@ -185,26 +185,33 @@ struct ThreatMatrixCard: View {
 		 }
 		 .padding(16)
 		 .background(
-			RoundedRectangle(cornerRadius: 16)
-			   .fill(Color.black.opacity(0.4))
-			   .overlay(
-				  RoundedRectangle(cornerRadius: 16)
-					 .stroke(intelligence.threatLevel.color.opacity(0.5), lineWidth: 1)
-			   )
-		 )
-		 .background(
-			RoundedRectangle(cornerRadius: 16)
-			   .fill(
-				  LinearGradient(
-					 colors: [
-						intelligence.threatLevel.color.opacity(0.1),
-						intelligence.threatLevel.color.opacity(0.05)
-					 ],
-					 startPoint: .topLeading,
-					 endPoint: .bottomTrailing
-				  )
-			   )
-		 )
+            // Blur backdrop layer
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.thinMaterial) // iOS blur material
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.black.opacity(0.2)) // Light tint for transparency
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(intelligence.threatLevel.color.opacity(0.5), lineWidth: 1)
+                )
+        )
+        .background(
+            // Outer glow effect
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            intelligence.threatLevel.color.opacity(0.1),
+                            intelligence.threatLevel.color.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blur(radius: 1)
+        )
 	  }
 	  .buttonStyle(PlainButtonStyle())
    }

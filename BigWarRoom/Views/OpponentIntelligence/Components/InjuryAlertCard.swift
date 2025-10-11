@@ -10,15 +10,39 @@ import SwiftUI
 /// Card displaying injury status alerts for my rostered players
 struct InjuryAlertCard: View {
     let recommendation: StrategicRecommendation
+    let onNavigateToMatchup: ((UnifiedMatchup) -> Void)? // Navigation callback
     
-    // Extract player info from recommendation description (temporary until we pass InjuryAlert directly)
+    // Convenience init for backward compatibility
+    init(recommendation: StrategicRecommendation) {
+        self.recommendation = recommendation
+        self.onNavigateToMatchup = nil
+    }
+    
+    // Full init with navigation callback
+    init(recommendation: StrategicRecommendation, onNavigateToMatchup: ((UnifiedMatchup) -> Void)?) {
+        self.recommendation = recommendation
+        self.onNavigateToMatchup = onNavigateToMatchup
+    }
+    
+    // Use actual InjuryAlert data if available, otherwise fall back to parsing
+    private var injuryAlert: InjuryAlert? {
+        recommendation.injuryAlert
+    }
+    
     private var playerName: String {
-        // Parse player name from description (e.g., "Josh Allen is on BYE Week...")
+        if let alert = injuryAlert {
+            return alert.player.fullName
+        }
+        // Fallback to parsing
         let components = recommendation.description.components(separatedBy: " is ")
         return components.first ?? "Unknown Player"
     }
     
     private var statusType: InjuryStatusType {
+        if let alert = injuryAlert {
+            return alert.injuryStatus
+        }
+        // Fallback to parsing
         let description = recommendation.description.lowercased()
         if description.contains("bye") {
             return .bye
@@ -29,128 +53,239 @@ struct InjuryAlertCard: View {
         } else if description.contains("questionable") {
             return .questionable
         }
-        return .questionable // fallback
+        return .questionable
+    }
+    
+    private var leagueRosters: [InjuryLeagueRoster] {
+        injuryAlert?.leagueRosters ?? []
     }
     
     private var priorityBadge: String {
         switch statusType {
-        case .bye, .injuredReserve, .out:
+        case .bye, .injuredReserve, .out, .pup, .nfi:
             return "URGENT"
-        case .questionable:
+        case .doubtful, .questionable:
             return "ATTENTION"
         }
     }
     
     var body: some View {
+        VStack(spacing: 0) {
+            mainAlertContent
+            
+            if !leagueRosters.isEmpty {
+                leagueRosterSection
+            }
+        }
+        .background(blurBackdrop)
+        .background(outerGlow)
+    }
+    
+    // MARK: - View Components
+    
+    private var mainAlertContent: some View {
         HStack(spacing: 16) {
-            // Status icon with priority-based styling
-            ZStack {
-                Circle()
-                    .fill(statusType.color)
-                    .frame(width: 50, height: 50)
-                
-                Image(systemName: statusType.sfSymbol)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-                
-                // Priority indicator (for critical alerts)
-                if recommendation.priority == .critical {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Circle()
-                                .fill(Color.red)
-                                .frame(width: 16, height: 16)
-                                .overlay(
-                                    Image(systemName: "exclamationmark")
-                                        .font(.system(size: 10, weight: .black))
-                                        .foregroundColor(.white)
-                                )
-                        }
-                    }
-                    .frame(width: 50, height: 50)
-                }
-            }
-            
-            // Alert content
-            VStack(alignment: .leading, spacing: 6) {
-                // Alert title with status
-                HStack {
-                    Text(statusType.alertTitle)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Spacer()
-                    
-                    // Priority badge
-                    Text(priorityBadge)
-                        .font(.system(size: 10, weight: .black))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(statusType.color)
-                        )
-                }
-                
-                // Player name and position (extracted from description)
-                Text(playerName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
-                
-                // Action description
-                Text(getActionText())
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(2)
-            }
-            
-            // Action button
-            Button(action: {
-                handleActionTap()
-            }) {
-                VStack(spacing: 4) {
-                    Image(systemName: getActionIcon())
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                    
-                    Text("FIX")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(statusType.color.opacity(0.8))
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
+            statusIcon
+            alertContent
+            Spacer()
         }
         .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(statusType.color, lineWidth: 2)
-                )
-        )
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            statusType.color.opacity(0.2),
-                            statusType.color.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+    }
+    
+    private var statusIcon: some View {
+        ZStack {
+            Circle()
+                .fill(statusType.color)
+                .frame(width: 50, height: 50)
+            
+            Image(systemName: statusType.sfSymbol)
+                .font(.system(size: 20, weight: .bold))
+                .foregroundColor(.white)
+            
+            if recommendation.priority == .critical {
+                priorityIndicator
+            }
+        }
+    }
+    
+    private var priorityIndicator: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 16, height: 16)
+                    .overlay(
+                        Image(systemName: "exclamationmark")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.white)
                     )
+            }
+        }
+        .frame(width: 50, height: 50)
+    }
+    
+    private var alertContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            alertHeader
+            
+            Text(playerName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
+            
+            Text(getActionText())
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.8))
+                .lineLimit(2)
+        }
+    }
+    
+    private var alertHeader: some View {
+        HStack {
+            Text(statusType.displayName)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            Text(priorityBadge)
+                .font(.system(size: 10, weight: .black))
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(statusType.color)
                 )
-        )
+        }
+    }
+    
+    private var leagueRosterSection: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(Color.white.opacity(0.2))
+            
+            VStack(alignment: .leading, spacing: 8) {
+                leagueHeader
+                leagueGrid
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+    }
+    
+    private var leagueHeader: some View {
+        HStack {
+            Image(systemName: "building.2.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.7))
+            
+            Text("Rostered in \(leagueRosters.count) league\(leagueRosters.count > 1 ? "s" : ""):")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+            
+            Spacer()
+        }
+    }
+    
+    private var leagueGrid: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), alignment: .leading),
+            GridItem(.flexible(), alignment: .trailing)
+        ], spacing: 8) {
+            ForEach(Array(leagueRosters.enumerated()), id: \.element.id) { index, leagueRoster in
+                leagueButton(for: leagueRoster)
+            }
+        }
+    }
+    
+    private func leagueButton(for leagueRoster: InjuryLeagueRoster) -> some View {
+        Button(action: {
+            openLeagueURL(for: leagueRoster)
+        }) {
+            HStack(spacing: 8) {
+                leagueSourceLogo(for: leagueRoster)
+                leagueInfo(for: leagueRoster)
+                Spacer()
+                
+                Image(systemName: "arrow.up.right.square")
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(leagueButtonBackground)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func leagueSourceLogo(for leagueRoster: InjuryLeagueRoster) -> some View {
+        Group {
+            if leagueRoster.leagueSource == .espn {
+                Image("espnLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+            } else {
+                Image("sleeperLogo")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 16, height: 16)
+            }
+        }
+    }
+    
+    private func leagueInfo(for leagueRoster: InjuryLeagueRoster) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(leagueRoster.leagueName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            
+            if leagueRosters.count > 1 {
+                Text(leagueRoster.isStarterInThisLeague ? "STARTING" : "BENCH")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+    }
+    
+    private var leagueButtonBackground: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(.thinMaterial)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.black.opacity(0.3))
+            )
+    }
+    
+    private var blurBackdrop: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(.thinMaterial)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black.opacity(0.2))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(statusType.color, lineWidth: 2)
+            )
+    }
+    
+    private var outerGlow: some View {
+        RoundedRectangle(cornerRadius: 16)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        statusType.color.opacity(0.15),
+                        statusType.color.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .blur(radius: 1)
     }
     
     // MARK: - Helper Methods
@@ -163,75 +298,148 @@ struct InjuryAlertCard: View {
             return "Move to IR slot or find replacement"
         case .out:
             return "Replace before games start - confirmed out"
+        case .doubtful:
+            return "Very unlikely to play - prepare backup"
         case .questionable:
             return "Monitor status and prepare backup plan"
+        case .pup:
+            return "Expected out at least 6 weeks - find replacement"
+        case .nfi:
+            return "Non-football injury - monitor status updates"
         }
     }
     
-    private func getActionIcon() -> String {
-        switch statusType {
-        case .bye, .out:
-            return "person.crop.circle.fill.badge.minus" // Replace player
-        case .injuredReserve:
-            return "cross.case.fill" // Medical/IR
-        case .questionable:
-            return "eye.fill" // Monitor
+    /// Open external league URL based on league source
+    private func openLeagueURL(for leagueRoster: InjuryLeagueRoster) {
+        switch leagueRoster.leagueSource {
+        case .sleeper:
+            // Launch Sleeper app
+            if let sleeperURL = URL(string: "sleeper://") {
+                #if os(iOS)
+                UIApplication.shared.open(sleeperURL)
+                #endif
+                print("🚀 Launching Sleeper app")
+            }
+            
+        case .espn:
+            // ESPN: Use full web URL with league ID and team ID
+            guard let url = generateLeagueURL(for: leagueRoster) else {
+                print("❌ Could not generate ESPN league URL for \(leagueRoster.leagueName)")
+                return
+            }
+            
+            print("🔗 Opening ESPN league URL: \(url.absoluteString)")
+            
+            #if os(iOS)
+            UIApplication.shared.open(url)
+            #elseif os(macOS)
+            NSWorkspace.shared.open(url)
+            #endif
         }
     }
     
-    private func handleActionTap() {
-        // TODO: Implement navigation to roster management
-        // Could navigate to specific league's lineup page
-        // Or show quick-fix options
-        print("Fix \(statusType.displayName) for \(playerName)")
+    /// Generate the appropriate URL for the league
+    private func generateLeagueURL(for leagueRoster: InjuryLeagueRoster) -> URL? {
+        let matchup = leagueRoster.matchup
+        
+        switch leagueRoster.leagueSource {
+        case .sleeper:
+            // Sleeper uses app launch, no URL needed
+            return nil
+            
+        case .espn:
+            // ESPN URL: https://fantasy.espn.com/football/team?leagueId=[LeagueID]&teamId=[TeamID]&view=overview
+            let leagueID = matchup.league.league.leagueID
+            
+            guard let teamID = ESPNCredentialsManager.shared.getTeamID(for: leagueID) else {
+                print("❌ ESPN: No team ID found for league \(leagueID)")
+                return nil
+            }
+            
+            let urlString = "https://fantasy.espn.com/football/team?leagueId=\(leagueID)&teamId=\(teamID)&view=overview"
+            return URL(string: urlString)
+        }
+    }
+    
+    private func navigateToLeagueRoster(_ leagueRoster: InjuryLeagueRoster) {
+        // DEPRECATED: This method is now replaced by openLeagueURL
+        // Navigate to the specific matchup for this league
+        onNavigateToMatchup?(leagueRoster.matchup)
+        print("Navigating to \(leagueRoster.leagueName) matchup for \(playerName)")
+    }
+    
+    private func navigateToLeague(_ leagueName: String) {
+        // This method is obsolete - replaced with navigateToLeagueRoster
     }
 }
 
 // MARK: - Preview
 
-#Preview("Injury Alert Cards") {
-    VStack(spacing: 16) {
-        // BYE Week Alert
-        InjuryAlertCard(recommendation: StrategicRecommendation(
-            type: .injuryAlert,
-            title: "🛌 Player on BYE Week", 
-            description: "Josh Allen is on BYE Week in Main League. Replace in your starting lineup immediately.",
-            priority: .critical,
-            actionable: true,
-            opponentTeam: nil
-        ))
-        
-        // Injured Reserve Alert  
-        InjuryAlertCard(recommendation: StrategicRecommendation(
-            type: .injuryAlert,
-            title: "🏥 Player on Injured Reserve",
-            description: "Christian McCaffrey is on Injured Reserve (IR) in Dynasty League. Move to IR slot or replace.",
-            priority: .high,
-            actionable: true,
-            opponentTeam: nil
-        ))
-        
-        // OUT Alert
-        InjuryAlertCard(recommendation: StrategicRecommendation(
-            type: .injuryAlert,
-            title: "❌ Player OUT",
-            description: "Cooper Kupp is OUT in Redraft League. Replace in your starting lineup before games start.",
-            priority: .critical,
-            actionable: true,
-            opponentTeam: nil
-        ))
-        
-        // Questionable Alert
-        InjuryAlertCard(recommendation: StrategicRecommendation(
-            type: .injuryAlert,
-            title: "⚠️ Player QUESTIONABLE", 
-            description: "Travis Kelce is QUESTIONABLE in Work League. Monitor closely and have backup ready.",
-            priority: .high,
-            actionable: true,
-            opponentTeam: nil
-        ))
+#Preview("Multi-League Injury Alert") {
+    ScrollView {
+        VStack(spacing: 16) {
+            // Multi-league BYE Alert
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player on BYE Week", 
+                description: "Josh Allen is on BYE Week in 3 leagues: Main League, Dynasty League, Work League. Replace immediately - won't play this week.",
+                priority: .critical,
+                actionable: true,
+                opponentTeam: nil
+            ))
+            
+            // Single league IR Alert  
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player on Injured Reserve",
+                description: "Christian McCaffrey is on Injured Reserve (IR) in Dynasty League. Move to IR slot or find replacement.",
+                priority: .critical,
+                actionable: true,
+                opponentTeam: nil
+            ))
+            
+            // OUT Alert
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player Out",
+                description: "Cooper Kupp is OUT in 2 leagues: Redraft League, Friends League. Replace immediately.",
+                priority: .critical,
+                actionable: true,
+                opponentTeam: nil
+            ))
+            
+            // Doubtful Alert
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player Doubtful",
+                description: "Derrick Henry is DOUBTFUL in Work League. Very unlikely to play.",
+                priority: .high,
+                actionable: true,
+                opponentTeam: nil
+            ))
+            
+            // Questionable Alert
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player Questionable", 
+                description: "Travis Kelce is QUESTIONABLE in Work League. Monitor closely and have backup ready.",
+                priority: .high,
+                actionable: true,
+                opponentTeam: nil
+            ))
+            
+            // PUP Alert
+            InjuryAlertCard(recommendation: StrategicRecommendation(
+                type: .injuryAlert,
+                title: "Player on PUP List",
+                description: "Nick Chubb is on Physically Unable to Perform list in Dynasty League. Expected to be out at least 6 weeks.",
+                priority: .critical,
+                actionable: true,
+                opponentTeam: nil
+            ))
+        }
+        .padding()
     }
-    .padding()
     .background(Color.black)
     .preferredColorScheme(.dark)
 }

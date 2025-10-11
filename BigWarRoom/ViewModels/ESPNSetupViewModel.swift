@@ -69,6 +69,11 @@ final class ESPNSetupViewModel: ObservableObject {
             leagueIDs: credentialsManager.leagueIDs
         )
         
+        // NEW: Resolve team IDs after saving credentials
+        Task {
+            await credentialsManager.resolveAllTeamIDs()
+        }
+        
         // Show success feedback
         clearResultMessage = "✅ ESPN credentials saved successfully!"
         showingClearResult = true
@@ -80,6 +85,13 @@ final class ESPNSetupViewModel: ObservableObject {
         let trimmedID = newLeagueID.trimmingCharacters(in: .whitespacesAndNewlines)
         credentialsManager.addLeagueID(trimmedID)
         newLeagueID = ""
+        
+        // NEW: Resolve team ID for the newly added league
+        if credentialsManager.hasValidCredentials {
+            Task {
+                await credentialsManager.resolveAllTeamIDs()
+            }
+        }
         
         // Show success feedback
         clearResultMessage = "✅ League ID added successfully!"
@@ -106,6 +118,13 @@ final class ESPNSetupViewModel: ObservableObject {
         let newCount = credentialsManager.leagueIDs.count
         let addedCount = newCount - previousCount
         
+        // NEW: Resolve team IDs for newly added leagues
+        if addedCount > 0 && credentialsManager.hasValidCredentials {
+            Task {
+                await credentialsManager.resolveAllTeamIDs()
+            }
+        }
+        
         if addedCount > 0 {
             clearResultMessage = "✅ Added \(addedCount) default league ID(s)!"
         } else {
@@ -121,6 +140,11 @@ final class ESPNSetupViewModel: ObservableObject {
         
         Task {
             let isValid = await credentialsManager.validateCredentials()
+            
+            // NEW: If validation successful and we have leagues, resolve team IDs
+            if isValid && !credentialsManager.leagueIDs.isEmpty {
+                await credentialsManager.resolveAllTeamIDs()
+            }
             
             await MainActor.run {
                 isValidating = false
