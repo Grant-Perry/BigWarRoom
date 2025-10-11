@@ -460,16 +460,7 @@ struct OpponentIntelligenceDashboardView: View {
     }
     
     private var loadingView: some View {
-        VStack(spacing: 20) {
-            ProgressView()
-                .scaleEffect(1.5)
-                .tint(.white)
-            
-            Text("Analyzing opponents across leagues...")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        IntelligenceLoadingView()
     }
     
     private var emptyStateView: some View {
