@@ -2,12 +2,12 @@
 //  MatchupsStatsOverviewView.swift
 //  BigWarRoom
 //
-//  Stats overview component showing winning, losing, and leagues count
+//  #GoodNav Template - Week picker with Intelligence-style icon controls
 //
 
 import SwiftUI
 
-/// Component displaying key win/loss stats in card format
+/// #GoodNav Template: Week selector with navigation icons (filters, watch, refresh)
 struct MatchupsStatsOverviewView: View {
     let matchupsCount: Int
     let selectedWeek: Int
@@ -16,63 +16,69 @@ struct MatchupsStatsOverviewView: View {
     let losingCount: Int
     let onWeekPickerTapped: () -> Void
     
+    // #GoodNav: Intelligence-style actions
+    let onFiltersToggle: () -> Void
+    let onWatchedPlayersToggle: () -> Void
+    let onRefreshTapped: () -> Void
+    let watchedPlayersCount: Int
+    
+    @StateObject private var watchService = PlayerWatchService.shared
+    
     var body: some View {
-        HStack(spacing: 0) {
-            StatCardView(
-                value: "\(winningCount)",
-                label: "WINNING",
-                color: .gpGreen
-            )
-            
+        HStack {
+            // #GoodNav: WEEK picker (left side)
             Button(action: onWeekPickerTapped) {
-                StatCardView(
-                    value: "WEEK \(selectedWeek)",
-                    label: "\(connectedLeaguesCount) LEAGUES",
-                    color: .blue
+                HStack(spacing: 6) {
+                    Text("WEEK \(selectedWeek)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.blue)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                        )
                 )
             }
             .buttonStyle(PlainButtonStyle())
             
-            StatCardView(
-                value: "\(losingCount)",
-                label: "LOSING",
-                color: .gpRedPink
-            )
-        }
-        .padding(.horizontal, 8)
-    }
-}
-
-// MARK: - Supporting Components
-
-/// Individual stat card component
-private struct StatCardView: View {
-    let value: String
-    let label: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+            Spacer()
             
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.gray)
-                .lineLimit(1)
+            // #GoodNav: Intelligence-style icon controls (right side)
+            HStack(spacing: 12) {
+                // Filters button
+                Button(action: onFiltersToggle) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Watched players button with badge
+                Button(action: onWatchedPlayersToggle) {
+                    Image(systemName: "eye.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
+                        .notificationBadge(count: watchService.watchCount)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Refresh button
+                Button(action: onRefreshTapped) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.2)) // Increased from 0.1 to 0.2 for higher opacity
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.5), lineWidth: 1) // Increased from 0.3 to 0.5 for more visible border
-                )
-        )
     }
 }

@@ -2,12 +2,12 @@
 //  MatchupsHubHeroHeaderView.swift
 //  BigWarRoom
 //
-//  Hero header section for MatchupsHub
+//  #GoodNav Template - Hero header with Intelligence-style navigation
 //
 
 import SwiftUI
 
-/// Hero header section for MatchupsHub
+/// #GoodNav Template: Hero header section for MatchupsHub
 struct MatchupsHubHeroHeaderView: View {
     let matchupsCount: Int
     let selectedWeek: Int
@@ -20,70 +20,37 @@ struct MatchupsHubHeroHeaderView: View {
     let onWeekPickerTapped: () -> Void
     let onAutoRefreshToggle: () -> Void
     
+    // #GoodNav: Intelligence-style actions
+    let onFiltersToggle: () -> Void
+    let onWatchedPlayersToggle: () -> Void
+    let onRefreshTapped: () -> Void
+    
     var body: some View {
         VStack(spacing: 16) {
-            MissionControlHeaderView()
+            MissionControlHeaderView(
+                lastUpdateTime: lastUpdateTime,
+                timeAgoString: timeAgoString,
+                connectedLeaguesCount: connectedLeaguesCount,
+                winningCount: winningCount,
+                losingCount: losingCount
+            )
             
+            // #GoodNav: Week picker with Intelligence-style icons
             MatchupsStatsOverviewView(
                 matchupsCount: matchupsCount,
                 selectedWeek: selectedWeek,
                 connectedLeaguesCount: connectedLeaguesCount,
                 winningCount: winningCount,
                 losingCount: losingCount,
-                onWeekPickerTapped: onWeekPickerTapped
-            )
-            
-            // 🔥 MOVED: Last Update info now goes between stat boxes and controls
-            CompactLastUpdateView(
-                lastUpdateTime: lastUpdateTime,
-                timeAgoString: timeAgoString
+                onWeekPickerTapped: onWeekPickerTapped,
+                onFiltersToggle: onFiltersToggle,
+                onWatchedPlayersToggle: onWatchedPlayersToggle,
+                onRefreshTapped: onRefreshTapped,
+                watchedPlayersCount: 0 // Will be handled by watchService internally
             )
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
-        .padding(.bottom, 8)
-        .background(
-            // Add semi-transparent background to entire hero section
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.black.opacity(0.4))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                )
-        )
-    }
-}
-
-// MARK: - Supporting Components
-
-/// Compact last update display (no auto-refresh toggle)
-private struct CompactLastUpdateView: View {
-    let lastUpdateTime: Date?
-    let timeAgoString: String?
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 12))
-                .foregroundColor(.gpGreen)
-            
-            if let timeAgoString {
-                Text("Last Update: \(timeAgoString)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            } else {
-                Text("Ready to load your battles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            }
-            
-            Spacer()
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.black.opacity(0.2))
-        )
+        .padding(.bottom, 16)
     }
 }

@@ -63,25 +63,10 @@ struct AllLivePlayersView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    Text("All Rostered Players")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    // Red notification badge with player count
-                    if allLivePlayersViewModel.filteredPlayers.count > 0 {
-                        Text("\(allLivePlayersViewModel.filteredPlayers.count)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(minWidth: 24, minHeight: 24)
-                            .background(
-                                Circle()
-                                    .fill(.red)
-                            )
-                            .scaleEffect(allLivePlayersViewModel.filteredPlayers.count > 99 ? 0.8 : 1.0) // Scale down for large numbers
-                            .offset(x: -8, y: -5)
-                    }
-                }
+                Text("All Rostered Players")
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                    .notificationBadge(count: allLivePlayersViewModel.filteredPlayers.count, xOffset: 28, yOffset: -8)
             }
         }
         .refreshable {
@@ -138,12 +123,17 @@ struct AllLivePlayersView: View {
                 )
                 // 🔥 NEW: Automatic recovery for potentially stuck states
                 .onAppear {
-                    // If we have players but filtered list is empty (and we're not loading), might be stuck
+                    // Only trigger auto-recovery if we have players, not loading, AND it's not due to legitimate filtering
                     if !allLivePlayersViewModel.allPlayers.isEmpty && !allLivePlayersViewModel.isLoading {
                         // Delay to allow normal filtering to complete first
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            if allLivePlayersViewModel.filteredPlayers.isEmpty && !allLivePlayersViewModel.allPlayers.isEmpty {
-                                print("🔧 AUTO-RECOVERY: Detected potentially stuck state after 2 seconds")
+                            // Only recover if filtered list is empty AND it's not due to user choosing Active Only filter
+                            let isEmptyDueToActiveFilter = allLivePlayersViewModel.showActiveOnly && allLivePlayersViewModel.filteredPlayers.isEmpty
+                            
+                            if allLivePlayersViewModel.filteredPlayers.isEmpty && 
+                               !allLivePlayersViewModel.allPlayers.isEmpty && 
+                               !isEmptyDueToActiveFilter {
+                                print("🔧 AUTO-RECOVERY: Detected potentially stuck state after 2 seconds (not due to Active Only filter)")
                                 allLivePlayersViewModel.recoverFromStuckState()
                             }
                         }

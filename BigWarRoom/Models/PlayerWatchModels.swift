@@ -21,9 +21,66 @@ struct WatchedPlayer: Identifiable, Codable {
     let initialScore: Double
     let opponentReferences: [OpponentReference]
     
-    // Dynamic properties (not stored)
+    // Dynamic properties (not stored) - refreshed on app launch
     var currentScore: Double = 0.0
     var isLive: Bool = false
+    
+    // MARK: - Codable Implementation
+    
+    init(id: String, playerID: String, playerName: String, position: String, team: String?, 
+         watchStartTime: Date, initialScore: Double, opponentReferences: [OpponentReference],
+         currentScore: Double = 0.0, isLive: Bool = false) {
+        self.id = id
+        self.playerID = playerID
+        self.playerName = playerName
+        self.position = position
+        self.team = team
+        self.watchStartTime = watchStartTime
+        self.initialScore = initialScore
+        self.opponentReferences = opponentReferences
+        self.currentScore = currentScore
+        self.isLive = isLive
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, playerID, playerName, position, team
+        case watchStartTime, initialScore, opponentReferences
+        case currentScore, isLive
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        id = try container.decode(String.self, forKey: .id)
+        playerID = try container.decode(String.self, forKey: .playerID)
+        playerName = try container.decode(String.self, forKey: .playerName)
+        position = try container.decode(String.self, forKey: .position)
+        team = try container.decodeIfPresent(String.self, forKey: .team)
+        watchStartTime = try container.decode(Date.self, forKey: .watchStartTime)
+        initialScore = try container.decode(Double.self, forKey: .initialScore)
+        opponentReferences = try container.decode([OpponentReference].self, forKey: .opponentReferences)
+        
+        // Handle persistent dynamic properties with defaults for backward compatibility
+        currentScore = try container.decodeIfPresent(Double.self, forKey: .currentScore) ?? 0.0
+        isLive = try container.decodeIfPresent(Bool.self, forKey: .isLive) ?? false
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        
+        try container.encode(id, forKey: .id)
+        try container.encode(playerID, forKey: .playerID)
+        try container.encode(playerName, forKey: .playerName)
+        try container.encode(position, forKey: .position)
+        try container.encodeIfPresent(team, forKey: .team)
+        try container.encode(watchStartTime, forKey: .watchStartTime)
+        try container.encode(initialScore, forKey: .initialScore)
+        try container.encode(opponentReferences, forKey: .opponentReferences)
+        
+        // Now encode the persistent dynamic properties
+        try container.encode(currentScore, forKey: .currentScore)
+        try container.encode(isLive, forKey: .isLive)
+    }
     
     /// Score change since watching started
     var deltaScore: Double {
@@ -138,13 +195,13 @@ enum WatchThreatLevel: String, CaseIterable {
         }
     }
     
-    var emoji: String {
+    var sfSymbol: String {
         switch self {
-        case .beneficial: return "✅"
-        case .minimal: return "😐"
-        case .moderate: return "⚡"
-        case .high: return "⚠️"
-        case .critical: return "🚨"
+        case .beneficial: return "checkmark.circle.fill"
+        case .minimal: return "minus.circle.fill"
+        case .moderate: return "bolt.fill"
+        case .high: return "exclamationmark.triangle.fill"
+        case .critical: return "flame.fill"
         }
     }
     
@@ -251,7 +308,7 @@ struct WatchSettings: Codable {
     var enableSound: Bool = false
     var autoUnwatchAfterGames: Bool = true
     var maxWatchedPlayers: Int = 25 // Increased from 10 to 25
-    var clearWatchedPlayersOnWeekChange: Bool = true // Clear watches when week changes
+    var clearWatchedPlayersOnWeekChange: Bool = false // Keep watches across weeks now
     
     enum NotificationSensitivity: String, CaseIterable, Codable {
         case conservative = "Conservative"

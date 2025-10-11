@@ -132,6 +132,46 @@ struct FantasyTeam: Identifiable, Codable {
         guard let score = projectedScore else { return "0.00" }
         return String(format: "%.2f", score)
     }
+    
+    /// Calculate number of players yet to play for this team
+    /// Players "yet to play" are starters with 0 points who haven't played yet
+    var playersYetToPlay: Int {
+        return roster.filter { player in
+            // Only count starters
+            guard player.isStarter else { return false }
+            
+            // Use GameStatusService for authoritative "yet to play" calculation
+            // Pass nil for gameDate since we don't have matchup context here
+            // The service will use its own logic to determine game status
+            return GameStatusService.shared.isPlayerYetToPlay(
+                playerTeam: player.team,
+                currentPoints: player.currentPoints
+            )
+        }.count
+    }
+    
+    /// Calculate number of players yet to play for this team with week context
+    /// This version can be more accurate by considering the week being viewed
+    func playersYetToPlay(forWeek week: Int) -> Int {
+        // Simple heuristic: If viewing a past week, no players are "yet to play"
+        let currentWeek = WeekSelectionManager.shared.currentNFLWeek
+        
+        // If looking at a past week, all games are finished
+        if week < currentWeek {
+            return 0
+        }
+        
+        return roster.filter { player in
+            // Only count starters
+            guard player.isStarter else { return false }
+            
+            // For current/future weeks, use normal logic
+            return GameStatusService.shared.isPlayerYetToPlay(
+                playerTeam: player.team,
+                currentPoints: player.currentPoints
+            )
+        }.count
+    }
 }
 
 // MARK: -> Team Record

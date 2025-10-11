@@ -24,6 +24,7 @@ struct MatchupsHubView: View {
     // @State internal var showingMatchupDetail: UnifiedMatchup?
     @State internal var showingSettings = false
     @State internal var showingWeekPicker = false
+    @State internal var showingWatchedPlayers = false // NEW: Add watched players sheet state
     
     // MARK: - UI State
     @State internal var refreshing = false
@@ -31,7 +32,7 @@ struct MatchupsHubView: View {
     
     // MARK: - Battles Section State
     @State internal var battlesMinimized = false
-    @State internal var poweredByExpanded = true
+    @State internal var poweredByExpanded = false // Changed from true to false - hide the branding banner
     
     // MARK: - Sorting States
     @State internal var sortByWinning = true
@@ -96,6 +97,9 @@ struct MatchupsHubView: View {
         }
         .sheet(isPresented: $showingWeekPicker) {
             buildWeekPickerSheet()
+        }
+        .sheet(isPresented: $showingWatchedPlayers) {
+            WatchedPlayersSheet(watchService: PlayerWatchService.shared)
         }
         .onChange(of: weekManager.selectedWeek) { oldValue, newValue in
             if oldValue != newValue {

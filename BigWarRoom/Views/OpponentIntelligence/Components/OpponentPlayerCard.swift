@@ -108,8 +108,9 @@ struct OpponentPlayerCard: View {
                 
                 // Threat level indicator
                 VStack(spacing: 2) {
-                    Text(player.threatLevel.emoji)
-                        .font(.system(size: 16))
+                    Image(systemName: player.threatLevel.sfSymbol)
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(player.threatLevel.color)
                     
                     Text(player.threatLevel.rawValue)
                         .font(.system(size: 7, weight: .black))

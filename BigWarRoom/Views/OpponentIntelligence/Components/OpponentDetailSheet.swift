@@ -132,8 +132,9 @@ struct OpponentDetailSheet: View {
                 Spacer()
                 
                 HStack {
-                    Text(intelligence.threatLevel.emoji)
-                        .font(.system(size: 20))
+                    Image(systemName: intelligence.threatLevel.sfSymbol)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(intelligence.threatLevel.color)
                     Text(intelligence.threatLevel.rawValue)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(intelligence.threatLevel.color)

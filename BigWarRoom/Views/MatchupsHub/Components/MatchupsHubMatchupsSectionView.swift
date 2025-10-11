@@ -31,7 +31,7 @@ struct MatchupsHubMatchupsSectionView: View {
     let getWinningStatus: (UnifiedMatchup) -> Bool
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 35) { //  space between sections
             MatchupsSectionHeaderView(
                 poweredByExpanded: poweredByExpanded,
                 sortByWinning: sortByWinning,

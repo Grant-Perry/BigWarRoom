@@ -659,6 +659,27 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  await updatePlayerDataSurgically()
    }
 
+	  // Refresh data while preserving user filter settings
+   func refreshWithFilterPreservation() async {
+      // Store current filter settings
+      let currentActiveOnly = showActiveOnly
+      let currentPosition = selectedPosition
+      let currentSortHighToLow = sortHighToLow
+      let currentSortingMethod = sortingMethod
+      
+      // Perform hard reset
+      await hardResetFilteringState()
+      
+      // Restore user settings
+      showActiveOnly = currentActiveOnly
+      selectedPosition = currentPosition
+      sortHighToLow = currentSortHighToLow
+      sortingMethod = currentSortingMethod
+      
+      // Apply the restored filters
+      applyPositionFilter()
+   }
+
 	  // 🔥 NEW: Surgical data update that doesn't trigger full UI refresh
    private func updatePlayerDataSurgically() async {
       var allPlayerEntries: [LivePlayerEntry] = []

@@ -46,7 +46,20 @@ extension MatchupsHubView {
             autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
             onWeekPickerTapped: showWeekPicker,
-            onAutoRefreshToggle: toggleAutoRefresh
+            onAutoRefreshToggle: toggleAutoRefresh,
+            // #GoodNav: Intelligence-style actions
+            onFiltersToggle: {
+                // TODO: Add filters functionality for Mission Control
+                print("🔧 Mission Control filters - to be implemented")
+            },
+            onWatchedPlayersToggle: {
+                showingWatchedPlayers = true
+            },
+            onRefreshTapped: {
+                Task {
+                    await handlePullToRefresh()
+                }
+            }
         )
     }
     

@@ -59,11 +59,32 @@ final class GameStatusService {
     /// This is the authoritative method for "yet to play" calculation
     func isPlayerYetToPlay(
         playerTeam: String?,
-        currentPoints: Double?
+        currentPoints: Double?,
+        gameDate: Date? = nil
     ) -> Bool {
+        // First check: If we have a game date and it's in the past, no one is "yet to play"
+        if let gameDate = gameDate {
+            let calendar = Calendar.current
+            let today = calendar.startOfDay(for: Date())
+            let gameDayStart = calendar.startOfDay(for: gameDate)
+            
+            // If game date is before today, all games are finished
+            if gameDayStart < today {
+//                print("🏁 YET TO PLAY: Game date \(gameDate) is in the past - all games finished")
+                return false
+            }
+        }
+        
         guard let gameStatus = getGameStatus(for: playerTeam) else {
-            // If we can't determine game status, assume they haven't played
-            // This should be rare with proper data
+            // If we can't determine game status but have game date, use date logic
+            if let gameDate = gameDate {
+                let calendar = Calendar.current
+                let today = calendar.startOfDay(for: Date())
+                let gameDayStart = calendar.startOfDay(for: gameDate)
+                return gameDayStart >= today
+            }
+            
+            // Last resort fallback
 //            print("⚠️ YET TO PLAY: Cannot determine game status for team '\(playerTeam ?? "nil")' - assuming yet to play")
             return true
         }

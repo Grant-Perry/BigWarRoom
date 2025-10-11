@@ -156,6 +156,51 @@ final class OpponentIntelligenceViewModel: ObservableObject {
         await loadOpponentIntelligence()
     }
     
+    /// Nuclear option: Clear ALL caches and force complete reload when week changes
+    /// This ensures loading state stays true until ALL fresh data is ready
+    func weekChangeReload() async {
+        print("🔄 OpponentIntelligenceViewModel: Week change reload started")
+        
+        // Lock loading state - prevent any intermediate updates
+        isLoading = true
+        errorMessage = nil
+        
+        // Clear all local data immediately to prevent stale data showing
+        opponentIntelligence = []
+        allOpponentPlayers = []
+        conflictPlayers = []
+        strategicRecommendations = []
+        
+        do {
+            // Clear intelligence cache
+            intelligenceService.clearCache()
+            
+            // Force matchups hub to do a fresh load (not using cached data)
+            print("🔄 Forcing MatchupsHubViewModel refresh...")
+            await matchupsHubViewModel.manualRefresh()
+            
+            // Wait a bit to ensure the refresh completed
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // Now analyze with truly fresh data
+            print("🔄 Analyzing opponents with fresh data...")
+            let intelligence = intelligenceService.analyzeOpponents(from: matchupsHubViewModel.myMatchups)
+            let recommendations = intelligenceService.generateRecommendations(from: intelligence)
+            
+            // Update UI with fresh data
+            await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
+            
+            print("🔄 Week change reload completed successfully")
+            
+        } catch {
+            errorMessage = "Failed to reload for new week: \(error.localizedDescription)"
+            print("❌ Week change reload failed: \(error)")
+        }
+        
+        // Only now set loading to false
+        isLoading = false
+    }
+    
     // MARK: - Filter & Sort Methods
     
     func setThreatLevelFilter(_ threat: ThreatLevel?) {
@@ -262,13 +307,13 @@ final class OpponentIntelligenceViewModel: ObservableObject {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
     
-    /// Get emoji for overall threat assessment
-    func getOverallThreatEmoji() -> String {
+    /// Get SF Symbol for overall threat assessment
+    func getOverallThreatSFSymbol() -> String {
         switch overallThreatAssessment {
-        case .critical: return "🚨"
-        case .high: return "⚠️"
-        case .medium: return "⚡"
-        case .low: return "✅"
+        case .critical: return "exclamationmark.triangle.fill"
+        case .high: return "exclamationmark.circle.fill"
+        case .medium: return "bolt.fill"
+        case .low: return "checkmark.circle.fill"
         }
     }
     

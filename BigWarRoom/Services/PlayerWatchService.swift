@@ -119,8 +119,7 @@ final class PlayerWatchService: ObservableObject {
             team: player.team,
             watchStartTime: Date(),
             initialScore: player.currentScore,
-            opponentReferences: opponentReferences,
-            currentScore: player.currentScore
+            opponentReferences: opponentReferences
         )
         
         watchedPlayers.append(watchedPlayer)
@@ -174,7 +173,7 @@ final class PlayerWatchService: ObservableObject {
         if updated {
             // Sort by threat level (highest threat first)
             watchedPlayers.sort { $0.weightedThreatScore > $1.weightedThreatScore }
-            saveWatchedPlayers()
+            // No need to save - only dynamic properties changed
         }
     }
     
@@ -203,6 +202,27 @@ final class PlayerWatchService: ObservableObject {
             saveWatchedPlayers()
             print("🎯 Auto-removed \(removedCount) watched players (games completed)")
         }
+    }
+    
+    /// Manually reorder watched players
+    /// - Parameters:
+    ///   - from: Source indices
+    ///   - to: Destination index
+    func moveWatchedPlayers(from: IndexSet, to: Int) {
+        // Use the same sorting as sortedWatchedPlayers for consistent behavior
+        var sortedPlayers = watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
+        sortedPlayers.move(fromOffsets: from, toOffset: to)
+        
+        // Update the original array to match the new order
+        watchedPlayers = sortedPlayers
+        saveWatchedPlayers()
+        
+        print("🎯 Reordered watched players - new order saved")
+    }
+    
+    /// Get watched players in current display order (for drag consistency)
+    var displayOrderWatchedPlayers: [WatchedPlayer] {
+        watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
     }
     
     // MARK: - Notification System
@@ -306,6 +326,7 @@ final class PlayerWatchService: ObservableObject {
     private func saveWatchedPlayers() {
         if let data = try? JSONEncoder().encode(watchedPlayers) {
             userDefaults.set(data, forKey: watchedPlayersKey)
+            print("🎯 Saved \(watchedPlayers.count) watched players (identities only)")
         }
     }
     
@@ -313,6 +334,7 @@ final class PlayerWatchService: ObservableObject {
         if let data = userDefaults.data(forKey: watchedPlayersKey),
            let players = try? JSONDecoder().decode([WatchedPlayer].self, from: data) {
             watchedPlayers = players
+            print("🎯 Loaded \(watchedPlayers.count) watched players - scores will refresh dynamically")
         }
     }
     

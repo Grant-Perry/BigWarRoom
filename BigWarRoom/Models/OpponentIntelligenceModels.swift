@@ -124,12 +124,12 @@ enum ThreatLevel: String, CaseIterable {
         }
     }
     
-    var emoji: String {
+    var sfSymbol: String {
         switch self {
-        case .critical: return "🔴"
-        case .high: return "🟠"
-        case .medium: return "🟡"
-        case .low: return "🟢"
+        case .critical: return "exclamationmark.triangle.fill"
+        case .high: return "exclamationmark.circle.fill"
+        case .medium: return "bolt.fill"
+        case .low: return "checkmark.circle.fill"
         }
     }
     
@@ -159,12 +159,12 @@ enum PlayerThreatLevel: String, CaseIterable {
         }
     }
     
-    var emoji: String {
+    var sfSymbol: String {
         switch self {
-        case .explosive: return "💥"
-        case .dangerous: return "⚠️"
-        case .moderate: return "📊"
-        case .minimal: return "💤"
+        case .explosive: return "flame.fill"
+        case .dangerous: return "exclamationmark.triangle.fill"
+        case .moderate: return "chart.bar.fill"
+        case .minimal: return "zzz"
         }
     }
 }
@@ -201,11 +201,11 @@ enum ConflictType: String, CaseIterable {
     case multipleOpponents = "MULTIPLE_OPPONENTS"
     case mutualOwnership = "MUTUAL_OWNERSHIP"
     
-    var emoji: String {
+    var sfSymbol: String {
         switch self {
-        case .ownAndFace: return "⚖️"
-        case .multipleOpponents: return "🎯"
-        case .mutualOwnership: return "🤝"
+        case .ownAndFace: return "scale.3d"
+        case .multipleOpponents: return "target"
+        case .mutualOwnership: return "handshake.fill"
         }
     }
     
@@ -245,19 +245,45 @@ struct StrategicRecommendation: Identifiable {
     let description: String
     let priority: Priority
     let actionable: Bool
+    let opponentTeam: FantasyTeam? // Include opponent team for avatar display
+    let matchup: UnifiedMatchup? // NEW: Include matchup for navigation to specific league
+    
+    // Convenience init for backward compatibility
+    init(type: RecommendationType, title: String, description: String, priority: Priority, actionable: Bool, opponentTeam: FantasyTeam?) {
+        self.type = type
+        self.title = title
+        self.description = description
+        self.priority = priority
+        self.actionable = actionable
+        self.opponentTeam = opponentTeam
+        self.matchup = nil
+    }
+    
+    // Full init with matchup
+    init(type: RecommendationType, title: String, description: String, priority: Priority, actionable: Bool, opponentTeam: FantasyTeam?, matchup: UnifiedMatchup?) {
+        self.type = type
+        self.title = title
+        self.description = description
+        self.priority = priority
+        self.actionable = actionable
+        self.opponentTeam = opponentTeam
+        self.matchup = matchup
+    }
     
     enum RecommendationType: String, CaseIterable {
         case lineupAdjustment = "LINEUP_ADJUSTMENT"
         case conflictWarning = "CONFLICT_WARNING"
         case opportunityAlert = "OPPORTUNITY_ALERT"
         case threatAssessment = "THREAT_ASSESSMENT"
+        case injuryAlert = "INJURY_ALERT"
         
-        var emoji: String {
+        var sfSymbol: String {
             switch self {
-            case .lineupAdjustment: return "🔄"
-            case .conflictWarning: return "⚠️"
-            case .opportunityAlert: return "🎯"
-            case .threatAssessment: return "🛡️"
+            case .lineupAdjustment: return "arrow.triangle.2.circlepath"
+            case .conflictWarning: return "exclamationmark.triangle.fill"
+            case .opportunityAlert: return "target"
+            case .threatAssessment: return "shield.fill"
+            case .injuryAlert: return "cross.case.fill"
             }
         }
     }
@@ -275,6 +301,160 @@ struct StrategicRecommendation: Identifiable {
             case .medium: return .blue
             case .low: return .gray
             }
+        }
+    }
+}
+
+// MARK: - Injury Status Alert Models
+
+/// Individual injury status alert for a rostered player
+struct InjuryAlert: Identifiable {
+    let id = UUID()
+    let player: FantasyPlayer
+    let injuryStatus: InjuryStatusType
+    let leagueName: String
+    let leagueSource: LeagueSource
+    let myTeam: FantasyTeam
+    let matchup: UnifiedMatchup // Include matchup for navigation
+    let isStarter: Bool
+    let priority: InjuryPriority
+    
+    /// Generate recommendation description with league context
+    var alertDescription: String {
+        let leagueContext = "in \(leagueName)"
+        
+        switch injuryStatus {
+        case .bye:
+            return "\(player.fullName) is on BYE Week \(leagueContext). Replace immediately - won't play this week."
+        case .injuredReserve:
+            return "\(player.fullName) is on Injured Reserve (IR) \(leagueContext). Move to IR slot or find replacement."
+        case .out:
+            return "\(player.fullName) status is O for game \(leagueContext). Replace immediately."
+        case .questionable:
+            return "\(player.fullName) is QUESTIONABLE \(leagueContext). Keep an eye on them before their start."
+        }
+    }
+    
+    /// Convert to StrategicRecommendation
+    func asStrategicRecommendation() -> StrategicRecommendation {
+        return StrategicRecommendation(
+            type: .injuryAlert,
+            title: injuryStatus.alertTitle,
+            description: alertDescription,
+            priority: priority.strategicPriority,
+            actionable: true,
+            opponentTeam: nil, // Injury alerts are about MY players, not opponents
+            matchup: matchup // Include matchup for FIX button navigation
+        )
+    }
+}
+
+/// Injury status types with priority ordering
+enum InjuryStatusType: String, CaseIterable {
+    case bye = "BYE"
+    case injuredReserve = "IR"
+    case out = "O"
+    case questionable = "Q"
+    
+    var displayName: String {
+        switch self {
+        case .bye: return "BYE Week"
+        case .injuredReserve: return "Injured Reserve"
+        case .out: return "OUT"
+        case .questionable: return "QUESTIONABLE"
+        }
+    }
+    
+    var alertTitle: String {
+        switch self {
+        case .bye: return "Player on BYE Week"
+        case .injuredReserve: return "Player on Injured Reserve"
+        case .out: return "Player OUT"
+        case .questionable: return "Player QUESTIONABLE"
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .bye: return .orange
+        case .injuredReserve: return .red
+        case .out: return .red
+        case .questionable: return .yellow
+        }
+    }
+    
+    var sfSymbol: String {
+        switch self {
+        case .bye: return "bed.double.fill"
+        case .injuredReserve: return "cross.case.fill"
+        case .out: return "xmark.circle.fill"
+        case .questionable: return "questionmark.circle.fill"
+        }
+    }
+    
+    /// Priority ranking (lower number = higher priority)
+    var priorityRanking: Int {
+        switch self {
+        case .bye: return 1 // Most important - player definitely won't play
+        case .injuredReserve: return 2 // Very important - long-term injury
+        case .out: return 3 // Important - definitely won't play this week
+        case .questionable: return 4 // Monitor - might play
+        }
+    }
+    
+    /// Initialize from raw injury status string
+    static func from(injuryStatus: String?, isByeWeek: Bool = false) -> InjuryStatusType? {
+        // First check for BYE week (highest priority)
+        if isByeWeek {
+            return .bye
+        }
+        
+        // Then check injury status string
+        guard let status = injuryStatus?.uppercased() else { return nil }
+        
+        switch status {
+        case "IR", "INJURED_RESERVE", "PUP": return .injuredReserve
+        case "O", "OUT": return .out
+        case "Q", "QUESTIONABLE", "DOUBTFUL": return .questionable
+        default: return nil
+        }
+    }
+}
+
+/// Priority levels for injury alerts
+enum InjuryPriority: Int, CaseIterable {
+    case urgent = 1    // BYE, IR, OUT in starting lineup
+    case attention = 2 // Q in starting lineup
+    case low = 3       // Should not occur with current logic (only starters)
+    
+    /// Convert to StrategicRecommendation priority
+    var strategicPriority: StrategicRecommendation.Priority {
+        switch self {
+        case .urgent: return .critical
+        case .attention: return .high  
+        case .low: return .medium
+        }
+    }
+    
+    /// Badge text for UI
+    var badgeText: String {
+        switch self {
+        case .urgent: return "URGENT"
+        case .attention: return "ATTENTION"
+        case .low: return "ALERT"
+        }
+    }
+    
+    /// Determine priority based on injury status and roster position
+    static func determine(status: InjuryStatusType, isStarter: Bool) -> InjuryPriority {
+        // Only care about starters - bench players don't get alerts
+        guard isStarter else { return .low }
+        
+        switch status {
+        case .bye, .injuredReserve, .out:
+            return .urgent // Can't play = URGENT
+        case .questionable:
+            return .attention // Might not play = ATTENTION
         }
     }
 }

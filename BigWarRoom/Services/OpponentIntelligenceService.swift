@@ -85,28 +85,49 @@ final class OpponentIntelligenceService {
     func generateRecommendations(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
         var recommendations: [StrategicRecommendation] = []
         
+        // FIRST PRIORITY: Injury status alerts for MY players
+        let injuryAlerts = generateInjuryAlerts(from: intelligence)
+        recommendations.append(contentsOf: injuryAlerts)
+        
         // Critical threat recommendations
         let criticalThreats = intelligence.filter { $0.threatLevel == .critical }
         for threat in criticalThreats {
+            // Get week context for accurate "yet to play" calculation
+            let currentWeek = threat.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
+            
+            // Calculate yet-to-play counts for both teams
+            let myYetToPlay = threat.myTeam.playersYetToPlay(forWeek: currentWeek)
+            let theirYetToPlay = threat.opponentTeam.playersYetToPlay(forWeek: currentWeek)
+            
+            // Enhanced description with yet-to-play information
+            let baseDescription = "You're losing to \(threat.opponentTeam.ownerName) by \(abs(threat.scoreDifferential).formatted(.number.precision(.fractionLength(1)))) points in \(threat.leagueName)"
+            let yetToPlayInfo = "You have \(myYetToPlay) to play, they have \(theirYetToPlay) to play"
+            
             recommendations.append(StrategicRecommendation(
                 type: .threatAssessment,
-                title: "🚨 Critical Threat Alert",
-                description: "You're losing to \(threat.opponentTeam.ownerName) by \(abs(threat.scoreDifferential).formatted(.number.precision(.fractionLength(1)))) points in \(threat.leagueName)",
+                title: "Critical Threat Alert",
+                description: "\(baseDescription). \(yetToPlayInfo)",
                 priority: .critical,
-                actionable: true
+                actionable: true,
+                opponentTeam: threat.opponentTeam
             ))
         }
         
-        // Conflict warnings
+        // Conflict warnings - Enhanced with league context instead of useless BENCH advice
         let majorConflicts = intelligence.flatMap { $0.conflictPlayers.filter { $0.severity == .extreme || $0.severity == .high } }
         for conflict in majorConflicts {
-            let action = conflict.netImpact > 0 ? "START" : "BENCH"
+            // Build league context instead of generic bench advice
+            let opponentLeagueNames = conflict.opponentLeagues.map { $0.name }.joined(separator: ", ")
+            let impactDirection = conflict.netImpact > 0 ? "benefits" : "hurts"
+            let impactAmount = abs(conflict.netImpact).formatted(.number.precision(.fractionLength(1)))
+            
             recommendations.append(StrategicRecommendation(
                 type: .conflictWarning,
-                title: "⚖️ Player Conflict Detected",
-                description: "\(action) \(conflict.player.fullName) - \(conflict.recommendation)",
+                title: "Player Conflict Detected",
+                description: "\(conflict.player.fullName) conflict in \(opponentLeagueNames). Net impact \(impactDirection) you by \(impactAmount) points across leagues",
                 priority: conflict.severity == .extreme ? .critical : .high,
-                actionable: true
+                actionable: true,
+                opponentTeam: nil // Conflicts don't have a single opponent
             ))
         }
         
@@ -118,12 +139,151 @@ final class OpponentIntelligenceService {
                 title: "🎯 Opportunity Window",
                 description: "\(opportunity.opponentTeam.ownerName) is struggling (\(opportunity.totalOpponentScore.formatted(.number.precision(.fractionLength(1)))) pts) - maintain aggressive lineup in \(opportunity.leagueName)",
                 priority: .medium,
-                actionable: false
+                actionable: false,
+                opponentTeam: opportunity.opponentTeam
             ))
         }
         
         // Sort by priority
         return recommendations.sorted { $0.priority.rawValue < $1.priority.rawValue }
+    }
+    
+    // MARK: - Injury Alert Generation
+    
+    /// Generate injury status alerts for all my rostered players
+    /// - Parameter intelligence: Array of opponent intelligence containing my team rosters
+    /// - Returns: Array of strategic recommendations for injured players
+    private func generateInjuryAlerts(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
+        var alerts: [InjuryAlert] = []
+        
+        // Scan all my teams across all leagues
+        for intel in intelligence {
+            guard let myTeam = intel.matchup.myTeam else { continue }
+            
+            // Check each player on my roster
+            for player in myTeam.roster {
+                if let injuryAlert = createInjuryAlert(
+                    player: player,
+                    leagueName: intel.leagueName,
+                    leagueSource: intel.leagueSource,
+                    myTeam: myTeam,
+                    matchup: intel.matchup
+                ) {
+                    alerts.append(injuryAlert)
+                }
+            }
+        }
+        
+        // Sort alerts by priority (BYE → IR → O → Q)
+        alerts.sort { alert1, alert2 in
+            if alert1.priority.rawValue != alert2.priority.rawValue {
+                return alert1.priority.rawValue < alert2.priority.rawValue
+            }
+            // Within same priority, sort by injury status priority ranking
+            return alert1.injuryStatus.priorityRanking < alert2.injuryStatus.priorityRanking
+        }
+        
+        // Convert to StrategicRecommendation objects
+        return alerts.map { $0.asStrategicRecommendation() }
+    }
+    
+    /// Create injury alert for a specific player if they have injury status
+    /// - Parameters:
+    ///   - player: Fantasy player to check
+    ///   - leagueName: Name of the league
+    ///   - leagueSource: Source of the league (ESPN/Sleeper)
+    ///   - myTeam: My fantasy team containing this player
+    /// - Returns: InjuryAlert if player has concerning injury status, nil otherwise
+    private func createInjuryAlert(
+        player: FantasyPlayer,
+        leagueName: String,
+        leagueSource: LeagueSource,
+        myTeam: FantasyTeam,
+        matchup: UnifiedMatchup
+    ) -> InjuryAlert? {
+        
+        // ONLY CARE ABOUT STARTERS - ignore bench players completely
+        guard player.isStarter else { return nil }
+        
+        // Check for BYE week first (highest priority)
+        let isByeWeek = checkIfPlayerOnBye(player: player)
+        
+        // Get injury status from Sleeper player directory
+        let sleeperInjuryStatus = getSleeperInjuryStatus(for: player)
+        
+        // Determine injury status type
+        guard let injuryStatusType = InjuryStatusType.from(
+            injuryStatus: sleeperInjuryStatus,
+            isByeWeek: isByeWeek
+        ) else {
+            return nil // No concerning injury status
+        }
+        
+        // Determine priority based on status and roster position
+        let priority = InjuryPriority.determine(
+            status: injuryStatusType,
+            isStarter: player.isStarter
+        )
+        
+        // We need to find the matchup for this league to include it
+        // For now, we'll create a basic alert without matchup reference
+        return InjuryAlert(
+            player: player,
+            injuryStatus: injuryStatusType,
+            leagueName: leagueName,
+            leagueSource: leagueSource,
+            myTeam: myTeam,
+            matchup: matchup, // Pass the actual matchup parameter
+            isStarter: player.isStarter,
+            priority: priority
+        )
+    }
+    
+    /// Check if player is on BYE week using game status service
+    /// - Parameter player: Fantasy player to check
+    /// - Returns: True if player's team is on BYE this week
+    private func checkIfPlayerOnBye(player: FantasyPlayer) -> Bool {
+        guard let team = player.team else { return false }
+        
+        // Use NFLGameDataService to check if team is on bye
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            return gameInfo.gameStatus.lowercased() == "bye"
+        }
+        
+        // Fallback: Check if player has 0 projected points (common BYE indicator)
+        if let projectedPoints = player.projectedPoints, projectedPoints == 0.0,
+           let currentPoints = player.currentPoints, currentPoints == 0.0 {
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Get injury status from Sleeper player directory
+    /// - Parameter player: Fantasy player to lookup
+    /// - Returns: Injury status string from Sleeper data, if available
+    private func getSleeperInjuryStatus(for player: FantasyPlayer) -> String? {
+        // Try to find Sleeper player data using various ID mappings
+        if let sleeperID = player.sleeperID,
+           let sleeperPlayer = PlayerDirectoryStore.shared.player(for: sleeperID) {
+            return sleeperPlayer.injuryStatus
+        }
+        
+        // Try ESPN ID mapping to Sleeper
+        if let espnID = player.espnID,
+           let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnID) {
+            return sleeperPlayer.injuryStatus
+        }
+        
+        // Try name-based lookup as fallback - need to search through all players
+        let allPlayers = PlayerDirectoryStore.shared.players
+        for (_, sleeperPlayer) in allPlayers {
+            if sleeperPlayer.fullName.lowercased() == player.fullName.lowercased() {
+                return sleeperPlayer.injuryStatus
+            }
+        }
+        
+        return nil
     }
     
     // MARK: - Private Analysis Methods

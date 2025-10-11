@@ -2,12 +2,12 @@
 //  OpponentIntelligenceDashboardView.swift
 //  BigWarRoom
 //
-//  Main view for Opponent Intelligence Dashboard (OID)
+//  #GoodNav Template - Intelligence matching Mission Control exactly
 //
 
 import SwiftUI
 
-/// **Opponent Intelligence Dashboard**
+/// **Opponent Intelligence Dashboard - #GoodNav Template**
 /// 
 /// Strategic opponent analysis across all leagues
 struct OpponentIntelligenceDashboardView: View {
@@ -17,6 +17,37 @@ struct OpponentIntelligenceDashboardView: View {
     @State private var selectedIntelligence: OpponentIntelligence?
     @State private var showingWeekPicker = false
     @State private var showingWatchedPlayers = false
+    @State private var selectedMatchup: UnifiedMatchup? // NEW: For matchup navigation
+    
+    // #GoodNav: Mission Control-style controls (matching exactly)
+    @State private var sortByWinning = true
+    @State private var dualViewMode = true
+    @State private var autoRefreshEnabled = true
+    @State private var microMode = false
+
+    // MARK: - Interactive Filter States
+    @State private var showingThreatLevelDropdown = false
+    @State private var showingPositionDropdown = false
+    @State private var showingSortByDropdown = false
+
+    // Computed properties for display values
+    private var currentThreatLevelDisplay: String {
+        switch viewModel.selectedThreatLevel {
+        case .critical: return "Critical"
+        case .high: return "High" 
+        case .medium: return "Medium"
+        case .low: return "Low"
+        case .none: return "All"
+        }
+    }
+
+    private var currentSortByDisplay: String {
+        viewModel.sortBy.rawValue
+    }
+
+    private var conflictsOnlyDisplay: String {
+        viewModel.showConflictsOnly ? "Yes" : "No"
+    }
     
     var body: some View {
         NavigationView {
@@ -25,8 +56,12 @@ struct OpponentIntelligenceDashboardView: View {
                 backgroundView
                 
                 VStack(spacing: 0) {
-                    // Header with stats
+                    // #GoodNav Header (matching Mission Control exactly)
                     headerSection
+                    
+                    // MARK: - REMOVE THIS ENTIRE SECTION - MARKED FOR DELETION
+                    // #GoodNav Controls row (matching Mission Control exactly)
+                    // controlsSection
                     
                     if viewModel.isLoading {
                         loadingView
@@ -80,6 +115,15 @@ struct OpponentIntelligenceDashboardView: View {
             .sheet(isPresented: $showingWatchedPlayers) {
                 WatchedPlayersSheet(watchService: watchService)
             }
+            .sheet(item: $selectedMatchup) { matchup in
+                MatchupDetailSheetsView(matchup: matchup)
+            }
+            .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
+                // Nuclear option: Clear ALL caches and force fresh load when week changes
+                Task {
+                    await viewModel.weekChangeReload()
+                }
+            }
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
@@ -94,19 +138,15 @@ struct OpponentIntelligenceDashboardView: View {
             .ignoresSafeArea(.all)
     }
     
+    // #GoodNav: Header section matching Mission Control exactly
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            // Title and controls
+        VStack(spacing: 16) {
+            // Title row
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Intelligence")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.white)
-                        
-                        Text(viewModel.getOverallThreatEmoji())
-                            .font(.title)
-                    }
+                    Text("Intelligence")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
                     
                     Text("Opponent Analysis • \(viewModel.timeAgo(viewModel.lastUpdateTime))")
                         .font(.system(size: 14, weight: .medium))
@@ -114,96 +154,236 @@ struct OpponentIntelligenceDashboardView: View {
                 }
                 
                 Spacer()
-                
-                HStack(spacing: 12) {
-                    // Filters button
-                    Button(action: { showingFilters = true }) {
-                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.white)
-                    }
-                    
-                    Button(action: { showingWatchedPlayers = true }) {
-                        ZStack {
-                            Image(systemName: "eye.circle.fill")
-                                .font(.system(size: 22))
-                                .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
-                            
-                            // Badge showing watch count
-                            if watchService.watchCount > 0 {
-                                Text("\(watchService.watchCount)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 16, height: 16)
-                                    .background(Circle().fill(.red))
-                                    .offset(x: 8, y: -8)
-                            }
-                        }
-                    }
-                    
-                    // Refresh button
-                    Button(action: { 
-                        Task { await viewModel.manualRefresh() }
-                    }) {
-                        Image(systemName: "arrow.clockwise.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.white)
-                    }
-                }
             }
             
-            // Stats overview
-            statsOverviewSection
+            // #GoodNav: WEEK picker with icons row (matching Mission Control)
+            weekPickerWithIconsRow
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
         .padding(.bottom, 16)
     }
     
-    private var statsOverviewSection: some View {
-        HStack(spacing: 0) {
-            StatCardView(
-                value: "\(viewModel.totalOpponentsTracked)",
-                label: "OPPONENTS",
-                color: .blue
-            )
-            
-            // Week picker button - ADDED like Mission Control
+    // #GoodNav: Week picker with Intelligence icons (matching Mission Control)
+    private var weekPickerWithIconsRow: some View {
+        HStack {
+            // WEEK picker (left side)
             Button(action: { showingWeekPicker = true }) {
-                StatCardView(
-                    value: "WEEK \(WeekSelectionManager.shared.selectedWeek)",
-                    label: "\(viewModel.totalOpponentsTracked) LEAGUES",
-                    color: .blue
+                HStack(spacing: 6) {
+                    Text("WEEK \(WeekSelectionManager.shared.selectedWeek)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.blue)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                        )
                 )
             }
             .buttonStyle(PlainButtonStyle())
             
-            StatCardView(
-                value: "\(viewModel.totalConflictCount)",
-                label: "CONFLICTS",
-                color: viewModel.totalConflictCount > 0 ? .orange : .gray
-            )
+            Spacer()
             
-            StatCardView(
-                value: "\(viewModel.getLosingMatchups().count)",
-                label: "LOSING",
-                color: viewModel.getLosingMatchups().count > 0 ? .red : .green
-            )
+            // #GoodNav: Icon controls (right side) - matching Mission Control exactly
+            HStack(spacing: 12) {
+                // Filters button
+                Button(action: { showingFilters = true }) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Watched players button with badge
+                Button(action: { showingWatchedPlayers = true }) {
+                    Image(systemName: "eye.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
+                        .notificationBadge(count: watchService.watchCount)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Refresh button
+                Button(action: { 
+                    Task { await viewModel.manualRefresh() }
+                }) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
-        .padding(.horizontal, 8)
+    }
+    
+    // #GoodNav: Controls section with CONTEXTUAL Intelligence filters
+    private var controlsSection: some View {
+        HStack {
+            // Collapse button (chevron)
+            Button(action: {
+                // TODO: Add collapse functionality if needed
+            }) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // #GoodNav: CONTEXTUAL Intelligence controls
+            HStack {
+                Spacer()
+                
+                // Threat Level filter with dropdown
+                Menu {
+                    Button("All") {
+                        viewModel.setThreatLevelFilter(nil)
+                    }
+                    Button("Critical") {
+                        viewModel.setThreatLevelFilter(.critical)
+                    }
+                    Button("High") {
+                        viewModel.setThreatLevelFilter(.high)
+                    }
+                    Button("Medium") {
+                        viewModel.setThreatLevelFilter(.medium)
+                    }
+                    Button("Low") {
+                        viewModel.setThreatLevelFilter(.low)
+                    }
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(currentThreatLevelDisplay)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                        
+                        Text("Threat Level")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .menuStyle(BorderlessButtonMenuStyle())
+                
+                Spacer()
+                
+                // Position filter with dropdown
+                Menu {
+                    ForEach(viewModel.availablePositions, id: \.self) { position in
+                        Button(position) {
+                            viewModel.setPositionFilter(position)
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(viewModel.selectedPosition)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.purple)
+                        
+                        Text("Position")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .menuStyle(BorderlessButtonMenuStyle())
+                
+                Spacer()
+                
+                // Sort By filter with dropdown
+                Menu {
+                    ForEach(OpponentIntelligenceViewModel.SortMethod.allCases) { sortMethod in
+                        Button(sortMethod.rawValue) {
+                            viewModel.setSortMethod(sortMethod)
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(currentSortByDisplay)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.pink)
+                        
+                        Text("Sort by")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .menuStyle(BorderlessButtonMenuStyle())
+                
+                Spacer()
+                
+                // Conflicts Only toggle
+                Button(action: { 
+                    viewModel.toggleConflictsOnly()
+                }) {
+                    VStack(spacing: 2) {
+                        Text(conflictsOnlyDisplay)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(viewModel.showConflictsOnly ? .orange : .gray)
+                        
+                        Text("Conflicts only")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Spacer()
+            }
+            
+            // Timer dial placeholder (matching Mission Control)
+            Circle()
+                .stroke(Color.gray.opacity(0.3), lineWidth: 2)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Text("•")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.gray)
+                )
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
     }
     
     private var recommendationsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("🧠 Strategic Insights")
+                Text("Strategic Insights")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
             }
             
-            ForEach(viewModel.priorityRecommendations.prefix(3), id: \.id) { recommendation in
-                RecommendationCard(recommendation: recommendation)
+            // Display recommendations with injury alerts first (they're highest priority)
+            ForEach(viewModel.priorityRecommendations.prefix(5), id: \.id) { recommendation in
+                // Use different card types based on recommendation type
+                if recommendation.type == .injuryAlert {
+                    InjuryAlertCard(recommendation: recommendation)
+                        .onTapGesture {
+                            handleRecommendationTap(recommendation)
+                        }
+                } else {
+                    RecommendationCard(recommendation: recommendation)
+                        .onTapGesture {
+                            handleRecommendationTap(recommendation)
+                        }
+                }
             }
         }
     }
@@ -211,7 +391,7 @@ struct OpponentIntelligenceDashboardView: View {
     private var threatMatrixSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("🎯 Threat Matrix")
+                Text("Threat Matrix")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -225,7 +405,8 @@ struct OpponentIntelligenceDashboardView: View {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredIntelligence) { intelligence in
                     ThreatMatrixCard(intelligence: intelligence) {
-                        selectedIntelligence = intelligence
+                        // Navigate to matchup instead of showing opponent detail sheet
+                        selectedMatchup = intelligence.matchup
                     }
                 }
             }
@@ -257,7 +438,7 @@ struct OpponentIntelligenceDashboardView: View {
     private var opponentPlayersSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("👁️ All Opponent Players")
+                Text("All Opponent Players")
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 
@@ -319,43 +500,34 @@ struct OpponentIntelligenceDashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, 40)
     }
-}
-
-// MARK: - Supporting Components
-
-/// Individual stat card for header overview
-private struct StatCardView: View {
-    let value: String
-    let label: String
-    let color: Color
     
-    var body: some View {
-        VStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 18, weight: .black, design: .rounded))
-                .foregroundColor(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+    // MARK: - Navigation Helpers
+    
+    /// Handle taps on recommendation cards
+    private func handleRecommendationTap(_ recommendation: StrategicRecommendation) {
+        // For Critical Threat Alerts, find the matching intelligence and navigate to its matchup
+        if recommendation.title.contains("Critical Threat Alert"),
+           let opponentTeam = recommendation.opponentTeam {
             
-            Text(label)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.gray)
-                .lineLimit(1)
+            // Find the intelligence matching this opponent
+            if let intelligence = viewModel.filteredIntelligence.first(where: { 
+                $0.opponentTeam.ownerName == opponentTeam.ownerName 
+            }) {
+                selectedMatchup = intelligence.matchup
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.2))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(color.opacity(0.5), lineWidth: 1)
-                )
-        )
+        
+        // For Injury Alerts, navigate to the specific matchup where the player is rostered
+        if recommendation.type == .injuryAlert, let matchup = recommendation.matchup {
+            selectedMatchup = matchup
+        }
+        
+        // For Player Conflicts, could show conflict details or navigate to first conflicted league
+        // For now, we'll handle Critical Threat Alerts and Injury Alerts
     }
 }
 
-#Preview("Opponent Intelligence Dashboard") {
+#Preview("Intelligence Dashboard - #GoodNav Template") {
     OpponentIntelligenceDashboardView()
         .preferredColorScheme(.dark)
 }

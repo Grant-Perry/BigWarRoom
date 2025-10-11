@@ -9,46 +9,35 @@ import SwiftUI
 
 /// Hero header component for Mission Control with title and branding
 struct MissionControlHeaderView: View {
+    let lastUpdateTime: Date?
+    let timeAgoString: String?
+    let connectedLeaguesCount: Int
+    let winningCount: Int
+    let losingCount: Int
+    
     var body: some View {
-        VStack(spacing: 16) {
-            // Mission Control title section
-            MissionControlTitleSection()
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 8)
-    }
-}
-
-// MARK: - Supporting Components
-
-/// Mission Control title with icons and subtitle
-private struct MissionControlTitleSection: View {
-    var body: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "target")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.gpGreen)
+        VStack(alignment: .leading, spacing: 4) {
+            // Mission Control title with leagues indicator
+            HStack(spacing: 0) {
+                Text("Mission Control")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(.white)
+                    .notificationBadge(count: connectedLeaguesCount, xOffset: 24, yOffset: -8) // Fixed parameters
                 
-                Text("MISSION CONTROL")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .gpGreen.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Image(systemName: "rocket")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.gpGreen)
+                Spacer()
             }
             
-            Text("Fantasy Football Command Center")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.gray)
+            // Last Update
+            if let timeAgoString {
+                Text("Last Update: \(timeAgoString)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+            } else {
+                Text("Ready to load your battles")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

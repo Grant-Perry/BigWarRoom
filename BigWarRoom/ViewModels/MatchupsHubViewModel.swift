@@ -20,7 +20,7 @@ final class MatchupsHubViewModel: ObservableObject {
     @Published var autoRefreshEnabled = true
 
     // MARK: - Just Me Mode State (Persistent across refreshes)
-    @Published var microModeEnabled = true // Changed from false to true - start in Just Me mode
+    @Published var microModeEnabled = false // Changed from true to false - start with Just Me mode OFF
     @Published var expandedCardId: String? = nil
     @Published var justMeModeBannerVisible = false // Keep this false - no banner needed
     

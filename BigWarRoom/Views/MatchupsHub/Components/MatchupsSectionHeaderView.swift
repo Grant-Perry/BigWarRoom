@@ -2,12 +2,12 @@
 //  MatchupsSectionHeaderView.swift
 //  BigWarRoom
 //
-//  Complex header component with toggles and timer for matchups section
+//  #GoodNav Template - Clickable controls row
 //
 
 import SwiftUI
 
-/// Header component with collapse toggle, control toggles, and countdown timer
+/// #GoodNav Template: Controls row with clickable text toggles and timer
 struct MatchupsSectionHeaderView: View {
     let poweredByExpanded: Bool
     let sortByWinning: Bool
@@ -29,7 +29,7 @@ struct MatchupsSectionHeaderView: View {
                 onToggle: onPoweredByToggle
             )
             
-            // Control toggles with even spacing
+            // #GoodNav: Clickable control toggles
             ControlTogglesRow(
                 sortByWinning: sortByWinning,
                 dualViewMode: dualViewMode,
@@ -51,7 +51,7 @@ struct MatchupsSectionHeaderView: View {
             .scaleEffect(0.8)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 8) // 🔥 ADDED: Just a bit of breathing room at the top
+        .padding(.top, 16)
     }
 }
 
@@ -73,22 +73,23 @@ private struct CollapseButton: View {
     }
 }
 
-/// Row containing all control toggles
+/// #GoodNav: Row containing all clickable control toggles
 private struct ControlTogglesRow: View {
     let sortByWinning: Bool
     let dualViewMode: Bool
     let microMode: Bool
-    let autoRefreshEnabled: Bool // NEW: Auto-refresh state
+    let autoRefreshEnabled: Bool
     let onSortToggle: () -> Void
     let onDualViewToggle: () -> Void
     let onMicroModeToggle: () -> Void
-    let onAutoRefreshToggle: () -> Void // NEW: Auto-refresh toggle
+    let onAutoRefreshToggle: () -> Void
     
     var body: some View {
         HStack {
             Spacer()
             
-            ToggleControlView(
+            // #GoodNav: Clickable toggle controls
+            ClickableToggleControlView(
                 title: sortByWinning ? "Winning" : "Losing",
                 subtitle: "Sort",
                 color: sortByWinning ? .gpGreen : .gpRedPink,
@@ -97,7 +98,7 @@ private struct ControlTogglesRow: View {
             
             Spacer()
             
-            ToggleControlView(
+            ClickableToggleControlView(
                 title: dualViewMode ? "Dual" : "Single",
                 subtitle: "View",
                 color: dualViewMode ? .blue : .orange,
@@ -106,8 +107,7 @@ private struct ControlTogglesRow: View {
             
             Spacer()
             
-            // 🔥 MOVED: Auto-refresh toggle now next to Dual View
-            ToggleControlView(
+            ClickableToggleControlView(
                 title: autoRefreshEnabled ? "On" : "Off",
                 subtitle: "Auto-refresh",
                 color: autoRefreshEnabled ? .gpGreen : .gpRedPink,
@@ -116,7 +116,7 @@ private struct ControlTogglesRow: View {
             
             Spacer()
             
-            ToggleControlView(
+            ClickableToggleControlView(
                 title: microMode ? "On" : "Off",
                 subtitle: "Just me",
                 color: microMode ? .gpGreen : .gpRedPink,
@@ -128,27 +128,27 @@ private struct ControlTogglesRow: View {
     }
 }
 
-/// Individual toggle control component
-private struct ToggleControlView: View {
+/// #GoodNav: Individual clickable toggle control component
+private struct ClickableToggleControlView: View {
     let title: String
     let subtitle: String
     let color: Color
     let onToggle: () -> Void
     
     var body: some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-                .onTapGesture {
-                    onToggle()
-                }
-            
-            Text(subtitle)
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
+        Button(action: onToggle) {
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(color)
+                
+                Text(subtitle)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }

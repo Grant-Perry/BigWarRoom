@@ -33,60 +33,14 @@ struct AllLivePlayersHeaderView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Controls section (simplified - removed Week picker)
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Player Analysis")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.white)
-                    
-                    Text("Updated: \(Int(refreshCountdown))s ago")
-                        .font(.system(size: 14, weight: .regular))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                
-                Spacer()
-                
-                HStack(spacing: 12) {
-                    // Filters button
-                    Button(action: { showingFilters = true }) {
-                        Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    }
-                    
-                    // Watched players button with count badge
-                    Button(action: { showingWatchedPlayers = true }) {
-                        ZStack {
-                            Image(systemName: "eye.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
-                            
-                            // Badge showing watch count
-                            if watchService.watchCount > 0 {
-                                Text("\(watchService.watchCount)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 16, height: 16)
-                                    .background(Circle().fill(.red))
-                                    .offset(x: 8, y: -8)
-                            }
-                        }
-                    }
-                    
-                    // Refresh button
-                    Button(action: { 
-                        Task { await performManualRefresh() }
-                    }) {
-                        Image(systemName: "arrow.clockwise.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white)
-                    }
-                }
-            }
+            // #GoodNav: Header with WEEK + icons (like Mission Control/Intelligence)
+            weekPickerWithIconsRow
             
-            // Stats Summary with Week picker in first position
-            statsOverviewSection
+            // #GoodNav: Contextual controls row
+            controlsSection
+            
+            // Stats Summary - REMOVED (keeping it clean)
+            // statsOverviewSection
         }
         .padding(.horizontal, 20)
         .padding(.top, 24)
@@ -110,11 +64,165 @@ struct AllLivePlayersHeaderView: View {
             }
         }
         .onChange(of: weekManager.selectedWeek) { _, _ in
-            // 🔥 NEW: Refresh data when week changes
+            // 🔥 FIXED: Use gentle refresh instead of hard reset to preserve user settings
             Task {
-                await performRefreshWithReset()
+                await performBackgroundRefresh()
             }
         }
+    }
+    
+    // #GoodNav: Week picker with icons (matching template)
+    private var weekPickerWithIconsRow: some View {
+        HStack {
+            // WEEK picker (left side) 
+            Button(action: { showingWeekPicker = true }) {
+                HStack(spacing: 6) {
+                    Text("WEEK \(weekManager.selectedWeek)")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.blue)
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.blue)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Spacer()
+            
+            // Icons (right side)
+            HStack(spacing: 12) {
+                // Filters button
+                Button(action: { showingFilters = true }) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Watched players button
+                Button(action: { showingWatchedPlayers = true }) {
+                    Image(systemName: "eye.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
+                        .notificationBadge(count: watchService.watchCount)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Refresh button
+                Button(action: { 
+                    Task { await performManualRefresh() }
+                }) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+    
+    // #GoodNav: Controls section with CONTEXTUAL All Rostered Players filters
+    private var controlsSection: some View {
+        HStack {
+            // Collapse button (chevron)
+            Button(action: {
+                // TODO: Add collapse functionality if needed
+            }) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // #GoodNav: CONTEXTUAL All Rostered Players controls
+            HStack {
+                Spacer()
+                
+                // Top Score (non-functional - do nothing when clicked)
+                VStack(spacing: 2) {
+                    Text(String(format: "%.1f", viewModel.topScore))
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(.gpGreen)
+                    
+                    Text("Top Score")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Position filter with picker
+                Menu {
+                    ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
+                        Button(position.displayName) {
+                            viewModel.setPositionFilter(position)
+                        }
+                    }
+                } label: {
+                    VStack(spacing: 2) {
+                        Text(viewModel.selectedPosition.displayName.uppercased())
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.purple)
+                        
+                        Text("Position")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .menuStyle(BorderlessButtonMenuStyle())
+                
+                Spacer()
+                
+                // Active Only toggle (toggles between "Yes" and "No")
+                Button(action: { 
+                    viewModel.showActiveOnly.toggle()
+                }) {
+                    VStack(spacing: 2) {
+                        Text(viewModel.showActiveOnly ? "Yes" : "No")
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(viewModel.showActiveOnly ? .orange : .gray)
+                        
+                        Text("Active Only")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Spacer()
+            }
+            
+            // Timer dial (existing refresh countdown)
+            Circle()
+                .stroke(Color.gray.opacity(0.3), lineWidth: 2)
+                .frame(width: 30, height: 30)
+                .overlay(
+                    Text("\(Int(refreshCountdown))")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundColor(.white)
+                )
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 24)
     }
     
     // MARK: - Stats Overview Section (Intelligence style)
@@ -191,8 +299,8 @@ struct AllLivePlayersHeaderView: View {
     }
     
     private func performManualRefresh() async {
-        // Manual refresh with full reset
-        await viewModel.hardResetFilteringState()
+        // Manual refresh while preserving user filter settings
+        await viewModel.refreshWithFilterPreservation()
         onAnimationReset()
         resetCountdown()
     }
