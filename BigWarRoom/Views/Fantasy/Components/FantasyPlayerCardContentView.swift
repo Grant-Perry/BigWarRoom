@@ -15,15 +15,15 @@ struct FantasyPlayerCardMainContentView: View {
     
     let onScoreTap: (() -> Void)?
     
-    // 🔥 NEW: Add dependency for live score calculation
-    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    // 🔥 FIXED: Add FantasyViewModel to get corrected ESPN scores
+    let fantasyViewModel: FantasyViewModel?
     
-    init(player: FantasyPlayer, isPlayerLive: Bool, glowIntensity: Double, onScoreTap: (() -> Void)? = nil) {
+    init(player: FantasyPlayer, isPlayerLive: Bool, glowIntensity: Double, onScoreTap: (() -> Void)? = nil, fantasyViewModel: FantasyViewModel? = nil) {
         self.player = player
         self.isPlayerLive = isPlayerLive
         self.glowIntensity = glowIntensity
         self.onScoreTap = onScoreTap
+        self.fantasyViewModel = fantasyViewModel
     }
     
     var body: some View {
@@ -62,8 +62,25 @@ struct FantasyPlayerCardMainContentView: View {
     // MARK: - Helper Views
     
     private var scoreText: some View {
-        // 🔥 FIX: Use live calculated score instead of stale player.currentPoints
-        Text(liveScoreString)
+        // 🔥 FIXED: Use corrected score from FantasyViewModel when available
+        let displayScore: String
+        if let fantasyViewModel = fantasyViewModel {
+            let correctedScore = fantasyViewModel.getCorrectedPlayerScore(for: player)
+            displayScore = String(format: "%.2f", correctedScore)
+        } else {
+            displayScore = player.currentPointsString
+        }
+        
+        // 🔥 DEBUG: Log which score is being used for Daniel Jones
+        if player.fullName.contains("Daniel Jones") {
+            print("🎯 FANTASY CARD FINAL DEBUG: \(player.fullName)")
+            print("   Player ID: \(player.id)")
+            print("   Original Score: \(player.currentPoints ?? 0.0)")
+            print("   Display Score: \(displayScore)")
+            print("   Has FantasyViewModel: \(fantasyViewModel != nil)")
+        }
+        
+        return Text(displayScore)
             .font(.system(size: 22, weight: .black))
             .foregroundColor(.white)
             .lineLimit(1)
@@ -83,45 +100,6 @@ struct FantasyPlayerCardMainContentView: View {
                     )
                 : nil
             )
-    }
-    
-    // 🔥 NEW: Calculate live score using same logic as AllLivePlayersViewModel
-    private var liveScoreString: String {
-        // First try to get live calculated score
-        if let liveScore = calculateLiveScore() {
-            return String(format: "%.2f", liveScore)
-        }
-        
-        // Fallback to original player score
-        return player.currentPointsString
-    }
-    
-    // 🔥 NEW: Calculate live score from stats (same as AllLivePlayersViewModel)
-    private func calculateLiveScore() -> Double? {
-        guard let sleeperPlayer = getSleeperPlayerData() else { return nil }
-        guard let stats = livePlayersViewModel.playerStats[sleeperPlayer.playerID] else { return nil }
-        
-        // Use PPR scoring by default (most common)
-        if let pprPoints = stats["pts_ppr"] {
-            return pprPoints
-        } else if let halfPprPoints = stats["pts_half_ppr"] {
-            return halfPprPoints
-        } else if let stdPoints = stats["pts_std"] {
-            return stdPoints
-        }
-        
-        return nil
-    }
-    
-    // 🔥 NEW: Get Sleeper player data for stats lookup
-    private func getSleeperPlayerData() -> SleeperPlayer? {
-        let playerName = player.fullName.lowercased()
-        
-        return playerDirectory.players.values.first { sleeperPlayer in
-            sleeperPlayer.fullName.lowercased() == playerName ||
-            (sleeperPlayer.shortName.lowercased() == player.shortName.lowercased() &&
-             sleeperPlayer.team?.lowercased() == player.team?.lowercased())
-        }
     }
 }
 

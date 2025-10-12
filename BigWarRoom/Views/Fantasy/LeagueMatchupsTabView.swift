@@ -230,26 +230,43 @@ struct LeagueMatchupsTabView: View {
     
     private var headerView: some View {
         HStack {
-            // Left navigation button with proper dismiss logic
+            // 🔥 FIXED: Always show exit button on left
             Button(action: {
-                if selectedIndex > 0 {
+                print("🔥 DEBUG: Dismissing to Mission Control from LeagueMatchupsTabView")
+                dismiss()
+            }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                    Text("Exit")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.black.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Previous matchup button (only show if not first)
+            if selectedIndex > 0 {
+                Button(action: {
                     isNavigating = true
                     withAnimation(.easeInOut(duration: 0.3)) {
                         selectedIndex -= 1
                     }
-                } else {
-                    print("🔥 DEBUG: Dismissing to Mission Control from LeagueMatchupsTabView")
-                    dismiss()
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.black.opacity(0.7))
+                        .clipShape(Circle())
                 }
-            }) {
-                Image(systemName: selectedIndex > 0 ? "chevron.left" : "xmark") // 🔥 CHANGED: X when at first matchup
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.7))
-                    .clipShape(Circle())
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
             
             Spacer()
             
@@ -273,26 +290,25 @@ struct LeagueMatchupsTabView: View {
             
             Spacer()
             
-            // Right navigation button
-            Button(action: {
-                if selectedIndex < displayMatchups.count - 1 {
+            // Next matchup button (only show if not last)
+            if selectedIndex < displayMatchups.count - 1 {
+                Button(action: {
                     isNavigating = true
                     withAnimation(.easeInOut(duration: 0.3)) {
                         selectedIndex += 1
                     }
+                }) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(Color.black.opacity(0.7))
+                        .clipShape(Circle())
                 }
-            }) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(selectedIndex < displayMatchups.count - 1 ? .white : .white.opacity(0.3))
-                    .frame(width: 44, height: 44)
-                    .background(Color.black.opacity(0.7))
-                    .clipShape(Circle())
+                .buttonStyle(PlainButtonStyle())
             }
-            .buttonStyle(PlainButtonStyle())
-            .disabled(selectedIndex >= displayMatchups.count - 1)
         }
-        .padding(.horizontal, 16) // 🔥 FIX: Reduced padding to prevent clipping
+        .padding(.horizontal, 16)
         .padding(.top, 44) // Account for safe area
         .padding(.bottom, 12)
         .background(

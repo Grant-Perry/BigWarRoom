@@ -92,8 +92,8 @@ final class FantasyViewModel: ObservableObject {
     // MARK: -> Refresh control to prevent cascading
     private var isRefreshing = false
     
-    // MARK: -> Initialization (Private for Singleton)
-    private init() {
+    // MARK: -> Initialization (Made public for navigation instances)
+    init() {
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1
             // print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")

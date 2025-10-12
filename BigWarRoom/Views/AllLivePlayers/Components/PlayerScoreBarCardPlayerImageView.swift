@@ -10,6 +10,10 @@ import SwiftUI
 struct PlayerScoreBarCardPlayerImageView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
+    // 🔥 NEW: State for player detail sheet
+    @State private var showingPlayerDetail = false
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    
     var body: some View {
         AsyncImage(url: playerEntry.player.headshotURL) { phase in
             switch phase {
@@ -26,7 +30,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
                 // Successfully loaded image
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: .fit)
             case .failure(_):
                 // Failed to load - try alternative URL or show fallback
                 AsyncImage(url: alternativeImageURL) { altPhase in
@@ -34,7 +38,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
                     case .success(let altImage):
                         altImage
                             .resizable()
-                            .aspectRatio(contentMode: .fill)
+                            .aspectRatio(contentMode: .fit)
                     default:
                         Rectangle()
                             .fill(teamGradient)
@@ -55,7 +59,37 @@ struct PlayerScoreBarCardPlayerImageView: View {
                     )
             }
         }
-        .frame(width: 80, height: 100)
+		.frame(width: 150, height: 180)
+        // 🔥 FIXED: Use onTapGesture with simultaneous gesture recognition
+        .onTapGesture {
+            showingPlayerDetail = true
+        }
+        // 🔥 NEW: Player detail sheet
+        .sheet(isPresented: $showingPlayerDetail) {
+            NavigationView {
+                if let sleeperPlayer = getSleeperPlayerData() {
+                    PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: playerEntry.player.team ?? "")
+                    )
+                } else {
+                    PlayerDetailFallbackView(player: playerEntry.player)
+                }
+            }
+        }
+    }
+    
+    // 🔥 NEW: Get Sleeper player data for detailed stats
+    private func getSleeperPlayerData() -> SleeperPlayer? {
+        let playerName = playerEntry.player.fullName.lowercased()
+        let shortName = playerEntry.player.shortName.lowercased()
+        let team = playerEntry.player.team?.lowercased()
+        
+        return playerDirectory.players.values.first { sleeperPlayer in
+            sleeperPlayer.fullName.lowercased() == playerName ||
+            (sleeperPlayer.shortName.lowercased() == shortName &&
+             sleeperPlayer.team?.lowercased() == team)
+        }
     }
     
     // MARK: - Computed Properties (Data Only)

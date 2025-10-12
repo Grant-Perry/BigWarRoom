@@ -18,18 +18,13 @@ struct AllLivePlayersListView: View {
             // 🔥 FIXED: Use stable ID and reset animations when sort changes
             LazyVStack(spacing: 8) { // Reduced from 12 to 8 for tighter spacing
                 ForEach(viewModel.filteredPlayers, id: \.id) { playerEntry in
-                    // 🔥 DEATH TO SHEETS: Use NavigationLink instead of tap handler
-                    NavigationLink(
-                        destination: buildDestinationView(for: playerEntry.matchup)
-                    ) {
-                        PlayerScoreBarCardView(
-                            playerEntry: playerEntry,
-                            animateIn: shouldAnimatePlayer(playerEntry.id),
-                            onTap: nil, // 🔥 No more tap handler - NavigationLink handles it
-                            viewModel: viewModel
-                        )
-                    }
-                    .buttonStyle(PlainButtonStyle()) // Keep card styling clean
+                    // 🔥 SIMPLE: No NavigationLink wrapper - all navigation handled by buttons within the card
+                    PlayerScoreBarCardView(
+                        playerEntry: playerEntry,
+                        animateIn: shouldAnimatePlayer(playerEntry.id),
+                        onTap: nil, // No card-level tap - use individual buttons instead
+                        viewModel: viewModel
+                    )
                     .onAppear {
                         handlePlayerAppearance(playerEntry)
                     }
@@ -37,7 +32,8 @@ struct AllLivePlayersListView: View {
             }
             .id(viewModel.sortChangeID) // 🔥 FIXED: Force LazyVStack to rebuild when sort changes
             .padding(.horizontal, 20) // 🔥 FIXED: Increased horizontal padding from default to 20 to prevent edge clipping
-            .padding(.vertical, 12) // 🔥 NEW: Add vertical padding for better spacing
+            .padding(.top, 4) // 🔥 REDUCED: From 12 to 4 for tighter spacing
+            .padding(.bottom, 12) // Keep bottom padding for safe area
         }
         .clipped() // Prevent scroll view overflow during fast scrolling
         .onChange(of: viewModel.shouldResetAnimations) { _, shouldReset in

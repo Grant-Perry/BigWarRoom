@@ -38,7 +38,7 @@ struct ChoppedLeaderboardView: View {
         // 🔥 ARCHITECTURE FIX: The ScrollView MUST be the top-level view in the body.
 
         ScrollView {
-            VStack(spacing: 25) {
+            VStack(spacing: 6) { // 🔥 COMPRESSED: Reduced from 12 to 6
                 // BATTLE ROYALE HEADER
                 ChoppedBattleRoyaleHeader(
                     choppedLeaderboardViewModel: viewModel,
@@ -133,10 +133,8 @@ struct ChoppedLeaderboardView: View {
                     )
                 }
             }
-            .frame(maxWidth: .infinity) // 🚀 This will now work correctly
-//            .padding(.top, 20)
-//            .padding(.bottom, 25)
-            .padding(.horizontal, 24) // All content will now be correctly padded
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 20) // 🔥 COMPRESSED: Reduced from 24 to 20
         }
         .background(
             ChoppedApocalypticBackground(

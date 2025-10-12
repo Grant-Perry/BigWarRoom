@@ -81,32 +81,29 @@ struct MicroCardView: View {
     }
     
     var body: some View {
-        Button(action: onTap) {
-            // Use the extracted base content component
-            MicroCardBaseContentView(
-                leagueName: leagueName,
-                avatarURL: avatarURL,
-                managerName: managerName,
-                score: score,
-                scoreColor: scoreColor,
-                percentage: percentage,
-                isEliminated: isEliminated,
-                eliminationWeek: eliminationWeek,
-                eliminatedPulse: eliminatedPulse,
-                borderColors: borderColors,
-                borderWidth: borderWidth,
-                borderOpacity: borderOpacity,
-                shouldPulse: shouldPulse,
-                shadowColor: shadowColor,
-                shadowRadius: shadowRadius,
-                pulseOpacity: pulseOpacity,
-                isGamesFinished: isGamesFinishedForWeek,
-                celebrationBorderPulse: celebrationBorderPulse,
-                matchup: matchup,
-                isWinning: isWinning
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
+        // 🔥 FIXED: Remove Button wrapper - NavigationLink in parent handles navigation
+        MicroCardBaseContentView(
+            leagueName: leagueName,
+            avatarURL: avatarURL,
+            managerName: managerName,
+            score: score,
+            scoreColor: scoreColor,
+            percentage: percentage,
+            isEliminated: isEliminated,
+            eliminationWeek: eliminationWeek,
+            eliminatedPulse: eliminatedPulse,
+            borderColors: borderColors,
+            borderWidth: borderWidth,
+            borderOpacity: borderOpacity,
+            shouldPulse: shouldPulse,
+            shadowColor: shadowColor,
+            shadowRadius: shadowRadius,
+            pulseOpacity: pulseOpacity,
+            isGamesFinished: isGamesFinishedForWeek,
+            celebrationBorderPulse: celebrationBorderPulse,
+            matchup: matchup,
+            isWinning: isWinning
+        )
         .background(
             // 🔥 CELEBRATION: Massive expanding glow as background overlay - doesn't affect layout
             Group {

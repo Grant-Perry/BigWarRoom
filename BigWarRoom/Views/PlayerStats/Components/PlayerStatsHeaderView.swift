@@ -13,6 +13,8 @@ struct PlayerStatsHeaderView: View {
     let team: NFLTeam?
     
     @StateObject private var teamAssets = TeamAssetManager.shared
+    // 🔥 NEW: Access to live player stats for PPR points
+    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
     
     var body: some View {
         VStack(spacing: 16) {
@@ -33,15 +35,24 @@ struct PlayerStatsHeaderView: View {
                     // Position badge
                     positionBadge
                     
-                    // Team info
+                    // Team info with PPR
                     if let team = team {
-                        HStack(spacing: 6) {
-                            teamAssets.logoOrFallback(for: team.id)
-                                .frame(width: 24, height: 24)
+                        VStack(spacing: 4) {
+                            HStack(spacing: 6) {
+                                teamAssets.logoOrFallback(for: team.id)
+                                    .frame(width: 24, height: 24)
+                                
+                                Text(team.name)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                             
-                            Text(team.name)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            // 🔥 NEW: PPR points display
+                            if let pprPoints = getPPRPoints() {
+                                Text("PPR: \(String(format: "%.1f", pprPoints))")
+                                    .font(.callout)
+                                    .foregroundColor(.white)
+                            }
                         }
                     }
                     
@@ -86,6 +97,25 @@ struct PlayerStatsHeaderView: View {
         .padding()
         .background(teamBackgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+    
+    // 🔥 NEW: Get PPR points for this player from live stats
+    private func getPPRPoints() -> Double? {
+        // Get player stats from AllLivePlayersViewModel
+        guard let playerStats = livePlayersViewModel.playerStats[player.playerID] else {
+            return nil
+        }
+        
+        // Try PPR points first, then half PPR, then standard as fallback
+        if let pprPoints = playerStats["pts_ppr"], pprPoints > 0 {
+            return pprPoints
+        } else if let halfPprPoints = playerStats["pts_half_ppr"], halfPprPoints > 0 {
+            return halfPprPoints
+        } else if let stdPoints = playerStats["pts_std"], stdPoints > 0 {
+            return stdPoints
+        }
+        
+        return nil
     }
     
     // MARK: - Helper Views

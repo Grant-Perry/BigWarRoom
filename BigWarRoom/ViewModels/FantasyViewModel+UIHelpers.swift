@@ -25,6 +25,66 @@ extension FantasyViewModel {
         return team.currentScore ?? 0.0
     }
     
+    // 🔥 NEW: Get corrected score for individual player (for Fantasy Player Cards)
+    func getCorrectedPlayerScore(for player: FantasyPlayer) -> Double {
+        guard let selectedLeague = selectedLeague else {
+            return player.currentPoints ?? 0.0
+        }
+        
+        // Use the same correction logic as AllLivePlayersViewModel
+        let currentWeek = WeekSelectionManager.shared.selectedWeek
+        let currentYear = AppConstants.currentSeasonYear
+        
+        // Get cached provider from MatchupsHubViewModel
+        if let cachedProvider = MatchupsHubViewModel.shared.getCachedProvider(
+            for: selectedLeague,
+            week: currentWeek,
+            year: currentYear
+        ) {
+            // For ESPN leagues, we need to find the corrected player in the cached matchup data
+            if selectedLeague.source == .espn {
+                // For ESPN leagues, check if there's a fresh score from the current matchups
+                for matchup in matchups {
+                    let teams = [matchup.awayTeam, matchup.homeTeam]
+                    for team in teams {
+                        if let freshPlayer = team.roster.first(where: { $0.id == player.id }) {
+                            // 🔥 DEBUG: Log score correction for Daniel Jones
+                            if player.fullName.contains("Daniel Jones") {
+                                if let staleScore = player.currentPoints,
+                                   abs(freshPlayer.currentPoints ?? 0.0 - staleScore) > 0.01 {
+                                    print("🎯 FANTASY CORRECTED SCORE: \(player.fullName)")
+                                    print("   Stale Score: \(staleScore)")
+                                    print("   Fresh Score: \(freshPlayer.currentPoints ?? 0.0)")
+                                    print("   Using fresh score from cached matchup")
+                                }
+                            }
+                            
+                            return freshPlayer.currentPoints ?? 0.0
+                        }
+                    }
+                }
+            }
+            
+            // For Sleeper leagues, use the calculated score if available
+            if selectedLeague.source == .sleeper && cachedProvider.hasPlayerScores() {
+                let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
+                
+                // 🔥 DEBUG: Log when we're using calculated vs cached scores
+                if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
+                    print("🎯 SLEEPER CORRECTED SCORE: \(player.fullName)")
+                    print("   Cached Score: \(cachedScore)")
+                    print("   Calculated Score: \(calculatedScore)")
+                    print("   Using calculated score from cached provider")
+                }
+                
+                return calculatedScore
+            }
+        }
+        
+        // Fallback to original score
+        return player.currentPoints ?? 0.0
+    }
+    
     /// Get manager record for display with REAL league data 
     func getManagerRecord(managerID: String) -> String {
         // 🔥 NEW: For Sleeper leagues, don't show any records for ESPN teams

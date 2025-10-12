@@ -32,6 +32,17 @@ struct MoreTabView: View {
                     // Features List
                     ScrollView {
                         VStack(spacing: 12) {
+                            // Player Search - MOVED TO FIRST POSITION
+                            NavigationLink(destination: PlayerSearchView()) {
+                                MoreRowView(
+                                    icon: "person.crop.circle",
+                                    iconColor: .gpGreen,
+                                    title: "Player Search",
+                                    subtitle: "Search and view detailed player stats"
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            
                             // Team Rosters - MOVED FROM MAIN TAB
                             NavigationLink(destination: TeamRostersView()) {
                                 MoreRowView(
@@ -39,17 +50,6 @@ struct MoreTabView: View {
                                     iconColor: .blue,
                                     title: "Team Rosters",
                                     subtitle: "View all team rosters across leagues"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Player Search
-                            NavigationLink(destination: PlayerSearchView()) {
-                                MoreRowView(
-                                    icon: "person.crop.circle",
-                                    iconColor: .gpGreen,
-                                    title: "Player Search",
-                                    subtitle: "Search and view detailed player stats"
                                 )
                             }
                             .buttonStyle(PlainButtonStyle())

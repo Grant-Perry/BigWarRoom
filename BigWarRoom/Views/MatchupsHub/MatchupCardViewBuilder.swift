@@ -34,42 +34,36 @@ struct MatchupCardViewBuilder: View {
     private var microCardView: some View {
         let cardProperties = calculateMicroCardProperties()
         
-        return MicroCardView(
-            leagueName: cardProperties.leagueName,
-            avatarURL: cardProperties.avatarURL,
-            managerName: cardProperties.managerName,
-            score: cardProperties.score,
-            scoreColor: cardProperties.scoreColor,
-            percentage: cardProperties.percentage,
-            borderColors: cardProperties.borderColors,
-            borderWidth: cardProperties.borderWidth,
-            borderOpacity: cardProperties.borderOpacity,
-            shouldPulse: cardProperties.shouldPulse,
-            shadowColor: cardProperties.shadowColor,
-            shadowRadius: cardProperties.shadowRadius,
-            onTap: {
-                if matchup.isChoppedLeague {
-                    // 🏈 NAVIGATION FREEDOM: NavigationLink will handle navigation
-                    // Chopped leagues navigate to detail
-                } else {
-                    // Regular leagues can still expand in micro mode
-                    onMicroCardTap(matchup.id)
-                }
-            },
-            isEliminated: cardProperties.isEliminated,
-            eliminationWeek: cardProperties.eliminationWeek,
-            matchup: matchup,
-            isWinning: isWinning
-        )
-        .background(
-            // 🏈 NAVIGATION FREEDOM: Add NavigationLink overlay for chopped leagues
-            Group {
-                if matchup.isChoppedLeague {
-                    NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
-                        Color.clear
-                    }
-                    .buttonStyle(CardPressButtonStyle()) // 🔥 NEW: Add press feedback to micro cards too
-                }
+        // 🔥 FIXED: Make MicroCardView work like NonMicroCardView - wrap with NavigationLink
+        return NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+            MicroCardView(
+                leagueName: cardProperties.leagueName,
+                avatarURL: cardProperties.avatarURL,
+                managerName: cardProperties.managerName,
+                score: cardProperties.score,
+                scoreColor: cardProperties.scoreColor,
+                percentage: cardProperties.percentage,
+                borderColors: cardProperties.borderColors,
+                borderWidth: cardProperties.borderWidth,
+                borderOpacity: cardProperties.borderOpacity,
+                shouldPulse: cardProperties.shouldPulse,
+                shadowColor: cardProperties.shadowColor,
+                shadowRadius: cardProperties.shadowRadius,
+                onTap: {
+                    // Not needed anymore - NavigationLink handles it
+                },
+                isEliminated: cardProperties.isEliminated,
+                eliminationWeek: cardProperties.eliminationWeek,
+                matchup: matchup,
+                isWinning: isWinning
+            )
+        }
+        .buttonStyle(CardPressButtonStyle()) // Same button style as NonMicroCardView
+        .simultaneousGesture(
+            // Add tap feedback like NonMicroCardView
+            TapGesture().onEnded { _ in
+                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                impactFeedback.impactOccurred()
             }
         )
         .frame(height: 120)

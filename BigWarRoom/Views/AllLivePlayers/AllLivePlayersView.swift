@@ -32,6 +32,9 @@ struct AllLivePlayersView: View {
     // 🔥 PERFORMANCE: Task management for better lifecycle control
     @State private var loadTask: Task<Void, Never>?
     
+    // 🔥 FIXED: Track if initial load has been done to prevent reloading on navigation return
+    @State private var hasInitiallyLoaded = false
+    
     var body: some View {
         // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent TabView provides it
         // BEFORE: NavigationView { ... }
@@ -72,8 +75,14 @@ struct AllLivePlayersView: View {
         .refreshable {
             await performRefresh()
         }
-        .task {
-            await loadInitialData()
+        .onAppear {
+            // 🔥 FIXED: Only load if we haven't loaded before
+            if !hasInitiallyLoaded {
+                Task {
+                    await loadInitialData()
+                    hasInitiallyLoaded = true
+                }
+            }
         }
         .onDisappear {
             cancelTasks()
@@ -176,14 +185,15 @@ struct AllLivePlayersView: View {
         }
     }
     
-    /// Perform pull-to-refresh
+    /// Perform pull-to-refresh - always allow manual refresh
     private func performRefresh() async {
         await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
         await allLivePlayersViewModel.refresh()
     }
     
-    /// Load initial data with proper task management
+    /// Load initial data with proper task management - ONLY run once
     private func loadInitialData() async {
+        print("🔥 DEBUG: Loading initial data for All Live Players")
         // Cancel any existing task before starting new one
         loadTask?.cancel()
         loadTask = Task {

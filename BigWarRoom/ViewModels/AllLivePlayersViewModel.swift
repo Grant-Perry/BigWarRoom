@@ -54,6 +54,10 @@ final class AllLivePlayersViewModel: ObservableObject {
    private var liveGameCacheTimestamp: Date?
    private let liveGameCacheExpiration: TimeInterval = 30.0 // 30 second cache
 
+    // 🔥 NEW: Track last load time to prevent unnecessary reloads
+   private var lastLoadTime: Date?
+   private let cacheTimeout: TimeInterval = 10 // 🔥 REDUCED: 10 second cache for navigation, not data freshness
+
     // 🔥 NEW: Private init for singleton
    private init() {
 		 // Subscribe to week changes to invalidate stats with debouncing
@@ -256,88 +260,110 @@ final class AllLivePlayersViewModel: ObservableObject {
 
     // MARK: - Data Loading
 
-    // 🔥 CLEANED UP: Ensure stats are loaded in loadAllPlayers
+    // 🔥 CLEANED UP: Ensure stats are loaded in loadAllPlayers - with caching
    func loadAllPlayers() async {
-	  isLoading = true
-	  errorMessage = nil
+      // 🔥 FIXED: Only skip full reload for very recent loads (10 seconds)
+      // This prevents UI refresh spam but still allows data updates
+      if let lastLoad = lastLoadTime,
+         Date().timeIntervalSince(lastLoad) < cacheTimeout,
+         !allPlayers.isEmpty {
+         print("🔥 CACHE: Skipping full reload - data is recent (loaded \(Int(Date().timeIntervalSince(lastLoad)))s ago)")
+         // 🔥 NEW: Still do a lightweight refresh for score updates
+         await updatePlayerDataSurgically()
+         return
+      }
+      
+      print("🔥 LOADING: Loading all players (cache expired or empty)")
+      
+      isLoading = true
+      errorMessage = nil
 
-		 // Load stats first if not already loaded
-	  if !statsLoaded {
-		 await loadPlayerStats()
-	  }
+         // Load stats first if not already loaded
+      if !statsLoaded {
+         await loadPlayerStats()
+      }
 
-	  do {
-			// Use MatchupsHubViewModel to get current matchups
-		 await matchupsHubViewModel.loadAllMatchups()
+      do {
+            // Use MatchupsHubViewModel to get current matchups
+         await matchupsHubViewModel.loadAllMatchups()
 
-		 var allPlayerEntries: [LivePlayerEntry] = []
+         var allPlayerEntries: [LivePlayerEntry] = []
 
-			// Extract players from each matchup (with temporary values)
-		 for matchup in matchupsHubViewModel.myMatchups {
-			let playersFromMatchup = extractPlayersFromMatchup(matchup)
-			allPlayerEntries.append(contentsOf: playersFromMatchup)
-		 }
+            // Extract players from each matchup (with temporary values)
+         for matchup in matchupsHubViewModel.myMatchups {
+            let playersFromMatchup = extractPlayersFromMatchup(matchup)
+            allPlayerEntries.append(contentsOf: playersFromMatchup)
+         }
 
-			// Calculate overall statistics
-		 let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
-		 topScore = scores.first ?? 1.0
-		 let bottomScore = scores.last ?? 0.0
-		 scoreRange = topScore - bottomScore
+            // Calculate overall statistics
+         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
+         topScore = scores.first ?? 1.0
+         let bottomScore = scores.last ?? 0.0
+         scoreRange = topScore - bottomScore
 
-			// Calculate median
-		 if !scores.isEmpty {
-			let mid = scores.count / 2
-			medianScore = scores.count % 2 == 0 ?
-			(scores[mid - 1] + scores[mid]) / 2 :
-			scores[mid]
-		 }
+            // Calculate median
+         if !scores.isEmpty {
+            let mid = scores.count / 2
+            medianScore = scores.count % 2 == 0 ?
+            (scores[mid - 1] + scores[mid]) / 2 :
+            scores[mid]
+         }
 
-			// Use adaptive scaling if there's a huge gap (top score is 3x+ median)
-		 useAdaptiveScaling = topScore > (medianScore * 3)
+            // Use adaptive scaling if there's a huge gap (top score is 3x+ median)
+         useAdaptiveScaling = topScore > (medianScore * 3)
 
-			// Calculate quartiles for tier determination
-		 let quartiles = calculateQuartiles(from: scores)
+            // Calculate quartiles for tier determination
+         let quartiles = calculateQuartiles(from: scores)
 
-			// 🔥 PERFORMANCE: Batch updates to prevent UI churn
-		 await performBatchUpdate {
-			   // Update all players with proper percentages and tiers
-			allPlayers = allPlayerEntries.map { entry in
-			   let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
-			   let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
+            // 🔥 PERFORMANCE: Batch updates to prevent UI churn
+         await performBatchUpdate {
+               // Update all players with proper percentages and tiers
+            allPlayers = allPlayerEntries.map { entry in
+               let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
+               let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
 
-			   return LivePlayerEntry(
-				  id: entry.id,
-				  player: entry.player,
-				  leagueName: entry.leagueName,
-				  leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
-				  currentScore: entry.currentScore,
-				  projectedScore: entry.projectedScore,
-				  isStarter: entry.isStarter,
-				  percentageOfTop: percentage,
-				  matchup: entry.matchup,
-				  performanceTier: tier
-			   )
-			}
+               return LivePlayerEntry(
+                  id: entry.id,
+                  player: entry.player,
+                  leagueName: entry.leagueName,
+                  leagueSource: entry.leagueSource,  // 🔥 FIXED: Use actual leagueSource, not leagueName!
+                  currentScore: entry.currentScore,
+                  projectedScore: entry.projectedScore,
+                  isStarter: entry.isStarter,
+                  percentageOfTop: percentage,
+                  matchup: entry.matchup,
+                  performanceTier: tier
+               )
+            }
 
-			   // Apply initial filter
-			applyPositionFilter()
+               // Apply initial filter
+            applyPositionFilter()
+         }
+         
+         // 🔥 FIXED: Update last load time after successful load
+         lastLoadTime = Date()
 
-		 }
+      } catch {
+         errorMessage = "Failed to load players: \(error.localizedDescription)"
+      }
 
-	  } catch {
-		 errorMessage = "Failed to load players: \(error.localizedDescription)"
-	  }
-
-	  isLoading = false
+      isLoading = false
    }
 
-    // 🔥 IMPROVED: Add method to force refresh stats
+   // 🔥 NEW: Force reload method that bypasses cache
+   func forceLoadAllPlayers() async {
+      print("🔥 FORCE: Force loading all players (bypassing cache)")
+      lastLoadTime = nil // Clear cache
+      await loadAllPlayers()
+   }
+
+   // 🔥 IMPROVED: Add method to force refresh stats
    func forceLoadStats() async {
 	  statsLoaded = false
 	  await loadPlayerStats()
    }
 
-    // 🔥 IMPROVED: Non-blocking stats loading with better error handling
+   // 🔥 IMPROVED: Non-blocking stats loading with better error handling
    private func loadPlayerStats() async {
 		 // Prevent multiple concurrent loads
 	  guard !Task.isCancelled else { return }
@@ -448,13 +474,33 @@ final class AllLivePlayersViewModel: ObservableObject {
          week: currentWeek, 
          year: currentYear
       ) {
-         // Use the cached provider that already has loaded stats and scoring settings
+         // 🔥 FIX: For ESPN leagues, try to get fresh score from my team in the cached matchup
+         if matchup.league.source == .espn {
+            // Get the fresh player data from my team in the unified matchup
+            if let myTeam = matchup.myTeam,
+               let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
+               
+               // 🔥 DEBUG: Log score correction for ESPN players
+               if let staleScore = player.currentPoints, 
+                  abs(freshPlayer.currentPoints ?? 0.0 - staleScore) > 0.01 {
+                  print("🎯 ESPN SCORE CORRECTION: \(player.fullName)")
+                  print("   League: \(matchup.league.league.name)")
+                  print("   Stale Score: \(staleScore)")
+                  print("   Fresh Score: \(freshPlayer.currentPoints ?? 0.0)")
+                  print("   Using fresh score from cached matchup")
+               }
+               
+               return freshPlayer.currentPoints ?? 0.0
+            }
+         }
+         
+         // Use the cached provider that already has loaded stats and scoring settings for Sleeper
          if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
             let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
             
             // 🔥 DEBUG: Log when we're using calculated vs cached scores
             if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
-               print("🎯 SCORE CORRECTION: \(player.fullName)")
+               print("🎯 SLEEPER SCORE CORRECTION: \(player.fullName)")
                print("   League: \(matchup.league.league.name)")
                print("   Cached Score: \(cachedScore)")
                print("   Calculated Score: \(calculatedScore)")
@@ -479,7 +525,7 @@ final class AllLivePlayersViewModel: ObservableObject {
             
             // 🔥 DEBUG: Log when we're using calculated vs cached scores
             if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
-               print("🎯 SCORE CORRECTION (fallback): \(player.fullName)")
+               print("🎯 SLEEPER SCORE CORRECTION (fallback): \(player.fullName)")
                print("   League: \(matchup.league.league.name)")
                print("   Cached Score: \(cachedScore)")
                print("   Calculated Score: \(calculatedScore)")
@@ -490,7 +536,7 @@ final class AllLivePlayersViewModel: ObservableObject {
          }
       }
       
-      // Final fallback to cached score for ESPN leagues or when calculation unavailable
+      // Final fallback to cached score when no fresh data available
       return player.currentPoints ?? 0.0
    }
 
@@ -721,18 +767,19 @@ final class AllLivePlayersViewModel: ObservableObject {
 
 	  // 🔥 IMPROVED: Enhanced refresh with task cancellation and batch updates
    func refresh() async {
+      print("🔥 REFRESH: Manual refresh triggered (bypassing cache)")
+      
+      // Cancel any existing tasks
+      debounceTask?.cancel()
 
-		 // Cancel any existing tasks
-	  debounceTask?.cancel()
+      // For manual refresh, bypass cache
+      lastLoadTime = nil
+      
+      // Refresh matchups data first
+      await matchupsHubViewModel.loadAllMatchups()
 
-		 // Don't reset stats or loading state for background refresh
-		 // statsLoaded = false  // Keep this commented - we want surgical updates only
-
-		 // Refresh matchups data first
-	  await matchupsHubViewModel.loadAllMatchups()
-
-		 // Then update player data surgically
-	  await updatePlayerDataSurgically()
+      // Then update player data surgically
+      await updatePlayerDataSurgically()
    }
 
 	  // Refresh data while preserving user filter settings

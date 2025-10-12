@@ -113,7 +113,8 @@ struct FantasyPlayerCard: View {
             glowIntensity: viewModel.glowIntensity,
             onScoreTap: {
                 showingScoreBreakdown = true
-            }
+            },
+            fantasyViewModel: fantasyViewModel // 🔥 FIXED: Pass FantasyViewModel for ESPN score correction
         )
     }
     

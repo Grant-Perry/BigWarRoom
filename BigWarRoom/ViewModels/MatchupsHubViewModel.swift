@@ -317,8 +317,8 @@ struct UnifiedMatchup: Identifiable {
     /// This ensures the detail view knows which team is the user's team
     @MainActor
     func createConfiguredFantasyViewModel() -> FantasyViewModel {
-        // Use shared instance instead of creating new ones
-        let viewModel = FantasyViewModel.shared
+        // 🔥 FIXED: Create NEW instance instead of using shared to prevent conflicts
+        let viewModel = FantasyViewModel()
         
         // Set up the league context
         if let myTeamId = myTeam?.id {
@@ -327,22 +327,11 @@ struct UnifiedMatchup: Identifiable {
             viewModel.selectLeague(league)
         }
         
-        // 🔥 FIXED: Don't set just the single matchup - let selectLeague fetch ALL matchups
-        // The selectLeague method will call fetchMatchups() and populate viewModel.matchups with all league matchups
-        // if let matchup = fantasyMatchup {
-        //     viewModel.matchups = [matchup]  // OLD: Only single matchup
-        // }
-        
         // If we have chopped data, set it
         if let chopped = choppedSummary {
             viewModel.currentChoppedSummary = chopped
             viewModel.detectedAsChoppedLeague = true
         }
-        
-        // FIXED: Use selected week from WeekSelectionManager (NOT current NFL week)
-        // This ensures detail views show data for the week selected in Mission Control
-        // viewModel.selectedWeek = NFLWeekService.shared.currentWeek // OLD - WRONG!
-        // The FantasyViewModel now automatically uses WeekSelectionManager.shared.selectedWeek
         
         // Disable auto-refresh to prevent conflicts with Mission Control's refresh
         viewModel.setMatchupsHubControl(true)

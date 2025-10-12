@@ -54,8 +54,8 @@ struct ChoppedSurvivalStats: View {
                         color: .yellow
                     )
                 }
-                .padding(.vertical, 8)
-				.padding(.horizontal, 20)
+                .padding(.vertical, 6) // 🔥 COMPRESSED: Reduced from 8 to 6
+				.padding(.horizontal, 16) // 🔥 COMPRESSED: Reduced from 20 to 16
             } else {
                 // Show pre-game message instead of stats
                 VStack(spacing: 12) {

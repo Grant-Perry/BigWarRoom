@@ -206,7 +206,7 @@ struct AllLivePlayersHeaderView: View {
                 
                 // Active Only toggle (toggles between "Yes" and "No")
                 Button(action: { 
-                    viewModel.showActiveOnly.toggle()
+                    viewModel.setShowActiveOnly(!viewModel.showActiveOnly)
                 }) {
                     VStack(spacing: 2) {
                         Text(viewModel.showActiveOnly ? "Yes" : "No")
@@ -237,7 +237,7 @@ struct AllLivePlayersHeaderView: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, 8) // 🔥 REDUCED: From 24 to 8 for tighter spacing
     }
     
     // MARK: - Stats Overview Section (Intelligence style)

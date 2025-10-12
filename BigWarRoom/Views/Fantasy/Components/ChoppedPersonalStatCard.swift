@@ -22,13 +22,18 @@ struct ChoppedPersonalStatCard: View {
                 // Your rank badge (smaller)
                 HStack(spacing: 2) {
                     Text(choppedLeaderboardViewModel.myRankDisplay)
-					  .font(.system(size: 8, weight: .medium))
-					  .foregroundColor(choppedLeaderboardViewModel.myForeColor)
+					  .font(.system(size: 8, weight: .bold)) // 🔥 FIXED: Bold weight for better contrast
+					  .foregroundColor(.black) // 🔥 FIXED: Changed to black for better contrast on orange background
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
                                 .fill(choppedLeaderboardViewModel.myStatusColor)
+                                .overlay(
+                                    // 🔥 FIXED: Add dark stroke for better contrast
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(Color.black.opacity(0.3), lineWidth: 0.5)
+                                )
                         )
                     
 //                    Text("YOU")

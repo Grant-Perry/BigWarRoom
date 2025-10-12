@@ -57,15 +57,50 @@ extension FantasyViewModel {
         let startTime = Date()
         
         do {
-            if league.source == .espn {
-                // x Print("🏈 ESPN LEAGUE: Fetching ESPN data for \(league.league.leagueID)")
-                await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
+            // 🔥 CRITICAL FIX: Use cached LeagueMatchupProvider instead of direct API calls
+            let cachedProvider = MatchupsHubViewModel.shared.getCachedProvider(
+                for: league, 
+                week: selectedWeek, 
+                year: selectedYear
+            )
+            
+            if let cachedProvider = cachedProvider {
+                print("✅ FANTASY: Using cached provider for \(league.league.name)")
+                
+                // Get matchups from cached provider
+                let providerMatchups = try await cachedProvider.fetchMatchups()
+                
+                if !providerMatchups.isEmpty {
+                    // Use the fresh, correctly calculated matchups
+                    matchups = providerMatchups
+                    print("✅ FANTASY: Loaded \(matchups.count) matchups from cached provider")
+                } else if league.source == .sleeper {
+                    // Handle Chopped leagues
+                    detectedAsChoppedLeague = true
+                    hasActiveRosters = true
+                    print("🔥 FANTASY: Chopped league detected from cached provider")
+                }
+                
+                // Sync ESPN data if needed
+                if league.source == .espn {
+                    // Get ESPN league data from cached provider for member name resolution
+                    await ensureESPNLeagueDataLoaded()
+                }
+                
             } else {
-                // x Print("😴 SLEEPER LEAGUE: Fetching Sleeper data for \(league.league.leagueID)")
-                await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
-                await fetchSleeperWeeklyStats()
-                await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
-                await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
+                // Fallback: Use original API calls if no cached provider available
+                print("⚠️ FANTASY: No cached provider available, falling back to direct API calls")
+                
+                if league.source == .espn {
+                    // x Print("🏈 ESPN LEAGUE: Fetching ESPN data for \(league.league.leagueID)")
+                    await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
+                } else {
+                    // x Print("😴 SLEEPER LEAGUE: Fetching Sleeper data for \(league.league.leagueID)")
+                    await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
+                    await fetchSleeperWeeklyStats()
+                    await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
+                    await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
+                }
             }
             
             // x Print("🎯 FETCH COMPLETE: matchups.count = \(matchups.count)")

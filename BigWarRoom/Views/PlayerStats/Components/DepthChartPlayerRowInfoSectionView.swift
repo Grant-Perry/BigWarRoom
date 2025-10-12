@@ -10,6 +10,9 @@ import SwiftUI
 struct DepthChartPlayerRowInfoSectionView: View {
     let depthPlayer: DepthChartPlayer
     
+    // 🔥 NEW: Access to live player stats for PPR points
+    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
@@ -31,14 +34,14 @@ struct DepthChartPlayerRowInfoSectionView: View {
                 
                 Spacer()
                 
-                // Enhanced fantasy rank with styling
-                if let searchRank = depthPlayer.player.searchRank {
+                // 🔥 UPDATED: Show PPR points with clean styling, no rankings at all
+                if let pprPoints = getPPRPoints() {
                     HStack(spacing: 3) {
-                        Text("Rnk")
+                        Text("PPR")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.secondary)
                         
-                        Text("\(searchRank)")
+                        Text(String(format: "%.1f", pprPoints))
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.gpBlue)
                     }
@@ -78,5 +81,24 @@ struct DepthChartPlayerRowInfoSectionView: View {
                 )
             }
         }
+    }
+    
+    // 🔥 NEW: Get PPR points for this player from live stats
+    private func getPPRPoints() -> Double? {
+        // Get player stats from AllLivePlayersViewModel
+        guard let playerStats = livePlayersViewModel.playerStats[depthPlayer.player.playerID] else {
+            return nil
+        }
+        
+        // Try PPR points first, then half PPR, then standard as fallback
+        if let pprPoints = playerStats["pts_ppr"], pprPoints > 0 {
+            return pprPoints
+        } else if let halfPprPoints = playerStats["pts_half_ppr"], halfPprPoints > 0 {
+            return halfPprPoints
+        } else if let stdPoints = playerStats["pts_std"], stdPoints > 0 {
+            return stdPoints
+        }
+        
+        return nil
     }
 }

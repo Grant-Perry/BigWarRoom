@@ -352,6 +352,20 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
+        // 🔥 DEBUG: Log Daniel Jones info in roster
+        for player in filteredPlayers {
+            if player.fullName.contains("Daniel Jones") {
+                print("🎯 ROSTER DEBUG: \(player.fullName)")
+                print("   Team: \(team.name)")
+                print("   Team Index: \(teamIndex)")
+                print("   League ID: \(matchup.leagueID)")
+                print("   Player ID: \(player.id)")
+                print("   Current Points: \(player.currentPoints ?? 0.0)")
+                print("   ESPN ID: \(player.espnID ?? "nil")")
+                print("   Sleeper ID: \(player.sleeperID ?? "nil")")
+            }
+        }
+        
         return filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:
