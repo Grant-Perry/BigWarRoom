@@ -10,7 +10,8 @@ import SwiftUI
 
 struct NFLScheduleView: View {
     @StateObject private var viewModel = NFLScheduleViewModel()
-    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel()
+    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel.shared
     @StateObject private var weekManager = WeekSelectionManager.shared // Use shared week manager
     @State private var showingWeekPicker = false
     

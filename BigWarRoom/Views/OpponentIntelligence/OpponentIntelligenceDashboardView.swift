@@ -55,87 +55,77 @@ struct OpponentIntelligenceDashboardView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // Background
-                backgroundView
+        ZStack {
+            // Background
+            backgroundView
+            
+            VStack(spacing: 0) {
+                // #GoodNav Header (matching Mission Control exactly)
+                headerSection
                 
-                VStack(spacing: 0) {
-                    // #GoodNav Header (matching Mission Control exactly)
-                    headerSection
-                    
-                    // MARK: - REMOVE THIS ENTIRE SECTION - MARKED FOR DELETION
-                    // #GoodNav Controls row (matching Mission Control exactly)
-                    // controlsSection
-                    
-                    if viewModel.isLoading {
-                        loadingView
-                    } else if viewModel.opponentIntelligence.isEmpty {
-                        emptyStateView
-                    } else {
-                        // Main content
-                        ScrollView {
-                            VStack(spacing: 16) {
-                                // 1. PLAYER INJURY ALERTS (highest priority)
-                                if !viewModel.injuryAlerts.isEmpty {
-                                    playerInjuryAlertsSection
-                                }
-                                
-                                // 2. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
-                                if !viewModel.nonInjuryRecommendations.isEmpty {
-                                    criticalThreatAlertsSection
-                                }
-                                
-                                // 3. THREAT MATRIX
-                                threatMatrixSection
-                                
-                                // 4. CONFLICT ALERTS
-                                if !viewModel.conflictPlayers.isEmpty {
-                                    conflictsSection
-                                }
-                                
-                                // 5. ALL OPPONENT PLAYERS
-                                opponentPlayersSection
+                if viewModel.isLoading {
+                    loadingView
+                } else if viewModel.opponentIntelligence.isEmpty {
+                    emptyStateView
+                } else {
+                    // Main content
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            // 1. PLAYER INJURY ALERTS (highest priority) - ALWAYS SHOW
+                            playerInjuryAlertsSection
+                            
+                            // 2. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
+                            if !viewModel.nonInjuryRecommendations.isEmpty {
+                                criticalThreatAlertsSection
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 100) // Tab bar space
+                            
+                            // 3. THREAT MATRIX
+                            threatMatrixSection
+                            
+                            // 4. CONFLICT ALERTS
+                            if !viewModel.conflictPlayers.isEmpty {
+                                conflictsSection
+                            }
+                            
+                            // 5. ALL OPPONENT PLAYERS
+                            opponentPlayersSection
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 100) // Tab bar space
                     }
                 }
             }
-            .navigationBarHidden(true)
-            .task {
-                await viewModel.loadOpponentIntelligence()
-            }
-            .refreshable {
-                await viewModel.manualRefresh()
-            }
-            .onChange(of: viewModel.lastUpdateTime) { _ in
-                watchService.updateWatchedPlayerScores(viewModel.allOpponentPlayers)
-            }
-            .sheet(item: $selectedIntelligence) { intelligence in
-                OpponentDetailSheet(intelligence: intelligence)
-            }
-            .sheet(isPresented: $showingFilters) {
-                OpponentFiltersSheet(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showingWeekPicker) {
-                WeekPickerView(isPresented: $showingWeekPicker)
-            }
-            .sheet(isPresented: $showingWatchedPlayers) {
-                WatchedPlayersSheet(watchService: watchService)
-            }
-            .sheet(item: $selectedMatchup) { matchup in
-                MatchupDetailSheetsView(matchup: matchup)
-            }
-            .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
-                // Nuclear option: Clear ALL caches and force fresh load when week changes
-                Task {
-                    await viewModel.weekChangeReload()
-                }
+        }
+        .task {
+            await viewModel.loadOpponentIntelligence()
+        }
+        .refreshable {
+            await viewModel.manualRefresh()
+        }
+        .onChange(of: viewModel.lastUpdateTime) {
+            watchService.updateWatchedPlayerScores(viewModel.allOpponentPlayers)
+        }
+        .sheet(item: $selectedIntelligence) { intelligence in
+            OpponentDetailSheet(intelligence: intelligence)
+        }
+        .sheet(isPresented: $showingFilters) {
+            OpponentFiltersSheet(viewModel: viewModel)
+        }
+        .sheet(isPresented: $showingWeekPicker) {
+            WeekPickerView(isPresented: $showingWeekPicker)
+        }
+        .sheet(isPresented: $showingWatchedPlayers) {
+            WatchedPlayersSheet(watchService: watchService)
+        }
+        .sheet(item: $selectedMatchup) { matchup in
+            MatchupDetailSheetsView(matchup: matchup)
+        }
+        .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
+            // Nuclear option: Clear ALL caches and force fresh load when week changes
+            Task {
+                await viewModel.weekChangeReload()
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
     
     // MARK: - View Components
@@ -170,7 +160,7 @@ struct OpponentIntelligenceDashboardView: View {
             weekPickerWithIconsRow
         }
         .padding(.horizontal, 20)
-        .padding(.top, 20)
+        .padding(.top, 8) // REDUCED from 20 to 8 to eliminate excess space
         .padding(.bottom, 16)
     }
     
@@ -376,18 +366,24 @@ struct OpponentIntelligenceDashboardView: View {
     /// 1. Player Injury Alerts Section (highest priority)
     private var playerInjuryAlertsSection: some View {
         CollapsibleSection(
-            title: "🏥 Player Injury Alerts",
+            title: "Player Injury Alerts",
+			notice: "NOTICE: Data may continue to update in real-time.",
             count: viewModel.injuryAlerts.count,
             isExpanded: $showInjuryAlerts
         ) {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.injuryAlerts, id: \.id) { recommendation in
-                    InjuryAlertCard(
-                        recommendation: recommendation,
-                        onNavigateToMatchup: { matchup in
-                            selectedMatchup = matchup
+            VStack(spacing: 12) {
+                // Show injury alerts if we have any
+                if !viewModel.injuryAlerts.isEmpty {
+                    LazyVStack(spacing: 12) {
+                        ForEach(viewModel.injuryAlerts, id: \.id) { recommendation in
+                            InjuryAlertCard(
+                                recommendation: recommendation,
+                                onNavigateToMatchup: { matchup in
+                                    selectedMatchup = matchup
+                                }
+                            )
                         }
-                    )
+                    }
                 }
             }
         }

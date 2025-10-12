@@ -65,21 +65,21 @@ final class SleeperCredentialsManager: ObservableObject {
     
     /// Get current username or user ID for API calls
     func getUserIdentifier() -> String? {
-        print("🔍 SleeperCredentialsManager.getUserIdentifier() called:")
-        print("   - currentUsername: '\(currentUsername)'")
-        print("   - currentUserID: '\(currentUserID)'")
-        print("   - hasValidCredentials: \(hasValidCredentials)")
+        // print("🔍 SleeperCredentialsManager.getUserIdentifier() called:")
+        // print("   - currentUsername: '\(currentUsername)'")
+        // print("   - currentUserID: '\(currentUserID)'")
+        // print("   - hasValidCredentials: \(hasValidCredentials)")
         
         if !currentUsername.isEmpty {
-            print("   - Returning username: '\(currentUsername)'")
+            // print("   - Returning username: '\(currentUsername)'")
             return currentUsername
         } else if !currentUserID.isEmpty {
-            print("   - Returning userID: '\(currentUserID)'")
+            // print("   - Returning userID: '\(currentUserID)'")
             return currentUserID
         }
         // 🔥 FIX: Don't fallback to defaults - return nil if no credentials saved
         // This forces proper credential setup instead of using hardcoded values
-        print("   - No credentials found, returning nil")
+        // print("   - No credentials found, returning nil")
         return nil
     }
     

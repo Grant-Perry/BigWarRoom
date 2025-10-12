@@ -85,11 +85,88 @@ struct InjuryAlertCard: View {
     
     private var mainAlertContent: some View {
         HStack(spacing: 16) {
-            statusIcon
+            playerImage // Player image now on the LEFT
             alertContent
             Spacer()
+            statusIcon // Status icon now on the RIGHT
         }
         .padding(16)
+    }
+    
+    private var playerImage: some View {
+        Group {
+            if let alert = injuryAlert {
+                // Use the same pattern as FantasyPlayerCardHeadshotView for consistency (DRY)
+                AsyncImage(url: alert.player.headshotURL) { phase in
+                    switch phase {
+                    case .empty:
+                        ProgressView()
+                            .frame(width: 60, height: 60)
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 60)
+                            .clipShape(Circle()) // Changed to Circle
+                            .overlay(
+                                Circle() // Changed to Circle
+                                    .stroke(Color.white.opacity(0.2), lineWidth: 1) // Thin white border
+                            )
+                    case .failure:
+                        // Fallback: Try ESPN URL like FantasyPlayerCardFallbackHeadshotView
+                        if let espnURL = alert.player.espnHeadshotURL {
+                            AsyncImage(url: espnURL) { phase2 in
+                                switch phase2 {
+                                case .success(let image2):
+                                    image2
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                        .frame(width: 60, height: 60)
+                                        .clipShape(Circle()) // Changed to Circle
+                                        .overlay(
+                                            Circle() // Changed to Circle
+                                                .stroke(Color.white.opacity(0.2), lineWidth: 1) // Thin white border
+                                        )
+                                default:
+                                    playerImagePlaceholder
+                                }
+                            }
+                        } else {
+                            playerImagePlaceholder
+                        }
+                    @unknown default:
+                        playerImagePlaceholder
+                    }
+                }
+            } else {
+                playerImagePlaceholder
+            }
+        }
+        .frame(width: 60, height: 60) // Square frame for circle
+    }
+    
+    private var playerImagePlaceholder: some View {
+        Circle() // Changed to Circle
+            .fill(Color.gray.opacity(0.3))
+            .overlay(
+                VStack(spacing: 2) {
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white.opacity(0.6))
+                    
+                    // Show position if available
+                    if let alert = injuryAlert {
+                        Text(alert.player.position)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+            )
+            .overlay(
+                Circle() // Changed to Circle
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1) // Thin white border
+            )
+            .frame(width: 60, height: 60) // Square frame for circle
     }
     
     private var statusIcon: some View {
@@ -98,8 +175,9 @@ struct InjuryAlertCard: View {
                 .fill(statusType.color)
                 .frame(width: 50, height: 50)
             
-            Image(systemName: statusType.sfSymbol)
-                .font(.system(size: 20, weight: .bold))
+            // Large capital letter instead of SF Symbol
+            Text(String(statusType.displayName.prefix(1)))
+                .font(.system(size: 24, weight: .black))
                 .foregroundColor(.white)
             
             if recommendation.priority == .critical {
@@ -128,25 +206,39 @@ struct InjuryAlertCard: View {
     
     private var alertContent: some View {
         VStack(alignment: .leading, spacing: 6) {
-            alertHeader
-            
+            // Player name first - larger font
             Text(playerName)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+            
+            // Status with first letter in colored circle
+            HStack(spacing: -1) { // Negative spacing to make letters overlap/intersect
+                // First letter in colored circle
+                Circle()
+                    .fill(statusType.color)
+                    .frame(width: 20, height: 20)
+                    .overlay(
+                        Text(String(statusType.displayName.prefix(1)))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white)
+                )
+                // Rest of the status word - closer/overlapping
+                Text(String(statusType.displayName.dropFirst()))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.8))
+					.offset(y: -1)
+
+            }
             
             Text(getActionText())
                 .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(.white.opacity(0.7))
                 .lineLimit(2)
         }
     }
     
     private var alertHeader: some View {
         HStack {
-            Text(statusType.displayName)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-            
             Spacer()
             
             Text(priorityBadge)
@@ -172,6 +264,17 @@ struct InjuryAlertCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
+            .background(
+                // Add the gpDeltaPurple gradient background
+                LinearGradient(
+                    colors: [
+					 Color.padresDark.opacity(0.4),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
         }
     }
     

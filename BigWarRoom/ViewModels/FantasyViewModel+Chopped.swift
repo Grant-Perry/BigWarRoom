@@ -155,6 +155,32 @@ extension FantasyViewModel {
                 let teamProjected = matchup.projectedPoints ?? (teamScore * 1.05)
                 let managerID = rosterIDToManagerID[matchup.rosterID] ?? ""
                 
+                // 🔥 NEW: Debug Bo Nix specifically in Chopped leagues
+                if let starters = matchup.starters {
+                    for playerID in starters {
+                        if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
+                            let playerFullName = "\(sleeperPlayer.firstName ?? "") \(sleeperPlayer.lastName ?? "")"
+                            if playerFullName.lowercased().contains("bo nix") || playerFullName.lowercased().contains("nix") {
+                                let playerScore = calculateSleeperPlayerScore(playerId: playerID)
+                                print("🏈 [CHOPPED] Bo Nix Debug:")
+                                print("   Player ID: \(playerID)")
+                                print("   Full Name: \(playerFullName)")
+                                print("   League ID: \(leagueID)")
+                                print("   Team Score: \(teamScore)")
+                                print("   Individual Score: \(playerScore)")
+                                print("   Manager: \(userIDs[managerID] ?? "Unknown")")
+                                
+                                if let playerStats = playerStats[playerID] {
+                                    print("   Stats: \(playerStats)")
+                                }
+                                if let scoringSettings = sleeperLeagueSettings {
+                                    print("   Scoring Settings Count: \(scoringSettings.count)")
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 // 🔥 THE ONLY THING THAT MATTERS: Do they have players?
                 let starterCount = matchup.starters?.count ?? 0
                 let playerCount = matchup.players?.count ?? 0

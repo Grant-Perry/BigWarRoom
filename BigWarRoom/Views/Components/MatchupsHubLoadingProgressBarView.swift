@@ -50,7 +50,7 @@ struct MatchupsHubLoadingProgressBarView: View {
         }
         .frame(maxWidth: 300)
         .onChange(of: progress) { oldValue, newValue in
-            print("🔥 PROGRESS BAR: Progress \(oldValue) → \(newValue), width will be \(max(8, 300 * newValue)) pixels")
+            // print("🔥 PROGRESS BAR: Progress \(oldValue) → \(newValue), width will be \(max(8, 300 * newValue)) pixels")
         }
     }
 }

@@ -13,6 +13,9 @@ import SwiftUI
 @MainActor
 final class MatchupsHubViewModel: ObservableObject {
     
+    // 🔥 NEW: Shared singleton instance to ensure data consistency across views
+    static let shared = MatchupsHubViewModel()
+    
     // MARK: - Published Properties
     @Published var myMatchups: [UnifiedMatchup] = []
     @Published var isLoading = false
@@ -31,6 +34,9 @@ final class MatchupsHubViewModel: ObservableObject {
     @Published var loadingProgress: Double = 0.0
     internal var totalLeagueCount: Int = 0
     internal var loadedLeagueCount: Int = 0
+    
+    // 🔥 NEW: Cache loaded LeagueMatchupProvider instances for score consistency
+    internal var cachedProviders: [String: LeagueMatchupProvider] = [:]
     
     // MARK: - Dependencies
     internal let unifiedLeagueManager = UnifiedLeagueManager()
@@ -269,6 +275,19 @@ final class MatchupsHubViewModel: ObservableObject {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
+    // 🔥 NEW: Get cached LeagueMatchupProvider for consistent scoring
+    func getCachedProvider(for league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String) -> LeagueMatchupProvider? {
+        let cacheKey = "\(league.id)_\(week)_\(year)"
+        return cachedProviders[cacheKey]
+    }
+    
+    // 🔥 NEW: Store provider in cache after loading
+    internal func cacheProvider(_ provider: LeagueMatchupProvider, for league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String) {
+        let cacheKey = "\(league.id)_\(week)_\(year)"
+        cachedProviders[cacheKey] = provider
+        print("🔥 CACHE: Stored provider for \(league.league.name) (key: \(cacheKey))")
     }
 }
 

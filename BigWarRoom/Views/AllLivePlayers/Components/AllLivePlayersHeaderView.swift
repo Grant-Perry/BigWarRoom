@@ -135,32 +135,47 @@ struct AllLivePlayersHeaderView: View {
     // #GoodNav: Controls section with CONTEXTUAL All Rostered Players filters
     private var controlsSection: some View {
         HStack {
-            // Collapse button (chevron)
-            Button(action: {
-                // TODO: Add collapse functionality if needed
-            }) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 20, height: 20)
-            }
-            .buttonStyle(PlainButtonStyle())
-            
             // #GoodNav: CONTEXTUAL All Rostered Players controls
             HStack {
                 Spacer()
                 
-                // Top Score (non-functional - do nothing when clicked)
-                VStack(spacing: 2) {
-                    Text(String(format: "%.1f", viewModel.topScore))
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.gpGreen)
+                // Position/Sort Method with conditional arrow (replacing Top Score)
+                HStack(spacing: 8) {
+                    // Sort Method Menu
+                    Menu {
+                        ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
+                            Button(method.displayName) {
+                                viewModel.setSortingMethod(method)
+                            }
+                        }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text(viewModel.sortingMethod.displayName.uppercased())
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.purple)
+                            
+                            // Show sort direction text when Score is selected, otherwise "Sort By"
+                            Text(viewModel.sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .menuStyle(BorderlessButtonMenuStyle())
                     
-                    Text("Top Score")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
+                    // Sort Direction Arrow (only show for Score)
+                    if viewModel.sortingMethod == .score {
+                        Button(action: {
+                            viewModel.toggleSortDirection()
+                        }) {
+                            // Up arrow for Highest (sortHighToLow = true), Down arrow for Lowest
+                            Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.gpGreen)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
                 
                 Spacer()
@@ -299,8 +314,10 @@ struct AllLivePlayersHeaderView: View {
     }
     
     private func performManualRefresh() async {
-        // Manual refresh while preserving user filter settings
-        await viewModel.refreshWithFilterPreservation()
+        // 🔥 FIXED: Manual refresh should do EXACTLY the same as the automatic 15-second timer
+        // This ensures consistency between manual and automatic refreshes
+        print("🔄 Manual refresh: Using same logic as 15-second timer")
+        await performBackgroundRefresh()
         onAnimationReset()
         resetCountdown()
     }

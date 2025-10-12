@@ -10,7 +10,8 @@ import SwiftUI
 /// Main matchups hub view - focuses on core structure and state management
 struct MatchupsHubView: View {
     // MARK: - ViewModels
-    @StateObject internal var matchupsHubViewModel = MatchupsHubViewModel()
+    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency across all views
+    @StateObject internal var matchupsHubViewModel = MatchupsHubViewModel.shared
     
     // MARK: - Week Selection (SSOT)
     @StateObject internal var weekManager = WeekSelectionManager.shared

@@ -12,7 +12,8 @@ struct PlayerRosteredSectionView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
     
-    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel()
+    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel.shared
     @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
     var body: some View {

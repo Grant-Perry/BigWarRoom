@@ -18,11 +18,12 @@ struct IntelligenceLoadingView: View {
     private let loadingMessages = [
         "Gathering data from all your leagues...",
         "Analyzing opponent lineups...",
+		"This is a LOT of data... almost there!",
         "Calculating threat levels...",
+        "This will be worth it...",
         "Processing injury reports...",
         "Cross-referencing player conflicts...",
         "Building strategic insights...",
-        "This is a LOT of data... almost there!",
         "Making sense of it all...",
         "Final calculations... worth the wait!"
     ]
@@ -30,9 +31,9 @@ struct IntelligenceLoadingView: View {
     var body: some View {
         VStack(spacing: 40) {
             // Move content up by reducing top spacer
-            Spacer()
-                .frame(maxHeight: 100) // Limit the top spacer
-            
+//            Spacer()
+//                .frame(maxHeight: 100) // Limit the top spacer
+
             // Animated orb cluster
             animatedOrbCluster
             
@@ -171,12 +172,6 @@ struct IntelligenceLoadingView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
                 .animation(.easeInOut(duration: 0.5), value: loadingTextIndex)
-            
-            // Encouraging subtitle
-            Text("Analyzing \(getCurrentTaskCount()) data points...")
-                .font(.system(size: 14, weight: .regular))
-                .foregroundColor(.white.opacity(0.7))
-                .animation(.easeInOut(duration: 1.0), value: loadingTextIndex)
         }
     }
     
@@ -201,16 +196,16 @@ struct IntelligenceLoadingView: View {
             }
         }
     }
-    
-    // MARK: - Helper Methods
-    
-    private func getCurrentTaskCount() -> String {
-        // Simulate increasing data processing
-        let baseCounts = [247, 391, 528, 612, 745, 889, 934, 1067, 1249]
-        let currentCount = baseCounts[min(loadingTextIndex, baseCounts.count - 1)]
-        return String(currentCount)
-    }
 }
+
+// MARK: - Helper Methods
+    
+    // private func getCurrentTaskCount() -> String {
+    //     // Simulate increasing data processing
+    //     let baseCounts = [247, 391, 528, 612, 745, 889, 934, 1067, 1249]
+    //     let currentCount = baseCounts[min(loadingTextIndex, baseCounts.count - 1)]
+    //     return String(currentCount)
+    // }
 
 // MARK: - Preview
 

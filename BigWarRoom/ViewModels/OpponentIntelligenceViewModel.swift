@@ -22,6 +22,7 @@ final class OpponentIntelligenceViewModel: ObservableObject {
     @Published var conflictPlayers: [ConflictPlayer] = []
     @Published var strategicRecommendations: [StrategicRecommendation] = []
     @Published var isLoading = false
+    @Published var isInjuryDataLoading = false // NEW: Specific injury loading state
     @Published var lastUpdateTime = Date()
     @Published var errorMessage: String?
     
@@ -42,7 +43,8 @@ final class OpponentIntelligenceViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let intelligenceService = OpponentIntelligenceService.shared
-    private let matchupsHubViewModel = MatchupsHubViewModel()
+    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+    private let matchupsHubViewModel = MatchupsHubViewModel.shared
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Computed Properties
@@ -130,6 +132,13 @@ final class OpponentIntelligenceViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        // NEW: Subscribe to injury loading state changes
+        intelligenceService.onInjuryLoadingStateChanged = { [weak self] isLoading in
+            Task { @MainActor in
+                self?.isInjuryDataLoading = isLoading
+            }
+        }
     }
     
     // MARK: - Public Interface
@@ -139,21 +148,35 @@ final class OpponentIntelligenceViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        print("🔄 Starting injury data loading...")
+        isInjuryDataLoading = true // Start with injury loading true
+        
+        // Force a small delay to ensure the UI updates before we start processing
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
         do {
             // Ensure matchups are loaded
             await matchupsHubViewModel.loadAllMatchups()
             
-            // Analyze opponents
+            print("🔄 Analyzing opponents...")
+            // Analyze opponents (this is fast)
             let intelligence = intelligenceService.analyzeOpponents(from: matchupsHubViewModel.myMatchups)
             
-            // Generate recommendations
+            print("🔄 Generating recommendations (including injury scan)...")
+            // Generate recommendations (this includes injury scanning - the slow part)
             let recommendations = intelligenceService.generateRecommendations(from: intelligence)
             
+            print("🔄 Updating UI with \(recommendations.filter { $0.type == .injuryAlert }.count) injury alerts...")
             // Update UI
             await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
             
+            print("🔄 Injury data loading complete!")
+            isInjuryDataLoading = false // Only set to false after recommendations are complete
+            
         } catch {
             errorMessage = "Failed to load opponent intelligence: \(error.localizedDescription)"
+            print("❌ Error during loading: \(error)")
+            isInjuryDataLoading = false // Stop injury loading on error
         }
         
         isLoading = false
@@ -161,15 +184,39 @@ final class OpponentIntelligenceViewModel: ObservableObject {
     
     /// Refresh intelligence data (background refresh)
     func refreshIntelligence() async {
-        // Don't show loading for background refresh
+        print("🔄 Background refresh - starting injury loading...")
+        // Start injury loading for refresh
+        isInjuryDataLoading = true
+        
+        // Small delay for UI update
+        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+        
         let intelligence = intelligenceService.analyzeOpponents(from: matchupsHubViewModel.myMatchups)
         let recommendations = intelligenceService.generateRecommendations(from: intelligence)
         
         await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
+        
+        print("🔄 Background refresh complete - stopping injury loading")
+        // Stop injury loading after refresh complete
+        isInjuryDataLoading = false
     }
     
     /// Manual refresh trigger
     func manualRefresh() async {
+        // 🔥 FIX: Clear cache immediately to force fresh injury scan
+        print("🔄 Manual refresh - clearing cache and starting injury loading...")
+        intelligenceService.clearCache()
+        
+        isInjuryDataLoading = true // Show injury loading during manual refresh
+        
+        // Small delay for UI update
+        try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        
+        // Also refresh AllLivePlayersViewModel to ensure injury alerts use fresh data
+        print("🔄 OpponentIntelligenceViewModel: Manual refresh - also refreshing AllLivePlayersViewModel")
+        await AllLivePlayersViewModel.shared.refresh()
+        
+        // Now do the main intelligence refresh with fresh data
         await loadOpponentIntelligence()
     }
     
@@ -195,15 +242,18 @@ final class OpponentIntelligenceViewModel: ObservableObject {
         strategicRecommendations = []
         
         do {
-            // Clear intelligence cache
+            // Clear intelligence cache IMMEDIATELY
             intelligenceService.clearCache()
+            
+            // Also clear AllLivePlayersViewModel cache
+            await AllLivePlayersViewModel.shared.refresh()
             
             // Force matchups hub to do a fresh load (not using cached data)
             print("🔄 Forcing MatchupsHubViewModel refresh...")
             await matchupsHubViewModel.manualRefresh()
             
-            // Wait a bit to ensure the refresh completed
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            // Reduced wait time since we're now more aggressive about cache clearing
+            try await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds instead of 0.5
             
             // Now analyze with truly fresh data
             print("🔄 Analyzing opponents with fresh data...")

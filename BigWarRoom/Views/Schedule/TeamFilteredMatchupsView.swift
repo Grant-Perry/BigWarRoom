@@ -776,7 +776,8 @@ struct TeamFilteredMatchupsView: View {
     TeamFilteredMatchupsView(
         awayTeam: "WSH", 
         homeTeam: "GB",
-        matchupsHubViewModel: MatchupsHubViewModel(),
+        // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+        matchupsHubViewModel: MatchupsHubViewModel.shared,
         gameData: ScheduleGame(
             id: "WSH@GB",
             awayTeam: "WSH",
@@ -796,7 +797,8 @@ struct TeamFilteredMatchupsView: View {
     TeamFilteredMatchupsView(
         awayTeam: "JAX",
         homeTeam: "TEN", 
-        matchupsHubViewModel: MatchupsHubViewModel(),
+        // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+        matchupsHubViewModel: MatchupsHubViewModel.shared,
         gameData: ScheduleGame(
             id: "JAX@TEN",
             awayTeam: "JAX",

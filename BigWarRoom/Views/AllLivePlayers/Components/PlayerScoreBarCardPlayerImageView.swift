@@ -56,7 +56,6 @@ struct PlayerScoreBarCardPlayerImageView: View {
             }
         }
         .frame(width: 80, height: 100)
-        .id(playerEntry.player.id + "_" + (playerEntry.player.headshotURL?.absoluteString ?? "")) // Force refresh when URL changes
     }
     
     // MARK: - Computed Properties (Data Only)

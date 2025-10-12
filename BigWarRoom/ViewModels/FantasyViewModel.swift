@@ -35,7 +35,7 @@ final class FantasyViewModel: ObservableObject {
     private let instanceID = UUID().uuidString.prefix(8)
     private static var instanceCount = 0 {
         didSet {
-            print("📊 FantasyViewModel instance count: \(instanceCount)")
+            // print("📊 FantasyViewModel instance count: \(instanceCount)")
         }
     }
     
@@ -96,7 +96,7 @@ final class FantasyViewModel: ObservableObject {
     private init() {
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1
-            print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")
+            // print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")
         }
         
         setupAutoRefresh()
@@ -108,7 +108,7 @@ final class FantasyViewModel: ObservableObject {
     deinit {
         Task { @MainActor in
             FantasyViewModel.instanceCount -= 1
-            print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
+            // print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
         }
         refreshTimer?.invalidate()
     }
@@ -123,11 +123,11 @@ final class FantasyViewModel: ObservableObject {
                 
                 // Prevent cascading refreshes
                 guard !self.isRefreshing else {
-                    print("📊 FantasyViewModel \(self.instanceID): Skipping refresh - already refreshing")
+                    // print("📊 FantasyViewModel \(self.instanceID): Skipping refresh - already refreshing")
                     return
                 }
                 
-                print("📊 FantasyViewModel \(self.instanceID): Week changed to \(newWeek), refreshing data...")
+                // print("📊 FantasyViewModel \(self.instanceID): Week changed to \(newWeek), refreshing data...")
                 
                 self.isRefreshing = true
                 

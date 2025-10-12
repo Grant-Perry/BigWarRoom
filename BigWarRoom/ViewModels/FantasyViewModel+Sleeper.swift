@@ -348,7 +348,17 @@ extension FantasyViewModel {
     func calculateSleeperPlayerScore(playerId: String) -> Double {
         guard let playerStats = playerStats[playerId],
               let scoringSettings = sleeperLeagueSettings else {
+            // print("🔍 [FantasyViewModel] No stats/settings for player \(playerId)")
             return 0.0
+        }
+        
+        // 🔥 DEBUG: Log Bo Nix specifically
+        if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
+            print("🏈 [FantasyViewModel] Bo Nix Debug:")
+            print("   Player ID: \(playerId)")
+            print("   Stats: \(playerStats)")
+            print("   Scoring Settings Count: \(scoringSettings.count)")
+            print("   Key scoring rules: pass_yd=\(scoringSettings["pass_yd"] ?? "nil"), pass_td=\(scoringSettings["pass_td"] ?? "nil"), rush_yd=\(scoringSettings["rush_yd"] ?? "nil")")
         }
         
         var totalScore = 0.0
@@ -356,8 +366,21 @@ extension FantasyViewModel {
             if let scoring = scoringSettings[statKey] as? Double {
                 let points = statValue * scoring
                 totalScore += points
+                
+                // 🔥 DEBUG: Log each stat calculation for Bo Nix
+                if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
+                    if points != 0.0 {
+                        print("   \(statKey): \(statValue) × \(scoring) = \(points)")
+                    }
+                }
             }
         }
+        
+        // 🔥 DEBUG: Log final total for Bo Nix
+        if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
+            print("   [FantasyViewModel] TOTAL: \(totalScore)")
+        }
+        
         return totalScore
     }
     

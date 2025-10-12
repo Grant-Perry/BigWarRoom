@@ -21,7 +21,7 @@ final class AllLivePlayersViewModel: ObservableObject {
    @Published var errorMessage: String?
    @Published var topScore: Double = 0.0
    @Published var sortHighToLow = true
-   @Published var sortingMethod: SortingMethod = .score
+   @Published var sortingMethod: SortingMethod = .position // Changed to .position as default
    @Published var showActiveOnly: Bool = false // Changed from includeCompletedGames
 
     // 🔥 NEW: Animation state management
@@ -39,7 +39,8 @@ final class AllLivePlayersViewModel: ObservableObject {
    @Published var playerStats: [String: [String: Double]] = [:]
    @Published var statsLoaded: Bool = false
 
-   let matchupsHubViewModel = MatchupsHubViewModel()
+   // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency across all views
+   let matchupsHubViewModel = MatchupsHubViewModel.shared
 
     // 🔥 NEW: Week selection subscription with debouncing
    private var weekSubscription: AnyCancellable?
@@ -94,14 +95,16 @@ final class AllLivePlayersViewModel: ObservableObject {
 
     /// Get dynamic sort direction text based on current sorting method
    var sortDirectionText: String {
-	  switch sortingMethod {
-		 case .score:
-			return sortHighToLow ? "Highest" : "Lowest"
-		 case .name:
-			return sortHighToLow ? "A to Z" : "Z to A"
-		 case .team:
-			return sortHighToLow ? "A to Z" : "Z to A"
-	  }
+      switch sortingMethod {
+      case .position:
+         return sortHighToLow ? "QB to K" : "K to QB"
+      case .score:
+         return sortHighToLow ? "Highest" : "Lowest"
+      case .name:
+         return sortHighToLow ? "A to Z" : "Z to A"
+      case .team:
+         return sortHighToLow ? "A to Z" : "Z to A"
+      }
    }
 
     /// Check if we have leagues connected but no players for current position
@@ -241,13 +244,14 @@ final class AllLivePlayersViewModel: ObservableObject {
 
     // MARK: - Sorting Method
    enum SortingMethod: String, CaseIterable, Identifiable {
-	  case score = "Score"
-	  case name = "Name"
-	  case team = "Team"
+      case position = "Position"
+      case score = "Score"
+      case name = "Name"
+      case team = "Team"
 
-	  var id: String { rawValue }
+      var id: String { rawValue }
 
-	  var displayName: String { rawValue }
+      var displayName: String { rawValue }
    }
 
     // MARK: - Data Loading
@@ -381,54 +385,113 @@ final class AllLivePlayersViewModel: ObservableObject {
 
     // 🔥 CRITICAL BUG FIX: Only extract players from MY teams, not opponent teams!
    private func extractPlayersFromMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
-	  var players: [LivePlayerEntry] = []
+      var players: [LivePlayerEntry] = []
 
-		 // For regular matchups, extract ONLY from MY team
-	  if let fantasyMatchup = matchup.fantasyMatchup {
-			// 🔥 CRITICAL FIX: Only extract from MY team, not both teams!
-		 if let myTeam = matchup.myTeam {
-			let myStarters = myTeam.roster.filter { $0.isStarter }
-			for player in myStarters {
-				  // 🔥 NEW: Debug Josh Allen specifically
+         // For regular matchups, extract ONLY from MY team
+      if let fantasyMatchup = matchup.fantasyMatchup {
+            // 🔥 CRITICAL FIX: Only extract from MY team, not both teams!
+         if let myTeam = matchup.myTeam {
+            let myStarters = myTeam.roster.filter { $0.isStarter }
+            for player in myStarters {
+                  // 🔥 CRITICAL FIX: Use LeagueMatchupProvider calculated score instead of cached player.currentPoints
+               let calculatedScore = getCalculatedPlayerScore(for: player, in: matchup)
+               
+               players.append(LivePlayerEntry(
+                  id: "\(matchup.id)_my_\(player.id)",
+                  player: player,
+                  leagueName: matchup.league.league.name,
+                  leagueSource: matchup.league.source.rawValue,
+                  currentScore: calculatedScore, // 🔥 FIXED: Use calculated score, not cached
+                  projectedScore: player.projectedPoints ?? 0.0,
+                  isStarter: player.isStarter,
+                  percentageOfTop: 0.0, // Will be calculated later
+                  matchup: matchup,
+                  performanceTier: .average // Temporary, will be calculated later
+               ))
+            }
+         }
+      }
 
-			   players.append(LivePlayerEntry(
-				  id: "\(matchup.id)_my_\(player.id)",
-				  player: player,
-				  leagueName: matchup.league.league.name,
-				  leagueSource: matchup.league.source.rawValue,
-				  currentScore: player.currentPoints ?? 0.0,
-				  projectedScore: player.projectedPoints ?? 0.0,
-				  isStarter: player.isStarter,
-				  percentageOfTop: 0.0, // Will be calculated later
-				  matchup: matchup,
-				  performanceTier: .average // Temporary, will be calculated later
-			   ))
-			}
-		 }
-	  }
+         // For Chopped leagues, extract from my team ranking
+      if let myTeamRanking = matchup.myTeamRanking {
+         let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
 
-		 // For Chopped leagues, extract from my team ranking
-	  if let myTeamRanking = matchup.myTeamRanking {
-		 let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
-
-		 for player in myTeamStarters {
-			   // 🔥 NEW: Debug Josh Allen specifically
-
-			players.append(LivePlayerEntry(
-			   id: "\(matchup.id)_chopped_\(player.id)",
-			   player: player,
-			   leagueName: matchup.league.league.name,
-			   leagueSource: matchup.league.source.rawValue,
-			   currentScore: player.currentPoints ?? 0.0,
-			   projectedScore: player.projectedPoints ?? 0.0,
-			   isStarter: player.isStarter,
-			   percentageOfTop: 0.0, // Will be calculated later
-			   matchup: matchup,
-			   performanceTier: .average // Temporary, will be calculated later
-			))
-		 }
-	  }
-	  return players
+         for player in myTeamStarters {
+               // 🔥 CRITICAL FIX: Use LeagueMatchupProvider calculated score instead of cached player.currentPoints
+            let calculatedScore = getCalculatedPlayerScore(for: player, in: matchup)
+            
+            players.append(LivePlayerEntry(
+               id: "\(matchup.id)_chopped_\(player.id)",
+               player: player,
+               leagueName: matchup.league.league.name,
+               leagueSource: matchup.league.source.rawValue,
+               currentScore: calculatedScore, // 🔥 FIXED: Use calculated score, not cached
+               projectedScore: player.projectedPoints ?? 0.0,
+               isStarter: player.isStarter,
+               percentageOfTop: 0.0, // Will be calculated later
+               matchup: matchup,
+               performanceTier: .average // Temporary, will be calculated later
+            ))
+         }
+      }
+      return players
+   }
+   
+   // 🔥 NEW: Get calculated player score from LeagueMatchupProvider
+   private func getCalculatedPlayerScore(for player: FantasyPlayer, in matchup: UnifiedMatchup) -> Double {
+      let currentWeek = WeekSelectionManager.shared.selectedWeek
+      let currentYear = AppConstants.currentSeasonYear
+      
+      // 🔥 CRITICAL FIX: Use the cached, already-loaded LeagueMatchupProvider instead of creating a blank one!
+      if let cachedProvider = matchupsHubViewModel.getCachedProvider(
+         for: matchup.league, 
+         week: currentWeek, 
+         year: currentYear
+      ) {
+         // Use the cached provider that already has loaded stats and scoring settings
+         if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
+            let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
+            
+            // 🔥 DEBUG: Log when we're using calculated vs cached scores
+            if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
+               print("🎯 SCORE CORRECTION: \(player.fullName)")
+               print("   League: \(matchup.league.league.name)")
+               print("   Cached Score: \(cachedScore)")
+               print("   Calculated Score: \(calculatedScore)")
+               print("   Using calculated score from cached provider")
+            }
+            
+            return calculatedScore
+         }
+      } else {
+         // Fallback: Create new provider only if no cached one exists
+         print("⚠️ FALLBACK: No cached provider found for \(matchup.league.league.name), creating new one")
+         
+         let leagueMatchupProvider = LeagueMatchupProvider(
+            league: matchup.league,
+            week: currentWeek,
+            year: currentYear
+         )
+         
+         // For Sleeper leagues, get calculated score if available
+         if matchup.league.source == .sleeper && leagueMatchupProvider.hasPlayerScores() {
+            let calculatedScore = leagueMatchupProvider.getPlayerScore(playerId: player.id)
+            
+            // 🔥 DEBUG: Log when we're using calculated vs cached scores
+            if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
+               print("🎯 SCORE CORRECTION (fallback): \(player.fullName)")
+               print("   League: \(matchup.league.league.name)")
+               print("   Cached Score: \(cachedScore)")
+               print("   Calculated Score: \(calculatedScore)")
+               print("   Using calculated score from fallback provider")
+            }
+            
+            return calculatedScore
+         }
+      }
+      
+      // Final fallback to cached score for ESPN leagues or when calculation unavailable
+      return player.currentPoints ?? 0.0
    }
 
     // MARK: - Filtering and Sorting
@@ -448,10 +511,17 @@ final class AllLivePlayersViewModel: ObservableObject {
    }
 
    func setSortingMethod(_ method: SortingMethod) {
-	  sortingMethod = method
-		 // 🔥 FIXED: Clear animations when sorting method changes
-	  triggerAnimationReset()
-	  applyPositionFilter() // Re-apply filter with new sorting method
+      sortingMethod = method
+        // 🔥 FIXED: Clear animations when sorting method changes
+      triggerAnimationReset()
+      applyPositionFilter() // Re-apply filter with new sorting method
+   }
+   
+   // 🔥 NEW: Toggle sort direction (for header buttons)
+   func toggleSortDirection() {
+      sortHighToLow.toggle()
+      triggerAnimationReset()
+      applyPositionFilter()
    }
 
    func setShowActiveOnly(_ showActive: Bool) {
@@ -578,47 +648,53 @@ final class AllLivePlayersViewModel: ObservableObject {
 	  // 🔥 NEW: Separated sorting logic for better performance
    private func sortPlayers(_ players: [LivePlayerEntry]) -> [LivePlayerEntry] {
 
-	  let sortedPlayers: [LivePlayerEntry]
+      let sortedPlayers: [LivePlayerEntry]
 
-	  switch sortingMethod {
-		 case .score:
-			sortedPlayers = sortHighToLow ?
-			players.sorted { $0.currentScore > $1.currentScore } :
-			players.sorted { $0.currentScore < $1.currentScore }
+      switch sortingMethod {
+      case .position:
+         // Sort by position priority (QB, RB, WR, TE, FLEX, DEF, K)
+         sortedPlayers = sortHighToLow ?
+         players.sorted { positionPriority($0.position) < positionPriority($1.position) } :
+         players.sorted { positionPriority($0.position) > positionPriority($1.position) }
+         
+      case .score:
+         sortedPlayers = sortHighToLow ?
+         players.sorted { $0.currentScore > $1.currentScore } :
+         players.sorted { $0.currentScore < $1.currentScore }
 
-		 case .name:
-			   // 🔥 FIX: Sort by last name instead of full name
-			sortedPlayers = sortHighToLow ?
-			players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
-			players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
+      case .name:
+         // 🔥 FIX: Sort by last name instead of full name
+         sortedPlayers = sortHighToLow ?
+         players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
+         players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
 
-		 case .team:
-			   // 🔥 FIXED: Don't filter out players - handle empty team names in sorting instead
-			sortedPlayers = sortHighToLow ?
-			players.sorted { player1, player2 in
-			   let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
-			   let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
+      case .team:
+         // 🔥 FIXED: Don't filter out players - handle empty team names in sorting instead
+         sortedPlayers = sortHighToLow ?
+         players.sorted { player1, player2 in
+            let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
+            let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
 
-			   if team1 != team2 {
-				  return team1 < team2
-			   }
-			   return positionPriority(player1.position) < positionPriority(player2.position)
-			} :
-			players.sorted { player1, player2 in
-			   let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
-			   let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
+            if team1 != team2 {
+               return team1 < team2
+            }
+            return positionPriority(player1.position) < positionPriority(player2.position)
+         } :
+         players.sorted { player1, player2 in
+            let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
+            let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
 
-			   if team1 != team2 {
-				  return team1 > team2
-			   }
-			   return positionPriority(player1.position) < positionPriority(player2.position)
-			}
-	  }
+            if team1 != team2 {
+               return team1 > team2
+            }
+            return positionPriority(player1.position) < positionPriority(player2.position)
+         }
+      }
 
-	  for (index, player) in sortedPlayers.prefix(5).enumerated() {
-	  }
+      for (index, player) in sortedPlayers.prefix(5).enumerated() {
+      }
 
-	  return sortedPlayers
+      return sortedPlayers
    }
 
 	  /// Extract last name from full name for proper sorting

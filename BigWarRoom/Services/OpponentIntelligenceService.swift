@@ -19,7 +19,11 @@ final class OpponentIntelligenceService {
     
     private var cachedIntelligence: [OpponentIntelligence] = []
     private var cacheTimestamp: Date?
-    private let cacheExpiration: TimeInterval = 30.0 // 30 seconds
+    private let cacheExpiration: TimeInterval = 5.0 // Reduced to 5 seconds for faster injury updates
+    private var lastInjuryScanHash: String? // Track injury scan to prevent duplicates
+    
+    // NEW: Injury loading state callback
+    var onInjuryLoadingStateChanged: ((Bool) -> Void)?
     
     private init() {}
     
@@ -85,9 +89,45 @@ final class OpponentIntelligenceService {
     func generateRecommendations(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
         var recommendations: [StrategicRecommendation] = []
         
-        // FIRST PRIORITY: Injury status alerts for MY players
-        let injuryAlerts = generateInjuryAlerts(from: intelligence)
-        recommendations.append(contentsOf: injuryAlerts)
+        // 🔥 PREVENT DUPLICATE INJURY SCANS: Create hash of intelligence data
+        let intelligenceHash = createIntelligenceHash(from: intelligence)
+        
+        // FIRST PRIORITY: Injury status alerts for MY players - but avoid duplicate scans
+        var injuryAlerts: [StrategicRecommendation] = []
+        
+        if lastInjuryScanHash != intelligenceHash {
+            print("🏥 RUNNING FRESH INJURY SCAN (hash changed)")
+            
+            // Notify that injury loading started
+            onInjuryLoadingStateChanged?(true)
+            
+            injuryAlerts = generateInjuryAlerts(from: intelligence)
+            recommendations.append(contentsOf: injuryAlerts)
+            lastInjuryScanHash = intelligenceHash
+            
+            // Notify that injury loading finished
+            onInjuryLoadingStateChanged?(false)
+        } else {
+            print("🏥 SKIPPING DUPLICATE INJURY SCAN (same data as before)")
+            // Still add cached injury alerts if we have them from the cached intelligence
+            let cachedInjuryAlerts = cachedIntelligence.isEmpty ? [] : generateInjuryAlerts(from: intelligence)
+            recommendations.append(contentsOf: cachedInjuryAlerts)
+            injuryAlerts = cachedInjuryAlerts
+        }
+        
+        // If no injury alerts found but we have matchup data, force a more aggressive scan
+        if injuryAlerts.isEmpty && !intelligence.isEmpty {
+            print("🏥 No injury alerts found on first pass - forcing immediate rescan...")
+            
+            // Notify that injury loading started for force scan
+            onInjuryLoadingStateChanged?(true)
+            
+            let immediateInjuryAlerts = forceImmediateInjuryAlert(from: intelligence)
+            recommendations.append(contentsOf: immediateInjuryAlerts)
+            
+            // Notify that injury loading finished for force scan
+            onInjuryLoadingStateChanged?(false)
+        }
         
         // Critical threat recommendations
         let criticalThreats = intelligence.filter { $0.threatLevel == .critical }
@@ -148,26 +188,72 @@ final class OpponentIntelligenceService {
         return recommendations.sorted { $0.priority.rawValue < $1.priority.rawValue }
     }
     
+    // MARK: - Helper Methods
+    
+    /// Create a hash of intelligence data to prevent duplicate injury scans
+    private func createIntelligenceHash(from intelligence: [OpponentIntelligence]) -> String {
+        let playerData = intelligence.flatMap { intel in
+            intel.myTeam.roster.map { player in
+                "\(player.id)_\(player.isStarter)_\(intel.leagueName)"
+            }
+        }.joined(separator: "|")
+        
+        return String(playerData.hash)
+    }
+    
     // MARK: - Injury Alert Generation
+    
+    /// EMERGENCY: Force immediate injury alert scan when regular scan fails
+    /// This bypasses some checks to ensure we don't miss critical injury data
+    private func forceImmediateInjuryAlert(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
+        print("🚨 FORCE IMMEDIATE INJURY SCAN ACTIVATED")
+        
+        // Clear any existing cache to force fresh data
+        cachedIntelligence.removeAll()
+        cacheTimestamp = nil
+        
+        // Re-run the injury alert generation with more aggressive parameters
+        return generateInjuryAlerts(from: intelligence)
+    }
     
     /// Generate injury status alerts for all my rostered players
     /// - Parameter intelligence: Array of opponent intelligence containing my team rosters
     /// - Returns: Array of strategic recommendations for injured players
     private func generateInjuryAlerts(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
-        print("🏥 INJURY SCAN: Using AllLivePlayersViewModel for consistent player data")
+        print("🏥 INJURY SCAN: Using FRESH matchup data instead of stale AllLivePlayersViewModel")
         
-        // Use the same reliable data source as Live Players tab
-        let livePlayersViewModel = AllLivePlayersViewModel.shared
-        let allMyPlayers = livePlayersViewModel.allPlayers
+        // 🔥 FIX: Extract players from fresh intelligence data instead of stale shared data
+        var allMyPlayers: [(player: FantasyPlayer, matchup: UnifiedMatchup, leagueName: String, leagueSource: String, isStarter: Bool)] = []
         
-        print("🏥 Found \(allMyPlayers.count) total players from AllLivePlayersViewModel")
+        // Extract all my players from the fresh matchup data
+        for intel in intelligence {
+            let myTeam = intel.myTeam
+            for player in myTeam.roster {
+                allMyPlayers.append((
+                    player: player,
+                    matchup: intel.matchup,
+                    leagueName: intel.leagueName,
+                    leagueSource: intel.leagueSource.rawValue,
+                    isStarter: player.isStarter
+                ))
+            }
+        }
+        
+        print("🏥 Found \(allMyPlayers.count) total players from FRESH matchup data")
+        
+        // Early return with helpful message if no data
+        if allMyPlayers.isEmpty {
+            print("🏥 ❌ NO MATCHUP DATA AVAILABLE YET - injury scan cannot proceed")
+            return []
+        }
         
         var playerInjuries: [String: InjuryAlert] = [:]
         var totalPlayersScanned = 0
         var totalStartersScanned = 0
         var injuriesFound = 0
+        var benchInjuriesIgnored = 0
         
-        // Scan all players from the Live Players data source
+        // Scan all players from the fresh matchup data
         for playerEntry in allMyPlayers {
             totalPlayersScanned += 1
             
@@ -185,6 +271,15 @@ final class OpponentIntelligenceService {
             
             print("🏥 \(playerEntry.player.fullName) - BYE: \(isByeWeek), Injury Status: \(sleeperInjuryStatus ?? "None")")
             
+            // 🔥 NEW: Skip players whose games are already completed - no point in injury alerts for finished games
+            if let team = playerEntry.player.team,
+               let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+                if gameInfo.isCompleted && gameInfo.gameStatus.lowercased() == "post" {
+                    print("🏥 SKIPPING \(playerEntry.player.fullName) - game already completed (\(gameInfo.gameStatus))")
+                    continue
+                }
+            }
+            
             // Determine injury status type
             guard let injuryStatusType = InjuryStatusType.from(
                 injuryStatus: sleeperInjuryStatus,
@@ -196,11 +291,11 @@ final class OpponentIntelligenceService {
             injuriesFound += 1
             print("🏥 INJURY FOUND: \(playerEntry.player.fullName) - Status: \(injuryStatusType.displayName) in \(playerEntry.leagueName)")
             
-            // Create league roster entry
+            // Create league roster entry using FRESH data
             let leagueRoster = InjuryLeagueRoster(
                 leagueName: playerEntry.leagueName,
                 leagueSource: LeagueSource(rawValue: playerEntry.leagueSource) ?? .sleeper,
-                myTeam: playerEntry.matchup.myTeam!, // We know this exists from Live Players
+                myTeam: playerEntry.matchup.myTeam!, // We know this exists from fresh intelligence
                 matchup: playerEntry.matchup,
                 isStarterInThisLeague: playerEntry.isStarter
             )
@@ -213,7 +308,7 @@ final class OpponentIntelligenceService {
                 var updatedLeagueRosters = existingAlert.leagueRosters
                 updatedLeagueRosters.append(leagueRoster)
                 
-                // Update the alert with combined league rosters
+                // 🔥 CRITICAL FIX: Update the alert with combined league rosters
                 let isStarterAnywhere = updatedLeagueRosters.contains { $0.isStarterInThisLeague }
                 let priority = InjuryPriority.determine(status: injuryStatusType, isStarter: isStarterAnywhere)
                 
@@ -221,11 +316,11 @@ final class OpponentIntelligenceService {
                     player: existingAlert.player,
                     injuryStatus: injuryStatusType,
                     leagueRosters: updatedLeagueRosters,
-                    isStarter: isStarterAnywhere,
+                    isStarter: isStarterAnywhere, // 🔥 KEY FIX: True if starter in ANY league
                     priority: priority
                 )
                 
-                print("🏥 Updated \(playerEntry.player.fullName) - now in \(updatedLeagueRosters.count) leagues")
+                print("🏥 Updated \(playerEntry.player.fullName) - now in \(updatedLeagueRosters.count) leagues (Starter anywhere: \(isStarterAnywhere))")
             } else {
                 // First time seeing this player
                 let priority = InjuryPriority.determine(status: injuryStatusType, isStarter: playerEntry.isStarter)
@@ -238,19 +333,47 @@ final class OpponentIntelligenceService {
                     priority: priority
                 )
                 
-                print("🏥 Created new entry for \(playerEntry.player.fullName)")
+                print("🏥 Created new entry for \(playerEntry.player.fullName) (Starter: \(playerEntry.isStarter))")
+            }
+            
+            // Track bench injuries that would be ignored for logging
+            if !playerEntry.isStarter && !playerInjuries.values.contains(where: { $0.player.fullName == playerEntry.player.fullName && $0.isStarter }) {
+                benchInjuriesIgnored += 1
             }
         }
         
         print("🏥 SCAN COMPLETE: \(totalPlayersScanned) total players, \(totalStartersScanned) starters, \(injuriesFound) injuries found")
         
-        // Only create alerts for starters (ignore bench injuries)
-        let starterAlerts = playerInjuries.values.filter { $0.isStarter }
+        // 🔥 CRITICAL FIX: Show alerts ONLY for players who are starters - NO BENCH PLAYERS EVER
+        let alertsToShow = playerInjuries.values.compactMap { alert -> InjuryAlert? in
+            // Show ONLY if starter in at least one league - period, no exceptions
+            guard alert.isStarter else {
+                print("🏥 FILTERED OUT: \(alert.player.fullName) - bench player (we don't give a fuck about bench players)")
+                return nil
+            }
+            
+            // 🔥 ALSO FILTER OUT BENCH LEAGUE ROSTERS - only show leagues where they're starting
+            let starterLeagueRosters = alert.leagueRosters.filter { $0.isStarterInThisLeague }
+            
+            if starterLeagueRosters.isEmpty {
+                print("🏥 FILTERED OUT: \(alert.player.fullName) - no starting leagues found (this shouldn't happen)")
+                return nil
+            }
+            
+            // Create new InjuryAlert with only starting league rosters
+            return InjuryAlert(
+                player: alert.player,
+                injuryStatus: alert.injuryStatus,
+                leagueRosters: starterLeagueRosters,
+                isStarter: true, // Always true since we filtered for starters
+                priority: alert.priority
+            )
+        }
         
-        print("🏥 FINAL RESULT: \(starterAlerts.count) injury alerts created for starters")
+        print("🏥 FINAL RESULT: \(alertsToShow.count) injury alerts created (bench leagues filtered out)")
         
         // Sort alerts by priority (BYE → IR → O → Q)
-        let sortedAlerts = starterAlerts.sorted { alert1, alert2 in
+        let sortedAlerts = alertsToShow.sorted { alert1, alert2 in
             if alert1.priority.rawValue != alert2.priority.rawValue {
                 return alert1.priority.rawValue < alert2.priority.rawValue
             }
@@ -604,5 +727,7 @@ final class OpponentIntelligenceService {
     func clearCache() {
         cachedIntelligence.removeAll()
         cacheTimestamp = nil
+        lastInjuryScanHash = nil // Also clear injury scan hash
+        print("🗑️ OpponentIntelligenceService: All caches cleared for fresh injury scan")
     }
 }

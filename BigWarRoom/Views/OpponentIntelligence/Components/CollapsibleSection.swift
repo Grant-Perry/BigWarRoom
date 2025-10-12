@@ -10,6 +10,7 @@ import SwiftUI
 /// Collapsible section with header and expandable content
 struct CollapsibleSection<Content: View>: View {
     let title: String
+    var notice: String? = ""
     let count: Int
     @Binding var isExpanded: Bool
     let content: () -> Content
@@ -26,12 +27,19 @@ struct CollapsibleSection<Content: View>: View {
                     Text(title)
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
-                    
+
                     Spacer()
+                    
+                    if let notice = notice, !notice.isEmpty {
+                        Text(notice)
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
                     
                     Text("\(count)")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
+                        .padding(.leading, 8)
                     
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                         .font(.system(size: 12, weight: .bold))
@@ -61,7 +69,7 @@ struct CollapsibleSection<Content: View>: View {
 #Preview("Collapsible Section") {
     VStack(spacing: 16) {
         CollapsibleSection(
-            title: "🏥 Player Injury Alerts",
+            title: "Player Injury Alerts",
             count: 3,
             isExpanded: .constant(true)
         ) {
@@ -74,7 +82,7 @@ struct CollapsibleSection<Content: View>: View {
         }
         
         CollapsibleSection(
-            title: "🎯 Threat Matrix",
+            title: "Threat Matrix",
             count: 5,
             isExpanded: .constant(false)
         ) {

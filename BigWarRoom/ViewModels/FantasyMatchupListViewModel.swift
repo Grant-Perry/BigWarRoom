@@ -15,7 +15,8 @@ import Combine
 final class FantasyMatchupListViewModel: ObservableObject {
     
     // MARK: - Dependencies
-    private var matchupsHubViewModel: MatchupsHubViewModel
+    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
+    private let matchupsHubViewModel = MatchupsHubViewModel.shared
     private let weekManager: WeekSelectionManager
     private let fantasyViewModel: FantasyViewModel
     private var draftRoomViewModel: DraftRoomViewModel?
@@ -39,7 +40,7 @@ final class FantasyMatchupListViewModel: ObservableObject {
     ) {
         self.weekManager = weekManager
         self.fantasyViewModel = fantasyViewModel
-        self.matchupsHubViewModel = MatchupsHubViewModel()
+        // 🔥 REMOVED: No longer creating our own instance - using shared
     }
     
     // MARK: - Setup
@@ -48,10 +49,7 @@ final class FantasyMatchupListViewModel: ObservableObject {
         self.draftRoomViewModel = draftRoomViewModel
         fantasyViewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
         
-        // Ensure matchupsHubViewModel is initialized
-        if matchupsHubViewModel == nil {
-            matchupsHubViewModel = MatchupsHubViewModel()
-        }
+        // 🔥 REMOVED: No longer need to initialize our own instance
     }
     
     // MARK: - Smart Mode Detection
@@ -78,11 +76,6 @@ final class FantasyMatchupListViewModel: ObservableObject {
         defer { isDetectingSmartMode = false }
         
         print("🧠 SMART MODE: Detecting current context...")
-        
-        // Ensure matchupsHubViewModel is initialized
-        if matchupsHubViewModel == nil {
-            matchupsHubViewModel = MatchupsHubViewModel()
-        }
         
         // Load all available matchups first
         await matchupsHubViewModel.loadAllMatchups()

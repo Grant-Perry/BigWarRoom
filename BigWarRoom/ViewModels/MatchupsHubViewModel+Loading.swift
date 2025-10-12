@@ -15,12 +15,12 @@ extension MatchupsHubViewModel {
     /// Main loading function - Load all matchups across all connected leagues
     internal func performLoadAllMatchups() async {
         guard !isLoading else { 
-            print("🔥 LOADING: Already loading, ignoring duplicate request")
+            // print("🔥 LOADING: Already loading, ignoring duplicate request")
             return 
         }
         
         let loadingSessionId = UUID().uuidString.prefix(8)
-        print("🔥 LOADING SESSION \(loadingSessionId): Starting new loading session")
+        // print("🔥 LOADING SESSION \(loadingSessionId): Starting new loading session")
         
         await MainActor.run {
             isLoading = true
@@ -68,21 +68,21 @@ extension MatchupsHubViewModel {
             }
         }
         
-        print("🔥 LOADING SESSION \(loadingSessionId): Completed loading session")
+        // print("🔥 LOADING SESSION \(loadingSessionId): Completed loading session")
     }
     
     /// 🔥 NEW: Bulletproof progress update that forces UI refresh
     private func updateProgress(_ progress: Double, message: String, sessionId: String) async {
         let clampedProgress = max(0.0, min(1.0, progress))
         
-        print("🔥 SESSION \(sessionId): Setting progress to \(clampedProgress) (\(Int(clampedProgress * 100))%)")
+        // print("🔥 SESSION \(sessionId): Setting progress to \(clampedProgress) (\(Int(clampedProgress * 100))%)")
         
         await MainActor.run {
             // Update all progress-related properties at once
             self.loadingProgress = clampedProgress
             self.currentLoadingLeague = message
             
-            print("🔥 SESSION \(sessionId): UI properties updated - progress=\(self.loadingProgress), message='\(self.currentLoadingLeague)'")
+            // print("🔥 SESSION \(sessionId): UI properties updated - progress=\(self.loadingProgress), message='\(self.currentLoadingLeague)'")
         }
     }
     
@@ -91,7 +91,7 @@ extension MatchupsHubViewModel {
         // Initialize loading states - 15% progress
         await updateProgress(0.15, message: "Initializing leagues...", sessionId: sessionId)
         
-        print("🔥 SESSION \(sessionId): Starting to load \(leagues.count) leagues")
+        // print("🔥 SESSION \(sessionId): Starting to load \(leagues.count) leagues")
         
         await MainActor.run {
             for league in leagues {
@@ -100,7 +100,7 @@ extension MatchupsHubViewModel {
                     status: .pending,
                     progress: 0.0
                 )
-                print("🔥 SESSION \(sessionId): Initialized league: \(league.league.name)")
+                // print("🔥 SESSION \(sessionId): Initialized league: \(league.league.name)")
             }
         }
         
@@ -108,41 +108,41 @@ extension MatchupsHubViewModel {
         let totalLeagues = leagues.count
         var processedLeagues = 0
         
-        print("🔥 SESSION \(sessionId): About to start withTaskGroup for \(totalLeagues) leagues")
+        // print("🔥 SESSION \(sessionId): About to start withTaskGroup for \(totalLeagues) leagues")
         
         // Load leagues in parallel for maximum speed
         await withTaskGroup(of: (UnifiedMatchup?, String).self) { group in
-            print("🔥 SESSION \(sessionId): Inside withTaskGroup, adding tasks...")
+            // print("🔥 SESSION \(sessionId): Inside withTaskGroup, adding tasks...")
             
             for league in leagues {
-                print("🔥 SESSION \(sessionId): Adding task for league: \(league.league.name)")
+                // print("🔥 SESSION \(sessionId): Adding task for league: \(league.league.name)")
                 group.addTask {
-                    print("🔥 SESSION \(sessionId): Starting task for league: \(league.league.name)")
+                    // print("🔥 SESSION \(sessionId): Starting task for league: \(league.league.name)")
                     let matchup = await self.loadSingleLeagueMatchup(league)
-                    print("🔥 SESSION \(sessionId): Finished task for league: \(league.league.name), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
+                    // print("🔥 SESSION \(sessionId): Finished task for league: \(league.league.name), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
                     return (matchup, league.id)
                 }
             }
             
             var loadedMatchups: [UnifiedMatchup] = []
             
-            print("🔥 SESSION \(sessionId): About to iterate through task group results...")
+            // print("🔥 SESSION \(sessionId): About to iterate through task group results...")
             
             for await (matchup, leagueID) in group {
                 processedLeagues += 1
-                print("🔥 SESSION \(sessionId): Processed league \(processedLeagues)/\(totalLeagues), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
+                // print("🔥 SESSION \(sessionId): Processed league \(processedLeagues)/\(totalLeagues), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
                 
                 if let matchup = matchup {
                     await MainActor.run {
                         loadedMatchups.append(matchup)
                         self.myMatchups = loadedMatchups.sorted { $0.priority > $1.priority }
                     }
-                    print("🔥 SESSION \(sessionId): Added matchup to collection, total: \(loadedMatchups.count)")
+                    // print("🔥 SESSION \(sessionId): Added matchup to collection, total: \(loadedMatchups.count)")
                 }
                 
                 // 🔥 BULLETPROOF PROGRESS: Linear interpolation from 20% to 90%
                 let progressPercent = 0.20 + (Double(processedLeagues) / Double(totalLeagues)) * 0.70
-                print("🔥 SESSION \(sessionId): Updating progress to \(progressPercent) (\(Int(progressPercent * 100))%)")
+                // print("🔥 SESSION \(sessionId): Updating progress to \(progressPercent) (\(Int(progressPercent * 100))%)")
                 await updateProgress(
                     progressPercent, 
                     message: "Loaded \(processedLeagues) of \(totalLeagues) leagues...",
@@ -154,29 +154,29 @@ extension MatchupsHubViewModel {
                 }
             }
             
-            print("🔥 SESSION \(sessionId): Finished processing all league tasks")
+            // print("🔥 SESSION \(sessionId): Finished processing all league tasks")
         }
         
-        print("🔥 SESSION \(sessionId): Exited withTaskGroup, proceeding to finalization...")
+        // print("🔥 SESSION \(sessionId): Exited withTaskGroup, proceeding to finalization...")
         
         // 🔥 FINAL STEPS: 90% -> 100%
-        print("🔥 SESSION \(sessionId): Starting finalization at 95%...")
+        // print("🔥 SESSION \(sessionId): Starting finalization at 95%...")
         await updateProgress(0.95, message: "Finalizing matchups...", sessionId: sessionId)
         
         // Brief pause to show near completion
         try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
         
-        print("🔥 SESSION \(sessionId): Setting progress to 100%...")
+        // print("🔥 SESSION \(sessionId): Setting progress to 100%...")
         await updateProgress(1.0, message: "Complete!", sessionId: sessionId)
         
         // Brief pause to show 100% completion
         try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
         
         // Finalize loading
-        print("🔥 SESSION \(sessionId): Calling finalizeLoading()...")
+        // print("🔥 SESSION \(sessionId): Calling finalizeLoading()...")
         await finalizeLoading()
         
-        print("🔥 SESSION \(sessionId): Completely finished loading process")
+        // print("🔥 SESSION \(sessionId): Completely finished loading process")
     }
     
     /// Load matchup for a single league using isolated LeagueMatchupProvider
@@ -189,7 +189,7 @@ extension MatchupsHubViewModel {
         loadingLock.lock()
         if currentlyLoadingLeagues.contains(leagueKey) {
             loadingLock.unlock()
-            print("🔥 SINGLE LEAGUE: Already loading \(league.league.name), skipping")
+            // print("🔥 SINGLE LEAGUE: Already loading \(league.league.name), skipping")
             return nil
         }
         currentlyLoadingLeagues.insert(leagueKey)
@@ -199,14 +199,14 @@ extension MatchupsHubViewModel {
             loadingLock.lock()
             currentlyLoadingLeagues.remove(leagueKey)
             loadingLock.unlock()
-            print("🔥 SINGLE LEAGUE: Finished loading \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Finished loading \(league.league.name)")
         }
         
         // Update individual league progress
         await updateLeagueLoadingState(league.id, status: .loading, progress: 0.1)
         
         do {
-            print("🔥 SINGLE LEAGUE: Creating provider for \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Creating provider for \(league.league.name)")
             
             // 🔥 NEW APPROACH: Create isolated provider for this league
             let provider = LeagueMatchupProvider(
@@ -217,32 +217,37 @@ extension MatchupsHubViewModel {
             
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.3)
             
-            print("🔥 SINGLE LEAGUE: Identifying team ID for \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Identifying team ID for \(league.league.name)")
             
             // Step 1: Identify user's team ID
             guard let myTeamID = await provider.identifyMyTeamID() else {
-                print("🔥 SINGLE LEAGUE: Failed to identify team ID for \(league.league.name)")
+                // print("🔥 SINGLE LEAGUE: Failed to identify team ID for \(league.league.name)")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil
             }
             
-            print("🔥 SINGLE LEAGUE: Found team ID '\(myTeamID)' for \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Found team ID '\(myTeamID)' for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.6)
             
             // Step 2: Fetch matchups using isolated provider
-            print("🔥 SINGLE LEAGUE: Fetching matchups for \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Fetching matchups for \(league.league.name)")
             let matchups = try await provider.fetchMatchups()
-            print("🔥 SINGLE LEAGUE: Fetched \(matchups.count) matchups for \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Fetched \(matchups.count) matchups for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
+            
+            // 🔥 NEW: Cache the fully-loaded provider for later use
+            await MainActor.run {
+                self.cacheProvider(provider, for: league, week: currentWeek, year: currentYear)
+            }
             
             // Step 3: Check for Chopped league
             if league.source == .sleeper && matchups.isEmpty {
-                print("🔥 SINGLE LEAGUE: Detected Chopped league: \(league.league.name)")
+                // print("🔥 SINGLE LEAGUE: Detected Chopped league: \(league.league.name)")
                 return await handleChoppedLeague(league: league, myTeamID: myTeamID)
             }
             
             // Step 4: Handle regular leagues
-            print("🔥 SINGLE LEAGUE: Processing regular league: \(league.league.name)")
+            // print("🔥 SINGLE LEAGUE: Processing regular league: \(league.league.name)")
             return await handleRegularLeague(league: league, matchups: matchups, myTeamID: myTeamID, provider: provider)
             
         } catch {
