@@ -95,21 +95,34 @@ struct PlayerScoreBarCardContentView: View {
                         .offset(y: -20)
                         
                         VStack(alignment: .trailing, spacing: 2) {
-                            HStack(spacing: 8) {
-                                // 🔥 SIMPLIFIED: Just show the score, no complex breakdown
-                                Text(playerEntry.currentScoreString)
-                                    .font(.callout)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(playerScoreColor)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.6)
-                                
-                                Text("pts")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.6)
+                            // 🔥 FIXED: Make score clickable with background like before
+                            Button(action: { showingScoreBreakdown = true }) {
+                                HStack(spacing: 8) {
+                                    Text(playerEntry.currentScoreString)
+                                        .font(.callout)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(playerScoreColor)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                    
+                                    Text("pts")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(playerScoreColor.opacity(0.4))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(playerScoreColor.opacity(0.6), lineWidth: 1)
+                                        )
+                                )
                             }
+                            .buttonStyle(PlainButtonStyle())
                             .offset(y: -20)
                         }
                     }
@@ -177,6 +190,13 @@ struct PlayerScoreBarCardContentView: View {
         }
         .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Clip the entire thing
+        .sheet(isPresented: $showingScoreBreakdown) {
+            let breakdown = ScoreBreakdownFactory.createBreakdown(
+                for: playerEntry.player,
+                week: WeekSelectionManager.shared.selectedWeek
+            )
+            ScoreBreakdownView(breakdown: breakdown)
+        }
     }
     
     // MARK: - Watch Functionality

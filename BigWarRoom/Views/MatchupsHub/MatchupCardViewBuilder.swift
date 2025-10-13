@@ -142,19 +142,53 @@ struct MatchupCardViewBuilder: View {
                 shadowRadius = 6
             }
         } else if isLive {
-            // Live game styling - more green!
-            borderColors = [Color.gpGreen, Color.gpGreen.opacity(0.8), Color.cyan.opacity(0.6), Color.gpGreen.opacity(0.9), Color.gpGreen]
-            borderWidth = 2
-            borderOpacity = 0.8
-            shadowColor = Color.gpGreen.opacity(0.3)
-            shadowRadius = 4
+            // 🔥 FIXED: Check win/loss status even for live games
+            if isWinning {
+                // Winning LIVE game: Keep the original live green theme
+                borderColors = [Color.gpGreen, Color.gpGreen.opacity(0.8), Color.cyan.opacity(0.6), Color.gpGreen.opacity(0.9), Color.gpGreen]
+                borderWidth = 2
+                borderOpacity = 0.8
+                shadowColor = Color.gpGreen.opacity(0.3)
+                shadowRadius = 4
+            } else {
+                // 🔥 LOSING LIVE game: Cool gradient from gpPink to gpRed with light blue accents
+                borderColors = [
+                    Color.gpPink, 
+                    Color.gpRedPink.opacity(0.8),
+                    Color.cyan.opacity(0.4), // Light blue accent
+                    Color.gpRed.opacity(0.9),
+                    Color.gpPink.opacity(0.7),
+                    Color.gpRed
+                ]
+                borderWidth = 2.4
+                borderOpacity = 0.9
+                shadowColor = Color.gpRedPink.opacity(0.4)
+                shadowRadius = 7
+            }
         } else {
-            // Regular game styling
-            borderColors = [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
-            borderWidth = 1.5
-            borderOpacity = 0.7
-            shadowColor = Color.black.opacity(0.2)
-            shadowRadius = 2
+            // Non-live games
+            if isWinning {
+                // Winning: Keep the original blue theme
+                borderColors = [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
+                borderWidth = 1.5
+                borderOpacity = 0.7
+                shadowColor = Color.black.opacity(0.2)
+                shadowRadius = 2
+            } else {
+                // 🔥 LOSING: Cool gradient from gpPink to gpRed with light blue accents
+                borderColors = [
+                    Color.gpPink, 
+                    Color.gpRedPink.opacity(0.8),
+                    Color.cyan.opacity(0.3), // Light blue accent
+                    Color.gpRed.opacity(0.9),
+                    Color.gpPink.opacity(0.7),
+                    Color.gpRed
+                ]
+                borderWidth = 2.2
+                borderOpacity = 0.85
+                shadowColor = Color.gpRedPink.opacity(0.35)
+                shadowRadius = 5
+            }
         }
         
         return MicroCardProperties(
