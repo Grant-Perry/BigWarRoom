@@ -29,27 +29,29 @@ struct AllLivePlayersView: View {
     @State private var hasPerformedInitialLoad = false
     
     var body: some View {
-        ZStack {
-            // BG7 background
-            Image("BG7")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .opacity(0.35)
-                .ignoresSafeArea(.all)
-            
-            VStack(spacing: 0) {
-                // 🔥 CLEAN: Extracted header component
-                AllLivePlayersHeaderView(
-                    viewModel: allLivePlayersViewModel,
-                    sortHighToLow: $sortHighToLow,
-                    showingWeekPicker: $showingWeekPicker,
-                    onAnimationReset: resetAnimations,
-                    showingFilters: $showingFilters,
-                    showingWatchedPlayers: $showingWatchedPlayers
-                )
+        GeometryReader { geometry in
+            ZStack {
+                // BG7 background
+                Image("BG7")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .opacity(0.35)
+                    .ignoresSafeArea(.all)
                 
-                // 🔥 PROPER: Content based on clean state machine
-                buildContentView()
+                VStack(spacing: 0) {
+                    // 🔥 FIXED: Header with NO top padding
+                    AllLivePlayersHeaderView(
+                        viewModel: allLivePlayersViewModel,
+                        sortHighToLow: $sortHighToLow,
+                        showingWeekPicker: $showingWeekPicker,
+                        onAnimationReset: resetAnimations,
+                        showingFilters: $showingFilters,
+                        showingWatchedPlayers: $showingWatchedPlayers
+                    )
+                    
+                    // 🔥 PROPER: Content based on clean state machine
+                    buildContentView()
+                }
             }
         }
         .navigationTitle("All Rostered Players")
@@ -65,18 +67,23 @@ struct AllLivePlayersView: View {
         .refreshable {
             await performRefresh()
         }
+        .keyboardAdaptive() // Custom modifier to handle keyboard properly
         .onAppear {
-            // 🔥 PROPER: Only load if we haven't loaded before OR data is initial
-            let needsLoad = !hasPerformedInitialLoad || allLivePlayersViewModel.isInitialState
+            // 🔥 REVERTED: Back to simple, working logic
+            let hasData = !allLivePlayersViewModel.allPlayers.isEmpty
             
-            if needsLoad {
-                print("🔥 ONAPPEAR: Performing initial load")
+            print("🔥 LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
+            
+            // Simple rule: If we don't have data, load it
+            if !hasData && !hasPerformedInitialLoad {
+                print("🔥 LIVE PLAYERS: Starting data load")
+                hasPerformedInitialLoad = true
                 Task {
                     await allLivePlayersViewModel.loadAllPlayers()
-                    hasPerformedInitialLoad = true
                 }
             } else {
-                print("🔥 ONAPPEAR: Skipping load - already loaded")
+                print("🔥 LIVE PLAYERS: Already have data or already loaded")
+                hasPerformedInitialLoad = true
             }
         }
         .onDisappear {
@@ -113,16 +120,29 @@ struct AllLivePlayersView: View {
         }
     }
     
-    // MARK: - Content View Selection (Clean State Machine)
+    // MARK: - Content View Selection (Reverted to Working Logic)
     
     func buildContentView() -> some View {
-        switch allLivePlayersViewModel.dataState {
-        case .initial, .loading:
+        let dataState = allLivePlayersViewModel.dataState
+        
+        // If searching and no results, show search-specific empty state
+        if allLivePlayersViewModel.isSearching && allLivePlayersViewModel.filteredPlayers.isEmpty {
+            return AnyView(searchEmptyStateView)
+        }
+        
+        // If we're loading OR if we have no data yet but are not in error state, show loading
+        if case .loading = dataState {
             return AnyView(AllLivePlayersLoadingView())
-            
+        }
+        
+        if case .initial = dataState {
+            return AnyView(AllLivePlayersLoadingView())
+        }
+        
+        // Only show empty state if we've actually finished loading and confirmed no data
+        switch dataState {
         case .loaded:
             if allLivePlayersViewModel.filteredPlayers.isEmpty {
-                // This means we have data but filters eliminated everything
                 return AnyView(
                     AllLivePlayersEmptyStateView(
                         viewModel: allLivePlayersViewModel,
@@ -140,7 +160,6 @@ struct AllLivePlayersView: View {
             }
             
         case .empty:
-            // Legitimately no players found after loading
             return AnyView(
                 AllLivePlayersEmptyStateView(
                     viewModel: allLivePlayersViewModel,
@@ -173,7 +192,53 @@ struct AllLivePlayersView: View {
                 }
                 .padding()
             )
+            
+        default:
+            // Fallback to loading for any other state
+            return AnyView(AllLivePlayersLoadingView())
         }
+    }
+    
+    // MARK: - Search Empty State View
+    
+    private var searchEmptyStateView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.crop.circle.badge.xmark")
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.6))
+            
+            VStack(spacing: 8) {
+                Text(allLivePlayersViewModel.searchText.capitalized)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                
+                if allLivePlayersViewModel.showRosteredOnly {
+                    Text("Not rostered in any of your leagues")
+                        .font(.system(size: 16))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("No players found in NFL database")
+                        .font(.system(size: 16))
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            
+            // Suggestion to try removing rostered filter
+            if allLivePlayersViewModel.showRosteredOnly {
+                Button(action: {
+                    allLivePlayersViewModel.showRosteredOnly = false
+                    allLivePlayersViewModel.toggleRosteredFilter()
+                }) {
+                    Text("Search All NFL Players")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.gpBlue)
+                }
+                .padding(.top, 8)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Event Handlers (UI Coordination Only)
@@ -222,5 +287,30 @@ struct AllLivePlayersView: View {
     /// Cancel background tasks when view disappears
     private func cancelTasks() {
         loadTask?.cancel()
+    }
+}
+
+// MARK: - Custom Keyboard Adaptive Modifier
+extension View {
+    func keyboardAdaptive() -> some View {
+        modifier(KeyboardAdaptive())
+    }
+}
+
+struct KeyboardAdaptive: ViewModifier {
+    @State private var keyboardHeight: CGFloat = 0
+    
+    func body(content: Content) -> some View {
+        content
+            .padding(.bottom, keyboardHeight)
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue {
+                    keyboardHeight = keyboardFrame.cgRectValue.height
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardHeight = 0
+            }
+            .animation(.easeInOut(duration: 0.3), value: keyboardHeight)
     }
 }

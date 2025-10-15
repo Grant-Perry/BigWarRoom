@@ -21,6 +21,8 @@ final class PlayerWatchService: ObservableObject {
     @Published var watchedPlayers: [WatchedPlayer] = []
     @Published var recentNotifications: [WatchNotification] = []
     @Published var settings = WatchSettings()
+    @Published var isManuallyOrdered = false // Track if user has manually reordered
+    @Published var sortHighToLow = true // Track sort direction for threat mode
     
     // MARK: - Private Properties
     
@@ -33,6 +35,8 @@ final class PlayerWatchService: ObservableObject {
     // Keys for UserDefaults persistence
     private let watchedPlayersKey = "BigWarRoom_WatchedPlayers"
     private let watchSettingsKey = "BigWarRoom_WatchSettings"
+    private let manualOrderKey = "BigWarRoom_WatchedPlayers_ManualOrder"
+    private let sortDirectionKey = "BigWarRoom_WatchedPlayers_SortDirection"
     
     // MARK: - Initialization
     
@@ -170,10 +174,9 @@ final class PlayerWatchService: ObservableObject {
             }
         }
         
-        if updated {
-            // Sort by threat level (highest threat first)
-            watchedPlayers.sort { $0.weightedThreatScore > $1.weightedThreatScore }
-            // No need to save - only dynamic properties changed
+        if updated && !isManuallyOrdered {
+            // Only auto-sort if user hasn't manually reordered
+            applySorting()
         }
     }
     
@@ -209,20 +212,53 @@ final class PlayerWatchService: ObservableObject {
     ///   - from: Source indices
     ///   - to: Destination index
     func moveWatchedPlayers(from: IndexSet, to: Int) {
-        // Use the same sorting as sortedWatchedPlayers for consistent behavior
-        var sortedPlayers = watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
-        sortedPlayers.move(fromOffsets: from, toOffset: to)
+        // Apply the move directly to the current display order
+        watchedPlayers.move(fromOffsets: from, toOffset: to)
         
-        // Update the original array to match the new order
-        watchedPlayers = sortedPlayers
+        // Mark as manually ordered to prevent auto-sorting
+        isManuallyOrdered = true
+        
         saveWatchedPlayers()
+        saveManualOrderFlag()
         
-        print("🎯 Reordered watched players - new order saved")
+        print("🎯 Manually reordered watched players - auto-sorting disabled")
     }
     
     /// Get watched players in current display order (for drag consistency)
     var displayOrderWatchedPlayers: [WatchedPlayer] {
-        watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
+        if isManuallyOrdered {
+            return watchedPlayers // Return in user's manual order
+        } else {
+            return applySorting()
+        }
+    }
+    
+    /// Reset to automatic threat-based sorting
+    func resetToAutomaticSorting() {
+        isManuallyOrdered = false
+        watchedPlayers = applySorting()
+        saveWatchedPlayers()
+        saveManualOrderFlag()
+        print("🎯 Reset to automatic threat-based sorting")
+    }
+    
+    /// Toggle sort direction for threat-based sorting
+    func toggleSortDirection() {
+        sortHighToLow.toggle()
+        if !isManuallyOrdered {
+            watchedPlayers = applySorting()
+        }
+        saveSortDirection()
+        print("🎯 Toggled sort direction to \(sortHighToLow ? "High→Low" : "Low→High")")
+    }
+    
+    /// Apply current sorting method
+    private func applySorting() -> [WatchedPlayer] {
+        if sortHighToLow {
+            return watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
+        } else {
+            return watchedPlayers.sorted { $0.weightedThreatScore < $1.weightedThreatScore }
+        }
     }
     
     // MARK: - Notification System
@@ -336,6 +372,8 @@ final class PlayerWatchService: ObservableObject {
             watchedPlayers = players
             print("🎯 Loaded \(watchedPlayers.count) watched players - scores will refresh dynamically")
         }
+        loadManualOrderFlag() // Load the manual order flag too
+        loadSortDirection() // Load the sort direction too
     }
     
     private func saveSettings() {
@@ -348,6 +386,25 @@ final class PlayerWatchService: ObservableObject {
         if let data = userDefaults.data(forKey: watchSettingsKey),
            let loadedSettings = try? JSONDecoder().decode(WatchSettings.self, from: data) {
             settings = loadedSettings
+        }
+    }
+    
+    private func saveManualOrderFlag() {
+        userDefaults.set(isManuallyOrdered, forKey: manualOrderKey)
+    }
+    
+    private func loadManualOrderFlag() {
+        isManuallyOrdered = userDefaults.bool(forKey: manualOrderKey)
+    }
+    
+    private func saveSortDirection() {
+        userDefaults.set(sortHighToLow, forKey: sortDirectionKey)
+    }
+    
+    private func loadSortDirection() {
+        sortHighToLow = userDefaults.bool(forKey: sortDirectionKey)
+        if userDefaults.object(forKey: sortDirectionKey) == nil {
+            sortHighToLow = true // Default to high to low
         }
     }
     

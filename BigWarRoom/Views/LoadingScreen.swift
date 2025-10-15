@@ -15,6 +15,9 @@ struct LoadingScreen: View {
     @State private var purpleWave: CGFloat = 0
     @State private var isComplete = false
     @State private var footballScale: Double = 1.0
+    @State private var loadingMessage = "Loading BigWarRoom..." // 🔥 NEW: Loading progress message
+    @State private var isDataLoading = false // 🔥 NEW: Track data loading state
+    @State private var orbRotation: Double = 0 // 🔥 NEW: For spinning orbs
     
     /// Completion handler 
     let onComplete: (Bool) -> Void
@@ -22,7 +25,8 @@ struct LoadingScreen: View {
     /// Credentials managers for checking persistent data
     @StateObject private var espnCredentials = ESPNCredentialsManager.shared
     @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
-    
+    @StateObject private var matchupsHub = MatchupsHubViewModel.shared // 🔥 NEW: Load data through this
+
     var body: some View {
         ZStack {
             // Static beautiful gradient background
@@ -58,6 +62,10 @@ struct LoadingScreen: View {
             // Bokeh background effects
             BokehLayer()
                 .opacity(0.6)
+            
+            // 🔥 NEW: Spinning Orbs around the football
+            SpinningOrbsView(rotation: orbRotation)
+                .opacity(textOpacity)
             
             // Main content
             VStack(spacing: 50) {
@@ -97,27 +105,57 @@ struct LoadingScreen: View {
                 
                 Spacer()
                 
-                // Loading dots
-                LoadingDots()
-                    .opacity(textOpacity)
-                
-                // Tap to continue hint
-                Text("Tap to continue")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .opacity(textOpacity)
-                    .animation(.easeIn(duration: 1.0).delay(2.0), value: textOpacity)
+                // 🔥 NEW: Loading message and progress
+                VStack(spacing: 16) {
+                    LoadingDots()
+                        .opacity(textOpacity)
+                    
+                    Text(loadingMessage)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .opacity(textOpacity)
+                        .animation(.easeInOut(duration: 0.3), value: loadingMessage)
+                    
+                    // 🔥 NEW: Show different message when data loading vs splash
+                    if isDataLoading {
+                        Text("Loading your leagues...")
+                            .font(.system(size: 12, weight: .regular))
+                            .foregroundColor(.white.opacity(0.6))
+                            .opacity(textOpacity)
+                    } else {
+                        Text("Tap to continue")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .opacity(textOpacity)
+                            .animation(.easeIn(duration: 1.0).delay(2.0), value: textOpacity)
+                    }
+                }
                 
                 Spacer()
             }
             .padding(.horizontal, 32)
         }
         .onTapGesture {
-            // Tap anywhere to exit splash screen
-            completeLoading()
+            // Only allow tap to skip if not loading data
+            if !isDataLoading {
+                completeLoading()
+            }
         }
         .onAppear {
             startSplashSequence()
+            startOrbAnimation()
+        }
+        .onChange(of: matchupsHub.currentLoadingLeague) { _, newMessage in
+            if !newMessage.isEmpty && isDataLoading {
+                loadingMessage = newMessage
+            }
+        }
+    }
+    
+    /// 🔥 NEW: Start the spinning orbs animation
+    private func startOrbAnimation() {
+        withAnimation(.linear(duration: 10.0).repeatForever(autoreverses: false)) {
+            orbRotation = 360
         }
     }
     
@@ -143,10 +181,41 @@ struct LoadingScreen: View {
             purpleWave = 1.5
         }
         
-        // Complete after 3 seconds (longer to show "tap to continue")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            // Auto-complete if user doesn't tap
-            if !isComplete {
+        // 🔥 CHANGED: After splash animation, start loading essential data
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            startEssentialDataLoading()
+        }
+    }
+    
+    /// 🔥 NEW: Load essential data before showing main app
+    private func startEssentialDataLoading() {
+        // Check if user has any valid credentials
+        let hasESPNCredentials = espnCredentials.hasValidCredentials
+        let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
+        let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
+        
+        // If no credentials, skip data loading and go straight to onboarding
+        if !hasAnyCredentials {
+            print("🔥 LOADING: No credentials found - skipping data loading")
+            completeLoading()
+            return
+        }
+        
+        // Start loading essential data
+        print("🔥 LOADING: Starting essential data loading...")
+        isDataLoading = true
+        loadingMessage = "Loading your leagues..."
+        
+        Task {
+            // Load the essential Mission Control data
+            await matchupsHub.loadAllMatchups()
+            
+            // Also preload other essential services
+            await AllLivePlayersViewModel.shared.loadAllPlayers()
+            
+            print("🔥 LOADING: Essential data loading complete")
+            
+            await MainActor.run {
                 completeLoading()
             }
         }
@@ -164,7 +233,7 @@ struct LoadingScreen: View {
         // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
-        // x// x Print("🔍 Loading screen check - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
+        print("🔍 Loading complete - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
             // Add exit animation here if needed
@@ -358,5 +427,73 @@ struct BokehLayer: View {
 #Preview {
     LoadingScreen { _ in
         // x// x Print("Splash complete!")
+    }
+}
+
+// 🔥 NEW: Spinning Orbs View Component
+struct SpinningOrbsView: View {
+    let rotation: Double
+    
+    var body: some View {
+        ZStack {
+            // Outer ring of orbs (8 orbs)
+            ForEach(0..<8, id: \.self) { index in
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.gpGreen, .gpBlue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 12, height: 12)
+                    .shadow(color: .gpGreen, radius: 4)
+                    .offset(y: -180) // Distance from center
+                    .rotationEffect(.degrees(Double(index) * 45 + rotation))
+            }
+            
+            // Middle ring of orbs (6 orbs)
+            ForEach(0..<6, id: \.self) { index in
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.gpOrange, .gpRedPink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 10, height: 10)
+                    .shadow(color: .gpOrange, radius: 3)
+                    .offset(y: -140) // Distance from center
+                    .rotationEffect(.degrees(Double(index) * 60 + rotation * -0.7)) // Counter rotation
+            }
+            
+            // Inner ring of orbs (4 orbs)
+            ForEach(0..<4, id: \.self) { index in
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 8, height: 8)
+                    .shadow(color: .purple, radius: 2)
+                    .offset(y: -100) // Distance from center
+                    .rotationEffect(.degrees(Double(index) * 90 + rotation * 0.5)) // Slower rotation
+            }
+            
+            // Tiny sparkle orbs (12 orbs)
+            ForEach(0..<12, id: \.self) { index in
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 4, height: 4)
+                    .shadow(color: .white, radius: 1)
+                    .offset(y: -220) // Outermost ring
+                    .rotationEffect(.degrees(Double(index) * 30 + rotation * 1.5)) // Fastest rotation
+                    .opacity(0.8)
+            }
+        }
     }
 }

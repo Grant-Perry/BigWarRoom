@@ -52,7 +52,7 @@ struct NonMicroWinProbability: View {
                 let (myPercentage, opponentPercentage) = calculateScorePercentages()
                 
                 Text("\(myPercentage)%")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.gpGreen)
                 
                 Spacer()
@@ -60,7 +60,7 @@ struct NonMicroWinProbability: View {
                 // Score delta in center - match percentage font exactly
                 if let delta = scoreDelta {
                     Text(formatScoreDelta(delta))
-                        .font(.system(size: 10, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
@@ -69,7 +69,7 @@ struct NonMicroWinProbability: View {
                 Spacer()
                 
                 Text("\(opponentPercentage)%")
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white.opacity(0.7))
             }
             

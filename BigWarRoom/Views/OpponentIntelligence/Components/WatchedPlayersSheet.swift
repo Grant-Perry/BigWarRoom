@@ -30,6 +30,9 @@ struct WatchedPlayersSheet: View {
                     if watchService.watchedPlayers.isEmpty {
                         emptyStateView
                     } else {
+                        // Sort control section (matching All Live Players style)
+                        sortControlsSection
+                        
                         // Native SwiftUI List with .onMove for smooth drag & drop
                         List {
                             ForEach(watchService.displayOrderWatchedPlayers, id: \.id) { watchedPlayer in
@@ -82,6 +85,80 @@ struct WatchedPlayersSheet: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             watchService.moveWatchedPlayers(from: source, to: destination)
         }
+    }
+    
+    // MARK: - Sort Controls Section
+    
+    private var sortControlsSection: some View {
+        HStack {
+            Spacer()
+            
+            // Sort Mode Toggle (Static/Threat)
+            Button(action: {
+                if watchService.isManuallyOrdered {
+                    watchService.resetToAutomaticSorting()
+                } else {
+                    // Already in threat mode, user needs to drag to switch to static
+                }
+            }) {
+                VStack(spacing: 2) {
+                    Text(watchService.isManuallyOrdered ? "STATIC" : "THREAT")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .gpGreen)
+                    
+                    Text("Sort Order")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Spacer()
+            
+            // Sort Direction Toggle (only clickable in threat mode)
+            Button(action: {
+                if !watchService.isManuallyOrdered {
+                    watchService.toggleSortDirection()
+                }
+            }) {
+                VStack(spacing: 2) {
+                    Text(watchService.isManuallyOrdered ? "CUSTOM" : (watchService.sortHighToLow ? "HIGH→LOW" : "LOW→HIGH"))
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
+                    
+                    Text("Direction")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .disabled(watchService.isManuallyOrdered) // Disable when in manual mode
+            .opacity(watchService.isManuallyOrdered ? 0.6 : 1.0) // Visual feedback for disabled state
+            
+            Spacer()
+            
+            // Drag Hint
+            VStack(spacing: 2) {
+                Text("DRAG")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.gpBlue)
+                
+                Text("To Reorder")
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(Color.black.opacity(0.1))
     }
 
     private var emptyStateView: some View {

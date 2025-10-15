@@ -73,41 +73,99 @@ struct FeaturesView: View {
                 icon: "target",
                 iconColor: .gpPostBot,
                 title: "Mission Control",
-                description: "Real-time matchup tracking across your Sleeper and ESPN leagues. Monitor scores, projections, and win probabilities in one unified dashboard.",
-                badge: nil
+                description: "Real-time matchup tracking across your Sleeper and ESPN leagues. Monitor scores, projections, and win probabilities with dynamic color-coded borders and live updates.",
+                badge: "LIVE"
+            )
+            
+            FeatureCard(
+                icon: "eye.circle.fill",
+                iconColor: .purple,
+                title: "Intelligence Dashboard",
+                description: "Advanced opponent analysis with injury alerts, conflict detection, and strategic recommendations. Get critical player updates with 'FIX' buttons for instant action.",
+                badge: "SMART"
             )
             
             FeatureCard(
                 icon: "chart.bar.fill",
                 iconColor: .gpGreen,
-                title: "Live Players Tracker",
-                description: "Track all your active players with live scoring, performance tiers, and position filtering. See who's crushing it and who's struggling in real-time.",
-                badge: nil
+                title: "All Rostered Players",
+                description: "Track every player across all your leagues with live scoring, performance tiers, position filtering, and comprehensive search. Sort by score, position, name, or team.",
+                badge: "ENHANCED"
             )
             
             FeatureCard(
                 icon: "calendar.circle.fill",
                 iconColor: .blue,
                 title: "NFL Schedule Integration",
-                description: "Complete NFL schedule with live scores, game status, and direct links to player matchups. Never miss a game or scoring opportunity.",
+                description: "Complete NFL schedule with live scores, game status, team logos, and betting lines. See which of your players are in live games with color-coded indicators.",
                 badge: nil
             )
             
+            // Advanced Intelligence Features
+            FeatureCard(
+                icon: "cross.case.fill",
+                iconColor: .red,
+                title: "Injury Alert System",
+                description: "Real-time injury monitoring with beautiful alert cards showing BYE weeks, IR status, OUT/QUESTIONABLE players, and direct links to fix your lineups.",
+                badge: "CRITICAL"
+            )
+            
+            FeatureCard(
+                icon: "eye.fill",
+                iconColor: .gpOrange,
+                title: "Player Watch System",
+                description: "Watch and track specific players across all leagues with live score updates, performance notifications, and easy management of your watch list.",
+                badge: "NEW"
+            )
+            
+            FeatureCard(
+                icon: "magnifyingglass.circle.fill",
+                iconColor: .gpBlue,
+                title: "Advanced Player Search",
+                description: "Search all NFL players or just your rostered players with intelligent name matching, position filtering, and instant results from comprehensive player database.",
+                badge: "POWERFUL"
+            )
+            
+            FeatureCard(
+                icon: "brain.head.profile",
+                iconColor: .purple,
+                title: "Conflict Detection",
+                description: "Automatically detects when you own players facing each other across leagues, calculating net impact and strategic implications for optimal lineup decisions.",
+                badge: "SMART"
+            )
+            
+            // Loading and Performance Features
+            FeatureCard(
+                icon: "circle.hexagongrid.fill",
+                iconColor: .cyan,
+                title: "Centralized Loading System",
+                description: "Beautiful spinning orb loading screens with progress indicators that change color from red to green. All your data loads upfront for instant tab switching.",
+                badge: "SMOOTH"
+            )
+            
+            FeatureCard(
+                icon: "arrow.clockwise.circle.fill",
+                iconColor: .gpGreen,
+                title: "Dynamic Refresh Timers",
+                description: "Color-changing countdown timers that show when data will refresh. Green when fresh, orange when halfway, red when almost time to update.",
+                badge: "VISUAL"
+            )
+            
+            FeatureCard(
+                icon: "percent",
+                iconColor: .gpGreen,
+                title: "Enhanced Win Probabilities",
+                description: "Larger, more visible win percentage displays on matchup cards with improved color coding and better contrast for quick assessment.",
+                badge: "IMPROVED"
+            )
+            
+            // War Room and Draft Features
             FeatureCard(
                 icon: "person.2.fill",
                 iconColor: .orange,
                 title: "War Room",
-                description: "Advanced draft preparation and league management. Research players, track draft picks, and manage your roster strategy.",
+                description: "Advanced draft preparation and league management. Research players, track draft picks, and manage your roster strategy with comprehensive tools.",
                 badge: nil
-            )
-            
-            // Advanced Features
-            FeatureCard(
-                icon: "brain.head.profile",
-                iconColor: .purple,
-                title: "AI Pick Suggestions",
-                description: "Machine learning-powered draft recommendations based on ADP, projections, and league settings. Get the edge on your competition.",
-                badge: "SMART"
             )
             
             FeatureCard(
@@ -126,44 +184,53 @@ struct FeaturesView: View {
                 badge: "LIVE"
             )
             
+            // User Experience Features
             FeatureCard(
-                icon: "person.crop.circle",
-                iconColor: .gpGreen,
-                title: "My Roster Management",
-                description: "Comprehensive roster overview with player performance tracking, injury updates, and lineup optimization suggestions.",
-                badge: nil
+                icon: "textformat.size",
+                iconColor: .blue,
+                title: "Responsive Text Scaling",
+                description: "Smart text that automatically scales to fit available space with line limits and minimum scale factors. No more text wrapping or cutoff issues.",
+                badge: "POLISHED"
             )
             
             FeatureCard(
-                icon: "football",
-                iconColor: .brown,
-                title: "Fantasy Matchup Analysis",
-                description: "Deep-dive into weekly matchups with opponent analysis, strength of schedule, and strategic recommendations for optimal lineups.",
-                badge: nil
+                icon: "keyboard.fill",
+                iconColor: .gray,
+                title: "Intelligent Keyboard Handling",
+                description: "Search bars that stay properly positioned when keyboard appears, with auto-focus, auto-capitalization disabled, and proper safe area handling.",
+                badge: "UX"
             )
             
-            // Platform Integration
+            FeatureCard(
+                icon: "link.circle.fill",
+                iconColor: .gpBlue,
+                title: "External App Integration",
+                description: "Direct 'FIX' buttons that launch Sleeper app or ESPN website to make lineup changes. Seamless integration with your existing fantasy workflow.",
+                badge: "INTEGRATION"
+            )
+            
+            // Platform and Technical Features
             FeatureCard(
                 icon: "icloud.fill",
                 iconColor: .gray,
                 title: "Multi-Platform Support",
-                description: "Seamless integration with ESPN and Sleeper, and other major fantasy platforms. All your leagues in one place.",
+                description: "Seamless integration with ESPN and Sleeper platforms. All your leagues unified in one place with consistent data presentation.",
                 badge: "UNIVERSAL"
             )
             
             FeatureCard(
-                icon: "arrow.clockwise.circle.fill",
-                iconColor: .gpPostBot,
-                title: "Auto-Refresh Scoring",
-                description: "Automatic score updates every 15 seconds during games. Never manually refresh again - your data is always current.",
-                badge: "AUTO"
+                icon: "server.rack",
+                iconColor: .green,
+                title: "Centralized Data Management",
+                description: "Single source of truth for all fantasy data with intelligent caching, background updates, and coordinated loading across all app features.",
+                badge: "ARCHITECTURE"
             )
             
             FeatureCard(
                 icon: "bell.fill",
                 iconColor: .yellow,
                 title: "Smart Notifications",
-                description: "Intelligent alerts for scoring plays, injury updates, and lineup changes. Stay informed without being overwhelmed.",
+                description: "Intelligent alerts for scoring plays, injury updates, and lineup changes. Contextual badges and visual indicators keep you informed without overwhelming.",
                 badge: "SMART"
             )
         }
@@ -252,6 +319,16 @@ struct FeatureCard: View {
         case "SMART": return .purple
         case "AUTO": return .blue
         case "UNIVERSAL": return .orange
+        case "CRITICAL": return .red
+        case "ENHANCED": return .gpGreen
+        case "POWERFUL": return .gpBlue
+        case "SMOOTH": return .cyan
+        case "VISUAL": return .gpOrange
+        case "IMPROVED": return .gpGreen
+        case "POLISHED": return .blue
+        case "UX": return .purple
+        case "INTEGRATION": return .gpBlue
+        case "ARCHITECTURE": return .green
         default: return .gpPostBot
         }
     }

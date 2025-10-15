@@ -29,6 +29,10 @@ final class AllLivePlayersViewModel: ObservableObject {
     @Published var shouldResetAnimations = false
     @Published var sortChangeID = UUID()
     @Published var lastUpdateTime = Date()
+    @Published var searchText: String = ""
+    @Published var isSearching: Bool = false
+    @Published var showRosteredOnly: Bool = false // Changed to checkbox approach
+    @Published var allNFLPlayers: [SleeperPlayer] = [] // For All Players search
     
     // MARK: - Computed Statistics
     @Published var topScore: Double = 0.0
@@ -52,6 +56,7 @@ final class AllLivePlayersViewModel: ObservableObject {
     // MARK: - Private Init
     private init() {
         subscribeToWeekChanges()
+        // 🔥 REMOVED: subscribeToMatchupsChanges() - no longer needed with centralized loading
     }
     
     // MARK: - Cleanup
@@ -175,7 +180,18 @@ extension AllLivePlayersViewModel {
     }
     
     var hasNoLeagues: Bool {
-        matchupsHubViewModel.myMatchups.isEmpty
+        // Only consider it "no leagues" if we've finished loading and still have nothing
+        // Don't show "no leagues" during initial loading
+        let isCurrentlyLoading = {
+            switch dataState {
+            case .loading:
+                return true
+            default:
+                return false
+            }
+        }()
+        
+        return !matchupsHubViewModel.isLoading && matchupsHubViewModel.myMatchups.isEmpty && !isCurrentlyLoading
     }
     
     var hasLeaguesButNoPlayers: Bool {

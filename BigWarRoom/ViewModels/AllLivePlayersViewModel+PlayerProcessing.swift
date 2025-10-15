@@ -190,29 +190,113 @@ extension AllLivePlayersViewModel {
     
     // 🔥 NEW: Silent filter application (called during background updates)
     private func applySilentPositionFilter() {
-        print("🔇 SILENT FILTER: Applying filters without UI state changes")
+        print("🔇 SILENT FILTER: Applying filters without UI state changes - Search: '\(searchText)', RosteredOnly: \(showRosteredOnly)")
         
         guard !allPlayers.isEmpty else {
             filteredPlayers = []
             return
         }
 
-        // Apply position filter
-        let positionFiltered = selectedPosition == .all ?
-            allPlayers :
-            allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
+        var players = allPlayers
+        
+        // If searching, handle two different flows (SAME AS MAIN FILTER)
+        if isSearching {
+            if showRosteredOnly {
+                // ROSTERED ONLY SEARCH: Filter existing league players by search terms
+                print("🔇 SILENT: Searching ROSTERED players for '\(searchText)'")
+                
+                players = allPlayers.filter { livePlayer in
+                    let matches = playerNameMatches(livePlayer.playerName, searchQuery: searchText)
+                    if matches {
+                        print("🔇 ROSTERED MATCH: '\(searchText)' matches '\(livePlayer.playerName)'")
+                    }
+                    return matches
+                }
+                
+                print("🔇 SILENT: Found \(players.count) rostered players matching '\(searchText)'")
+                
+                // IMPORTANT: Don't apply any other filters when doing rostered search
+                // Skip to the final steps to preserve the search results
+            } else {
+                // FULL NFL SEARCH: Search all NFL players and create search entries
+                print("🔇 SILENT: Searching ALL NFL players for '\(searchText)'")
+                
+                guard !allNFLPlayers.isEmpty else {
+                    filteredPlayers = []
+                    return
+                }
+                
+                let matchingNFLPlayers = allNFLPlayers.filter { player in
+                    let matches = sleeperPlayerMatches(player, searchQuery: searchText)
+                    if matches {
+                        print("🔇 NFL MATCH: '\(searchText)' matches '\(player.fullName)'")
+                    }
+                    return matches
+                }.prefix(50)
+                
+                // Convert to LivePlayerEntry format for display
+                players = matchingNFLPlayers.compactMap { sleeperPlayer in
+                    let fantasyPlayer = FantasyPlayer(
+                        id: sleeperPlayer.playerID,
+                        sleeperID: sleeperPlayer.playerID,
+                        espnID: sleeperPlayer.espnID,
+                        firstName: sleeperPlayer.firstName,
+                        lastName: sleeperPlayer.lastName,
+                        position: sleeperPlayer.position ?? "UNKNOWN",
+                        team: sleeperPlayer.team,
+                        jerseyNumber: sleeperPlayer.number?.description,
+                        currentPoints: 0.0,
+                        projectedPoints: 0.0,
+                        gameStatus: nil,
+                        isStarter: false,
+                        lineupSlot: nil
+                    )
+                    
+                    guard let templateMatchup = allPlayers.first?.matchup else { 
+                        return nil 
+                    }
+                    
+                    return LivePlayerEntry(
+                        id: "search_all_\(sleeperPlayer.playerID)",
+                        player: fantasyPlayer,
+                        leagueName: "NFL Search",
+                        leagueSource: "Search",
+                        currentScore: 0.0,
+                        projectedScore: 0.0,
+                        isStarter: false,
+                        percentageOfTop: 0.0,
+                        matchup: templateMatchup,
+                        performanceTier: .average
+                    )
+                }
+                
+                print("🔇 SILENT: Found \(players.count) NFL players matching '\(searchText)'")
+            }
+        } else {
+            // Apply normal filters when not searching
+            
+            // Apply position filter
+            players = selectedPosition == .all ?
+                allPlayers :
+                allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
 
-        // Apply active-only filter
-        var players = positionFiltered
-        if showActiveOnly {
-            players = positionFiltered.filter { player in
-                return isPlayerInLiveGame(player.player)
+            // Apply active-only filter
+            if showActiveOnly {
+                players = players.filter { player in
+                    return isPlayerInLiveGame(player.player)
+                }
             }
         }
         
-        // Filter out empty cards for name sorting
-        if sortingMethod == .name {
-            players = players.filter { $0.currentScore > 0.0 }
+        // Basic quality filter - BUT SKIP if doing rostered search to preserve results
+        if !(isSearching && showRosteredOnly) {
+            players = players.filter { player in
+                let hasValidName = !player.playerName.trimmingCharacters(in: .whitespaces).isEmpty
+                let isNotUnknown = player.player.fullName != "Unknown Player"
+                let hasReasonableData = player.currentScore >= 0.0 // Allow 0.0 scores
+                
+                return hasValidName && isNotUnknown && hasReasonableData
+            }
         }
 
         guard !players.isEmpty else {
@@ -258,8 +342,8 @@ extension AllLivePlayersViewModel {
         switch sortingMethod {
         case .position:
             sortedPlayers = sortHighToLow ?
-                players.sorted { positionPriority($0.position) < positionPriority($1.position) } :
-                players.sorted { positionPriority($0.position) > positionPriority($1.position) }
+                players.sorted { positionPrioritySilent($0.position) < positionPrioritySilent($1.position) } :
+                players.sorted { positionPrioritySilent($0.position) > positionPrioritySilent($1.position) }
             
         case .score:
             sortedPlayers = sortHighToLow ?
@@ -268,8 +352,8 @@ extension AllLivePlayersViewModel {
 
         case .name:
             sortedPlayers = sortHighToLow ?
-                players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
-                players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
+                players.sorted { extractLastNameSilent($0.playerName) < extractLastNameSilent($1.playerName) } :
+                players.sorted { extractLastNameSilent($0.playerName) > extractLastNameSilent($1.playerName) }
 
         case .team:
             sortedPlayers = sortHighToLow ?
@@ -280,7 +364,7 @@ extension AllLivePlayersViewModel {
                     if team1 != team2 {
                         return team1 < team2
                     }
-                    return positionPriority(player1.position) < positionPriority(player2.position)
+                    return positionPrioritySilent(player1.position) < positionPrioritySilent(player2.position)
                 } :
                 players.sorted { player1, player2 in
                     let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
@@ -289,7 +373,7 @@ extension AllLivePlayersViewModel {
                     if team1 != team2 {
                         return team1 > team2
                     }
-                    return positionPriority(player1.position) < positionPriority(player2.position)
+                    return positionPrioritySilent(player1.position) < positionPrioritySilent(player2.position)
                 }
         }
 
@@ -297,12 +381,12 @@ extension AllLivePlayersViewModel {
     }
     
     // 🔥 NEW: Helper methods for silent operations
-    private func extractLastName(_ fullName: String) -> String {
+    private func extractLastNameSilent(_ fullName: String) -> String {
         let components = fullName.components(separatedBy: " ")
         return components.last ?? fullName
     }
 
-    private func positionPriority(_ position: String) -> Int {
+    private func positionPrioritySilent(_ position: String) -> Int {
         switch position.uppercased() {
         case "QB": return 1
         case "RB": return 2
@@ -313,6 +397,66 @@ extension AllLivePlayersViewModel {
         case "K": return 7
         default: return 8
         }
+    }
+
+    // MARK: - NEW: Matching Functions for Silent Updates (copied from Filtering extension)
+    
+    /// Smart name matching that handles apostrophes properly - SILENT VERSION
+    private func playerNameMatches(_ playerName: String, searchQuery: String) -> Bool {
+        // Don't force any capitalization - keep everything lowercase for matching
+        let query = searchQuery.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = playerName.lowercased()
+        
+        guard !query.isEmpty else { return false }
+        
+        // Split both query and name by spaces for flexible matching
+        let queryTerms = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        let nameComponents = name.components(separatedBy: .whitespaces)
+        let firstName = nameComponents.first ?? ""
+        let lastName = nameComponents.last ?? ""
+        
+        // For each query term, check if ANY name field contains it
+        for queryTerm in queryTerms {
+            let termFound = name.contains(queryTerm) || 
+                          firstName.contains(queryTerm) || 
+                          lastName.contains(queryTerm)
+            
+            if termFound {
+                return true  // If any term matches, player matches
+            }
+        }
+        
+        return false
+    }
+    
+    /// Smart name matching for SleeperPlayer objects - SILENT VERSION
+    private func sleeperPlayerMatches(_ player: SleeperPlayer, searchQuery: String) -> Bool {
+        // Don't force any capitalization - keep everything lowercase for matching
+        let query = searchQuery.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !query.isEmpty else { return false }
+        
+        let fullName = player.fullName.lowercased()
+        let shortName = player.shortName.lowercased()  
+        let firstName = player.firstName?.lowercased() ?? ""
+        let lastName = player.lastName?.lowercased() ?? ""
+        
+        // Split query by spaces for flexible matching
+        let queryTerms = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        
+        // For each query term, check if ANY name field contains it
+        for queryTerm in queryTerms {
+            let termFound = fullName.contains(queryTerm) || 
+                          shortName.contains(queryTerm) || 
+                          firstName.contains(queryTerm) || 
+                          lastName.contains(queryTerm)
+            
+            if termFound {
+                return true  // If any term matches, player matches
+            }
+        }
+        
+        return false
     }
     
     // MARK: - Statistical Calculations
@@ -355,5 +499,26 @@ extension AllLivePlayersViewModel {
         } else {
             return .struggling
         }
+    }
+
+    /// Normalize text for more forgiving search matching
+    private func normalizeSearchText(_ text: String) -> String {
+        return text.lowercased()
+            .replacingOccurrences(of: "'", with: "") // Remove apostrophes
+            .replacingOccurrences(of: "'", with: "") // Remove curly apostrophes  
+            .replacingOccurrences(of: ".", with: "") // Remove periods
+            .replacingOccurrences(of: "-", with: "") // Remove dashes
+            .replacingOccurrences(of: " ", with: "")  // Remove spaces for partial matching
+    }
+    
+    /// Get all Sleeper IDs of players on my rosters
+    private func getMyRosterSleeperIDs() -> Set<String> {
+        var ids = Set<String>()
+        for matchup in allPlayers {
+            if let sleeperID = matchup.player.sleeperID {
+                ids.insert(sleeperID)
+            }
+        }
+        return ids
     }
 }

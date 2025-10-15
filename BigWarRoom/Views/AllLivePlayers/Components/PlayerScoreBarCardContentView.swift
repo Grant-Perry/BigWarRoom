@@ -191,11 +191,22 @@ struct PlayerScoreBarCardContentView: View {
         .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Clip the entire thing
         .sheet(isPresented: $showingScoreBreakdown) {
+            let leagueContext = LeagueContext(
+                leagueID: playerEntry.matchup.league.league.leagueID,
+                source: playerEntry.matchup.league.source,
+                isChopped: playerEntry.matchup.isChoppedLeague
+            )
+            
             let breakdown = ScoreBreakdownFactory.createBreakdown(
                 for: playerEntry.player,
-                week: WeekSelectionManager.shared.selectedWeek
-            )
+                week: WeekSelectionManager.shared.selectedWeek,
+                leagueContext: leagueContext
+            ).withLeagueName(playerEntry.leagueName)
+            
             ScoreBreakdownView(breakdown: breakdown)
+                .presentationDetents([.height(500)])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(.clear)
         }
     }
     

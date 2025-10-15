@@ -19,6 +19,9 @@ struct AllLivePlayersHeaderView: View {
     @Binding var showingFilters: Bool
     @Binding var showingWatchedPlayers: Bool
     
+    // 🔥 NEW: Focus state for search TextField
+    @FocusState private var isSearchFocused: Bool
+    
     // Timer states for actual refresh cycle - using @State to prevent full view redraws
     @State private var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)
     @State private var countdownTimer: Timer?
@@ -36,6 +39,11 @@ struct AllLivePlayersHeaderView: View {
             // #GoodNav: Header with WEEK + icons (like Mission Control/Intelligence)
             weekPickerWithIconsRow
             
+            // Search bar (when active) - should appear RIGHT AFTER the week/icons row
+            if viewModel.isSearching {
+                searchBarSection
+            }
+            
             // #GoodNav: Contextual controls row
             controlsSection
             
@@ -43,8 +51,8 @@ struct AllLivePlayersHeaderView: View {
             // statsOverviewSection
         }
         .padding(.horizontal, 20)
-        .padding(.top, 24)
-        .padding(.bottom, 20)
+        .padding(.top, 0)
+        .padding(.bottom, 8)  // Minimal bottom padding
         .onAppear {
             // 🔥 FIX: Sync initial state between View and ViewModel
             sortHighToLow = viewModel.sortHighToLow
@@ -134,110 +142,229 @@ struct AllLivePlayersHeaderView: View {
     
     // #GoodNav: Controls section with CONTEXTUAL All Rostered Players filters
     private var controlsSection: some View {
-        HStack {
-            // #GoodNav: CONTEXTUAL All Rostered Players controls
+        VStack(spacing: 12) {
+            // Main controls row (removed search bar from here)
             HStack {
-                Spacer()
-                
-                // Position/Sort Method with conditional arrow (replacing Top Score)
-                HStack(spacing: 8) {
-                    // Sort Method Menu
+                // #GoodNav: CONTEXTUAL All Rostered Players controls
+                HStack {
+                    Spacer()
+                    
+                    // Position/Sort Method with conditional arrow (replacing Top Score)
+                    HStack(spacing: 8) {
+                        // Sort Method Menu
+                        Menu {
+                            ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
+                                Button(method.displayName) {
+                                    viewModel.setSortingMethod(method)
+                                }
+                            }
+                        } label: {
+                            VStack(spacing: 2) {
+                                Text(viewModel.sortingMethod.displayName.uppercased())
+                                    .font(.caption)  // Reduced from .subheadline to .caption
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.purple)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                
+                                // Show sort direction text when Score is selected, otherwise "Sort By"
+                                Text(viewModel.sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                            }
+                        }
+                        .menuStyle(BorderlessButtonMenuStyle())
+                        
+                        // Sort Direction Arrow (only show for Score)
+                        if viewModel.sortingMethod == .score {
+                            Button(action: {
+                                viewModel.toggleSortDirection()
+                            }) {
+                                // Up arrow for Highest (sortHighToLow = true), Down arrow for Lowest
+                                Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.gpGreen)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Position filter with picker
                     Menu {
-                        ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
-                            Button(method.displayName) {
-                                viewModel.setSortingMethod(method)
+                        ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
+                            Button(position.displayName) {
+                                viewModel.setPositionFilter(position)
                             }
                         }
                     } label: {
                         VStack(spacing: 2) {
-                            Text(viewModel.sortingMethod.displayName.uppercased())
+                            Text(viewModel.selectedPosition.displayName.uppercased())
                                 .font(.subheadline)
                                 .fontWeight(.bold)
-                                .foregroundColor(.purple)
+                                .foregroundColor(viewModel.selectedPosition == .all ? .gpBlue : .purple)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                             
-                            // Show sort direction text when Score is selected, otherwise "Sort By"
-                            Text(viewModel.sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
+                            Text("Position")
                                 .font(.caption2)
                                 .fontWeight(.medium)
                                 .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                         }
                     }
                     .menuStyle(BorderlessButtonMenuStyle())
                     
-                    // Sort Direction Arrow (only show for Score)
-                    if viewModel.sortingMethod == .score {
-                        Button(action: {
-                            viewModel.toggleSortDirection()
-                        }) {
-                            // Up arrow for Highest (sortHighToLow = true), Down arrow for Lowest
-                            Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.gpGreen)
+                    Spacer()
+                    
+                    // Active Only toggle (toggles between "Yes" and "No")
+                    Button(action: { 
+                        viewModel.setShowActiveOnly(!viewModel.showActiveOnly)
+                    }) {
+                        VStack(spacing: 2) {
+                            Text(viewModel.showActiveOnly ? "Yes" : "No")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(viewModel.showActiveOnly ? .gpGreen : .gpRedPink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                            
+                            Text("Active Only")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
+                    
+                    // Search toggle button
+                    Button(action: {
+                        if viewModel.isSearching {
+                            viewModel.clearSearch()
+                            isSearchFocused = false // Clear focus when closing search
+                        } else {
+                            viewModel.isSearching = true
+                            // 🔥 FIX: Focus the search field automatically when opening search
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                isSearchFocused = true
+                            }
+                        }
+                    }) {
+                        VStack(spacing: 2) {
+                            Image(systemName: viewModel.isSearching ? "xmark" : "magnifyingglass")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(viewModel.isSearching ? .gpRedPink : .gpBlue)
+                            
+                            Text("Search")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
                 }
                 
-                Spacer()
-                
-                // Position filter with picker
-                Menu {
-                    ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
-                        Button(position.displayName) {
-                            viewModel.setPositionFilter(position)
+                // Timer dial (existing refresh countdown)
+                Circle()
+                    .stroke(timerColor, lineWidth: 2)
+                    .frame(width: 30, height: 30)
+                    .overlay(
+                        Text("\(Int(refreshCountdown))")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white)
+                    )
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+        }
+    }
+    
+    // MARK: - Search Bar Section
+    
+    private var searchBarSection: some View {
+        VStack(spacing: 8) {
+            // Search input row
+            HStack {
+                TextField("Search players by name...", text: $viewModel.searchText)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.white)
+                    )
+                    .focused($isSearchFocused) // 🔥 FIX: Connect focus state
+                    .textInputAutocapitalization(.never) // 🔥 FIX: Turn off auto-capitalization
+                    .autocorrectionDisabled() // 🔥 FIX: Also disable autocorrect for player names
+                    .onAppear {
+                        // 🔥 FIX: Auto-focus when search bar appears
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            isSearchFocused = true
                         }
                     }
-                } label: {
-                    VStack(spacing: 2) {
-                        Text(viewModel.selectedPosition.displayName.uppercased())
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(viewModel.selectedPosition == .all ? .gpBlue : .purple)
-                        
-                        Text("Position")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
+                    .onChange(of: viewModel.searchText) { _, newValue in
+                        viewModel.setSearchText(newValue)
                     }
+                
+                Button("Cancel") {
+                    viewModel.clearSearch()
+                    isSearchFocused = false // 🔥 FIX: Clear focus on cancel
                 }
-                .menuStyle(BorderlessButtonMenuStyle())
-                
-                Spacer()
-                
-                // Active Only toggle (toggles between "Yes" and "No")
-                Button(action: { 
-                    viewModel.setShowActiveOnly(!viewModel.showActiveOnly)
+                .foregroundColor(.gpBlue)
+            }
+            
+            // Search filters row
+            HStack {
+                // Rostered Only checkbox
+                Button(action: {
+                    viewModel.toggleRosteredFilter()
                 }) {
-                    VStack(spacing: 2) {
-                        Text(viewModel.showActiveOnly ? "Yes" : "No")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(viewModel.showActiveOnly ? .gpGreen : .gpRedPink)
+                    HStack(spacing: 8) {
+                        Image(systemName: viewModel.showRosteredOnly ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(viewModel.showRosteredOnly ? .gpGreen : .secondary)
                         
-                        Text("Active Only")
-                            .font(.caption2)
+                        Text("Rostered Only")
+                            .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
                 
                 Spacer()
+                
+                // Results count
+                Text("\(viewModel.filteredPlayers.count) results")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            
-            // Timer dial (existing refresh countdown)
-            Circle()
-                .stroke(Color.gray.opacity(0.3), lineWidth: 2)
-                .frame(width: 30, height: 30)
-                .overlay(
-                    Text("\(Int(refreshCountdown))")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.white)
-                )
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 8) // 🔥 REDUCED: From 24 to 8 for tighter spacing
+        .padding(.top, 12)  // Increased top padding
+        .safeAreaInset(edge: .top, spacing: 0) {
+            // Invisible spacer to maintain safe area positioning
+            Rectangle()
+                .fill(Color.clear)
+                .frame(height: 0)
+        }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.isSearching)
     }
     
     // MARK: - Stats Overview Section (Intelligence style)
@@ -293,6 +420,18 @@ struct AllLivePlayersHeaderView: View {
     }
     
     // MARK: - Helper Methods
+    
+    private var timerColor: Color {
+        let progress = refreshCountdown / Double(AppConstants.MatchupRefresh)
+        
+        if progress > 0.66 {
+            return .gpGreen
+        } else if progress > 0.33 {
+            return .orange
+        } else {
+            return .gpRedPink
+        }
+    }
     
     private func getOverallPerformanceEmoji() -> String {
         let totalPlayers = viewModel.filteredPlayers.count

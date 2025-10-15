@@ -67,11 +67,10 @@ struct ScoreBreakdownView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    dismiss()
-                }
+            // Completely clear background
+            Color.clear
+                .ignoresSafeArea(.all)
+            
             VStack(spacing: 0) {
                 headerSection
                 if breakdown.hasStats {
@@ -130,18 +129,18 @@ struct ScoreBreakdownView: View {
                         VStack(spacing: 6) {
                             // Smaller position badge
                                Text(breakdown.player.position.uppercased())
-								   .font(.system(size: 10, weight: .bold))
-								   .foregroundColor(.white)
-								   .background(positionColor)
-								   .clipShape(RoundedRectangle(cornerRadius: 6))
+                                   .font(.system(size: 10, weight: .bold))
+                                   .foregroundColor(.white)
+                                   .background(positionColor)
+                                   .clipShape(RoundedRectangle(cornerRadius: 6))
                             // Smaller score
                             Text(breakdown.totalScoreString)
                                 .font(.system(size: 18, weight: .bold))
                                 .foregroundColor(scoreColor)
                         }
                         .offset(x: -40, y: 35)
-//                        .padding(.trailing, 40)
-//                        .padding(.top, 100)
+    //                        .padding(.trailing, 40)
+    //                        .padding(.top, 100)
                         
                         Spacer()
                     }
@@ -151,30 +150,32 @@ struct ScoreBreakdownView: View {
             .clipShape(RoundedRectangle(cornerRadius: 16)) // 🔥 MOVED: Apply clipShape to the entire modal structure
             
             // Close button, matches original
-            VStack {
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 32, height: 32)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.7))
-                                    .overlay(
-                                        Circle()
-                                            .stroke(borderGradient, lineWidth: 1)
-                                    )
-                            )
+            .overlay(
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            dismiss()
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.7))
+                                        .overlay(
+                                            Circle()
+                                                .stroke(borderGradient, lineWidth: 1)
+                                        )
+                                )
+                        }
+                        .padding(.trailing, 32)
+                        .padding(.top, 8)
                     }
-                    .padding(.trailing, 32)
-                    .padding(.top, 8)
+                    Spacer()
                 }
-                Spacer()
-            }
+            )
         }
     }
 

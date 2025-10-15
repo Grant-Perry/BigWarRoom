@@ -130,17 +130,44 @@ extension AllLivePlayersViewModel {
             .removeDuplicates()
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] newWeek in
+                print("🔄 WEEK CHANGE: Week changed to \(newWeek) - preserving search state")
                 self?.debounceTask?.cancel()
                 self?.debounceTask = Task { @MainActor in
+                    // 🔥 PRESERVE SEARCH STATE: Don't clear search data during week changes
+                    let wasSearching = self?.isSearching ?? false
+                    let searchText = self?.searchText ?? ""
+                    let showRosteredOnly = self?.showRosteredOnly ?? false
+                    let preservedNFLPlayers = self?.allNFLPlayers ?? []
+                    
+                    print("🔄 WEEK CHANGE: Preserving search state - wasSearching: \(wasSearching), searchText: '\(searchText)', NFL players: \(preservedNFLPlayers.count)")
+                    
+                    // Reset stats for new week
                     self?.statsLoaded = false
                     self?.playerStats = [:]
                     
+                    // Reload stats for new week if we have players
                     if !(self?.allPlayers.isEmpty ?? true) {
                         await self?.loadPlayerStats()
+                    }
+                    
+                    // 🔥 RESTORE SEARCH STATE: Put search state back after week change
+                    if wasSearching {
+                        print("🔄 WEEK CHANGE: Restoring search state")
+                        self?.isSearching = wasSearching
+                        self?.searchText = searchText
+                        self?.showRosteredOnly = showRosteredOnly
+                        self?.allNFLPlayers = preservedNFLPlayers
+                        
+                        // Reapply search filters for new week
+                        self?.applyPositionFilter()
                     }
                 }
             }
     }
+    
+    // MARK: - OLD SUBSCRIPTION METHODS - REMOVED
+    // 🔥 REMOVED: subscribeToMatchupsChanges() and processMatchupsData() 
+    // These are no longer needed with centralized initialization
     
     // MARK: - Force Methods (For Compatibility)
     func forceLoadAllPlayers() async {

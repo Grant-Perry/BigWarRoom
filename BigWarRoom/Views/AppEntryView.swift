@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AppEntryView: View {
-    @State private var showingLoading = false
+    @State private var showingLoading = true // 🔥 CHANGED: Start with loading screen
     @State private var shouldShowOnboarding = false
     
     var body: some View {
@@ -19,7 +19,7 @@ struct AppEntryView: View {
                     showingLoading = false
                 }
             } else {
-                // BYPASS: Go directly to Mission Control (tab 0)
+                // Only show main app AFTER loading completes
                 BigWarRoomWithConditionalStart(shouldShowOnboarding: shouldShowOnboarding)
             }
         }
@@ -36,15 +36,13 @@ struct BigWarRoomWithConditionalStart: View {
     }
 }
 
-// Modified BigWarRoom that conditionally starts on Settings or Mission Control
+// 🔥 SIMPLIFIED: Remove all the tab disabling bullshit - data is already loaded
 struct BigWarRoomModified: View {
     @StateObject private var viewModel = DraftRoomViewModel()
+    @StateObject private var matchupsHub = MatchupsHubViewModel.shared
     @State private var selectedTab: Int
     
-    // Initialize with conditional starting tab
     init(startOnSettings: Bool) {
-        // If user needs onboarding → start on Settings (4)
-        // If user has credentials → start on Mission Control (0)
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
     }
     
@@ -59,7 +57,7 @@ struct BigWarRoomModified: View {
                     }
                     .tag(0)
                 
-                // TEAM ROSTERS TAB (replaces War Room)
+                // TEAM ROSTERS TAB
                 TeamRostersView()
                     .tabItem {
                         Image(systemName: "person.3.fill")
@@ -85,7 +83,7 @@ struct BigWarRoomModified: View {
                     }
                     .tag(3)
                 
-                // MORE TAB - Contains additional features AND settings (now includes War Room)
+                // MORE TAB
                 MoreTabView(viewModel: viewModel)
                     .tabItem {
                         Image(systemName: "ellipsis")
@@ -93,14 +91,12 @@ struct BigWarRoomModified: View {
                     }
                     .tag(4)
             }
-            .padding(.horizontal, 16) // FINALLY! This should add padding to ALL tab content
+            .padding(.horizontal, 16)
             .preferredColorScheme(.dark)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
-                // Switch to More tab (where War Room now lives)
                 selectedTab = 4
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
-                // Switch to Mission Control tab
                 selectedTab = 0
             }
             

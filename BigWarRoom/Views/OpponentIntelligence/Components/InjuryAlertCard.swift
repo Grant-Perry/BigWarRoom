@@ -332,9 +332,15 @@ struct InjuryAlertCard: View {
                 leagueInfo(for: leagueRoster)
                 Spacer()
                 
-                Image(systemName: "arrow.up.right.square")
-                    .font(.system(size: 14))
-                    .foregroundColor(.white.opacity(0.6))
+                HStack(spacing: 4) {
+                    Text("FIX")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.gpBlue)
+                    
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 12))
+                        .foregroundColor(.gpBlue)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
