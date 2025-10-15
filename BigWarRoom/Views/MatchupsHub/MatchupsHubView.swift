@@ -36,7 +36,7 @@ struct MatchupsHubView: View {
     @State internal var poweredByExpanded = false // Changed from true to false - hide the branding banner
     
     // MARK: - Sorting States
-    @State internal var sortByWinning = true
+    @State internal var sortByWinning = false
     
     // MARK: - View Mode State
     @State internal var dualViewMode = true

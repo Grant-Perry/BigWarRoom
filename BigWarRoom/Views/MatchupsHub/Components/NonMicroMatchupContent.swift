@@ -30,7 +30,7 @@ struct NonMicroMatchupContent: View {
     }
     
     var body: some View {
-        VStack(spacing: dualViewMode ? 12 : 6) {
+        VStack(spacing: dualViewMode ? 8 : 4) {
             // Teams row - HOME on LEFT, AWAY on RIGHT
             HStack(spacing: 8) {
                 // Home team on LEFT
@@ -66,10 +66,26 @@ struct NonMicroMatchupContent: View {
                 }
             }
             
-            // Win probability - ALWAYS show it now
+            // Win probability with score delta
             if let winProb = matchup.myWinProbability {
-                NonMicroWinProbability(winProb: winProb)
+                NonMicroWinProbability(
+                    winProb: winProb,
+                    scoreDelta: matchup.scoreDifferential,
+                    isWinning: isWinning,
+                    matchup: matchup
+                )
             }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    /// Format score delta with proper sign and formatting
+    private func formatScoreDelta(_ delta: Double) -> String {
+        if delta > 0 {
+            return "+\(String(format: "%.1f", delta))"
+        } else {
+            return String(format: "%.1f", delta)
         }
     }
 }

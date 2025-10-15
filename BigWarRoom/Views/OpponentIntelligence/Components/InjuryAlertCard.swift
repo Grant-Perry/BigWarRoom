@@ -172,7 +172,7 @@ struct InjuryAlertCard: View {
     private var statusIcon: some View {
         ZStack {
             Circle()
-                .fill(statusType.color)
+                .fill(statusType == .bye ? Color.gpPink : statusType.color)
                 .frame(width: 50, height: 50)
             
             // Large capital letter instead of SF Symbol
@@ -211,23 +211,43 @@ struct InjuryAlertCard: View {
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
             
-            // Status with first letter in colored circle
-            HStack(spacing: -1) { // Negative spacing to make letters overlap/intersect
-                // First letter in colored circle
-                Circle()
-                    .fill(statusType.color)
-                    .frame(width: 20, height: 20)
-                    .overlay(
-                        Text(String(statusType.displayName.prefix(1)))
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                )
-                // Rest of the status word - closer/overlapping
-                Text(String(statusType.displayName.dropFirst()))
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.8))
-					.offset(y: -1)
-
+            // Status with special handling for BYE
+            HStack(spacing: 4) {
+                if statusType == .bye {
+                    // BYE Week: Red oval around entire word "BYE" with gpPink background
+                    Text("BYE")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.gpPink)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.red, lineWidth: 1)
+                                )
+                        )
+                    
+                    Text("Week")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                } else {
+                    // Other statuses: First letter in colored circle + rest of word
+                    Circle()
+                        .fill(statusType.color)
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Text(String(statusType.displayName.prefix(1)))
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                    )
+                    // Rest of the status word - closer/overlapping
+                    Text(String(statusType.displayName.dropFirst()))
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .offset(y: -1)
+                }
             }
             
             Text(getActionText())

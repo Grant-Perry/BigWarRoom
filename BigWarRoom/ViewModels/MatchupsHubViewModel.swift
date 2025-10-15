@@ -122,26 +122,56 @@ final class MatchupsHubViewModel: ObservableObject {
             }
         }
         
-        // Sort only the active matchups using unified margin logic
+        // 🔥 NEW: Separate winning and losing matchups for proper secondary sorting
+        var winningMatchups: [UnifiedMatchup] = []
+        var losingMatchups: [UnifiedMatchup] = []
+        
+        for matchup in activeMatchups {
+            let isWinning = getWinningStatusForMatchup(matchup)
+            if isWinning {
+                winningMatchups.append(matchup)
+            } else {
+                losingMatchups.append(matchup)
+            }
+        }
+        
+        // Sort winning matchups by MY score descending (highest scores first)
+        let sortedWinningMatchups = winningMatchups.sorted { matchup1, matchup2 in
+            let myScore1 = getMyScore(for: matchup1)
+            let myScore2 = getMyScore(for: matchup2)
+            return myScore1 > myScore2 // My highest scores first
+        }
+        
+        // Sort losing matchups by MY score descending (highest scores first)
+        let sortedLosingMatchups = losingMatchups.sorted { matchup1, matchup2 in
+            let myScore1 = getMyScore(for: matchup1)
+            let myScore2 = getMyScore(for: matchup2)
+            return myScore1 > myScore2 // My highest scores first
+        }
+        
+        // 🔥 NEW: Combine based on primary sort preference
         let sortedActiveMatchups: [UnifiedMatchup]
         if sortByWinning {
-            // Winning sort: Highest margins first (best performance)
-            sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
-                let margin1 = getPerformanceMargin(for: matchup1)
-                let margin2 = getPerformanceMargin(for: matchup2)
-                return margin1 > margin2 // Higher margins first (more winning)
-            }
+            // Winning sort: Show winning matchups first (highest scores), then losing matchups (highest scores)
+            sortedActiveMatchups = sortedWinningMatchups + sortedLosingMatchups
         } else {
-            // Losing sort: Lowest margins first (worst performance)
-            sortedActiveMatchups = activeMatchups.sorted { matchup1, matchup2 in
-                let margin1 = getPerformanceMargin(for: matchup1)
-                let margin2 = getPerformanceMargin(for: matchup2)
-                return margin1 < margin2 // Lower margins first (more losing)
-            }
+            // Losing sort: Show losing matchups first (highest scores), then winning matchups (highest scores)
+            sortedActiveMatchups = sortedLosingMatchups + sortedWinningMatchups
         }
         
         // 🔥 ALWAYS append eliminated matchups at the end (no sorting)
         return sortedActiveMatchups + eliminatedMatchups
+    }
+    
+    /// 🔥 NEW: Get my score for any matchup type
+    private func getMyScore(for matchup: UnifiedMatchup) -> Double {
+        if matchup.isChoppedLeague {
+            // For chopped leagues: Use my current score
+            return matchup.myTeam?.currentScore ?? 0.0
+        } else {
+            // For regular leagues: Use my current score
+            return matchup.myTeam?.currentScore ?? 0.0
+        }
     }
     
     /// 🔥 NEW: Calculate unified performance margin for any matchup type

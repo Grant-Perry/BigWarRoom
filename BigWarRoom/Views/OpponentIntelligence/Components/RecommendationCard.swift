@@ -33,7 +33,7 @@ struct RecommendationCard: View {
                     ZStack {
                         // Pulsing glow for critical threats
                         Circle()
-                            .fill(Color.gpGreen.opacity(0.6))
+                            .fill(Color.gpRedPink.opacity(0.6))
                             .frame(width: isPulsing ? 44 : 40, height: isPulsing ? 44 : 40)
                             .blur(radius: 4)
                             .scaleEffect(isPulsing ? 1.2 : 1.0)
@@ -115,10 +115,10 @@ struct RecommendationCard: View {
                             .padding(.vertical, 3)
                             .background(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.gpGreen.opacity(0.8))
+                                    .fill(Color.gpRedPink.opacity(0.8))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 6)
-                                            .stroke(Color.gpGreen, lineWidth: 1)
+                                            .stroke(Color.gpRedPink, lineWidth: 1)
                                     )
                             )
                     }
@@ -129,8 +129,8 @@ struct RecommendationCard: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.gpGreen.opacity(0.3),
-                                        Color.gpGreen.opacity(0.2)
+                                        Color.gpRedPink.opacity(0.3),
+                                        Color.gpRedPink.opacity(0.2)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -138,7 +138,7 @@ struct RecommendationCard: View {
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1)
+                                    .stroke(Color.gpRedPink.opacity(0.6), lineWidth: 1)
                             )
                     )
                 } else if isPlayerConflict {
@@ -228,7 +228,7 @@ struct RecommendationCard: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
                         .stroke(
-                            isCriticalThreatAlert ? Color.gpGreen.opacity(0.7) : 
+                            isCriticalThreatAlert ? Color.gpRedPink.opacity(0.7) : 
                             isPlayerConflict ? Color.gpPink.opacity(0.7) :
                             recommendation.priority.color.opacity(0.5), 
                             lineWidth: (isCriticalThreatAlert || isPlayerConflict) ? 2 : 1
@@ -241,8 +241,8 @@ struct RecommendationCard: View {
                 .fill(
                     LinearGradient(
                         colors: isCriticalThreatAlert ? [
-                            Color.gpGreen.opacity(0.15),
-                            Color.gpGreen.opacity(0.05)
+                            Color.gpRedPink.opacity(0.15),
+                            Color.gpRedPink.opacity(0.05)
                         ] : isPlayerConflict ? [
                             Color.gpPink.opacity(0.15),
                             Color.gpPink.opacity(0.05)

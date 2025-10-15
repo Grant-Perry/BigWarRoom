@@ -44,6 +44,28 @@ final class PlayerMatchService: ObservableObject {
     
     // MARK: - Public Interface
     
+    /// Convenience method matching the old interface
+    /// - Parameters:
+    ///   - fullName: Player's full name
+    ///   - shortName: Player's short name
+    ///   - team: Team code
+    ///   - position: Position
+    /// - Returns: Matched SleeperPlayer or nil
+    func matchPlayer(fullName: String, shortName: String, team: String?, position: String) -> SleeperPlayer? {
+        let result = matchPlayerWithConfidence(fullName: fullName, shortName: shortName, team: team, position: position)
+        
+        print("🔍 MATCH DEBUG: PlayerMatchService result")
+        print("   - Input: '\(fullName)' (\(shortName)) - \(team ?? "nil") \(position)")
+        print("   - Match found: \(result.player != nil)")
+        print("   - Confidence: \(result.confidence)%")
+        if let player = result.player {
+            print("   - Matched: \(player.fullName) - \(player.team ?? "nil") \(player.position ?? "nil")")
+            print("   - ESPN ID: \(player.espnID ?? "NONE")")
+        }
+        
+        return result.player
+    }
+    
     /// Match a player with confidence scoring
     /// - Parameters:
     ///   - fullName: Player's full name
@@ -51,17 +73,21 @@ final class PlayerMatchService: ObservableObject {
     ///   - team: Team code
     ///   - position: Position
     /// - Returns: Tuple of (matched player, confidence score 0-100)
-    func matchPlayer(
+    func matchPlayerWithConfidence(
         fullName: String,
         shortName: String,
         team: String?,
         position: String
     ) -> (player: SleeperPlayer?, confidence: Int) {
         
+        print("🔍 MATCH DEBUG: Starting player match")
+        print("   - Input: '\(fullName)' (\(shortName)) - \(team ?? "nil") \(position)")
+        
         let cacheKey = "\(fullName)|\(shortName)|\(team ?? "")|\(position)"
         
         // Check cache first
         if let cachedResult = matchCache[cacheKey] {
+            print("🔍 MATCH DEBUG: Found cached result: \(cachedResult != nil)")
             return (cachedResult, cachedResult != nil ? 90 : 0)
         }
         
@@ -71,6 +97,8 @@ final class PlayerMatchService: ObservableObject {
         // Normalize inputs
         let normalizedTeam = TeamCodeNormalizer.normalize(team)?.uppercased()
         let normalizedPosition = normalizePosition(position)
+        
+        print("🔍 MATCH DEBUG: Normalized team: \(normalizedTeam ?? "nil"), position: \(normalizedPosition)")
         
         // Try matching strategies in order of confidence
         let strategies: [(SleeperPlayer?, Int)] = [
@@ -84,25 +112,18 @@ final class PlayerMatchService: ObservableObject {
         // Return the highest confidence match
         for (player, confidence) in strategies {
             if let player = player {
+                print("🔍 MATCH DEBUG: Found match with confidence \(confidence)%")
+                print("   - Matched: \(player.fullName) - \(player.team ?? "nil") \(player.position ?? "nil")")
+                print("   - ESPN ID: \(player.espnID ?? "NONE")")
                 matchCache[cacheKey] = player
                 return (player, confidence)
             }
         }
         
         // No match found
+        print("🔍 MATCH DEBUG: No match found")
         matchCache[cacheKey] = nil
         return (nil, 0)
-    }
-    
-    /// Convenience method matching the old interface
-    /// - Parameters:
-    ///   - fullName: Player's full name
-    ///   - shortName: Player's short name
-    ///   - team: Team code
-    ///   - position: Position
-    /// - Returns: Matched SleeperPlayer or nil
-    func matchPlayer(fullName: String, shortName: String, team: String?, position: String) -> SleeperPlayer? {
-        return matchPlayer(fullName: fullName, shortName: shortName, team: team, position: position).player
     }
     
     // MARK: - Indexing
@@ -157,14 +178,26 @@ final class PlayerMatchService: ObservableObject {
     // MARK: - Matching Strategies
     
     private func exactMatch(fullName: String, team: String?, position: String) -> (SleeperPlayer?, Int) {
-        guard let team = team else { return (nil, 0) }
+        guard let team = team else { 
+            print("🔍 EXACT MATCH: No team provided")
+            return (nil, 0) 
+        }
         
         let teamPositionKey = "\(team)_\(position)"
         let candidates = teamPositionIndex[teamPositionKey] ?? []
         
+        print("🔍 EXACT MATCH: Looking for '\(fullName)' in \(teamPositionKey)")
+        print("🔍 EXACT MATCH: Found \(candidates.count) candidates")
+        
+        for candidate in candidates.prefix(5) {  // Log first 5 candidates
+            print("   - Candidate: \(candidate.fullName) (ESPN: \(candidate.espnID ?? "NONE"))")
+        }
+        
         let matches = candidates.filter { 
             $0.fullName.lowercased() == fullName.lowercased() 
         }
+        
+        print("🔍 EXACT MATCH: Found \(matches.count) exact matches")
         
         return matches.count == 1 ? (matches.first, 100) : (nil, 0)
     }

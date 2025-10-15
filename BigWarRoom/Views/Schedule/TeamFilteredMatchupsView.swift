@@ -23,7 +23,7 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - UI State (reusing Mission Control patterns)
     @State private var refreshing = false
-    @State private var sortByWinning = true
+    @State private var sortByWinning = false
     @State private var microMode = false
     @State private var expandedCardId: String? = nil
     // 🔥 NUCLEAR: Add navigation trigger state

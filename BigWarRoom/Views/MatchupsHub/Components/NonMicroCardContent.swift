@@ -34,9 +34,6 @@ struct NonMicroCardContent: View {
                     scoreAnimation: scoreAnimation
                 )
             }
-            
-            // Compact footer
-            NonMicroCardFooter(matchup: matchup, dualViewMode: dualViewMode)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, dualViewMode ? 14 : 8)

@@ -2,44 +2,153 @@
 //  AllLivePlayersEmptyStateView.swift
 //  BigWarRoom
 //
-//  Empty state view for All Live Players (handles both no leagues and no players scenarios)
+//  Empty state view for when no players match current filters
 //
 
 import SwiftUI
 
-/// Empty state handling both no leagues connected and no players for position
+/// Shows appropriate empty state based on current filter conditions
 struct AllLivePlayersEmptyStateView: View {
     @ObservedObject var viewModel: AllLivePlayersViewModel
     let onAnimationReset: () -> Void
     
     var body: some View {
         VStack(spacing: 24) {
-            if viewModel.hasNoLeagues {
-                buildNoLeaguesView()
-            } else {
-                buildNoPlayersView()
+            // Icon and title based on state
+            Group {
+                if viewModel.hasNoLeagues {
+                    // No leagues connected at all
+                    AllLivePlayersNoLeaguesView(viewModel: viewModel)
+                } else {
+                    // Has leagues but no players matching filters
+                    noPlayersContent
+                }
             }
         }
+        .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    // MARK: - Builder Functions
-    
-    func buildNoLeaguesView() -> some View {
-        AllLivePlayersNoLeaguesView(viewModel: viewModel)
+    private var noPlayersContent: some View {
+        VStack(spacing: 24) {
+            // 🔥 NEW: Different messaging for Active Only vs other filters
+            if viewModel.showActiveOnly {
+                activeOnlyEmptyState
+            } else {
+                standardEmptyState
+            }
+        }
     }
     
-    func buildNoPlayersView() -> some View {
-        AllLivePlayersNoPlayersView(
-            viewModel: viewModel,
-            onAnimationReset: onAnimationReset
-        )
+    private var activeOnlyEmptyState: some View {
+        VStack(spacing: 24) {
+            // Icon
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            // Title
+            Text("No Active Players")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            // 🔥 NEW: Better messaging for Active Only filter
+            VStack(spacing: 12) {
+                Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                
+                // 🔥 NEW: Show game status info
+                if NFLGameDataService.shared.gameData.isEmpty {
+                    Text("🔄 Loading game data...")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                } else {
+                    let liveGameCount = NFLGameDataService.shared.gameData.values.filter { $0.isLive }.count / 2 // Divide by 2 since each game has 2 teams
+                    if liveGameCount > 0 {
+                        Text("📡 \(liveGameCount) games currently live")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    } else {
+                        Text("⏰ No games currently live")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                }
+            }
+            
+            // Reset Filters button
+            Button(action: {
+                viewModel.setShowActiveOnly(false)
+                viewModel.setPositionFilter(.all)
+                onAnimationReset()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .medium))
+                    
+                    Text("Reset Filters")
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 25)
+                        .fill(Color.orange)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+    
+    private var standardEmptyState: some View {
+        VStack(spacing: 24) {
+            // Icon
+            Image(systemName: "person.3.fill")
+                .font(.system(size: 60))
+                .foregroundColor(.gray)
+            
+            // Title
+            Text("No Active Players")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+            
+            // Description
+            Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+            
+            // Reset Filters button
+            Button(action: {
+                viewModel.setPositionFilter(.all)
+                onAnimationReset()
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .medium))
+                    
+                    Text("Reset Filters")
+                        .font(.system(size: 16, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 25)
+                        .fill(Color.orange)
+                )
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
 #Preview {
-    AllLivePlayersEmptyStateView(
-        viewModel: AllLivePlayersViewModel.shared,
-        onAnimationReset: {}
-    )
+    let viewModel = AllLivePlayersViewModel.shared
+    return AllLivePlayersEmptyStateView(viewModel: viewModel, onAnimationReset: {})
 }

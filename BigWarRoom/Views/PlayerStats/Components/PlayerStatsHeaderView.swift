@@ -13,19 +13,82 @@ struct PlayerStatsHeaderView: View {
     let team: NFLTeam?
     
     @StateObject private var teamAssets = TeamAssetManager.shared
-    // 🔥 NEW: Access to live player stats for PPR points
     @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    @StateObject private var playerNewsViewModel = PlayerNewsViewModel()
+    
+    // 🗞️ NEWS: Player news sheet state
+    @State private var showingPlayerNews = false
+    
+    // 🔥 NEW: Computed ESPN ID that tries multiple methods to find ESPN ID
+    private var resolvedESPNID: String? {
+        print("🔍 DEBUG: Starting ESPN ID resolution for \(player.fullName)")
+        
+        // Method 1: Try the direct ESPN ID from Sleeper
+        if let espnID = player.espnID {
+            print("🔍 DEBUG: Found direct ESPN ID: \(espnID)")
+            return espnID
+        }
+        
+        // Method 2: Try PlayerMatchService to find another Sleeper player with ESPN ID
+        print("🔍 DEBUG: No direct ESPN ID, trying PlayerMatchService...")
+        let matchService = PlayerMatchService.shared
+        let matchResult = matchService.matchPlayerWithConfidence(
+            fullName: player.fullName,
+            shortName: player.shortName,
+            team: player.team,
+            position: player.position ?? ""
+        )
+        
+        if let matchedPlayer = matchResult.player, let espnID = matchedPlayer.espnID {
+            print("🎯 SUCCESS: Resolved ESPN ID via PlayerMatchService: \(espnID)")
+            return espnID
+        }
+        
+        // Method 3: Try fallback mapping service for high-profile players
+        print("🔍 DEBUG: No ESPN ID via PlayerMatchService, trying fallback mapping...")
+        let fallbackService = ESPNIDMappingService.shared
+        if let fallbackESPNID = fallbackService.getFallbackESPNID(
+            fullName: player.fullName,
+            team: player.team,
+            position: player.position
+        ) {
+            print("🎯 SUCCESS: Resolved ESPN ID via fallback mapping: \(fallbackESPNID)")
+            return fallbackESPNID
+        }
+        
+        print("🔍 DEBUG: Final result - NO ESPN ID found for \(player.fullName) via any method")
+        return nil
+    }
     
     var body: some View {
         VStack(spacing: 16) {
-            // Large player image
-            PlayerImageView(
-                player: player,
-                size: 120,
-                team: team
+            // TAPPABLE PLAYER IMAGE FOR NEWS with NOTIFICATION BADGE
+            Button(action: {
+                print("🗞️ BUTTON TAPPED: \(player.fullName)")
+                print("🗞️ Direct ESPN ID from Sleeper: \(player.espnID ?? "NONE")")
+                print("🗞️ Resolved ESPN ID: \(resolvedESPNID ?? "NONE")")
+                print("🗞️ Current news count: \(playerNewsViewModel.newsItems.count)")
+                showingPlayerNews = true
+            }) {
+                PlayerImageView(
+                    player: player,
+                    size: 120,
+                    team: team
+                )
+            }
+            .buttonStyle(.plain)
+            .notificationBadge(
+                count: resolvedESPNID != nil ? playerNewsViewModel.newsItems.count : 0,
+                xOffset: 8,
+                yOffset: -8,
+                badgeColor: .gpRedPink
+            )
+            .scaleEffect(
+                resolvedESPNID != nil && playerNewsViewModel.newsItems.count > 0 ? 1.25 : 1.0,
+                anchor: .topTrailing
             )
             
-            // Player info
+            // Original player info
             VStack(spacing: 8) {
                 Text(player.fullName)
                     .font(.title2)
@@ -47,7 +110,6 @@ struct PlayerStatsHeaderView: View {
                                     .foregroundColor(.secondary)
                             }
                             
-                            // 🔥 NEW: PPR points display
                             if let pprPoints = getPPRPoints() {
                                 Text("PPR: \(String(format: "%.1f", pprPoints))")
                                     .font(.callout)
@@ -77,7 +139,7 @@ struct PlayerStatsHeaderView: View {
                 }
             }
             
-            // Additional info using our DRY PlayerInfoItem component
+            // Additional info
             HStack(spacing: 20) {
                 if let age = player.age {
                     PlayerInfoItem("Age", "\(age)", style: .compact)
@@ -97,16 +159,76 @@ struct PlayerStatsHeaderView: View {
         .padding()
         .background(teamBackgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onAppear {
+            print("🔍 DEBUG: PlayerStatsHeaderView.onAppear for \(player.fullName)")
+            
+            // Load news when view appears if player has ESPN ID (resolved)
+            if let espnID = resolvedESPNID, let espnIDInt = Int(espnID) {
+                print("🔍 DEBUG: Loading news with ESPN ID: \(espnIDInt)")
+                playerNewsViewModel.loadPlayerNews(espnId: espnIDInt)
+            } else {
+                print("🔍 DEBUG: No ESPN ID resolved, skipping news load")
+            }
+        }
+        .sheet(isPresented: $showingPlayerNews) {
+            if let espnID = resolvedESPNID, let espnIDInt = Int(espnID) {
+                // Use the actual PlayerNewsView with real ESPN data
+                PlayerNewsView(player: PlayerData(
+                    id: player.playerID,
+                    fullName: player.fullName,
+                    position: player.position ?? "UNK",
+                    team: player.team ?? "UNK",
+                    photoUrl: player.headshotURL?.absoluteString,
+                    espnId: espnIDInt
+                ))
+            } else {
+                // Fallback for players without ESPN ID
+                testNewsSheet
+            }
+        }
     }
     
-    // 🔥 NEW: Get PPR points for this player from live stats
+    // TEST SHEET for players without ESPN ID
+    private var testNewsSheet: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("🗞️ NO NEWS AVAILABLE")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                
+                Text("Player: \(player.fullName)")
+                    .font(.title2)
+                
+                Text("❌ No ESPN ID in Sleeper data")
+                    .font(.headline)
+                    .foregroundColor(.red)
+                
+                Text("This player doesn't have ESPN news integration available")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+                
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Player News")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        showingPlayerNews = false
+                    }
+                }
+            }
+        }
+    }
+    
     private func getPPRPoints() -> Double? {
-        // Get player stats from AllLivePlayersViewModel
         guard let playerStats = livePlayersViewModel.playerStats[player.playerID] else {
             return nil
         }
         
-        // Try PPR points first, then half PPR, then standard as fallback
         if let pprPoints = playerStats["pts_ppr"], pprPoints > 0 {
             return pprPoints
         } else if let halfPprPoints = playerStats["pts_half_ppr"], halfPprPoints > 0 {
@@ -117,8 +239,6 @@ struct PlayerStatsHeaderView: View {
         
         return nil
     }
-    
-    // MARK: - Helper Views
     
     private var positionBadge: some View {
         Text(player.position ?? "")
@@ -163,20 +283,20 @@ struct PlayerStatsHeaderView: View {
 }
 
 #Preview {
-    // Create a mock player with minimal required data
     let mockPlayerData = """
     {
         "player_id": "123",
-        "first_name": "Josh",
-        "last_name": "Allen",
+        "first_name": "Jared",
+        "last_name": "Goff",
         "position": "QB",
-        "team": "BUF",
-        "number": 17,
-        "age": 28,
-        "height": "77",
-        "weight": 237,
-        "years_exp": 6,
-        "college": "Wyoming"
+        "team": "DET",
+        "espn_id": "3046779",
+        "number": 16,
+        "age": 30,
+        "height": "76",
+        "weight": 217,
+        "years_exp": 9,
+        "college": "California"
     }
     """.data(using: .utf8)!
     

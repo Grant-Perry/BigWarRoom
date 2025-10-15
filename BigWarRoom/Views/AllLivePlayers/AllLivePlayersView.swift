@@ -2,21 +2,11 @@
 //  AllLivePlayersView.swift
 //  BigWarRoom
 //
-//  Clean coordinator view for displaying all active players across all leagues
-//  Following proper MVVM architecture with separated concerns
+//  🔥 FIXED: Proper caching and navigation state management to prevent excessive refreshes
 //
 
 import SwiftUI
 
-/// **CLEAN MVVM COORDINATOR VIEW**
-/// 
-/// This view now only handles:
-/// - UI coordination and navigation
-/// - State management for animations and sheets
-/// - Task lifecycle management
-/// 
-/// All business logic has been moved to AllLivePlayersViewModel
-/// All UI components have been extracted to separate, reusable view files
 struct AllLivePlayersView: View {
     // 🔥 FIXED: Use shared instance instead of creating new one
     @ObservedObject private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
@@ -32,13 +22,13 @@ struct AllLivePlayersView: View {
     // 🔥 PERFORMANCE: Task management for better lifecycle control
     @State private var loadTask: Task<Void, Never>?
     
-    // 🔥 FIXED: Track if initial load has been done to prevent reloading on navigation return
-    @State private var hasInitiallyLoaded = false
+    // 🔥 FIXED: More persistent flag that survives navigation
+    @AppStorage("AllLivePlayers_HasInitialLoad") private var hasGloballyLoaded = false
+    @State private var hasLoadedThisSession = false
+    // 🔥 PROPER: Clean state management without band-aids
+    @State private var hasPerformedInitialLoad = false
     
     var body: some View {
-        // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent TabView provides it
-        // BEFORE: NavigationView { ... }
-        // AFTER: Direct content - NavigationView provided by parent TabView
         ZStack {
             // BG7 background
             Image("BG7")
@@ -58,7 +48,7 @@ struct AllLivePlayersView: View {
                     showingWatchedPlayers: $showingWatchedPlayers
                 )
                 
-                // 🔥 CLEAN: Content based on state - no business logic here
+                // 🔥 PROPER: Content based on clean state machine
                 buildContentView()
             }
         }
@@ -76,18 +66,22 @@ struct AllLivePlayersView: View {
             await performRefresh()
         }
         .onAppear {
-            // 🔥 FIXED: Only load if we haven't loaded before
-            if !hasInitiallyLoaded {
+            // 🔥 PROPER: Only load if we haven't loaded before OR data is initial
+            let needsLoad = !hasPerformedInitialLoad || allLivePlayersViewModel.isInitialState
+            
+            if needsLoad {
+                print("🔥 ONAPPEAR: Performing initial load")
                 Task {
-                    await loadInitialData()
-                    hasInitiallyLoaded = true
+                    await allLivePlayersViewModel.loadAllPlayers()
+                    hasPerformedInitialLoad = true
                 }
+            } else {
+                print("🔥 ONAPPEAR: Skipping load - already loaded")
             }
         }
         .onDisappear {
             cancelTasks()
         }
-        // 🔥 DEATH TO SHEETS: Remove sheet for matchup detail - using NavigationLink instead
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(isPresented: $showingWeekPicker)
         }
@@ -119,43 +113,65 @@ struct AllLivePlayersView: View {
         }
     }
     
-    // MARK: - Content View Selection (No Business Logic)
+    // MARK: - Content View Selection (Clean State Machine)
     
     func buildContentView() -> some View {
-        if allLivePlayersViewModel.isLoading {
+        switch allLivePlayersViewModel.dataState {
+        case .initial, .loading:
             return AnyView(AllLivePlayersLoadingView())
-        } else if allLivePlayersViewModel.filteredPlayers.isEmpty {
+            
+        case .loaded:
+            if allLivePlayersViewModel.filteredPlayers.isEmpty {
+                // This means we have data but filters eliminated everything
+                return AnyView(
+                    AllLivePlayersEmptyStateView(
+                        viewModel: allLivePlayersViewModel,
+                        onAnimationReset: resetAnimations
+                    )
+                )
+            } else {
+                return AnyView(
+                    AllLivePlayersListView(
+                        viewModel: allLivePlayersViewModel,
+                        animatedPlayers: $animatedPlayers,
+                        onPlayerTap: handlePlayerTap
+                    )
+                )
+            }
+            
+        case .empty:
+            // Legitimately no players found after loading
             return AnyView(
                 AllLivePlayersEmptyStateView(
                     viewModel: allLivePlayersViewModel,
                     onAnimationReset: resetAnimations
                 )
-                // 🔥 NEW: Automatic recovery for potentially stuck states
-                .onAppear {
-                    // Only trigger auto-recovery if we have players, not loading, AND it's not due to legitimate filtering
-                    if !allLivePlayersViewModel.allPlayers.isEmpty && !allLivePlayersViewModel.isLoading {
-                        // Delay to allow normal filtering to complete first
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                            // Only recover if filtered list is empty AND it's not due to user choosing Active Only filter
-                            let isEmptyDueToActiveFilter = allLivePlayersViewModel.showActiveOnly && allLivePlayersViewModel.filteredPlayers.isEmpty
-                            
-                            if allLivePlayersViewModel.filteredPlayers.isEmpty && 
-                               !allLivePlayersViewModel.allPlayers.isEmpty && 
-                               !isEmptyDueToActiveFilter {
-                                print("🔧 AUTO-RECOVERY: Detected potentially stuck state after 2 seconds (not due to Active Only filter)")
-                                allLivePlayersViewModel.recoverFromStuckState()
-                            }
+            )
+            
+        case .error(let errorMessage):
+            return AnyView(
+                VStack(spacing: 20) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 50))
+                        .foregroundColor(.red)
+                    
+                    Text("Error Loading Players")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button("Try Again") {
+                        Task {
+                            await allLivePlayersViewModel.loadAllPlayers()
                         }
                     }
+                    .buttonStyle(.borderedProminent)
                 }
-            )
-        } else {
-            return AnyView(
-                AllLivePlayersListView(
-                    viewModel: allLivePlayersViewModel,
-                    animatedPlayers: $animatedPlayers,
-                    onPlayerTap: handlePlayerTap // 🔥 Keep this for now - will change to NavigationLink in list view
-                )
+                .padding()
             )
         }
     }
@@ -164,7 +180,6 @@ struct AllLivePlayersView: View {
     
     /// Reset animation state for smooth transitions
     private func resetAnimations() {
-        // 🔥 IMPROVED: Clear animations immediately and smoothly
         withAnimation(.easeOut(duration: 0.1)) {
             animatedPlayers.removeAll()
         }
@@ -172,11 +187,10 @@ struct AllLivePlayersView: View {
     
     /// Handle player tap - DEPRECATED: Will be replaced with NavigationLink
     private func handlePlayerTap(_ matchup: UnifiedMatchup) {
-        // 🔥 DEATH TO SHEETS: This will be replaced with NavigationLink in the list view
         print("🔥 DEBUG: Player tap - should use NavigationLink instead of sheet")
     }
     
-    /// Refresh data with task management
+    /// Refresh data with task management - ONLY for pull-to-refresh
     private func refreshData() {
         loadTask?.cancel()
         loadTask = Task {
@@ -187,14 +201,14 @@ struct AllLivePlayersView: View {
     
     /// Perform pull-to-refresh - always allow manual refresh
     private func performRefresh() async {
+        print("🔄 PULL-TO-REFRESH: User initiated manual refresh")
         await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
         await allLivePlayersViewModel.refresh()
     }
     
-    /// Load initial data with proper task management - ONLY run once
+    /// Load initial data with proper task management - ONLY run when needed
     private func loadInitialData() async {
-        print("🔥 DEBUG: Loading initial data for All Live Players")
-        // Cancel any existing task before starting new one
+        print("🔥 INITIAL LOAD: Loading initial data for All Live Players")
         loadTask?.cancel()
         loadTask = Task {
             // Ensure leagues are loaded first

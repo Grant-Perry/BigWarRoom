@@ -33,15 +33,6 @@ struct NonMicroCardFooter: View {
             
             Spacer()
             
-            // Score differential - if available
-            if let differential = matchup.scoreDifferential {
-                Text(differential > 0 ? "+\(String(format: "%.1f", differential))" : String(format: "%.1f", differential))
-                    .font(.system(size: dualViewMode ? 9 : 8, weight: .bold, design: .monospaced))
-                    .foregroundColor(differential > 0 ? .green : .red)
-            }
-            
-            Spacer()
-            
             // Tap hint
             Image(systemName: "chevron.right")
                 .font(.system(size: 8, weight: .bold))

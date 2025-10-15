@@ -25,7 +25,7 @@ struct OpponentIntelligenceDashboardView: View {
     @State private var showOpponentPlayers = true // NEW: Collapsible section state
     
     // #GoodNav: Mission Control-style controls (matching exactly)
-    @State private var sortByWinning = true
+    @State private var sortByWinning = false
     @State private var dualViewMode = true
     @State private var autoRefreshEnabled = true
     @State private var microMode = false

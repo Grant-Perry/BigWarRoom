@@ -2,40 +2,201 @@
 //  AllLivePlayersLoadingView.swift
 //  BigWarRoom
 //
-//  🔥 PHASE 2 REFACTOR: Migrated to use UnifiedLoadingView while preserving animations
-//  All original animations and visual effects are maintained through the unified system
+//  🔥 FIXED: Now uses Intelligence-style spinning orbs for consistent UX
 //
 
 import SwiftUI
 
-/// **AllLivePlayers Loading View** - Now using UnifiedLoadingSystem
-/// **All animations preserved:** pulseAnimation, gradientAnimation, glowAnimation
+/// **AllLivePlayers Loading View** - Using Intelligence-style spinning orbs
 struct AllLivePlayersLoadingView: View {
-    @State private var pulseAnimation = false
-    @State private var gradientAnimation = false
-    @State private var glowAnimation = false
+    @State private var animationOffset: CGFloat = 0
+    @State private var pulseAnimation: Bool = false
+    @State private var rotationAngle: Double = 0
+    @State private var loadingTextIndex: Int = 0
+    
+    // Loading messages that cycle - tailored for Live Players
+    private let loadingMessages = [
+        "Loading all your players...",
+        "Gathering scores from all leagues...",
+        "Calculating performance tiers...",
+        "Building your roster view...",
+        "Almost ready..."
+    ]
     
     var body: some View {
-        UnifiedLoadingView(
-            configuration: .allLivePlayers(
-                pulseAnimation: $pulseAnimation,
-                gradientAnimation: $gradientAnimation, 
-                glowAnimation: $glowAnimation
-            )
-        )
+        VStack(spacing: 40) {
+            // Animated orb cluster (same as Intelligence)
+            animatedOrbCluster
+            
+            // Loading text
+            loadingText
+            
+            Spacer()
+                .frame(maxHeight: 200)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             startAnimations()
         }
     }
     
-    /// **Animation Control** - PRESERVED EXACTLY AS ORIGINAL
+    // MARK: - Animated Orb Cluster (Same as Intelligence)
+    
+    private var animatedOrbCluster: some View {
+        ZStack {
+            // Background glow effect
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.blue.opacity(0.3),
+                            Color.purple.opacity(0.2),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 120
+                    )
+                )
+                .frame(width: 240, height: 240)
+                .scaleEffect(pulseAnimation ? 1.2 : 0.8)
+                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: pulseAnimation)
+            
+            // Orbiting orbs
+            ForEach(0..<8, id: \.self) { index in
+                orb(for: index)
+            }
+            
+            // Central core orb
+            centralOrb
+        }
+        .rotationEffect(.degrees(rotationAngle))
+        .animation(.linear(duration: 8.0).repeatForever(autoreverses: false), value: rotationAngle)
+    }
+    
+    private func orb(for index: Int) -> some View {
+        let angle = Double(index) * 45.0 // 360/8 = 45 degrees apart
+        let radius: CGFloat = 60
+        let x = cos(angle * .pi / 180) * radius
+        let y = sin(angle * .pi / 180) * radius
+        
+        return Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        orbColor(for: index),
+                        orbColor(for: index).opacity(0.6),
+                        orbColor(for: index).opacity(0.2),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 2,
+                    endRadius: 15
+                )
+            )
+            .frame(width: 20, height: 20)
+            .offset(x: x, y: y)
+            .scaleEffect(pulseAnimation ? 1.3 : 0.7)
+            .animation(
+                .easeInOut(duration: 1.5)
+                .delay(Double(index) * 0.1)
+                .repeatForever(autoreverses: true),
+                value: pulseAnimation
+            )
+            .shadow(color: orbColor(for: index), radius: 10, x: 0, y: 0)
+    }
+    
+    private var centralOrb: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white,
+                        Color.blue.opacity(0.8),
+                        Color.purple.opacity(0.6),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 5,
+                    endRadius: 25
+                )
+            )
+            .frame(width: 40, height: 40)
+            .scaleEffect(pulseAnimation ? 1.4 : 1.0)
+            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: pulseAnimation)
+            .shadow(color: .white, radius: 15, x: 0, y: 0)
+    }
+    
+    private func orbColor(for index: Int) -> Color {
+        let colors: [Color] = [
+            .red, .orange, .yellow, .green, .blue, .purple, .pink, .cyan
+        ]
+        return colors[index % colors.count]
+    }
+    
+    // MARK: - Loading Text
+    
+    private var loadingText: some View {
+        VStack(spacing: 12) {
+            // Animated dots
+            HStack(spacing: 4) {
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .fill(Color.white.opacity(0.8))
+                        .frame(width: 8, height: 8)
+                        .scaleEffect(animationOffset == CGFloat(index) ? 1.5 : 1.0)
+                        .animation(
+                            .easeInOut(duration: 0.6)
+                            .delay(Double(index) * 0.2)
+                            .repeatForever(autoreverses: true),
+                            value: animationOffset
+                        )
+                }
+            }
+            .padding(.bottom, 8)
+            
+            // Main loading message
+            Text(loadingMessages[loadingTextIndex])
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(.white.opacity(0.9))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+                .animation(.easeInOut(duration: 0.5), value: loadingTextIndex)
+        }
+    }
+    
+    // MARK: - Animation Control
+    
     private func startAnimations() {
+        // Start pulse animation
         pulseAnimation = true
-        gradientAnimation = true
-        glowAnimation = true
+        
+        // Start rotation
+        rotationAngle = 360
+        
+        // Start dot animation
+        withAnimation(.easeInOut(duration: 0.6).repeatForever()) {
+            animationOffset = 2
+        }
+        
+        // Cycle through loading messages faster for Live Players
+        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { _ in
+            withAnimation(.easeInOut(duration: 0.3)) {
+                loadingTextIndex = (loadingTextIndex + 1) % loadingMessages.count
+            }
+        }
     }
 }
 
-#Preview {
-    AllLivePlayersLoadingView()
+#Preview("All Live Players Loading") {
+    ZStack {
+        Image("BG7")
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .opacity(0.35)
+            .ignoresSafeArea(.all)
+        
+        AllLivePlayersLoadingView()
+    }
+    .preferredColorScheme(.dark)
 }

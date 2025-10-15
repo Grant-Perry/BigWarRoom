@@ -192,7 +192,7 @@ struct AllLivePlayersHeaderView: View {
                         Text(viewModel.selectedPosition.displayName.uppercased())
                             .font(.subheadline)
                             .fontWeight(.bold)
-                            .foregroundColor(.purple)
+                            .foregroundColor(viewModel.selectedPosition == .all ? .gpBlue : .purple)
                         
                         Text("Position")
                             .font(.caption2)
@@ -212,7 +212,7 @@ struct AllLivePlayersHeaderView: View {
                         Text(viewModel.showActiveOnly ? "Yes" : "No")
                             .font(.subheadline)
                             .fontWeight(.bold)
-                            .foregroundColor(viewModel.showActiveOnly ? .orange : .gray)
+                            .foregroundColor(viewModel.showActiveOnly ? .gpGreen : .gpRedPink)
                         
                         Text("Active Only")
                             .font(.caption2)
@@ -286,7 +286,7 @@ struct AllLivePlayersHeaderView: View {
             StatCardView(
                 value: viewModel.showActiveOnly ? "YES" : "NO",
                 label: "ACTIVE ONLY",
-                color: viewModel.showActiveOnly ? .orange : .gray
+                color: viewModel.showActiveOnly ? .gpGreen : .gpRedPink
             )
         }
         .padding(.horizontal, 8)
@@ -330,8 +330,8 @@ struct AllLivePlayersHeaderView: View {
     
     // MARK: - Background Refresh (No UI Resets)
     private func performBackgroundRefresh() async {
-        // Perform data refresh without triggering UI animations reset
-        await viewModel.refresh()
+        // 🔥 FIXED: Use silent live update instead of full refresh to prevent spinning orbs
+        await viewModel.performLiveUpdate()
         resetCountdown()
         // DO NOT call onAnimationReset() here - that causes the jarring refresh
     }

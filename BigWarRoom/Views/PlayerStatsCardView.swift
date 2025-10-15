@@ -118,6 +118,11 @@ struct PlayerStatsCardView: View {
     // 🏈 PLAYER NAVIGATION: Callback to update current player from depth chart
     private func updateCurrentPlayer(_ newPlayer: SleeperPlayer) {
         print("🏈 NAVIGATION DEBUG: Updating current player from \(currentPlayer.fullName) to \(newPlayer.fullName)")
+        print("🏈 NAVIGATION DEBUG: New player details:")
+        print("   - Full Name: '\(newPlayer.fullName)'")
+        print("   - Team: '\(newPlayer.team ?? "nil")'")
+        print("   - Position: '\(newPlayer.position ?? "nil")'")
+        print("   - Direct ESPN ID: '\(newPlayer.espnID ?? "NONE")'")
         
         // Update the current player and team
         currentPlayer = newPlayer

@@ -445,7 +445,7 @@ enum InjuryStatusType: String, CaseIterable {
     
     var color: Color {
         switch self {
-        case .bye: return .orange
+        case .bye: return .gpPink
         case .injuredReserve, .pup, .nfi: return .red
         case .out, .doubtful: return .red
         case .questionable: return .yellow
