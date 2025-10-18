@@ -47,6 +47,9 @@ final class OpponentIntelligenceViewModel: ObservableObject {
     private let matchupsHubViewModel = MatchupsHubViewModel.shared
     private var cancellables = Set<AnyCancellable>()
     
+    // MARK: - Game Alerts Integration 🚨
+    let gameAlertsManager = GameAlertsManager.shared
+
     // MARK: - Computed Properties
     
     /// Filtered and sorted opponent intelligence based on current settings

@@ -10,6 +10,80 @@ import SwiftUI
 struct MoreTabView: View {
     let viewModel: DraftRoomViewModel
     
+    // MARK: - Menu Data Configuration
+    private let menuItems: [MenuItem] = [
+        MenuItem(
+            icon: "magnifyingglass.circle.fill",
+            iconColor: .blue,
+            title: "Player Search",
+            subtitle: "Search NFL players and stats",
+            destination: .playerSearch
+        ),
+        MenuItem(
+            icon: "star.circle.fill",
+            iconColor: .gpPostBot,
+            title: "App Features",
+            subtitle: "Complete feature overview",
+            destination: .features
+        ),
+        MenuItem(
+            icon: "gearshape.fill",
+            iconColor: .gray,
+            title: "Settings",
+            subtitle: "App configuration and setup",
+            destination: .settings
+        ),
+        MenuItem(
+            icon: "person.3.fill",
+            iconColor: .green,
+            title: "Team Rosters",
+            subtitle: "NFL team depth charts",
+            destination: .teamRosters
+        ),
+        MenuItem(
+            icon: "shield.fill",
+            iconColor: .orange,
+            title: "War Room",
+            subtitle: "Draft preparation and strategy",
+            destination: .warRoom
+        ),
+        MenuItem(
+            icon: "brain.head.profile",
+            iconColor: .purple,
+            title: "AI Picks",
+            subtitle: "Smart draft recommendations",
+            destination: .aiPicks
+        ),
+        MenuItem(
+            icon: "list.clipboard.fill",
+            iconColor: .cyan,
+            title: "Draft Board",
+            subtitle: "Track draft picks and rankings",
+            destination: .draftBoard
+        ),
+        MenuItem(
+            icon: "clock.fill",
+            iconColor: .red,
+            title: "Live Picks",
+            subtitle: "Real-time draft tracking",
+            destination: .livePicks
+        ),
+        MenuItem(
+            icon: "person.crop.circle.fill",
+            iconColor: .gpGreen,
+            title: "My Roster",
+            subtitle: "Your fantasy team analysis",
+            destination: .myRoster
+        ),
+        MenuItem(
+            icon: "sportscourt.fill",
+            iconColor: .gpBlue,
+            title: "Fantasy",
+            subtitle: "League matchups and lineups",
+            destination: .fantasy
+        )
+    ]
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -29,118 +103,20 @@ struct MoreTabView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
                     
-                    // Features List
+                    // Data-Driven Features List
                     ScrollView {
                         VStack(spacing: 12) {
-                            // Player Search - MOVED TO FIRST POSITION
-                            NavigationLink(destination: PlayerSearchView()) {
-                                MoreRowView(
-                                    icon: "person.crop.circle",
-                                    iconColor: .gpGreen,
-                                    title: "Player Search",
-                                    subtitle: "Search and view detailed player stats"
-                                )
+                            ForEach(menuItems) { menuItem in
+                                NavigationLink(destination: destinationView(for: menuItem.destination)) {
+                                    MoreRowView(
+                                        icon: menuItem.icon,
+                                        iconColor: menuItem.iconColor,
+                                        title: menuItem.title,
+                                        subtitle: menuItem.subtitle
+                                    )
+                                }
+                                .buttonStyle(PlainButtonStyle())
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Team Rosters - MOVED FROM MAIN TAB
-                            NavigationLink(destination: TeamRostersView()) {
-                                MoreRowView(
-                                    icon: "person.3.fill",
-                                    iconColor: .blue,
-                                    title: "Team Rosters",
-                                    subtitle: "View all team rosters across leagues"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // War Room
-                            NavigationLink(destination: DraftRoomView(viewModel: viewModel, selectedTab: .constant(4))) {
-                                MoreRowView(
-                                    icon: "person.2.fill",
-                                    iconColor: .gpPostBot,
-                                    title: "War Room",
-                                    subtitle: "Draft room and live draft tracking"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // App Features
-                            NavigationLink(destination: FeaturesView()) {
-                                MoreRowView(
-                                    icon: "star.circle.fill",
-                                    iconColor: .gpPostBot,
-                                    title: "App Features",
-                                    subtitle: "Complete feature overview"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Settings
-                            NavigationLink(destination: AppSettingsView()) {
-                                MoreRowView(
-                                    icon: "gearshape.fill",
-                                    iconColor: .gray,
-                                    title: "Settings",
-                                    subtitle: "App configuration and setup"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Draft Board
-                            NavigationLink(destination: LeagueDraftView(viewModel: viewModel)) {
-                                MoreRowView(
-                                    icon: "list.bullet.clipboard",
-                                    iconColor: .blue,
-                                    title: "Draft Board",
-                                    subtitle: "Interactive draft tracking"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // AI Picks
-                            NavigationLink(destination: AIPickSuggestionsView(viewModel: viewModel)) {
-                                MoreRowView(
-                                    icon: "brain.head.profile",
-                                    iconColor: .purple,
-                                    title: "AI Picks",
-                                    subtitle: "Smart draft recommendations"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // My Roster
-                            NavigationLink(destination: MyRosterView(draftRoomViewModel: viewModel)) {
-                                MoreRowView(
-                                    icon: "person.crop.circle",
-                                    iconColor: .green,
-                                    title: "My Roster",
-                                    subtitle: "Roster management and analysis"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Fantasy
-                            NavigationLink(destination: FantasyMatchupListView(draftRoomViewModel: viewModel)) {
-                                MoreRowView(
-                                    icon: "football",
-                                    iconColor: .orange,
-                                    title: "Fantasy",
-                                    subtitle: "League matchups and analysis"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            
-                            // Live Picks
-                            NavigationLink(destination: LiveDraftPicksView(viewModel: viewModel)) {
-                                MoreRowView(
-                                    icon: "clock.fill",
-                                    iconColor: .red,
-                                    title: "Live Picks",
-                                    subtitle: "Real-time draft updates"
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
                         }
                         .padding(.horizontal, 20)
                         .padding(.top, 20)
@@ -154,6 +130,48 @@ struct MoreTabView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
     }
+    
+    // MARK: - Destination View Builder
+    @ViewBuilder
+    private func destinationView(for destination: MenuDestination) -> some View {
+        switch destination {
+        case .playerSearch:
+            PlayerSearchView()
+        case .features:
+            FeaturesView()
+        case .settings:
+            AppSettingsView()
+        case .teamRosters:
+            TeamRostersView()
+        case .warRoom:
+            DraftRoomView(viewModel: viewModel, selectedTab: .constant(4))
+        case .aiPicks:
+            AIPickSuggestionsView(viewModel: viewModel)
+        case .draftBoard:
+            LeagueDraftView(viewModel: viewModel)
+        case .livePicks:
+            LiveDraftPicksView(viewModel: viewModel)
+        case .myRoster:
+            MyRosterView(draftRoomViewModel: viewModel)
+        case .fantasy:
+            FantasyMatchupListView(draftRoomViewModel: viewModel)
+        }
+    }
+}
+
+// MARK: - Menu Data Models
+
+struct MenuItem: Identifiable {
+    let id = UUID()
+    let icon: String
+    let iconColor: Color
+    let title: String
+    let subtitle: String
+    let destination: MenuDestination
+}
+
+enum MenuDestination: CaseIterable {
+    case playerSearch, features, settings, teamRosters, warRoom, aiPicks, draftBoard, livePicks, myRoster, fantasy
 }
 
 // MARK: - Enhanced More Row Component

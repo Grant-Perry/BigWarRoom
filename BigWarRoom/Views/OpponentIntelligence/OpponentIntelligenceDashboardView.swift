@@ -19,22 +19,20 @@ struct OpponentIntelligenceDashboardView: View {
     @State private var showingWatchedPlayers = false
     @State private var selectedMatchup: UnifiedMatchup? // NEW: For matchup navigation
     @State private var showInjuryAlerts = true // NEW: Collapsible section state
+    @State private var showGameAlerts = true // NEW: Game alerts section state
     @State private var showThreatAlerts = true // NEW: Collapsible section state
     @State private var showThreatMatrix = true // NEW: Collapsible section state
     @State private var showConflictAlerts = true // NEW: Collapsible section state
     @State private var showOpponentPlayers = true // NEW: Collapsible section state
     
-    // #GoodNav: Mission Control-style controls (matching exactly)
-    @State private var sortByWinning = false
-    @State private var dualViewMode = true
-    @State private var autoRefreshEnabled = true
-    @State private var microMode = false
-
-    // MARK: - Interactive Filter States
-    @State private var showingThreatLevelDropdown = false
-    @State private var showingPositionDropdown = false
-    @State private var showingSortByDropdown = false
-
+    // NEW: Info sheet states
+    @State private var showingInjuryAlertsInfo = false
+    @State private var showingGameAlertsInfo = false
+    @State private var showingThreatAlertsInfo = false  
+    @State private var showingThreatMatrixInfo = false
+    @State private var showingConflictsInfo = false
+    @State private var showingOpponentPlayersInfo = false
+    
     // Computed properties for display values
     private var currentThreatLevelDisplay: String {
         switch viewModel.selectedThreatLevel {
@@ -74,20 +72,23 @@ struct OpponentIntelligenceDashboardView: View {
                             // 1. PLAYER INJURY ALERTS (highest priority) - ALWAYS SHOW
                             playerInjuryAlertsSection
                             
-                            // 2. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
+                            // 2. GAME ALERTS (highest scoring plays) - NEW FEATURE 🚨
+                            gameAlertsSection
+                            
+                            // 3. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
                             if !viewModel.nonInjuryRecommendations.isEmpty {
                                 criticalThreatAlertsSection
                             }
                             
-                            // 3. THREAT MATRIX
+                            // 4. THREAT MATRIX
                             threatMatrixSection
                             
-                            // 4. CONFLICT ALERTS
+                            // 5. CONFLICT ALERTS
                             if !viewModel.conflictPlayers.isEmpty {
                                 conflictsSection
                             }
                             
-                            // 5. ALL OPPONENT PLAYERS
+                            // 6. ALL OPPONENT PLAYERS
                             opponentPlayersSection
                         }
                         .padding(.horizontal, 16)
@@ -119,6 +120,24 @@ struct OpponentIntelligenceDashboardView: View {
         }
         .sheet(item: $selectedMatchup) { matchup in
             MatchupDetailSheetsView(matchup: matchup)
+        }
+        .sheet(isPresented: $showingInjuryAlertsInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .injuryAlerts)
+        }
+        .sheet(isPresented: $showingGameAlertsInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .gameAlerts)
+        }
+        .sheet(isPresented: $showingThreatAlertsInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .criticalThreatAlerts)
+        }
+        .sheet(isPresented: $showingThreatMatrixInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .threatMatrix)
+        }
+        .sheet(isPresented: $showingConflictsInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .playerConflicts)
+        }
+        .sheet(isPresented: $showingOpponentPlayersInfo) {
+            IntelligenceSectionInfoSheet(sectionType: .allOpponentPlayers)
         }
         .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
             // Nuclear option: Clear ALL caches and force fresh load when week changes
@@ -367,9 +386,10 @@ struct OpponentIntelligenceDashboardView: View {
     private var playerInjuryAlertsSection: some View {
         CollapsibleSection(
             title: "Player Injury Alerts",
-			notice: "NOTICE: Data may continue to update in real-time.",
+            notice: "NOTICE: Data may continue to update in real-time.",
             count: viewModel.injuryAlerts.count,
-            isExpanded: $showInjuryAlerts
+            isExpanded: $showInjuryAlerts,
+            infoAction: { showingInjuryAlertsInfo = true }
         ) {
             VStack(spacing: 12) {
                 // Show injury alerts if we have any
@@ -389,12 +409,51 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
+    /// 2. Game Alerts Section (highest scoring plays per refresh) - NEW FEATURE 🚨
+    private var gameAlertsSection: some View {
+        CollapsibleSection(
+            title: "🚨 Game Alerts",
+            notice: viewModel.gameAlertsManager.hasAlerts ? "Live scoring updates from refreshes" : nil,
+            count: viewModel.gameAlertsManager.alertCount,
+            isExpanded: $showGameAlerts,
+            infoAction: { showingGameAlertsInfo = true }
+        ) {
+            VStack(spacing: 12) {
+                if viewModel.gameAlertsManager.hasAlerts {
+                    LazyVStack(spacing: 12) {
+                        ForEach(viewModel.gameAlertsManager.sessionAlerts.prefix(10)) { alert in
+                            GameAlertCard(alert: alert)
+                        }
+                    }
+                } else {
+                    // Empty state for game alerts
+                    VStack(spacing: 12) {
+                        Image(systemName: "bolt.slash.circle")
+                            .font(.system(size: 40))
+                            .foregroundColor(.white.opacity(0.4))
+                        
+                        Text("No game alerts yet")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.8))
+                        
+                        Text("Big plays will appear here as they happen during refreshes")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.6))
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.vertical, 20)
+                }
+            }
+        }
+    }
+    
     /// 2. Critical Threat Alerts Section (non-injury strategic recommendations)
     private var criticalThreatAlertsSection: some View {
         CollapsibleSection(
             title: "⚠️ Critical Threat Alerts",
             count: viewModel.nonInjuryRecommendations.count,
-            isExpanded: $showThreatAlerts
+            isExpanded: $showThreatAlerts,
+            infoAction: { showingThreatAlertsInfo = true }
         ) {
             LazyVStack(spacing: 12) {
                 ForEach(viewModel.nonInjuryRecommendations.prefix(5), id: \.id) { recommendation in
@@ -412,7 +471,8 @@ struct OpponentIntelligenceDashboardView: View {
         CollapsibleSection(
             title: "🎯 Threat Matrix",
             count: viewModel.filteredIntelligence.count,
-            isExpanded: $showThreatMatrix
+            isExpanded: $showThreatMatrix,
+            infoAction: { showingThreatMatrixInfo = true }
         ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredIntelligence) { intelligence in
@@ -430,7 +490,8 @@ struct OpponentIntelligenceDashboardView: View {
         CollapsibleSection(
             title: "⚔️ Player Conflicts",
             count: viewModel.conflictPlayers.count,
-            isExpanded: $showConflictAlerts
+            isExpanded: $showConflictAlerts,
+            infoAction: { showingConflictsInfo = true }
         ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.conflictPlayers.prefix(5)) { conflict in
@@ -445,7 +506,8 @@ struct OpponentIntelligenceDashboardView: View {
         CollapsibleSection(
             title: "👥 All Opponent Players",
             count: viewModel.filteredOpponentPlayers.count,
-            isExpanded: $showOpponentPlayers
+            isExpanded: $showOpponentPlayers,
+            infoAction: { showingOpponentPlayersInfo = true }
         ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredOpponentPlayers.prefix(20)) { player in

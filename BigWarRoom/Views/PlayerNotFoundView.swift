@@ -51,7 +51,7 @@ struct PlayerNotFoundView: View {
                         .font(.headline)
                         .foregroundColor(.primary)
                     
-                    Text("We couldn't find detailed stats for this player in our database. This might be a newer player or the data hasn't been updated yet.")
+                    Text("We couldn't find detailed stats for this player. This might be a newer player or the data hasn't been updated yet.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

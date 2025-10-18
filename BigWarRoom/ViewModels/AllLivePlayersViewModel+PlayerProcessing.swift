@@ -92,6 +92,9 @@ extension AllLivePlayersViewModel {
     internal func buildPlayerData(from allPlayerEntries: [LivePlayerEntry]) async {
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
         
+        // 🚨 GAME ALERTS: Process game alerts for highest scoring play
+        processGameAlerts(from: allPlayerEntries)
+        
         // Calculate overall statistics
         topScore = scores.first ?? 1.0
         let bottomScore = scores.last ?? 0.0
@@ -147,6 +150,9 @@ extension AllLivePlayersViewModel {
     // 🔥 NEW: Truly silent update that doesn't trigger UI changes
     private func updatePlayerDataSilently(from allPlayerEntries: [LivePlayerEntry]) async {
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
+        
+        // 🚨 GAME ALERTS: Process game alerts during silent updates too
+        processGameAlerts(from: allPlayerEntries)
         
         // Update statistics silently
         topScore = scores.first ?? 1.0
