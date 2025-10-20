@@ -5,6 +5,7 @@
 //  🔥 PHASE 2 MVVM REFACTOR: Updated to use proper View components
 //  REMOVED: Direct ViewModel UI calls (MVVM violation)
 //  ADDED: Proper View components from FantasyMatchupRosterSections
+//  ENHANCED: Connected filter controls to actual roster display logic
 //
 
 import SwiftUI
@@ -23,6 +24,11 @@ struct FantasyMatchupDetailView: View {
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position
     @State private var sortHighToLow = false // Position: A-Z, Score: High-Low by default
+    
+    // NEW: Filter states - now managed at the parent level
+    @State private var selectedPosition: FantasyPosition = .all
+    @State private var showActiveOnly: Bool = false
+    @State private var showRosteredOnly: Bool = false
 
     // MARK: - Initializers
 
@@ -102,7 +108,9 @@ struct FantasyMatchupDetailView: View {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         sortHighToLow.toggle()
                     }
-                }
+                },
+                selectedPosition: $selectedPosition,
+                showActiveOnly: $showActiveOnly
             )
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -133,19 +141,23 @@ struct FantasyMatchupDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
-                    // 🔥 MVVM REFACTOR: Using proper View components instead of ViewModel UI methods
-                    FantasyMatchupActiveRosterSectionSorted(
+                    // 🔥 MVVM REFACTOR: Using proper View components with filter parameters
+                    FantasyMatchupActiveRosterSectionFiltered(
                         matchup: matchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
-                        highToLow: sortHighToLow
+                        highToLow: sortHighToLow,
+                        selectedPosition: selectedPosition,
+                        showActiveOnly: showActiveOnly
                     )
                     
-                    FantasyMatchupBenchSectionSorted(
+                    FantasyMatchupBenchSectionFiltered(
                         matchup: matchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
-                        highToLow: sortHighToLow
+                        highToLow: sortHighToLow,
+                        selectedPosition: selectedPosition,
+                        showActiveOnly: showActiveOnly
                     )
                 } else {
                     // Fallback content when no view model is available

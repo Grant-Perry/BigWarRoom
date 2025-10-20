@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 
 extension AllLivePlayersViewModel {
     // MARK: - Player Extraction from Single Matchup
@@ -74,13 +75,23 @@ extension AllLivePlayersViewModel {
             if matchup.league.source == .espn {
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
-                    return freshPlayer.currentPoints ?? 0.0
+                    let freshScore = freshPlayer.currentPoints ?? 0.0
+                    // 🔥 DEBUG: Log score updates during background refresh
+                    if abs(freshScore - (player.currentPoints ?? 0.0)) > 0.01 {
+                        print("📈 SCORE UPDATE: \(player.fullName) \(player.currentPoints ?? 0.0) → \(freshScore)")
+                    }
+                    return freshScore
                 }
             }
             
             // Sleeper leagues - use calculated score from provider
             if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
-                return cachedProvider.getPlayerScore(playerId: player.id)
+                let freshScore = cachedProvider.getPlayerScore(playerId: player.id)
+                // 🔥 DEBUG: Log score updates during background refresh
+                if abs(freshScore - (player.currentPoints ?? 0.0)) > 0.01 {
+                    print("📈 SCORE UPDATE: \(player.fullName) \(player.currentPoints ?? 0.0) → \(freshScore)")
+                }
+                return freshScore
             }
         }
         
@@ -93,7 +104,9 @@ extension AllLivePlayersViewModel {
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
         
         // 🚨 GAME ALERTS: Process game alerts for highest scoring play
-        processGameAlerts(from: allPlayerEntries)
+        // 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
+        // TO RE-ENABLE: Uncomment the line below and ensure GameAlertsManager is active
+        // processGameAlerts(from: allPlayerEntries)
         
         // Calculate overall statistics
         topScore = scores.first ?? 1.0
@@ -142,9 +155,14 @@ extension AllLivePlayersViewModel {
         let allPlayerEntries = extractAllPlayers()
         guard !allPlayerEntries.isEmpty else { return }
         
-        // 🔥 FIX: Update data silently without triggering any UI state changes
+        // 🔥 FIX: Update data silently but NOTIFY SwiftUI of changes
         await updatePlayerDataSilently(from: allPlayerEntries)
         lastUpdateTime = Date()
+        
+        // 🔥 CRITICAL FIX: Notify SwiftUI that data changed without triggering loading states
+        objectWillChange.send()
+        
+        print("🔇 SILENT UPDATE: Completed with SwiftUI notification")
     }
     
     // 🔥 NEW: Truly silent update that doesn't trigger UI changes
@@ -152,25 +170,43 @@ extension AllLivePlayersViewModel {
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
         
         // 🚨 GAME ALERTS: Process game alerts during silent updates too
-        processGameAlerts(from: allPlayerEntries)
+        // 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns  
+        // TO RE-ENABLE: Uncomment the line below and ensure GameAlertsManager is active
+        // processGameAlerts(from: allPlayerEntries)
         
         // Update statistics silently
-        topScore = scores.first ?? 1.0
+        let newTopScore = scores.first ?? 1.0
         let bottomScore = scores.last ?? 0.0
-        scoreRange = topScore - bottomScore
+        let newScoreRange = newTopScore - bottomScore
+        
+        // 🔥 FIX: Only update if values actually changed to minimize UI churn
+        if abs(topScore - newTopScore) > 0.01 {
+            topScore = newTopScore
+        }
+        if abs(scoreRange - newScoreRange) > 0.01 {
+            scoreRange = newScoreRange
+        }
         
         if !scores.isEmpty {
             let mid = scores.count / 2
-            medianScore = scores.count % 2 == 0 ?
+            let newMedianScore = scores.count % 2 == 0 ?
                 (scores[mid - 1] + scores[mid]) / 2 :
                 scores[mid]
+            
+            if abs(medianScore - newMedianScore) > 0.01 {
+                medianScore = newMedianScore
+            }
         }
         
-        useAdaptiveScaling = topScore > (medianScore * 3)
+        let newAdaptiveScaling = topScore > (medianScore * 3)
+        if useAdaptiveScaling != newAdaptiveScaling {
+            useAdaptiveScaling = newAdaptiveScaling
+        }
+        
         let quartiles = calculateQuartiles(from: scores)
         
-        // Update players silently
-        allPlayers = allPlayerEntries.map { entry in
+        // Update players silently with fresh score data
+        let updatedPlayers = allPlayerEntries.map { entry in
             let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: topScore)
             let tier = determinePerformanceTier(score: entry.currentScore, quartiles: quartiles)
             
@@ -188,10 +224,13 @@ extension AllLivePlayersViewModel {
             )
         }
         
+        // 🔥 FIX: Update allPlayers with fresh data
+        allPlayers = updatedPlayers
+        
         // 🔥 FIX: Apply filters silently without triggering state changes
         applySilentPositionFilter()
         
-        print("🔇 SILENT UPDATE: Completed without any loading state changes")
+        print("🔇 SILENT UPDATE: Updated \(allPlayers.count) players, filtered to \(filteredPlayers.count)")
     }
     
     // 🔥 NEW: Silent filter application (called during background updates)

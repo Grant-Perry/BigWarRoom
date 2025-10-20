@@ -341,7 +341,7 @@ final class LeagueMatchupProvider {
                     lastName: player.fullName.lastName,
                     position: positionString(entry.lineupSlotId),
                     team: player.nflTeamAbbreviation,
-                    jerseyNumber: nil,
+                    jerseyNumber: getJerseyNumberForPlayer(espnID: String(player.id), team: player.nflTeamAbbreviation, name: "\(player.fullName.firstName) \(player.fullName.lastName)"),
                     currentPoints: weeklyScore,
                     projectedPoints: weeklyScore * 1.1,
                     gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
@@ -946,5 +946,49 @@ final class LeagueMatchupProvider {
         await MainActor.run {
             FantasyViewModel.shared.currentESPNLeague = espnLeague
         }
+    }
+    
+    // MARK: -> Jersey Number Helper
+    
+    /// Get jersey number for a player by looking them up in the Sleeper directory
+    private func getJerseyNumberForPlayer(espnID: String? = nil, sleeperID: String? = nil, team: String?, name: String) -> String? {
+        // First try to find by ESPN ID if provided
+        if let espnID = espnID {
+            if let sleeperPlayer = playerDirectoryStore.players.values.first(where: { $0.espnID == espnID }) {
+                return sleeperPlayer.number?.description
+            }
+        }
+        
+        // Then try by Sleeper ID if provided
+        if let sleeperID = sleeperID {
+            if let sleeperPlayer = playerDirectoryStore.player(for: sleeperID) {
+                return sleeperPlayer.number?.description
+            }
+        }
+        
+        // Finally, try to match by name and team
+        if let team = team {
+            let normalizedName = name.lowercased()
+            let nameComponents = normalizedName.components(separatedBy: " ")
+            
+            if nameComponents.count >= 2 {
+                let firstName = nameComponents[0]
+                let lastName = nameComponents.dropFirst().joined(separator: " ")
+                
+                let matchingPlayer = playerDirectoryStore.players.values.first { player in
+                    guard let playerTeam = player.team?.uppercased(),
+                          playerTeam == team.uppercased() else { return false }
+                    
+                    let playerFirstName = (player.firstName ?? "").lowercased()
+                    let playerLastName = (player.lastName ?? "").lowercased()
+                    
+                    return playerFirstName == firstName && playerLastName == lastName
+                }
+                
+                return matchingPlayer?.number?.description
+            }
+        }
+        
+        return nil
     }
 }

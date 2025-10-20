@@ -121,6 +121,11 @@ extension AllLivePlayersViewModel {
     func performLiveUpdate() async {
         guard isDataLoaded else { return }
         print("🔄 BACKGROUND UPDATE: Silently refreshing player scores")
+        
+        // 🔥 FIX: Ensure we refresh underlying matchup data for fresh scores
+        await matchupsHubViewModel.loadAllMatchups()
+        
+        // Then update our player data surgically
         await updatePlayerDataSurgically()
     }
     

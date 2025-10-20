@@ -96,34 +96,57 @@ struct NFLGameInfo {
         case "in", "live":
             // Show quarter and time like "Q2 2:30"
             if !gameTime.isEmpty {
-                // Parse ESPN format for quarter and time
-                let components = gameTime.components(separatedBy: " ")
-                if components.count >= 1 {
-                    let firstComponent = components[0].lowercased()
-                    
-                    // Extract quarter number
-                    var quarterNum = ""
-                    if firstComponent.contains("1st") || firstComponent.contains("1") {
-                        quarterNum = "1"
-                    } else if firstComponent.contains("2nd") || firstComponent.contains("2") {
-                        quarterNum = "2" 
-                    } else if firstComponent.contains("3rd") || firstComponent.contains("3") {
-                        quarterNum = "3"
-                    } else if firstComponent.contains("4th") || firstComponent.contains("4") {
-                        quarterNum = "4"
-                    } else if firstComponent.contains("ot") || firstComponent.contains("overtime") {
-                        quarterNum = "OT"
+                // 🔥 IMPROVED: Better parsing of ESPN quarter format
+                print("🏈 DEBUG GAME TIME: Raw gameTime = '\(gameTime)' for \(awayTeam) vs \(homeTeam)")
+                
+                // ESPN sends various formats like:
+                // "1st 12:30", "2nd 5:45", "3rd 0:30", "4th 2:15", "Halftime", "Final"
+                let lowercaseTime = gameTime.lowercased()
+                
+                var quarterDisplay = ""
+                var timeDisplay = ""
+                
+                // Extract quarter information more accurately
+                if lowercaseTime.contains("1st") || lowercaseTime.hasPrefix("1 ") {
+                    quarterDisplay = "Q1"
+                } else if lowercaseTime.contains("2nd") || lowercaseTime.hasPrefix("2 ") {
+                    quarterDisplay = "Q2"
+                } else if lowercaseTime.contains("3rd") || lowercaseTime.hasPrefix("3 ") {
+                    quarterDisplay = "Q3"  
+                } else if lowercaseTime.contains("4th") || lowercaseTime.hasPrefix("4 ") {
+                    quarterDisplay = "Q4"
+                } else if lowercaseTime.contains("ot") || lowercaseTime.contains("overtime") {
+                    quarterDisplay = "OT"
+                } else if lowercaseTime.contains("halftime") || lowercaseTime.contains("half") {
+                    return "HALFTIME"
+                } else if lowercaseTime.contains("final") {
+                    return "FINAL"
+                } else {
+                    // 🔥 DEBUG: Log unknown formats
+                    print("⚠️ UNKNOWN GAME TIME FORMAT: '\(gameTime)' - defaulting to LIVE")
+                    return "LIVE"
+                }
+                
+                // Extract time component (look for MM:SS pattern)
+                let timeRegex = try? NSRegularExpression(pattern: "\\d{1,2}:\\d{2}", options: [])
+                if let regex = timeRegex {
+                    let nsString = gameTime as NSString
+                    let results = regex.matches(in: gameTime, options: [], range: NSRange(location: 0, length: nsString.length))
+                    if let match = results.first {
+                        timeDisplay = nsString.substring(with: match.range)
                     }
-                    
-                    // Look for time component
-                    let timeComponent = components.first { $0.contains(":") }
-                    
-                    if !quarterNum.isEmpty {
-                        if let time = timeComponent {
-                            return "Q\(quarterNum) \(time)"
-                        } else {
-                            return "Q\(quarterNum)"
-                        }
+                }
+                
+                // Return formatted quarter and time
+                if !quarterDisplay.isEmpty {
+                    if !timeDisplay.isEmpty {
+                        let result = "\(quarterDisplay) \(timeDisplay)"
+                        print("🏈 FORMATTED TIME: '\(gameTime)' -> '\(result)'")
+                        return result
+                    } else {
+                        let result = quarterDisplay
+                        print("🏈 FORMATTED TIME: '\(gameTime)' -> '\(result)' (no time found)")
+                        return result
                     }
                 }
             }

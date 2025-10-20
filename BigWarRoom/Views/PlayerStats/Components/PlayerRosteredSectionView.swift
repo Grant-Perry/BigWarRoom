@@ -11,9 +11,10 @@ import SwiftUI
 struct PlayerRosteredSectionView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
+    let matchups: [UnifiedMatchup] // 🔥 PASS DATA INSTEAD OF OBSERVING
     
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel.shared
+    // 🔥 REMOVE: No more observing the shared view model
+    // @StateObject private var matchupsHubViewModel = MatchupsHubViewModel.shared
     @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
     var body: some View {
@@ -39,7 +40,7 @@ struct PlayerRosteredSectionView: View {
                     Spacer()
                     
                     HStack(spacing: 8) {
-                        Text("\(rosteredMatchups.count) leagues")
+                        Text("\(rosteredForMe.count + rosteredAgainstMe.count) leagues")
                             .font(.caption2)
                             .foregroundColor(.white.opacity(0.8))
                         
@@ -52,7 +53,7 @@ struct PlayerRosteredSectionView: View {
             
             // Collapsible Content
             if isExpanded {
-                if rosteredMatchups.isEmpty {
+                if rosteredForMe.isEmpty && rosteredAgainstMe.isEmpty {
                     emptyStateView
                 } else {
                     rosteredContent
@@ -65,20 +66,54 @@ struct PlayerRosteredSectionView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(overlayBorder)
         .shadow(color: (team?.primaryColor ?? Color.gpBlue).opacity(0.2), radius: 4, x: 0, y: 2)
-        .onAppear {
-            // Load matchup data when view appears to ensure we have current roster info
-            Task {
-                await matchupsHubViewModel.loadAllMatchups()
-            }
-        }
     }
     
     // MARK: - Content Views
     
     private var rosteredContent: some View {
-        LazyVStack(spacing: 6) {
-            ForEach(rosteredMatchups, id: \.id) { matchup in
-                RosteredLeagueRow(matchup: matchup)
+        VStack(spacing: 8) {
+            // "FOR ME" Section
+            if !rosteredForMe.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.thumbsup.fill")
+                            .font(.caption)
+                            .foregroundColor(.gpGreen)
+                        
+                        Text("FOR")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gpGreen)
+                    }
+                    
+                    LazyVStack(spacing: 6) {
+                        ForEach(rosteredForMe, id: \.id) { matchup in
+                            RosteredLeagueRow(matchup: matchup)
+                        }
+                    }
+                }
+            }
+            
+            // "AGAINST ME" Section
+            if !rosteredAgainstMe.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "hand.thumbsdown.fill")
+                            .font(.caption)
+                            .foregroundColor(.gpRedPink)
+                        
+                        Text("AGAINST")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gpRedPink)
+                    }
+                    
+                    LazyVStack(spacing: 6) {
+                        ForEach(rosteredAgainstMe, id: \.id) { matchup in
+                            RosteredLeagueRow(matchup: matchup)
+                        }
+                    }
+                }
             }
         }
     }
@@ -101,7 +136,7 @@ struct PlayerRosteredSectionView: View {
     
     /// Find all matchups where this player is on my team
     private var rosteredMatchups: [UnifiedMatchup] {
-        return matchupsHubViewModel.myMatchups.filter { matchup in
+        return matchups.filter { matchup in
             if matchup.isChoppedLeague {
                 // Check if player is on my chopped team
                 return matchup.myTeam?.roster.contains { rosterPlayer in
@@ -119,6 +154,71 @@ struct PlayerRosteredSectionView: View {
                     return nameMatch || sleeperIDMatch
                 } ?? false
             }
+        }
+    }
+    
+    // Find all matchups where this player is on my team
+    private var rosteredForMe: [UnifiedMatchup] {
+        return matchups.filter { matchup in
+            return matchup.myTeam?.roster.contains { rosterPlayer in
+                // Try multiple matching strategies for robustness
+                
+                // Strategy 1: SleeperID matching (for Sleeper leagues)
+                if let rosterSleeperID = rosterPlayer.sleeperID {
+                    let playerIDString = String(self.player.playerID)
+                    if rosterSleeperID == playerIDString {
+                        return true
+                    }
+                }
+                
+                // Strategy 2: Name matching (fallback for ESPN leagues or missing IDs)
+                let normalizedPlayerName = self.player.fullName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                let normalizedRosterName = rosterPlayer.fullName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if normalizedPlayerName == normalizedRosterName {
+                    return true
+                }
+                
+                // Strategy 3: Handle name variations (Jr., Sr., etc.)
+                let playerBaseName = normalizedPlayerName.replacingOccurrences(of: " jr.", with: "").replacingOccurrences(of: " sr.", with: "").replacingOccurrences(of: " iii", with: "").replacingOccurrences(of: " ii", with: "")
+                let rosterBaseName = normalizedRosterName.replacingOccurrences(of: " jr.", with: "").replacingOccurrences(of: " sr.", with: "").replacingOccurrences(of: " iii", with: "").replacingOccurrences(of: " ii", with: "")
+                
+                return playerBaseName == rosterBaseName
+            } ?? false
+        }
+    }
+    
+    // Find all matchups where this player is on my opponent's team
+    private var rosteredAgainstMe: [UnifiedMatchup] {
+        return matchups.filter { matchup in
+            // Chopped leagues don't have direct opponents, so this doesn't apply
+            guard !matchup.isChoppedLeague else { return false }
+            
+            return matchup.opponentTeam?.roster.contains { rosterPlayer in
+                // Try multiple matching strategies for robustness
+                
+                // Strategy 1: SleeperID matching (for Sleeper leagues)
+                if let rosterSleeperID = rosterPlayer.sleeperID {
+                    let playerIDString = String(self.player.playerID)
+                    if rosterSleeperID == playerIDString {
+                        return true
+                    }
+                }
+                
+                // Strategy 2: Name matching (fallback for ESPN leagues or missing IDs)
+                let normalizedPlayerName = self.player.fullName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                let normalizedRosterName = rosterPlayer.fullName.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if normalizedPlayerName == normalizedRosterName {
+                    return true
+                }
+                
+                // Strategy 3: Handle name variations (Jr., Sr., etc.)
+                let playerBaseName = normalizedPlayerName.replacingOccurrences(of: " jr.", with: "").replacingOccurrences(of: " sr.", with: "").replacingOccurrences(of: " iii", with: "").replacingOccurrences(of: " ii", with: "")
+                let rosterBaseName = normalizedRosterName.replacingOccurrences(of: " jr.", with: "").replacingOccurrences(of: " sr.", with: "").replacingOccurrences(of: " iii", with: "").replacingOccurrences(of: " ii", with: "")
+                
+                return playerBaseName == rosterBaseName
+            } ?? false
         }
     }
     
@@ -270,22 +370,3 @@ private struct RosteredLeagueRow: View {
     }
 }
 
-#Preview {
-    // Create a mock player with minimal required data
-    let mockPlayerData = """
-    {
-        "player_id": "123",
-        "first_name": "Josh",
-        "last_name": "Allen",
-        "position": "QB",
-        "team": "BUF"
-    }
-    """.data(using: .utf8)!
-    
-    let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
-    
-    return PlayerRosteredSectionView(
-        player: mockPlayer,
-        team: nil
-    )
-}

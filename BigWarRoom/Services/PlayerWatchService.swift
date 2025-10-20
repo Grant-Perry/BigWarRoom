@@ -155,6 +155,38 @@ final class PlayerWatchService: ObservableObject {
         print("🎯 Cleared all watched players")
     }
     
+    /// Reset delta for a specific watched player (set initialScore to currentScore)
+    /// - Parameter playerID: The player ID to reset delta for
+    func resetPlayerDelta(_ playerID: String) {
+        guard let index = watchedPlayers.firstIndex(where: { $0.playerID == playerID }) else {
+            print("⚠️ Attempted to reset delta for unwatched player: \(playerID)")
+            return
+        }
+        
+        let oldInitialScore = watchedPlayers[index].initialScore
+        let currentScore = watchedPlayers[index].currentScore
+        
+        // Create new WatchedPlayer with reset initialScore and updated timestamp
+        let resetPlayer = WatchedPlayer(
+            id: watchedPlayers[index].id,
+            playerID: watchedPlayers[index].playerID,
+            playerName: watchedPlayers[index].playerName,
+            position: watchedPlayers[index].position,
+            team: watchedPlayers[index].team,
+            watchStartTime: Date(), // 🔥 Reset watch time to now
+            initialScore: currentScore, // 🔥 Set baseline to current score
+            opponentReferences: watchedPlayers[index].opponentReferences,
+            currentScore: currentScore,
+            isLive: watchedPlayers[index].isLive
+        )
+        
+        watchedPlayers[index] = resetPlayer
+        saveWatchedPlayers()
+        
+        let deltaWasReset = currentScore - oldInitialScore
+        print("🔄 Reset delta for \(resetPlayer.playerName): was \(String(format: "%.1f", deltaWasReset)), now 0.0")
+    }
+    
     /// Update scores for all watched players
     /// - Parameter opponentPlayers: Current opponent players with updated scores
     func updateWatchedPlayerScores(_ opponentPlayers: [OpponentPlayer]) {

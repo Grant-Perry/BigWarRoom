@@ -197,6 +197,9 @@ struct WatchedPlayerCard: View {
     @ObservedObject private var watchService = PlayerWatchService.shared
     @StateObject private var fantasyPlayerViewModel = FantasyPlayerViewModel()
     
+    // 🔥 NEW: State for player stats sheet
+    @State private var showingPlayerStats = false
+    
     // Computed properties to break up complex ViewBuilder
     private var sleeperPlayerData: SleeperPlayer? {
         PlayerMatchService.shared.matchPlayer(
@@ -249,55 +252,80 @@ struct WatchedPlayerCard: View {
     // MARK: - Component Views
     
     private var mainCardContent: some View {
-        HStack(spacing: 0) {
-            // Empty space for where image will be overlaid
-            Rectangle()
-                .fill(Color.clear)
-                .frame(width: 80)
+        VStack(spacing: 0) {
+            // Header row with player name and controls
+            HStack {
+                // Player name and team
+                HStack(spacing: 8) {
+                    Text(watchedPlayer.playerName)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                    
+                    if let team = watchedPlayer.team {
+                        Text(team)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.gray)
+                            .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                    }
+                }
+                
+                Spacer()
+                
+                // Controls
+                HStack(spacing: 8) {
+                    // Reset delta button
+                    Button(action: {
+                        watchService.resetPlayerDelta(watchedPlayer.playerID)
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12))
+                            .foregroundColor(.blue)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Unwatch button
+                    Button(action: {
+                        watchService.unwatchPlayer(watchedPlayer.playerID)
+                    }) {
+                        Image(systemName: "eye.slash")
+                            .font(.system(size: 14))
+                            .foregroundColor(.gray)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
             
-            // Player info section
-            playerInfoSection
-            
-            Spacer()
-            
-            // Delta and threat section
-            deltaAndThreatSection
+            // Main content row
+            HStack(spacing: 0) {
+                // Empty space for where image will be overlaid
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: 80)
+                
+                // Player info section (no longer has name)
+                playerInfoSection
+                
+                Spacer()
+                
+                // Delta and threat section
+                deltaAndThreatSection
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
         }
-        .padding(16)
         .background(cardBackground)
     }
     
     private var playerInfoSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Name and team header
-            HStack {
-                Text(watchedPlayer.playerName)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
-                
-                Spacer()
-                
-                if let team = watchedPlayer.team {
-                    Text(team)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
-                        .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
-                }
-                
-                // Unwatch button
-                Button(action: {
-                    watchService.unwatchPlayer(watchedPlayer.playerID)
-                }) {
-                    Image(systemName: "eye.slash")
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
+            // EMPTY - player name moved to header
             
-            // Scores section
+            // Scores section (now takes up more space)
             scoresSection
             
             // Opponent references
@@ -308,47 +336,63 @@ struct WatchedPlayerCard: View {
     }
     
     private var scoresSection: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 8) { // 🔥 REDUCED spacing from 16 to 8 to make more room
             // Initial score
             VStack(alignment: .leading, spacing: 2) {
                 Text("START")
                     .font(.system(size: 8, weight: .black))
                     .foregroundColor(.gray)
                     .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 Text(String(format: "%.1f", watchedPlayer.initialScore))
                     .font(.system(size: 14, weight: .bold, design: .rounded))
                     .foregroundColor(.blue)
                     .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
+            .frame(width: 45) // 🔥 FIXED width for START column
             
-            // Current score
+            // Current score - EXPANDED
             VStack(alignment: .leading, spacing: 2) {
                 Text("CURRENT")
                     .font(.system(size: 8, weight: .black))
                     .foregroundColor(.gray)
                     .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
                 Text(String(format: "%.1f", watchedPlayer.currentScore))
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundColor(watchedPlayer.isLive ? .green : .white)
+                    .font(.system(size: 20, weight: .bold, design: .rounded)) // Large size maintained
+                    .foregroundColor(watchedPlayer.deltaScore >= 0 ? .gpRedPink : .gpGreen) // 🔥 WIN/LOSE COLORS: Red when opponent scoring (bad), Green when struggling (good)
                     .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8) // 🔥 INCREASED from 0.7 to 0.8 for better readability
             }
+            .frame(minWidth: 65) // 🔥 INCREASED minimum width for CURRENT column
             
             Spacer()
             
-            // Watch duration
+            // 🔥 NEW: Delta score on same line as CURRENT
             VStack(alignment: .trailing, spacing: 2) {
-                Text("WATCHING")
+                Text("DELTA")
                     .font(.system(size: 8, weight: .black))
                     .foregroundColor(.gray)
-                    .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 
-                Text(watchedPlayer.watchDurationString)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-                    .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                Text(watchedPlayer.deltaDisplay)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundColor(
+                        watchedPlayer.deltaScore == 0 ? .secondary : 
+                        (watchedPlayer.deltaScore > 0 ? .gpGreen : .gpRedPink)
+                    ) // 🔥 FIXED: Gray when exactly 0, Green when positive, Red when negative
+                    .lineLimit(1)
+                    .minimumScaleFactor(1.0)
             }
+            .frame(width: 50) // 🔥 FIXED width for DELTA column
         }
     }
     
@@ -400,15 +444,14 @@ struct WatchedPlayerCard: View {
                     .minimumScaleFactor(0.7)
             }
             
-            // Delta score
+            // Watch duration
             VStack(spacing: 2) {
-                Text("DELTA")
-                    .font(.system(size: 8, weight: .black))
+                Text(watchedPlayer.watchDurationString)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.gray)
-                
-                Text(watchedPlayer.deltaDisplay)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(watchedPlayer.deltaColor)
+                    .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             
             // Live indicator
@@ -484,21 +527,47 @@ struct WatchedPlayerCard: View {
     }
     
     private var playerImageWithNavigation: some View {
-        Group {
-            if let sleeperPlayer = sleeperPlayerData {
-                NavigationLink(destination: PlayerStatsCardView(
-                    player: sleeperPlayer,
-                    team: NFLTeam.team(for: watchedPlayer.team ?? "")
-                )) {
-                    playerImageView
+        Button(action: {
+            // 🔥 FIXED: Use sheet instead of NavigationLink
+            showingPlayerStats = true
+        }) {
+            playerImageView
+        }
+        .buttonStyle(PlainButtonStyle())
+        .zIndex(2)
+        .offset(x: -1)
+        .sheet(isPresented: $showingPlayerStats) {
+            NavigationView {
+                if let sleeperPlayer = sleeperPlayerData {
+                    PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: watchedPlayer.team ?? "")
+                    )
+                } else {
+                    // 🔥 SIMPLIFIED FALLBACK: Show error message instead of trying to create SleeperPlayer
+                    VStack(spacing: 20) {
+                        Image(systemName: "person.crop.circle.badge.questionmark")
+                            .font(.system(size: 60))
+                            .foregroundColor(.gray)
+                        
+                        Text("Player Not Found")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Text("Unable to load detailed stats for \(watchedPlayer.playerName)")
+                            .font(.body)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                        
+                        Button("Dismiss") {
+                            showingPlayerStats = false
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                    .navigationTitle("Player Stats")
+                    .navigationBarTitleDisplayMode(.inline)
                 }
-                .buttonStyle(PlainButtonStyle())
-                .zIndex(2)
-                .offset(x: -1)
-            } else {
-                playerImageView
-                    .zIndex(2)
-                    .offset(x: -1)
             }
         }
     }

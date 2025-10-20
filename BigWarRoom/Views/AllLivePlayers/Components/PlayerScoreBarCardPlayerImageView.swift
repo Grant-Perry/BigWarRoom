@@ -15,56 +15,84 @@ struct PlayerScoreBarCardPlayerImageView: View {
     @StateObject private var playerDirectory = PlayerDirectoryStore.shared
     
     var body: some View {
-        AsyncImage(url: playerEntry.player.headshotURL) { phase in
-            switch phase {
-            case .empty:
-                // Loading state
-                Rectangle()
-                    .fill(teamGradient)
-                    .overlay(
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    )
-            case .success(let image):
-                // Successfully loaded image
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            case .failure(_):
-                // Failed to load - try alternative URL or show fallback
-                AsyncImage(url: alternativeImageURL) { altPhase in
-                    switch altPhase {
-                    case .success(let altImage):
-                        altImage
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                    default:
+        ZStack {
+            // Main player image or team logo
+            Group {
+                // 🔥 NEW: For D/ST players, use team logo instead of player photo
+                if isDefenseOrSpecialTeams {
+                    // Show team logo for defense/special teams
+                    if let team = NFLTeam.team(for: playerEntry.player.team ?? "") {
+                        TeamAssetManager.shared.logoOrFallback(for: team.id)
+                            .frame(width: 150, height: 180)
+                    } else {
+                        // Fallback for defense without recognized team
                         Rectangle()
                             .fill(teamGradient)
                             .overlay(
-                                Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
-                                    .font(.system(size: 26, weight: .bold))
-                                    .foregroundColor(.white)
+                                VStack(spacing: 4) {
+                                    Text(playerEntry.position)
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundColor(.white)
+                                    Text(playerEntry.player.team ?? "")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.8))
+                                }
                             )
+                            .frame(width: 150, height: 180)
                     }
+                } else {
+                    // Regular player - show headshot
+                    AsyncImage(url: playerEntry.player.headshotURL) { phase in
+                        switch phase {
+                        case .empty:
+                            // Loading state
+                            Rectangle()
+                                .fill(teamGradient)
+                                .overlay(
+                                    ProgressView()
+                                        .scaleEffect(0.6)
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                )
+                        case .success(let image):
+                            // Successfully loaded image
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        case .failure(_):
+                            // Failed to load - try alternative URL or show fallback
+                            AsyncImage(url: alternativeImageURL) { altPhase in
+                                switch altPhase {
+                                case .success(let altImage):
+                                    altImage
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                default:
+                                    Rectangle()
+                                        .fill(teamGradient)
+                                        .overlay(
+                                            Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
+                                                .font(.system(size: 26, weight: .bold))
+                                                .foregroundColor(.white)
+                                        )
+                                }
+                            }
+                        @unknown default:
+                            Rectangle()
+                                .fill(teamGradient)
+                                .overlay(
+                                    Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
+                                        .font(.system(size: 26, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                    }
+                    .frame(width: 150, height: 180)
                 }
-            @unknown default:
-                Rectangle()
-                    .fill(teamGradient)
-                    .overlay(
-                        Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
-                            .font(.system(size: 26, weight: .bold))
-                            .foregroundColor(.white)
-                    )
             }
         }
-		.frame(width: 150, height: 180)
-        // 🔥 FIXED: Use onTapGesture with simultaneous gesture recognition
         .onTapGesture {
             showingPlayerDetail = true
         }
-        // 🔥 NEW: Player detail sheet
         .sheet(isPresented: $showingPlayerDetail) {
             NavigationView {
                 if let sleeperPlayer = getSleeperPlayerData() {
@@ -77,6 +105,12 @@ struct PlayerScoreBarCardPlayerImageView: View {
                 }
             }
         }
+    }
+    
+    // 🔥 NEW: Helper to identify defense/special teams players
+    private var isDefenseOrSpecialTeams: Bool {
+        let position = playerEntry.position.uppercased()
+        return position == "DEF" || position == "DST" || position == "D/ST"
     }
     
     // 🔥 NEW: Get Sleeper player data for detailed stats

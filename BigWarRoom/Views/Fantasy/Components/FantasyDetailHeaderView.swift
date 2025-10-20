@@ -2,13 +2,14 @@
 //  FantasyDetailHeaderView.swift
 //  BigWarRoom
 //
-//  Header component for fantasy matchup detail view with sorting controls
-//  FIXED: No clipping + visible nyyDark gradient
+//  Header component for fantasy matchup detail view with enhanced sorting controls
+//  ENHANCED: Full All Live Players style controls with search, position filter, active filter
+//  CONNECTED: Filter states now properly bound to parent view
 //
 
 import SwiftUI
 
-/// Header view for fantasy matchup details with team comparison and sorting controls
+/// Header view for fantasy matchup details with team comparison and comprehensive sorting controls
 struct FantasyDetailHeaderView: View {
     let leagueName: String
     let matchup: FantasyMatchup
@@ -16,53 +17,56 @@ struct FantasyDetailHeaderView: View {
     let homeTeamIsWinning: Bool
     let fantasyViewModel: FantasyViewModel?
     
-    // Sorting parameters
+    // Enhanced sorting and filtering parameters
     let sortingMethod: MatchupSortingMethod
     let sortHighToLow: Bool
     let onSortingMethodChanged: (MatchupSortingMethod) -> Void
     let onSortDirectionChanged: () -> Void
+    
+    // NEW: Bound filter states (connected to parent)
+    @Binding var selectedPosition: FantasyPosition
+    @Binding var showActiveOnly: Bool
+    @FocusState private var isSearchFocused: Bool
     
     /// Dynamic sort direction text based on current method and direction
     private var sortDirectionText: String {
         switch sortingMethod {
         case .score:
             return sortHighToLow ? "↓" : "↑"
-        case .name, .position, .team: // UPDATED: Added .team case
+        case .name, .position, .team:
             return sortHighToLow ? "Z-A" : "A-Z"
         }
     }
     
     var body: some View {
-        // NO FRAME CONSTRAINTS - Let content determine size naturally
-        VStack(spacing: 12) { // REDUCED spacing from 18 to 12
+        VStack(spacing: 12) {
             // Team comparison row
             teamComparisonRow
             
-            // Sorting controls at bottom - CLOSER TO SCORES
-            scoresAndSortingRow
+            // Enhanced controls section
+            enhancedControlsSection
         }
-        .padding(.vertical, 20) // Internal padding
-        .padding(.horizontal, 20) // Internal padding
-	   // stats gradient background
+        .padding(.vertical, 20)
+        .padding(.horizontal, 20)
         .background(
             ZStack {
-                // MAIN GRADIENT BACKGROUND - More opaque to ensure visibility
+                // Main gradient background
                 LinearGradient(
                     gradient: Gradient(colors: [
-                        Color.nyyDark.opacity(0.9), // STRONGER opacity
+                        Color.nyyDark.opacity(0.9),
                         Color.black.opacity(0.7),
-                        Color.nyyDark.opacity(0.8) // STRONGER opacity
+                        Color.nyyDark.opacity(0.8)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 
-                // SUBTLE OVERLAY PATTERN
+                // Subtle overlay pattern
                 LinearGradient(
                     gradient: Gradient(colors: [
                         Color.white.opacity(0.08),
                         Color.clear,
-                        Color.nyyDark.opacity(0.1) // Add more nyyDark tint
+                        Color.nyyDark.opacity(0.1)
                     ]),
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
@@ -71,7 +75,6 @@ struct FantasyDetailHeaderView: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            // VISIBLE BORDER
             RoundedRectangle(cornerRadius: 16)
                 .stroke(
                     LinearGradient(
@@ -87,7 +90,7 @@ struct FantasyDetailHeaderView: View {
                 )
         )
         .shadow(
-            color: Color.nyyDark.opacity(0.4), // Stronger shadow
+            color: Color.nyyDark.opacity(0.4),
             radius: 8, 
             x: 0, 
             y: 4
@@ -97,9 +100,9 @@ struct FantasyDetailHeaderView: View {
     // MARK: - View Components
     
     private var teamComparisonRow: some View {
-        HStack(spacing: 24) { // Good spacing between teams
+        HStack(spacing: 24) {
             // Home team (left side)
-            VStack(spacing: 4) { // REDUCED spacing from 6 to 4 to accommodate "Yet to play"
+            VStack(spacing: 4) {
                 // Avatar with border
                 ZStack {
                     if let url = matchup.homeTeam.avatarURL {
@@ -107,7 +110,7 @@ struct FantasyDetailHeaderView: View {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 48, height: 48) // Good size
+                                .frame(width: 48, height: 48)
                                 .clipShape(Circle())
                         } placeholder: {
                             Image(systemName: "person.crop.circle.fill")
@@ -144,11 +147,11 @@ struct FantasyDetailHeaderView: View {
                         .foregroundColor(.gray)
                 }
                 
-                // SCORE and YET TO PLAY stack - no extra spacing
+                // SCORE and YET TO PLAY stack
                 VStack(spacing: 1) {
                     // Team score
                     Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
-                        .font(.system(size: 22, weight: .bold)) // Large, visible score
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
                     
                     // Yet to play count
@@ -156,7 +159,7 @@ struct FantasyDetailHeaderView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
-                .padding(.top, 2) // SMALL padding to bring score closer
+                .padding(.top, 2)
             }
             .frame(maxWidth: .infinity)
             
@@ -185,7 +188,7 @@ struct FantasyDetailHeaderView: View {
             .frame(width: 70)
             
             // Away team (right side)
-            VStack(spacing: 4) { // REDUCED spacing from 6 to 4 to accommodate "Yet to play"
+            VStack(spacing: 4) {
                 // Avatar with border
                 ZStack {
                     if let url = matchup.awayTeam.avatarURL {
@@ -193,7 +196,7 @@ struct FantasyDetailHeaderView: View {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 48, height: 48) // Good size
+                                .frame(width: 48, height: 48)
                                 .clipShape(Circle())
                         } placeholder: {
                             Image(systemName: "person.crop.circle.fill")
@@ -230,11 +233,11 @@ struct FantasyDetailHeaderView: View {
                         .foregroundColor(.gray)
                 }
                 
-                // SCORE and YET TO PLAY stack - no extra spacing
+                // SCORE and YET TO PLAY stack
                 VStack(spacing: 1) {
                     // Team score
                     Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
-                        .font(.system(size: 22, weight: .bold)) // Large, visible score
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
                     
                     // Yet to play count
@@ -242,19 +245,21 @@ struct FantasyDetailHeaderView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(.secondary)
                 }
-                .padding(.top, 2) // SMALL padding to bring score closer
+                .padding(.top, 2)
             }
             .frame(maxWidth: .infinity)
         }
     }
     
-    private var scoresAndSortingRow: some View {
+    // MARK: - Enhanced Controls Section
+    
+    private var enhancedControlsSection: some View {
         HStack {
             Spacer()
             
-            // Sorting controls CENTERED
-            HStack(spacing: 10) { // Good spacing between controls
-                // Sort method picker - SIZE 14
+            // Sort Method with conditional arrow
+            HStack(spacing: 8) {
+                // Sort Method Menu
                 Menu {
                     ForEach(MatchupSortingMethod.allCases) { method in
                         Button(action: {
@@ -271,31 +276,101 @@ struct FantasyDetailHeaderView: View {
                         }
                     }
                 } label: {
-                    Text(sortingMethod.displayName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 12) // Slightly reduced padding
-                        .padding(.vertical, 6) // Slightly reduced padding
-                        .background(Color.blue.opacity(0.2)) // More visible background
-                        .clipShape(RoundedRectangle(cornerRadius: 8)) 
+                    VStack(spacing: 2) {
+                        Text(sortingMethod.displayName.uppercased())
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.purple)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                        
+                        Text(sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
                 }
+                .menuStyle(BorderlessButtonMenuStyle())
                 
-                // Sort direction toggle - SIZE 14
-                Button(action: {
-                    onSortDirectionChanged()
-                }) {
-                    Text(sortDirectionText)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 12) // Slightly reduced padding
-                        .padding(.vertical, 6) // Slightly reduced padding
-                        .background(Color.orange.opacity(0.2)) // More visible background
-                        .clipShape(RoundedRectangle(cornerRadius: 8)) 
+                // Sort Direction Arrow (only show for Score)
+                if sortingMethod == .score {
+                    Button(action: {
+                        onSortDirectionChanged()
+                    }) {
+                        Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.gpGreen)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             
             Spacer()
+            
+            // Position filter with picker
+            Menu {
+                ForEach(FantasyPosition.allCases) { position in
+                    Button(action: {
+                        selectedPosition = position
+                    }) {
+                        HStack {
+                            Text(position.displayName)
+                            if selectedPosition == position {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Text(selectedPosition.displayName.uppercased())
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(selectedPosition == .all ? .gpBlue : .purple)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    
+                    Text("Position")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
+            .menuStyle(BorderlessButtonMenuStyle())
+            
+            Spacer()
+            
+            // Active Only toggle
+            Button(action: {
+                showActiveOnly.toggle()
+            }) {
+                VStack(spacing: 2) {
+                    Text(showActiveOnly ? "Yes" : "No")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(showActiveOnly ? .gpGreen : .gpRedPink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    
+                    Text("Active Only")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Spacer()
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
     
     // MARK: - Computed Properties (Data Only)

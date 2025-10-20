@@ -21,6 +21,19 @@ struct PlayerScoreBarCardContentView: View {
     
     var body: some View {
         ZStack(alignment: .leading) {
+            // 🔥 NEW: Jersey number as bottom layer - before any other content
+            HStack {
+                Spacer()
+                if let jerseyNumber = getJerseyNumber() {
+                    JerseyNumberView(
+                        jerseyNumber: jerseyNumber,
+                        teamColor: getContrastingJerseyColor(for: playerEntry.player.team ?? "")
+                    )
+                    .offset(x: -60, y: 15) // Position it in the right area
+                }
+                Spacer()
+            }
+            
             // Build the card content first (without image)
             HStack(spacing: 0) {
                 // Empty space for where image will be overlaid
@@ -162,7 +175,7 @@ struct PlayerScoreBarCardContentView: View {
             // NOW overlay the player image on top - unconstrained!
             HStack {
                 ZStack {
-                    // 🔥 FIXED: Large floating team logo behind player - positioned further right
+                    // 🔥 FIXED: Large floating team logo behind player - positioned further right and lower
                     let teamCode = playerEntry.player.team ?? ""
                     // 🔥 NEW: Use TeamCodeNormalizer for consistent team mapping
                     let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
@@ -171,7 +184,7 @@ struct PlayerScoreBarCardContentView: View {
                         TeamAssetManager.shared.logoOrFallback(for: team.id)
                             .frame(width: 140, height: 140)
                             .opacity(0.25)
-                            .offset(x: 10, y: -5) // 🔥 FIXED: Back to x: 20 as requested
+                            .offset(x: 20, y: 15) // 🔥 FIXED: Moved down from y: -5 to y: 10
                             .zIndex(0)
                     } else {
                         let _ = print("🔍 DEBUG - No team logo for player: \(playerEntry.player.shortName), team: '\(teamCode)' (normalized: '\(normalizedTeamCode)')")
@@ -184,7 +197,7 @@ struct PlayerScoreBarCardContentView: View {
                 }
                 .frame(height: 80) // Constrain height
                 .frame(maxWidth: 180) // 🔥 INCREASED: Wider to accommodate offset logo (was 120)
-                .offset(x: -10)
+				.offset(x: -10)
                 Spacer()
             }
         }
@@ -267,5 +280,104 @@ struct PlayerScoreBarCardContentView: View {
         } else {
             return "\(position) • No stats yet"
         }
+    }
+    
+    // MARK: - 🔥 NEW: Jersey Number Helper Methods
+    
+    /// Get jersey number for the player from SleeperPlayer data
+    private func getJerseyNumber() -> String? {
+        // Try to find SleeperPlayer by ID first (most reliable)
+        if let sleeperPlayer = PlayerDirectoryStore.shared.player(for: playerEntry.player.id) {
+            return sleeperPlayer.number?.description
+        }
+        
+        // Fallback to existing jerseyNumber property
+        return playerEntry.player.jerseyNumber
+    }
+    
+    /// Get team color for jersey number display
+    private func getTeamColor(for teamCode: String) -> Color {
+        if let team = NFLTeam.team(for: teamCode) {
+            return team.primaryColor
+        }
+        return .white // Default fallback
+    }
+    
+    /// Get contrasting color for jersey number display using WCAG luminance calculation
+    private func getContrastingJerseyColor(for teamCode: String) -> Color {
+        // 🔥 WCAG-COMPLIANT: Use luminance-based contrast calculation
+        guard let team = NFLTeam.team(for: teamCode) else {
+            return .white
+        }
+        
+        return team.primaryColor.adaptedTextColor()
+    }
+    
+    /// WCAG-compliant luminance calculation for contrast
+    private func calculateLuminance(_ color: Color) -> Double {
+        // Convert SwiftUI Color to UIColor to get RGB components
+        let uiColor = UIColor(color)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        
+        // Apply gamma correction according to WCAG formula
+        func adjustColorComponent(_ component: CGFloat) -> CGFloat {
+            return component <= 0.03928 ? component / 12.92 : pow((component + 0.055) / 1.055, 2.4)
+        }
+        
+        let adjustedRed = adjustColorComponent(red)
+        let adjustedGreen = adjustColorComponent(green)
+        let adjustedBlue = adjustColorComponent(blue)
+        
+        // WCAG luminance formula
+        return 0.2126 * Double(adjustedRed) + 0.7152 * Double(adjustedGreen) + 0.0722 * Double(adjustedBlue)
+    }
+}
+
+// MARK: - WCAG Color Contrast Extension
+extension Color {
+    /// Calculate luminance using WCAG formula
+    func luminance() -> Double {
+        let uiColor = UIColor(self)
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        
+        uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil)
+        
+        // Apply gamma correction according to WCAG
+        func adjustComponent(_ component: CGFloat) -> CGFloat {
+            return component <= 0.03928 ? component / 12.92 : pow((component + 0.055) / 1.055, 2.4)
+        }
+        
+        let adjRed = adjustComponent(red)
+        let adjGreen = adjustComponent(green)
+        let adjBlue = adjustComponent(blue)
+        
+        // WCAG luminance formula
+        return 0.2126 * Double(adjRed) + 0.7152 * Double(adjGreen) + 0.0722 * Double(adjBlue)
+    }
+    
+    /// Determine if color is light based on luminance
+    func isLight() -> Bool {
+        return luminance() > 0.5
+    }
+    
+    /// Return appropriate contrasting text color (black or white)
+    func adaptedTextColor() -> Color {
+        return isLight() ? Color.black : Color.white
+    }
+    
+    /// Calculate WCAG contrast ratio against another color
+    func contrastRatio(against color: Color) -> Double {
+        let luminance1 = self.luminance()
+        let luminance2 = color.luminance()
+        let lighter = max(luminance1, luminance2)
+        let darker = min(luminance1, luminance2)
+        return (lighter + 0.05) / (darker + 0.05)
     }
 }

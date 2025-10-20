@@ -139,6 +139,9 @@ final class AppInitializationManager: ObservableObject {
     }
     
     private func checkCredentials() async throws {
+        // 🗑️ CLEANUP: Remove old game alerts data from UserDefaults 
+        cleanupGameAlertsData()
+        
         // Check if we have valid credentials
         let sleeperManager = SleeperCredentialsManager.shared
         let espnManager = ESPNCredentialsManager.shared
@@ -148,6 +151,34 @@ final class AppInitializationManager: ObservableObject {
         
         if !sleeperManager.hasValidCredentials && !espnManager.hasValidCredentials {
             throw AppInitError.noCredentials
+        }
+    }
+    
+    // MARK: - Game Alerts Cleanup
+    
+    /// Clean up old game alerts data from UserDefaults
+    /// 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
+    private func cleanupGameAlertsData() {
+        let userDefaults = UserDefaults.standard
+        
+        // Remove game alerts UserDefaults keys
+        let gameAlertsKeys = [
+            "AllLivePlayers_PreviousScores"
+        ]
+        
+        var removedCount = 0
+        for key in gameAlertsKeys {
+            if userDefaults.object(forKey: key) != nil {
+                userDefaults.removeObject(forKey: key)
+                removedCount += 1
+                print("🗑️ CLEANUP: Removed UserDefaults key: \(key)")
+            }
+        }
+        
+        if removedCount > 0 {
+            print("🗑️ CLEANUP: Removed \(removedCount) game alerts data entries from UserDefaults")
+        } else {
+            print("🗑️ CLEANUP: No game alerts data found in UserDefaults")
         }
     }
     

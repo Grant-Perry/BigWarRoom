@@ -186,7 +186,11 @@ struct PlayerStatsCardView: View {
                     .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Rostered section
-                    PlayerRosteredSectionView(player: currentPlayer, team: currentTeam)
+                    PlayerRosteredSectionView(
+                        player: currentPlayer, 
+                        team: currentTeam,
+                        matchups: MatchupsHubViewModel.shared.myMatchups // 🔥 PASS MATCHUPS DATA
+                    )
                         .padding(.horizontal, 24) // Much more padding to each section
                     
                     // Team depth chart section

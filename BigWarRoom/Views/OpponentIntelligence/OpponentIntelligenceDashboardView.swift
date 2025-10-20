@@ -19,7 +19,7 @@ struct OpponentIntelligenceDashboardView: View {
     @State private var showingWatchedPlayers = false
     @State private var selectedMatchup: UnifiedMatchup? // NEW: For matchup navigation
     @State private var showInjuryAlerts = true // NEW: Collapsible section state
-    @State private var showGameAlerts = true // NEW: Game alerts section state
+    @State private var showGameAlerts = true // DISABLED: Game alerts section state
     @State private var showThreatAlerts = true // NEW: Collapsible section state
     @State private var showThreatMatrix = true // NEW: Collapsible section state
     @State private var showConflictAlerts = true // NEW: Collapsible section state
@@ -27,7 +27,7 @@ struct OpponentIntelligenceDashboardView: View {
     
     // NEW: Info sheet states
     @State private var showingInjuryAlertsInfo = false
-    @State private var showingGameAlertsInfo = false
+    @State private var showingGameAlertsInfo = false // DISABLED: Game alerts info sheet
     @State private var showingThreatAlertsInfo = false  
     @State private var showingThreatMatrixInfo = false
     @State private var showingConflictsInfo = false
@@ -72,8 +72,10 @@ struct OpponentIntelligenceDashboardView: View {
                             // 1. PLAYER INJURY ALERTS (highest priority) - ALWAYS SHOW
                             playerInjuryAlertsSection
                             
-                            // 2. GAME ALERTS (highest scoring plays) - NEW FEATURE 🚨
-                            gameAlertsSection
+                            // 2. GAME ALERTS (highest scoring plays per refresh) - DISABLED 🚫
+                            // 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
+                            // TO RE-ENABLE: Uncomment the section below and ensure GameAlertsManager is properly integrated
+                            // gameAlertsSection
                             
                             // 3. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
                             if !viewModel.nonInjuryRecommendations.isEmpty {
@@ -124,9 +126,9 @@ struct OpponentIntelligenceDashboardView: View {
         .sheet(isPresented: $showingInjuryAlertsInfo) {
             IntelligenceSectionInfoSheet(sectionType: .injuryAlerts)
         }
-        .sheet(isPresented: $showingGameAlertsInfo) {
-            IntelligenceSectionInfoSheet(sectionType: .gameAlerts)
-        }
+        // .sheet(isPresented: $showingGameAlertsInfo) { // DISABLED: Game alerts info sheet
+        //     IntelligenceSectionInfoSheet(sectionType: .gameAlerts)
+        // }
         .sheet(isPresented: $showingThreatAlertsInfo) {
             IntelligenceSectionInfoSheet(sectionType: .criticalThreatAlerts)
         }
@@ -409,7 +411,10 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
-    /// 2. Game Alerts Section (highest scoring plays per refresh) - NEW FEATURE 🚨
+    /// 2. Game Alerts Section (highest scoring plays per refresh) - DISABLED 🚫
+    /// 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
+    /// TO RE-ENABLE: Uncomment this entire section and ensure GameAlertsManager is active
+    /*
     private var gameAlertsSection: some View {
         CollapsibleSection(
             title: "🚨 Game Alerts",
@@ -446,6 +451,7 @@ struct OpponentIntelligenceDashboardView: View {
             }
         }
     }
+    */
     
     /// 2. Critical Threat Alerts Section (non-injury strategic recommendations)
     private var criticalThreatAlertsSection: some View {
