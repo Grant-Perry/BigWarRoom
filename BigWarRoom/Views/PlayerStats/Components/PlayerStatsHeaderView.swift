@@ -15,6 +15,7 @@ struct PlayerStatsHeaderView: View {
     @StateObject private var teamAssets = TeamAssetManager.shared
     @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
     @StateObject private var playerNewsViewModel = PlayerNewsViewModel()
+    @ObservedObject private var watchService = PlayerWatchService.shared
     
     // 🗞️ NEWS: Player news sheet state
     @State private var showingPlayerNews = false
@@ -87,12 +88,32 @@ struct PlayerStatsHeaderView: View {
                 resolvedESPNID != nil && playerNewsViewModel.newsItems.count > 0 ? 1.25 : 1.0,
                 anchor: .topTrailing
             )
+            .padding(.bottom, 12) // 👤 NEW: Add space between image and player name
             
             // Original player info
             VStack(spacing: 8) {
-                Text(player.fullName)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                // Player name with watch toggle
+                HStack(spacing: 12) {
+                    Text(player.fullName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                    
+                    // 👁️ NEW: Watch toggle button
+                    Button(action: {
+                        toggleWatchStatus()
+                    }) {
+                        Image(systemName: isPlayerWatched ? "eye.fill" : "eye")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(isPlayerWatched ? .gpYellow : .white.opacity(0.7))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(Color.black.opacity(0.3))
+                                    .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                            )
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
                 
                 HStack(spacing: 12) {
                     // Position badge
@@ -222,6 +243,75 @@ struct PlayerStatsHeaderView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - 👁️ Watch Status Helpers
+    
+    /// Check if current player is being watched
+    private var isPlayerWatched: Bool {
+        return watchService.isWatching(player.playerID)
+    }
+    
+    /// Toggle watch status for current player
+    private func toggleWatchStatus() {
+        if isPlayerWatched {
+            // Unwatch the player
+            watchService.unwatchPlayer(player.playerID)
+        } else {
+            // Watch the player - need to convert to OpponentPlayer format
+            if let opponentPlayer = createOpponentPlayer() {
+                let opponentReferences = createOpponentReferences()
+                let success = watchService.watchPlayer(opponentPlayer, opponentReferences: opponentReferences)
+                if !success {
+                    print("⚠️ Failed to watch player \(player.fullName) - limit reached or already watching")
+                }
+            }
+        }
+    }
+    
+    /// Convert SleeperPlayer to OpponentPlayer for watch service
+    private func createOpponentPlayer() -> OpponentPlayer? {
+        // Create a FantasyPlayer from SleeperPlayer first
+        let fantasyPlayer = FantasyPlayer(
+            id: player.playerID,
+            sleeperID: player.playerID,
+            espnID: player.espnID,
+            firstName: player.firstName,
+            lastName: player.lastName,
+            position: player.position ?? "UNK",
+            team: player.team,
+            jerseyNumber: player.number?.description,
+            currentPoints: getPPRPoints(),
+            projectedPoints: 0.0,
+            gameStatus: nil,
+            isStarter: false, // Default to false for individual player view
+            lineupSlot: nil
+        )
+        
+        return OpponentPlayer(
+            id: UUID().uuidString,
+            player: fantasyPlayer,
+            isStarter: false,
+            currentScore: getPPRPoints() ?? 0.0,
+            projectedScore: 0.0,
+            threatLevel: .moderate,
+            matchupAdvantage: .neutral,
+            percentageOfOpponentTotal: 0.0
+        )
+    }
+    
+    /// Create basic opponent references for this player
+    private func createOpponentReferences() -> [OpponentReference] {
+        // Since this is coming from individual player view, we don't have specific matchup context
+        // Create a generic reference
+        return [
+            OpponentReference(
+                id: UUID().uuidString,
+                opponentName: "Individual Player",
+                leagueName: "Player Stats View",
+                leagueSource: "sleeper"
+            )
+        ]
     }
     
     private func getPPRPoints() -> Double? {

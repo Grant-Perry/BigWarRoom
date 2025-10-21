@@ -28,6 +28,10 @@ struct FantasyDetailHeaderView: View {
     @Binding var showActiveOnly: Bool
     @FocusState private var isSearchFocused: Bool
     
+    // 👁️ NEW: Watched Players Sheet state
+    @State private var showingWatchedPlayers = false
+    @ObservedObject private var watchService = PlayerWatchService.shared
+    
     /// Dynamic sort direction text based on current method and direction
     private var sortDirectionText: String {
         switch sortingMethod {
@@ -95,6 +99,10 @@ struct FantasyDetailHeaderView: View {
             x: 0, 
             y: 4
         )
+        // 👁️ NEW: Watched Players Sheet
+        .sheet(isPresented: $showingWatchedPlayers) {
+            WatchedPlayersSheet(watchService: watchService)
+        }
     }
     
     // MARK: - View Components
@@ -255,6 +263,35 @@ struct FantasyDetailHeaderView: View {
     
     private var enhancedControlsSection: some View {
         HStack {
+            // 👁️ NEW: Watch Icon with Badge (left side)
+            Button(action: {
+                showingWatchedPlayers = true
+            }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "eye.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.gpYellow)
+                    
+                    // Red circle badge if there are watched players
+                    if watchService.watchedPlayers.count > 0 {
+                        ZStack {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 16, height: 16)
+                            
+                            Text("\(watchService.watchedPlayers.count)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                        .offset(x: 8, y: -8)
+                    }
+                }
+                .frame(width: 32, height: 32)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
             Spacer()
             
             // Sort Method with conditional arrow

@@ -2,7 +2,7 @@
 //  CentralizedAppLoader.swift
 //  BigWarRoom
 //
-//  Centralized app initialization - loads ALL core data before showing main app
+//  🔥 UPDATED: Progressive loading - show data as it becomes available
 //
 
 import Foundation
@@ -17,55 +17,101 @@ final class CentralizedAppLoader: ObservableObject {
     @Published var loadingProgress: Double = 0.0
     @Published var currentLoadingMessage = "Initializing BigWarRoom..."
     @Published var hasCompletedInitialization = false
+    @Published var canShowPartialData = false  // 🔥 NEW: Allow showing partial data
     
     private var loadingMessages = [
-        "Connecting to leagues...",
-        "Loading matchups...", 
-        "Gathering player data...",
-        "Loading player statistics...",
+        "Loading your fantasy data...",
+        "Fetching player statistics...", 
+        "Processing matchups...",
         "Finalizing setup..."
     ]
     
     private init() {}
     
-    /// Main initialization method - loads ALL core data upfront
-    func initializeApp() async {
+    /// 🔥 NEW: Progressive initialization - show data as it becomes available
+    func initializeAppProgressively() async {
         guard !hasCompletedInitialization else { return }
         
         isLoading = true
         loadingProgress = 0.0
         
-        do {
-            // Step 1: Load matchups (20%)
-            await updateProgress(0.2, message: loadingMessages[0])
-            await MatchupsHubViewModel.shared.loadAllMatchups()
-            
-            // Step 2: Load all live players data (40%)
-            await updateProgress(0.4, message: loadingMessages[1])
-            await AllLivePlayersViewModel.shared.forceLoadAllPlayers()
-            
-            // Step 3: Load player stats (60%)
-            await updateProgress(0.6, message: loadingMessages[2])
-            await AllLivePlayersViewModel.shared.forceLoadStats()
-            
-            // Step 4: Load any other core data (80%)
-            await updateProgress(0.8, message: loadingMessages[3])
-            // Add any other core data loading here
-            
-            // Step 5: Finalization (100%)
-            await updateProgress(1.0, message: loadingMessages[4])
-            try await Task.sleep(nanoseconds: 500_000_000) // Brief pause for UX
-            
-            // Mark as complete
-            isLoading = false
-            hasCompletedInitialization = true
-            
-        } catch {
-            print("❌ App initialization failed: \(error)")
-            // For now, still mark as complete to let user access app
-            isLoading = false
-            hasCompletedInitialization = true
+        // Step 1: Load core stats (40%) - this eliminates the redundant API calls
+        await updateProgress(0.2, message: loadingMessages[0])
+        await loadSharedStats()
+        
+        // Step 2: Allow showing partial data while the rest loads
+        await updateProgress(0.4, message: loadingMessages[1])
+        canShowPartialData = true
+        
+        // Step 3: Load matchups progressively (don't block UI)
+        Task.detached { @MainActor in
+            await self.loadMatchupsInBackground()
         }
+        
+        // Step 4: Load player data (80%)
+        await updateProgress(0.6, message: loadingMessages[2])
+        await loadPlayerDataInBackground()
+        
+        // Step 5: Finalization (100%)
+        await updateProgress(1.0, message: loadingMessages[3])
+        try? await Task.sleep(nanoseconds: 300_000_000) // Brief pause
+        
+        // Mark as complete
+        isLoading = false
+        hasCompletedInitialization = true
+        
+        print("✅ Progressive app initialization completed")
+    }
+    
+    /// Load shared stats first to eliminate redundant API calls
+    private func loadSharedStats() async {
+        do {
+            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            print("✅ CentralizedAppLoader: Shared stats loaded")
+        } catch {
+            print("❌ CentralizedAppLoader: Failed to load shared stats: \(error)")
+            // Continue anyway - app can still function
+        }
+    }
+    
+    /// Load matchups in background without blocking UI
+    private func loadMatchupsInBackground() async {
+        print("🚀 CentralizedAppLoader: Loading matchups in background...")
+        await MatchupsHubViewModel.shared.loadAllMatchups()
+        print("✅ CentralizedAppLoader: Background matchup loading completed")
+    }
+    
+    /// Load player data in background
+    private func loadPlayerDataInBackground() async {
+        print("🚀 CentralizedAppLoader: Loading player data in background...")
+        
+        if !AllLivePlayersViewModel.shared.statsLoaded {
+            await AllLivePlayersViewModel.shared.loadPlayerStats()
+        }
+        
+        // Process players if we have matchups
+        if !MatchupsHubViewModel.shared.myMatchups.isEmpty {
+            let playerEntries = AllLivePlayersViewModel.shared.extractAllPlayers()
+            await AllLivePlayersViewModel.shared.buildPlayerData(from: playerEntries)
+            
+            // Update state
+            if AllLivePlayersViewModel.shared.allPlayers.isEmpty {
+                AllLivePlayersViewModel.shared.dataState = .empty
+            } else {
+                AllLivePlayersViewModel.shared.dataState = .loaded
+                AllLivePlayersViewModel.shared.applyPositionFilter()
+            }
+            
+            AllLivePlayersViewModel.shared.lastUpdateTime = Date()
+        }
+        
+        print("✅ CentralizedAppLoader: Player data processing completed")
+    }
+    
+    /// 🔥 DEPRECATED: Old "load everything first" method
+    @available(*, deprecated, message: "Use initializeAppProgressively() instead")
+    func initializeApp() async {
+        await initializeAppProgressively()
     }
     
     private func updateProgress(_ progress: Double, message: String) async {
@@ -73,16 +119,13 @@ final class CentralizedAppLoader: ObservableObject {
         currentLoadingMessage = message
         
         // Give UI time to update
-        do {
-            try await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
-        } catch {
-            // Handle sleep error silently
-        }
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
     }
     
     /// Reset initialization state (for debugging/testing)
     func resetInitialization() {
         hasCompletedInitialization = false
+        canShowPartialData = false
         isLoading = true
         loadingProgress = 0.0
     }

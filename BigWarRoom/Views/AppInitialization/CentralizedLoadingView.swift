@@ -9,6 +9,7 @@ import SwiftUI
 
 struct CentralizedLoadingView: View {
     @ObservedObject var loader: CentralizedAppLoader
+    @StateObject private var sharedStats = SharedStatsService.shared  // 🔥 NEW: Monitor stats loading
     
     @State private var animationOffset: CGFloat = 0
     @State private var pulseAnimation: Bool = false
@@ -32,9 +33,11 @@ struct CentralizedLoadingView: View {
                         .font(.system(size: 32, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("Loading your fantasy data...")
+                    // 🔥 NEW: Dynamic loading message based on progress
+                    Text(dynamicLoadingMessage)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.8))
+                        .animation(.easeInOut(duration: 0.3), value: dynamicLoadingMessage)
                 }
                 
                 // Animated orb cluster
@@ -45,7 +48,7 @@ struct CentralizedLoadingView: View {
                     // Progress bar
                     VStack(spacing: 8) {
                         ProgressView(value: loader.loadingProgress)
-                            .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                            .progressViewStyle(LinearProgressViewStyle(tint: progressBarColor))
                             .scaleEffect(y: 2.0)
                             .frame(width: 250)
                         
@@ -61,6 +64,23 @@ struct CentralizedLoadingView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
                         .animation(.easeInOut(duration: 0.3), value: loader.currentLoadingMessage)
+                    
+                    // 🔥 NEW: Show stats loading status
+                    if sharedStats.isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                            
+                            Text("Loading player stats...")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.blue.opacity(0.8))
+                        }
+                    } else if loader.canShowPartialData && loader.loadingProgress > 0.4 {
+                        Text("Ready to show data")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.green.opacity(0.8))
+                    }
                 }
                 
                 Spacer()
@@ -75,6 +95,34 @@ struct CentralizedLoadingView: View {
         }
         .onAppear {
             startAnimations()
+        }
+    }
+    
+    // 🔥 NEW: Dynamic loading message based on progress
+    private var dynamicLoadingMessage: String {
+        switch loader.loadingProgress {
+        case 0.0..<0.2:
+            return "Starting up..."
+        case 0.2..<0.4:
+            return sharedStats.isLoading ? "Loading shared stats..." : "Preparing data..."
+        case 0.4..<0.8:
+            return "Loading leagues..."
+        case 0.8..<1.0:
+            return "Finalizing..."
+        default:
+            return loader.canShowPartialData ? "Ready!" : "Loading your fantasy data..."
+        }
+    }
+    
+    // 🔥 NEW: Progress bar color changes with loading stage
+    private var progressBarColor: Color {
+        switch loader.loadingProgress {
+        case 0.0..<0.4:
+            return .blue
+        case 0.4..<0.8:
+            return .orange
+        default:
+            return .green
         }
     }
     

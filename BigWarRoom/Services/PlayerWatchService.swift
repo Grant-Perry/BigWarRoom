@@ -23,6 +23,7 @@ final class PlayerWatchService: ObservableObject {
     @Published var settings = WatchSettings()
     @Published var isManuallyOrdered = false // Track if user has manually reordered
     @Published var sortHighToLow = true // Track sort direction for threat mode
+    @Published var sortMethod: WatchSortMethod = .delta // 🔥 NEW: Sort method with Delta as default
     
     // MARK: - Private Properties
     
@@ -37,6 +38,7 @@ final class PlayerWatchService: ObservableObject {
     private let watchSettingsKey = "BigWarRoom_WatchSettings"
     private let manualOrderKey = "BigWarRoom_WatchedPlayers_ManualOrder"
     private let sortDirectionKey = "BigWarRoom_WatchedPlayers_SortDirection"
+    private let sortMethodKey = "BigWarRoom_WatchedPlayers_SortMethod" // 🔥 NEW: Persist sort method
     
     // MARK: - Initialization
     
@@ -187,6 +189,38 @@ final class PlayerWatchService: ObservableObject {
         print("🔄 Reset delta for \(resetPlayer.playerName): was \(String(format: "%.1f", deltaWasReset)), now 0.0")
     }
     
+    /// Reset deltas for ALL watched players (set initialScore to currentScore for all)
+    func resetAllDeltas() {
+        guard !watchedPlayers.isEmpty else {
+            print("⚠️ No watched players to reset deltas for")
+            return
+        }
+        
+        let resetCount = watchedPlayers.count
+        let currentTime = Date()
+        
+        // Reset all players' deltas
+        for i in watchedPlayers.indices {
+            let currentScore = watchedPlayers[i].currentScore
+            
+            watchedPlayers[i] = WatchedPlayer(
+                id: watchedPlayers[i].id,
+                playerID: watchedPlayers[i].playerID,
+                playerName: watchedPlayers[i].playerName,
+                position: watchedPlayers[i].position,
+                team: watchedPlayers[i].team,
+                watchStartTime: currentTime, // 🔥 Reset watch time to now for all
+                initialScore: currentScore, // 🔥 Set baseline to current score for all
+                opponentReferences: watchedPlayers[i].opponentReferences,
+                currentScore: currentScore,
+                isLive: watchedPlayers[i].isLive
+            )
+        }
+        
+        saveWatchedPlayers()
+        print("🔄 Reset deltas for ALL \(resetCount) watched players - fresh start!")
+    }
+    
     /// Update scores for all watched players
     /// - Parameter opponentPlayers: Current opponent players with updated scores
     func updateWatchedPlayerScores(_ opponentPlayers: [OpponentPlayer]) {
@@ -271,10 +305,10 @@ final class PlayerWatchService: ObservableObject {
         watchedPlayers = applySorting()
         saveWatchedPlayers()
         saveManualOrderFlag()
-        print("🎯 Reset to automatic threat-based sorting")
+        print("🎯 Reset to automatic \(sortMethod.displayName) sorting")
     }
     
-    /// Toggle sort direction for threat-based sorting
+    /// Toggle sort direction for automatic sorting
     func toggleSortDirection() {
         sortHighToLow.toggle()
         if !isManuallyOrdered {
@@ -284,13 +318,34 @@ final class PlayerWatchService: ObservableObject {
         print("🎯 Toggled sort direction to \(sortHighToLow ? "High→Low" : "Low→High")")
     }
     
+    /// 🔥 NEW: Change sort method
+    func setSortMethod(_ method: WatchSortMethod) {
+        sortMethod = method
+        if !isManuallyOrdered {
+            watchedPlayers = applySorting()
+        }
+        saveSortMethod()
+        print("🎯 Changed sort method to \(method.displayName)")
+    }
+    
     /// Apply current sorting method
     private func applySorting() -> [WatchedPlayer] {
-        if sortHighToLow {
-            return watchedPlayers.sorted { $0.weightedThreatScore > $1.weightedThreatScore }
-        } else {
-            return watchedPlayers.sorted { $0.weightedThreatScore < $1.weightedThreatScore }
+        let sorted: [WatchedPlayer]
+        
+        switch sortMethod {
+        case .delta:
+            sorted = watchedPlayers.sorted { sortHighToLow ? $0.deltaScore > $1.deltaScore : $0.deltaScore < $1.deltaScore }
+        case .threat:
+            sorted = watchedPlayers.sorted { sortHighToLow ? $0.weightedThreatScore > $1.weightedThreatScore : $0.weightedThreatScore < $1.weightedThreatScore }
+        case .current:
+            sorted = watchedPlayers.sorted { sortHighToLow ? $0.currentScore > $1.currentScore : $0.currentScore < $1.currentScore }
+        case .name:
+            sorted = watchedPlayers.sorted { sortHighToLow ? $0.playerName > $1.playerName : $0.playerName < $1.playerName }
+        case .position:
+            sorted = watchedPlayers.sorted { sortHighToLow ? $0.position > $1.position : $0.position < $1.position }
         }
+        
+        return sorted
     }
     
     // MARK: - Notification System
@@ -406,6 +461,7 @@ final class PlayerWatchService: ObservableObject {
         }
         loadManualOrderFlag() // Load the manual order flag too
         loadSortDirection() // Load the sort direction too
+        loadSortMethod() // 🔥 NEW: Load the sort method too
     }
     
     private func saveSettings() {
@@ -434,9 +490,30 @@ final class PlayerWatchService: ObservableObject {
     }
     
     private func loadSortDirection() {
-        sortHighToLow = userDefaults.bool(forKey: sortDirectionKey)
-        if userDefaults.object(forKey: sortDirectionKey) == nil {
-            sortHighToLow = true // Default to high to low
+        if let savedDirection = userDefaults.object(forKey: sortDirectionKey) as? Bool {
+            sortHighToLow = savedDirection
+        } else {
+            // 🔥 NEW: Default sort direction based on method
+            switch sortMethod {
+            case .delta, .threat, .current:
+                sortHighToLow = true // High to Low for scores (biggest deltas first)
+            case .name, .position:
+                sortHighToLow = false // A to Z for text fields
+            }
+        }
+    }
+    
+    // 🔥 NEW: Sort method persistence
+    private func saveSortMethod() {
+        userDefaults.set(sortMethod.rawValue, forKey: sortMethodKey)
+    }
+    
+    private func loadSortMethod() {
+        if let methodString = userDefaults.string(forKey: sortMethodKey),
+           let method = WatchSortMethod(rawValue: methodString) {
+            sortMethod = method
+        } else {
+            sortMethod = .delta // Default to Delta sorting
         }
     }
     
@@ -491,6 +568,37 @@ extension PlayerWatchService {
                 )
             }
             return nil
+        }
+    }
+}
+
+// MARK: - 🔥 NEW: Watch Sort Methods
+
+/// Sorting methods for watched players
+enum WatchSortMethod: String, CaseIterable {
+    case delta = "delta"
+    case threat = "threat"
+    case name = "name"
+    case position = "position"
+    case current = "current"
+    
+    var displayName: String {
+        switch self {
+        case .delta: return "Delta"
+        case .threat: return "Threat"
+        case .name: return "Name"
+        case .position: return "Position"
+        case .current: return "Current"
+        }
+    }
+    
+    var shortDescription: String {
+        switch self {
+        case .delta: return "Score Change"
+        case .threat: return "Threat Level"
+        case .name: return "Player Name"
+        case .position: return "Position"
+        case .current: return "Current Score"
         }
     }
 }

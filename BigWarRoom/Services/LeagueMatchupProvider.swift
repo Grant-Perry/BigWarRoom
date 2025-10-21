@@ -448,102 +448,65 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperWeeklyStats() async {
-        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(year)/\(week)") else { 
-            print("❌ [LeagueMatchupProvider] Invalid stats URL for \(league.league.name)")
-            return 
-        }
-        
-        print("🔍 [LeagueMatchupProvider] Fetching weekly stats from: \(url)")
-        
+        // 🔥 FIX: Use SharedStatsService instead of making redundant API calls
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let sharedStats = try await SharedStatsService.shared.loadWeekStats(week: week, year: year)
+            playerStats = sharedStats
             
-            // Check HTTP response
-            if let httpResponse = response as? HTTPURLResponse {
-                print("📊 [LeagueMatchupProvider] Stats API Response: \(httpResponse.statusCode)")
-                
-                if httpResponse.statusCode != 200 {
-                    print("❌ [LeagueMatchupProvider] Non-200 response: \(httpResponse.statusCode)")
-                    return
-                }
-            }
-            
-            // Try to decode the stats data
-            let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
-            playerStats = statsData
-            
-            // 🔥 SUCCESS LOGGING: Show what we actually loaded
+            // 🔥 SUCCESS LOGGING: Show what we loaded (reduced logging)
             let playerCount = playerStats.keys.count
             let totalPoints = playerStats.values.compactMap { $0["pts_ppr"] }.reduce(0, +)
             
-            print("✅ [LeagueMatchupProvider] Successfully loaded player stats:")
+            print("✅ [LeagueMatchupProvider] Using cached stats from SharedStatsService:")
             print("   📊 Total players: \(playerCount)")
-            print("   📊 Total PPR points: \(String(format: "%.2f", totalPoints))")
             print("   📊 League: \(league.league.name)")
             
-            // 🔥 SPECIFIC BO NIX DEBUGGING
+            // 🔥 REDUCED: Only debug Bo Nix for Chopped Shootout specifically
             if league.league.name.contains("Chopped Shootout") {
-                // Look for Bo Nix in the stats (he's usually around player ID 11563)
-                let possibleBoNixIDs = ["11563", "11564", "11562", "11565", "11561"]  // Try a few IDs around his likely ID
-                
-                for playerID in possibleBoNixIDs {
-                    if let playerData = playerStats[playerID] {
-                        print("🎯 FOUND POTENTIAL BO NIX DATA:")
-                        print("   Player ID: \(playerID)")
-                        print("   Passing Yards: \(playerData["pass_yd"] ?? 0)")
-                        print("   PPR Points: \(playerData["pts_ppr"] ?? 0)")
-                        print("   Stats: \(playerData)")
-                        
-                        // Check if this could be Bo Nix by looking for Denver QB stats
-                        if let passYds = playerData["pass_yd"], passYds > 0 {
-                            print("   🏈 This could be Bo Nix! Let's calculate his Chopped Shootout score:")
-                            let calculatedScore = calculateSleeperPlayerScore(playerId: playerID)
-                            print("   🏈 Calculated Score: \(calculatedScore) (Expected: ~10.76)")
-                        }
-                    }
-                }
-                
-                // Also look for ANY player with passing yards (not just 200+)
-                let allQuarterbacks = playerStats.filter { _, stats in
-                    if let passYds = stats["pass_yd"], passYds > 0 {
-                        return true
-                    }
-                    return false
-                }.sorted { first, second in
-                    let firstYds = first.value["pass_yd"] ?? 0
-                    let secondYds = second.value["pass_yd"] ?? 0
-                    return firstYds > secondYds
-                }
-                
-                print("🎯 Found \(allQuarterbacks.count) QBs with ANY passing yards")
-                for (playerID, stats) in allQuarterbacks.prefix(10) {  // Show top 10
-                    print("   QB \(playerID): \(stats["pass_yd"] ?? 0) pass yards, \(stats["pts_ppr"] ?? 0) PPR points")
-                    
-                    // Check if any of these could be Bo Nix
-                    if playerID == "11563" || playerID == "11562" || playerID == "11564" {
-                        print("     ⭐ This could be BO NIX! Calculating score...")
-                        let calculatedScore = calculateSleeperPlayerScore(playerId: playerID)
-                        print("     ⭐ Chopped Shootout Score: \(calculatedScore)")
-                    }
-                }
+                await debugBoNixForChoppedShootout()
             }
             
-        } catch let decodingError as DecodingError {
-            print("❌ [LeagueMatchupProvider] JSON decoding error for \(league.league.name):")
-            switch decodingError {
-            case .dataCorrupted(let context):
-                print("   Data corrupted: \(context)")
-            case .keyNotFound(let key, let context):
-                print("   Key not found: \(key), context: \(context)")
-            case .typeMismatch(let type, let context):
-                print("   Type mismatch: \(type), context: \(context)")
-            case .valueNotFound(let value, let context):
-                print("   Value not found: \(value), context: \(context)")
-            @unknown default:
-                print("   Unknown decoding error: \(decodingError)")
-            }
         } catch {
-            print("❌ [LeagueMatchupProvider] Network error fetching stats for \(league.league.name): \(error)")
+            print("❌ [LeagueMatchupProvider] Failed to load shared stats for \(league.league.name): \(error)")
+            playerStats = [:]  // Set empty to prevent crashes
+        }
+    }
+    
+    /// Debug Bo Nix specifically for Chopped Shootout league
+    private func debugBoNixForChoppedShootout() async {
+        print("🎯 DEBUGGING BO NIX for Chopped Shootout:")
+        
+        // Look for Bo Nix in the stats (he's usually around player ID 11563)
+        let possibleBoNixIDs = ["11563", "11564", "11562"]
+        
+        for playerID in possibleBoNixIDs {
+            if let playerData = playerStats[playerID] {
+                print("   🎯 FOUND POTENTIAL BO NIX: Player \(playerID)")
+                print("   🎯 Passing Yards: \(playerData["pass_yd"] ?? 0)")
+                print("   🎯 Raw PPR Points: \(playerData["pts_ppr"] ?? 0)")
+                
+                if let passYds = playerData["pass_yd"], passYds > 0 {
+                    let calculatedScore = calculateSleeperPlayerScore(playerId: playerID)
+                    print("   🎯 CALCULATED CHOPPED SCORE: \(calculatedScore)")
+                }
+            }
+        }
+        
+        // Show top QBs for context
+        let allQuarterbacks = playerStats.filter { _, stats in
+            if let passYds = stats["pass_yd"], passYds > 0 {
+                return true
+            }
+            return false
+        }.sorted { first, second in
+            let firstYds = first.value["pass_yd"] ?? 0
+            let secondYds = second.value["pass_yd"] ?? 0
+            return firstYds > secondYds
+        }
+        
+        print("   🎯 Top 5 QBs this week:")
+        for (playerID, stats) in allQuarterbacks.prefix(5) {
+            print("     QB \(playerID): \(stats["pass_yd"] ?? 0) pass yds, \(stats["pts_ppr"] ?? 0) PPR")
         }
     }
     

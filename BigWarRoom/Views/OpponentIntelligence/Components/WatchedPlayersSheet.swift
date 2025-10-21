@@ -46,7 +46,6 @@ struct WatchedPlayersSheet: View {
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
                         .environment(\.editMode, .constant(.active)) // Always enable drag handles
-                        .padding(.bottom, 100)
                     }
                 }
             }
@@ -54,11 +53,20 @@ struct WatchedPlayersSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if !watchService.watchedPlayers.isEmpty {
-                        Button("Clear All") {
-                            watchService.clearAllWatchedPlayers()
+                    HStack {
+                        if !watchService.watchedPlayers.isEmpty {
+                            // 🔄 NEW: Reset All Deltas Button
+                            Button("Reset Δ") {
+                                watchService.resetAllDeltas()
+                            }
+                            .foregroundColor(.orange)
+                            
+                            // Clear All Button (existing)
+                            Button("Clear All") {
+                                watchService.clearAllWatchedPlayers()
+                            }
+                            .foregroundColor(.red)
                         }
-                        .foregroundColor(.red)
                     }
                 }
                 
@@ -93,16 +101,18 @@ struct WatchedPlayersSheet: View {
         HStack {
             Spacer()
             
-            // Sort Mode Toggle (Static/Threat)
+            // Sort Method Toggle - Make it clickable when STATIC
             Button(action: {
                 if watchService.isManuallyOrdered {
+                    // If currently manual, reset to automatic with current sort method
                     watchService.resetToAutomaticSorting()
                 } else {
-                    // Already in threat mode, user needs to drag to switch to static
+                    // If automatic, cycle through sort methods or show menu
+                    cycleToNextSortMethod()
                 }
             }) {
                 VStack(spacing: 2) {
-                    Text(watchService.isManuallyOrdered ? "STATIC" : "THREAT")
+                    Text(watchService.isManuallyOrdered ? "STATIC" : watchService.sortMethod.displayName.uppercased())
                         .font(.subheadline)
                         .fontWeight(.bold)
                         .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .gpGreen)
@@ -117,17 +127,28 @@ struct WatchedPlayersSheet: View {
             
             Spacer()
             
-            // Sort Direction Toggle (only clickable in threat mode)
+            // Sort Direction with Up/Down Chevron - Always show
             Button(action: {
-                if !watchService.isManuallyOrdered {
+                if watchService.isManuallyOrdered {
+                    // Reset to automatic when clicked in manual mode
+                    watchService.resetToAutomaticSorting()
+                } else {
+                    // Toggle direction in automatic mode
                     watchService.toggleSortDirection()
                 }
             }) {
                 VStack(spacing: 2) {
-                    Text(watchService.isManuallyOrdered ? "CUSTOM" : (watchService.sortHighToLow ? "HIGH→LOW" : "LOW→HIGH"))
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
+                    HStack(spacing: 4) {
+                        // 🔥 NEW: Always show up/down chevron
+                        Image(systemName: watchService.sortHighToLow ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
+                        
+                        Text(directionText)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
+                    }
                     
                     Text("Direction")
                         .font(.caption2)
@@ -136,8 +157,6 @@ struct WatchedPlayersSheet: View {
                 }
             }
             .buttonStyle(PlainButtonStyle())
-            .disabled(watchService.isManuallyOrdered) // Disable when in manual mode
-            .opacity(watchService.isManuallyOrdered ? 0.6 : 1.0) // Visual feedback for disabled state
             
             Spacer()
             
@@ -159,6 +178,28 @@ struct WatchedPlayersSheet: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
         .background(Color.black.opacity(0.1))
+    }
+    
+    // 🔥 NEW: Cycle through sort methods
+    private func cycleToNextSortMethod() {
+        let allMethods = WatchSortMethod.allCases
+        let currentIndex = allMethods.firstIndex(of: watchService.sortMethod) ?? 0
+        let nextIndex = (currentIndex + 1) % allMethods.count
+        watchService.setSortMethod(allMethods[nextIndex])
+    }
+    
+    // 🔥 NEW: Dynamic direction text based on sort method
+    private var directionText: String {
+        if watchService.isManuallyOrdered {
+            return "CUSTOM"
+        }
+        
+        switch watchService.sortMethod {
+        case .delta, .threat, .current:
+            return watchService.sortHighToLow ? "HIGH→LOW" : "LOW→HIGH"
+        case .name, .position:
+            return watchService.sortHighToLow ? "Z→A" : "A→Z"
+        }
     }
 
     private var emptyStateView: some View {

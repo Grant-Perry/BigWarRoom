@@ -211,14 +211,23 @@ final class AppInitializationManager: ObservableObject {
     }
     
     private func loadPlayerStats() async throws {
-        // Load player stats for Live Players
-        print("🚀 APP INIT: Loading player statistics...")
+        // 🔥 FIX: Load stats once using SharedStatsService instead of per-league loading
+        print("🚀 APP INIT: Loading shared player statistics...")
         
-        if !allLivePlayersViewModel.statsLoaded {
-            await allLivePlayersViewModel.loadPlayerStats()
+        do {
+            // Load current week stats once for ALL leagues
+            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            print("🚀 APP INIT: Shared stats loaded successfully")
+            
+            // Also load Live Players stats if needed
+            if !allLivePlayersViewModel.statsLoaded {
+                await allLivePlayersViewModel.loadPlayerStats()
+            }
+            
+        } catch {
+            print("🚀 APP INIT: Warning - Failed to load shared stats: \(error)")
+            // Don't throw - continue with initialization even if stats fail
         }
-        
-        print("🚀 APP INIT: Player stats loaded: \(allLivePlayersViewModel.statsLoaded)")
     }
     
     private func processPlayers() async throws {

@@ -2,42 +2,43 @@
 //  DraftWarRoomApp.swift
 //  DraftWarRoom
 //
-//  Created for Gp.
+//  🔥 UPDATED: Using progressive loading to eliminate redundant API calls
 //
-// MARK: -> App Entry
 
 import SwiftUI
 
 @main
 struct DraftWarRoomApp: App {
-    // MARK: -> Scene
     var body: some Scene {
         WindowGroup {
-            CentralizedAppView()
+            ProgressiveAppView()
         }
     }
 }
 
-// MARK: - Centralized App View with Proper Initialization
-struct CentralizedAppView: View {
+// MARK: - Progressive App View with Smart Loading
+
+struct ProgressiveAppView: View {
     @StateObject private var appLoader = CentralizedAppLoader.shared
     @StateObject private var viewModel = DraftRoomViewModel()
     @State private var selectedTab: Int = 0
+    @State private var shouldShowOnboarding = false
     
     var body: some View {
         Group {
             if appLoader.isLoading || !appLoader.hasCompletedInitialization {
-                // Show centralized loading screen until ALL data is loaded
+                // 🔥 FIX: Use progressive loading instead of blocking "load everything"
                 CentralizedLoadingView(loader: appLoader)
                     .onAppear {
                         if !appLoader.hasCompletedInitialization {
                             Task {
-                                await appLoader.initializeApp()
+                                // 🔥 NEW: Use progressive loading method
+                                await appLoader.initializeAppProgressively()
                             }
                         }
                     }
-            } else {
-                // Main app with all data pre-loaded
+            } else if appLoader.canShowPartialData || appLoader.hasCompletedInitialization {
+                // 🔥 NEW: Show main app as soon as we have partial data
                 mainAppTabs
             }
         }
@@ -57,7 +58,7 @@ struct CentralizedAppView: View {
                 }
                 .tag(0)
                 
-                // INTELLIGENCE TAB - NEW OPPONENT ANALYSIS
+                // INTELLIGENCE TAB
                 NavigationStack {
                     OpponentIntelligenceDashboardView()
                 }
@@ -77,7 +78,7 @@ struct CentralizedAppView: View {
                 }
                 .tag(2)
                 
-                // All Live Players Tab - DATA ALREADY LOADED
+                // ALL LIVE PLAYERS TAB - Shows partial data as it loads
                 NavigationStack {
                     AllLivePlayersView()
                 }
@@ -87,7 +88,7 @@ struct CentralizedAppView: View {
                 }
                 .tag(3)
                 
-                // MORE TAB - Contains additional features AND settings
+                // MORE TAB
                 NavigationStack {
                     MoreTabView(viewModel: viewModel)
                 }
@@ -98,7 +99,7 @@ struct CentralizedAppView: View {
                 .tag(4)
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
-                selectedTab = 5
+                selectedTab = 4
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
                 selectedTab = 0

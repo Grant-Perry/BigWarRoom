@@ -120,84 +120,138 @@ struct LeagueMatchupsTabView: View {
             Color.black.opacity(0.6)
                 .ignoresSafeArea(.all)
             
-            VStack(spacing: 28) {
-                VStack(spacing: 20) {
-                    // Animated progress ring
-                    ZStack {
-                        Circle()
-                            .stroke(Color.gpBlue.opacity(0.3), lineWidth: 8)
-                            .frame(width: 80, height: 80)
-                        
-                        Circle()
-                            .trim(from: 0, to: 0.7)
-                            .stroke(
-                                AngularGradient(
-                                    colors: [.gpBlue, .gpGreen, .gpBlue],
-                                    center: .center
-                                ),
-                                style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                            )
-                            .frame(width: 72, height: 72)
-                            .rotationEffect(.degrees(-90))
-                            .animation(.linear(duration: 2.0).repeatForever(autoreverses: false), value: animationTrigger)
-                        
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 12, height: 12)
-                            .scaleEffect(1.2)
-                            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: animationTrigger)
-                    }
+            VStack(spacing: 32) {
+                // 🌟 NEW: Animated orb cluster (from IntelligenceLoadingView)
+                animatedOrbCluster
+                
+                VStack(spacing: 16) {
+                    Text("Loading League Matchups")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 2)
                     
-                    VStack(spacing: 12) {
-                        Text("Loading League Matchups")
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.5), radius: 2)
-                        
-                        Text("Fetching all \(leagueName) matchups...")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                            .multilineTextAlignment(.center)
-                        
-                        // Animated status messages
-                        VStack(spacing: 6) {
-                            Text("🔍 Scanning league data...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.gpBlue.opacity(0.9))
-                                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: animationTrigger)
-                            
-                            Text("⚡ Building matchup details...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.gpGreen.opacity(0.9))
-                                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0), value: animationTrigger)
-                        }
-                    }
+                    Text("Fetching all \(leagueName) matchups...")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.8))
+                        .multilineTextAlignment(.center)
                     
-                    // Loading dots
-                    HStack(spacing: 8) {
-                        ForEach(0..<5, id: \.self) { index in
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.gpBlue, .gpGreen],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 10, height: 10)
-                                .scaleEffect(animationTrigger ? 1.5 : 1.0)
-                                .animation(
-                                    .easeInOut(duration: 0.8)
-                                    .repeatForever(autoreverses: true)
-                                    .delay(Double(index) * 0.15),
-                                    value: animationTrigger
-                                )
-                        }
+                    // Animated status messages
+                    VStack(spacing: 6) {
+                        Text("🔍 Scanning league data...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gpBlue.opacity(0.9))
+                            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: animationTrigger)
+                        
+                        Text("⚡ Building matchup details...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gpGreen.opacity(0.9))
+                            .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(1.0), value: animationTrigger)
                     }
                 }
             }
             .padding(.horizontal, 40)
         }
+    }
+    
+    // MARK: - 🌟 NEW: Animated Orb Cluster
+    
+    @State private var pulseAnimation: Bool = false
+    @State private var orbRotationAngle: Double = 0
+    
+    private var animatedOrbCluster: some View {
+        ZStack {
+            // Background glow effect
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.gpBlue.opacity(0.3),
+                            Color.gpGreen.opacity(0.2),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 20,
+                        endRadius: 120
+                    )
+                )
+                .frame(width: 200, height: 200)
+                .scaleEffect(pulseAnimation ? 1.2 : 0.8)
+                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: pulseAnimation)
+            
+            // Orbiting orbs
+            ForEach(0..<6, id: \.self) { index in
+                orbView(for: index)
+            }
+            
+            // Central core orb
+            centralOrbView
+        }
+        .rotationEffect(.degrees(orbRotationAngle))
+        .animation(.linear(duration: 6.0).repeatForever(autoreverses: false), value: orbRotationAngle)
+        .onAppear {
+            pulseAnimation = true
+            orbRotationAngle = 360
+        }
+    }
+    
+    private func orbView(for index: Int) -> some View {
+        let angle = Double(index) * 60.0 // 360/6 = 60 degrees apart
+        let radius: CGFloat = 50
+        let x = cos(angle * .pi / 180) * radius
+        let y = sin(angle * .pi / 180) * radius
+        
+        return Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        orbColor(for: index),
+                        orbColor(for: index).opacity(0.6),
+                        orbColor(for: index).opacity(0.2),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 2,
+                    endRadius: 12
+                )
+            )
+            .frame(width: 16, height: 16)
+            .offset(x: x, y: y)
+            .scaleEffect(pulseAnimation ? 1.4 : 0.8)
+            .animation(
+                .easeInOut(duration: 1.2)
+                .delay(Double(index) * 0.15)
+                .repeatForever(autoreverses: true),
+                value: pulseAnimation
+            )
+            .shadow(color: orbColor(for: index), radius: 8, x: 0, y: 0)
+    }
+    
+    private var centralOrbView: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white,
+                        Color.gpBlue.opacity(0.8),
+                        Color.gpGreen.opacity(0.6),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 5,
+                    endRadius: 20
+                )
+            )
+            .frame(width: 32, height: 32)
+            .scaleEffect(pulseAnimation ? 1.3 : 1.0)
+            .animation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true), value: pulseAnimation)
+            .shadow(color: .white, radius: 12, x: 0, y: 0)
+    }
+    
+    private func orbColor(for index: Int) -> Color {
+        let colors: [Color] = [
+            .gpBlue, .gpGreen, .gpYellow, .gpRedPink, .purple, .orange
+        ]
+        return colors[index % colors.count]
     }
     
     // MARK: - Main Tab View

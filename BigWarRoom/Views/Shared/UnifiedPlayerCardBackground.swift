@@ -83,10 +83,11 @@ struct UnifiedPlayerCardBackground: View {
             // Base team background
             buildScoreBarBaseBackground()
             
+            // 🚫 COMMENTED OUT: Score bar overlay (animated green bar behind cards)
             // Score bar overlay (only for players with points)
-            if playerEntry.currentScore > 0 {
-                buildScoreBarOverlay(playerEntry: playerEntry, scoreBarWidth: scoreBarWidth)
-            }
+            // if playerEntry.currentScore > 0 {
+            //     buildScoreBarOverlay(playerEntry: playerEntry, scoreBarWidth: scoreBarWidth)
+            // }
             
             // Performance indicator
             if playerEntry.currentScore > 0 {

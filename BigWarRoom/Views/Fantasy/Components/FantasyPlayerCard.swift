@@ -16,6 +16,7 @@ struct FantasyPlayerCard: View {
     let isBench: Bool
     
     @StateObject private var viewModel = FantasyPlayerViewModel()
+    @ObservedObject private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
     @State private var showingPlayerDetail = false // 🔥 FIX: Add dedicated player detail state
@@ -37,6 +38,9 @@ struct FantasyPlayerCard: View {
                 
                 // Player name and position (right-justified) - UPDATED with score breakdown action
                 buildPlayerNameAndPosition()
+                
+                // 👁️ NEW: Watch toggle button (top right corner)
+                buildWatchToggleButton()
                 
                 // Game matchup (centered)
                 buildGameMatchupSection()
@@ -160,6 +164,92 @@ struct FantasyPlayerCard: View {
             shadowColor: viewModel.shadowColor(for: player),
             shadowRadius: viewModel.shadowRadius(for: player)
         )
+    }
+    
+    func buildWatchToggleButton() -> some View {
+        VStack {
+            HStack {
+                Spacer()
+                
+                // 👁️ Watch toggle button
+                Button(action: {
+                    toggleWatchStatus()
+                }) {
+                    Image(systemName: isPlayerWatched ? "eye.fill" : "eye")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(isPlayerWatched ? .gpYellow : .white.opacity(0.6))
+                        .frame(width: 24, height: 24)
+                        .background(
+                            Circle()
+                                .fill(Color.black.opacity(0.6))
+                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.top, 8)
+                .padding(.trailing, 8)
+            }
+            Spacer()
+        }
+    }
+    
+    // MARK: - Watch Status Helpers
+    
+    /// Check if current player is being watched
+    private var isPlayerWatched: Bool {
+        return watchService.isWatching(player.id)
+    }
+    
+    /// Toggle watch status for current player
+    private func toggleWatchStatus() {
+        if isPlayerWatched {
+            // Unwatch the player
+            watchService.unwatchPlayer(player.id)
+        } else {
+            // Watch the player - need to convert to OpponentPlayer format
+            if let opponentPlayer = createOpponentPlayer() {
+                let opponentReferences = createOpponentReferences()
+                let success = watchService.watchPlayer(opponentPlayer, opponentReferences: opponentReferences)
+                if !success {
+                    print("⚠️ Failed to watch player \(player.fullName) - limit reached or already watching")
+                }
+            }
+        }
+    }
+    
+    /// Convert FantasyPlayer to OpponentPlayer for watch service
+    private func createOpponentPlayer() -> OpponentPlayer? {
+        // OpponentPlayer expects a FantasyPlayer, not SleeperPlayer
+        // We already have the FantasyPlayer as `player`, so use that directly
+        
+        return OpponentPlayer(
+            id: UUID().uuidString,
+            player: player, // 🔥 FIX: Use the FantasyPlayer directly instead of SleeperPlayer
+            isStarter: player.isStarter,
+            currentScore: player.currentPoints ?? 0.0,
+            projectedScore: player.projectedPoints ?? 0.0,
+            threatLevel: .moderate,
+            matchupAdvantage: .neutral,
+            percentageOfOpponentTotal: 0.0
+        )
+    }
+    
+    /// Create opponent references for the current matchup
+    private func createOpponentReferences() -> [OpponentReference] {
+        guard let matchup = matchup else { return [] }
+        
+        // Determine which team this player belongs to and create reference for the other team
+        let isOnHomeTeam = matchup.homeTeam.roster.contains { $0.id == player.id }
+        let opponentTeam = isOnHomeTeam ? matchup.awayTeam : matchup.homeTeam
+        
+        return [
+            OpponentReference(
+                id: opponentTeam.id,
+                opponentName: opponentTeam.ownerName,
+                leagueName: fantasyViewModel.selectedLeague?.league.name ?? "Unknown League",
+                leagueSource: fantasyViewModel.selectedLeague?.source.rawValue ?? "sleeper"
+            )
+        ]
     }
     
     // MARK: - ADD: Score Breakdown Helper Methods
