@@ -54,7 +54,7 @@ struct FantasyMatchupDetailView: View {
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
-        // 🔥 FIX: Only add background when NOT embedded in LeagueMatchupsTabView
+        // FIX: Only add background when NOT embedded in LeagueMatchupsTabView
         if isEmbeddedInTabView {
             // Embedded in LeagueMatchupsTabView - no background, content only
             contentView
@@ -80,7 +80,7 @@ struct FantasyMatchupDetailView: View {
         }
     }
 
-    // 🔥 FIX: Extract content to separate view with proper padding
+    // FIX: Extract content to separate view with proper padding
     private var contentView: some View {
         let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
         let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
@@ -121,7 +121,7 @@ struct FantasyMatchupDetailView: View {
             rosterScrollView
                 .zIndex(1)
         }
-        // 🔥 FIX: Add proper safe area padding to prevent clipping
+        // FIX: Add proper safe area padding to prevent clipping
         .padding(.horizontal, isEmbeddedInTabView ? 0 : 0) // Let individual components handle their own padding
         .onAppear {
             handleViewAppearance()
@@ -131,7 +131,7 @@ struct FantasyMatchupDetailView: View {
         }
     }
 
-    // 🔥 FIX: Detect if this view is embedded in LeagueMatchupsTabView
+    // FIX: Detect if this view is embedded in LeagueMatchupsTabView
     private var isEmbeddedInTabView: Bool {
         // Check if the parent view has fantasyViewModel (indicating it's from LeagueMatchupsTabView)
         return fantasyViewModel != nil
@@ -141,7 +141,7 @@ struct FantasyMatchupDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
-                    // 🔥 MVVM REFACTOR: Using proper View components with filter parameters
+                    // MVVM REFACTOR: Using proper View components with filter parameters
                     FantasyMatchupActiveRosterSectionFiltered(
                         matchup: matchup,
                         fantasyViewModel: viewModel,
@@ -165,7 +165,7 @@ struct FantasyMatchupDetailView: View {
                 }
             }
             .padding(.top, 8)
-            // 🔥 FIX: Increase horizontal padding to prevent clipping
+            // FIX: Increase horizontal padding to prevent clipping
             .padding(.horizontal, 16) // Increased from 8 to 16
         }
         .clipped()
@@ -192,7 +192,7 @@ struct FantasyMatchupDetailView: View {
                             teamIndex: 1, // Home team index
                             isBench: false
                         )
-                        // 🔥 FIX: Reduce horizontal padding to prevent double padding
+                        // FIX: Reduce horizontal padding to prevent double padding
                         .padding(.horizontal, 8) // Reduced from default
                     }
                 }
@@ -214,7 +214,7 @@ struct FantasyMatchupDetailView: View {
                             teamIndex: 0, // Away team index
                             isBench: false
                         )
-                        // 🔥 FIX: Reduce horizontal padding to prevent double padding
+                        // FIX: Reduce horizontal padding to prevent double padding
                         .padding(.horizontal, 8) // Reduced from default
                     }
                 }
@@ -226,7 +226,6 @@ struct FantasyMatchupDetailView: View {
 
     private func handleViewAppearance() {
         // Always load stats when this view appears
-        print("🏈 FantasyMatchupDetailView onAppear - forcing stats load")
         Task {
             await livePlayersViewModel.forceLoadStats()
         }
@@ -234,16 +233,11 @@ struct FantasyMatchupDetailView: View {
 
     private func handleViewTask() async {
         // Aggressive stats loading for Mission Control navigation
-        print("🏈 FantasyMatchupDetailView task - checking stats state")
-        print("📊 Stats loaded: \(livePlayersViewModel.statsLoaded)")
-        print("👥 Player stats count: \(livePlayersViewModel.playerStats.keys.count)")
-
+        
         // Always ensure we have stats - don't rely on statsLoaded flag alone
         if livePlayersViewModel.playerStats.isEmpty {
-            print("⚠️ No player stats found - forcing full reload")
             await livePlayersViewModel.loadAllPlayers()
         } else {
-            print("✅ Player stats already available - refreshing to ensure latest data")
             await livePlayersViewModel.forceLoadStats()
         }
     }

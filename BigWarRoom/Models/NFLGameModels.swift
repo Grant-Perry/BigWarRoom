@@ -96,9 +96,6 @@ struct NFLGameInfo {
         case "in", "live":
             // Show quarter and time like "Q2 2:30"
             if !gameTime.isEmpty {
-                // 🔥 IMPROVED: Better parsing of ESPN quarter format
-                print("🏈 DEBUG GAME TIME: Raw gameTime = '\(gameTime)' for \(awayTeam) vs \(homeTeam)")
-                
                 // ESPN sends various formats like:
                 // "1st 12:30", "2nd 5:45", "3rd 0:30", "4th 2:15", "Halftime", "Final"
                 let lowercaseTime = gameTime.lowercased()
@@ -122,8 +119,6 @@ struct NFLGameInfo {
                 } else if lowercaseTime.contains("final") {
                     return "FINAL"
                 } else {
-                    // 🔥 DEBUG: Log unknown formats
-                    print("⚠️ UNKNOWN GAME TIME FORMAT: '\(gameTime)' - defaulting to LIVE")
                     return "LIVE"
                 }
                 
@@ -141,11 +136,9 @@ struct NFLGameInfo {
                 if !quarterDisplay.isEmpty {
                     if !timeDisplay.isEmpty {
                         let result = "\(quarterDisplay) \(timeDisplay)"
-                        print("🏈 FORMATTED TIME: '\(gameTime)' -> '\(result)'")
                         return result
                     } else {
                         let result = quarterDisplay
-                        print("🏈 FORMATTED TIME: '\(gameTime)' -> '\(result)' (no time found)")
                         return result
                     }
                 }

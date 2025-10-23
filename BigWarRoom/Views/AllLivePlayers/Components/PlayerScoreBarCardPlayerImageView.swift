@@ -91,7 +91,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
             }
             
             // 🔥 NEW: Injury Status Badge (positioned at bottom-right of image)
-            if let injuryStatus = getInjuryStatus(), !injuryStatus.isEmpty {
+            if let injuryStatus = getSleeperPlayerData()?.injuryStatus, !injuryStatus.isEmpty {
                 VStack {
                     Spacer()
                     HStack {
@@ -99,6 +99,19 @@ struct PlayerScoreBarCardPlayerImageView: View {
                         InjuryStatusBadgeView(injuryStatus: injuryStatus)
                             .offset(x: -8, y: -8) // Position as subscript to image
                     }
+                }
+            }
+            
+            // 🔥 DEBUG: Force show badge in simple position for Lamar Jackson
+            if playerEntry.player.fullName.contains("Lamar Jackson") {
+                VStack {
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: "Q")
+                            .background(Color.red.opacity(0.5))
+                            .scaleEffect(1.5)
+                    }
+                    Spacer()
                 }
             }
         }
@@ -119,22 +132,27 @@ struct PlayerScoreBarCardPlayerImageView: View {
         }
     }
     
-    // 🔥 NEW: Get injury status from Sleeper player data
-    private func getInjuryStatus() -> String? {
-        if let sleeperPlayer = getSleeperPlayerData() {
-            return sleeperPlayer.injuryStatus
-        }
-        return nil
-    }
-    
     // 🔥 NEW: Helper to identify defense/special teams players
     private var isDefenseOrSpecialTeams: Bool {
         let position = playerEntry.position.uppercased()
         return position == "DEF" || position == "DST" || position == "D/ST"
     }
     
-    // 🔥 NEW: Get Sleeper player data for detailed stats
+    // 🔥 FIXED: Get Sleeper player data using SAME logic as Content View
     private func getSleeperPlayerData() -> SleeperPlayer? {
+        // 🔥 FIX: Try SleeperID first (most reliable) - SAME AS CONTENT VIEW
+        if let sleeperID = playerEntry.player.sleeperID,
+           let sleeperPlayer = playerDirectory.players[sleeperID] {
+            return sleeperPlayer
+        }
+        
+        // Try ESPN ID mapping to Sleeper
+        if let espnID = playerEntry.player.espnID,
+           let sleeperPlayer = playerDirectory.playerByESPNID(espnID) {
+            return sleeperPlayer
+        }
+        
+        // Fallback to name-based lookup
         let playerName = playerEntry.player.fullName.lowercased()
         let shortName = playerEntry.player.shortName.lowercased()
         let team = playerEntry.player.team?.lowercased()

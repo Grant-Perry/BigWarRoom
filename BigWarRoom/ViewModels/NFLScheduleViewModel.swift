@@ -121,17 +121,17 @@ final class NFLScheduleViewModel: ObservableObject {
         let existingGameIds = Set(games.map { $0.id })
         
         if newGameIds != existingGameIds || games.isEmpty {
-            print("🏈 Game order changed - updating games array")
+//            print("🏈 Game order changed - updating games array")
             games = sortedGames
         } else {
-            print("🏈 Game data updated but order preserved")
+//            print("🏈 Game data updated but order preserved")
             // Update game data but preserve order
             games = games.compactMap { existingGame in
                 processedGames.first { $0.id == existingGame.id }
             }
         }
         
-        print("🏈 Total games processed: \(games.count)")
+//        print("🏈 Total games processed: \(games.count)")
     }
     
     /// Show game detail with fantasy players

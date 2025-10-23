@@ -13,21 +13,11 @@ extension FantasyViewModel {
     /// Check if a league is a Chopped format - NOW USES CENTRALIZED DETECTION
     func isChoppedLeague(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper?) -> Bool {
         guard let leagueWrapper = leagueWrapper else {
-            // x Print("❌ CHOPPED CHECK: Nil league wrapper")
             return false
         }
         
-        // x Print("🔍 CHOPPED CHECK: Checking league \(leagueWrapper.league.leagueID)")
-        // x Print("   - League name: '\(leagueWrapper.league.name)'")
-        
         // USE THE CENTRALIZED DETECTION METHOD - DRY PRINCIPLE
         let isChopped = leagueWrapper.isChoppedLeague
-        
-        if isChopped {
-            // x Print("🔥 CHOPPED CHECK: ✅ Detected via centralized method (settings.type == 3)")
-        } else {
-            // x Print("❌ CHOPPED CHECK: NOT detected as Chopped league")
-        }
         
         return isChopped
     }
@@ -43,12 +33,8 @@ extension FantasyViewModel {
         let allTeamData = await fetchAllChoppedTeamData(leagueID: leagueID, week: week)
         
         guard !allTeamData.activeRankings.isEmpty else {
-//            print("❌ CHOPPED: No active rankings found")
             return nil
         }
-        
-//        print("🔥 CHOPPED: Active teams: \(allTeamData.activeRankings.count)")
-//        print("💀 CHOPPED: Eliminated teams: \(allTeamData.eliminatedTeams.count)")
 
         let activeRankings = allTeamData.activeRankings
         let eliminatedTeams = allTeamData.eliminatedTeams
@@ -121,13 +107,6 @@ extension FantasyViewModel {
             eliminationHistory: graveyardEvents // Now includes teams with no players
         )
         
-        if !graveyardEvents.isEmpty {
-//            print("💀 GRAVEYARD POPULATED:")
-            for event in graveyardEvents {
-//                print("   \(event.eliminatedTeam.team.ownerName) - no players")
-            }
-        }
-        
         return summary
     }
 
@@ -144,8 +123,6 @@ extension FantasyViewModel {
                 week: week
             )
             
-//            print("🔍 CHOPPED DEBUG: Analyzing \(sleeperMatchups.count) teams for active vs eliminated status")
-            
             var allTeams: [FantasyTeam] = []
             var activeTeams: [FantasyTeam] = []
             var eliminatedTeams: [FantasyTeam] = []
@@ -155,33 +132,26 @@ extension FantasyViewModel {
                 let teamProjected = matchup.projectedPoints ?? (teamScore * 1.05)
                 let managerID = rosterIDToManagerID[matchup.rosterID] ?? ""
                 
-                // 🔥 NEW: Debug Bo Nix specifically in Chopped leagues
+                // NEW: Debug Bo Nix specifically in Chopped leagues
                 if let starters = matchup.starters {
                     for playerID in starters {
                         if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
                             let playerFullName = "\(sleeperPlayer.firstName ?? "") \(sleeperPlayer.lastName ?? "")"
                             if playerFullName.lowercased().contains("bo nix") || playerFullName.lowercased().contains("nix") {
                                 let playerScore = calculateSleeperPlayerScore(playerId: playerID)
-                                print("🏈 [CHOPPED] Bo Nix Debug:")
-                                print("   Player ID: \(playerID)")
-                                print("   Full Name: \(playerFullName)")
-                                print("   League ID: \(leagueID)")
-                                print("   Team Score: \(teamScore)")
-                                print("   Individual Score: \(playerScore)")
-                                print("   Manager: \(userIDs[managerID] ?? "Unknown")")
                                 
                                 if let playerStats = playerStats[playerID] {
-                                    print("   Stats: \(playerStats)")
+                                    // Process stats silently
                                 }
                                 if let scoringSettings = sleeperLeagueSettings {
-                                    print("   Scoring Settings Count: \(scoringSettings.count)")
+                                    // Process settings silently
                                 }
                             }
                         }
                     }
                 }
                 
-                // 🔥 THE ONLY THING THAT MATTERS: Do they have players?
+                // THE ONLY THING THAT MATTERS: Do they have players?
                 let starterCount = matchup.starters?.count ?? 0
                 let playerCount = matchup.players?.count ?? 0
                 let hasAnyPlayers = starterCount > 0 || playerCount > 0
@@ -209,34 +179,13 @@ extension FantasyViewModel {
                     rosterID: matchup.rosterID
                 )
                 
-                // 🔥 DEBUG: Log each team's status
-//                print("   Team: \(finalManagerName)")
-//                print("     - Points: \(teamScore)")
-//                print("     - Starters: \(starterCount)")
-//                print("     - Players: \(playerCount)")
-//                print("     - Has Players: \(hasAnyPlayers)")
-//                print("     - Status: \(hasAnyPlayers ? "ACTIVE" : "ELIMINATED")")
-                
                 if hasAnyPlayers {
                     activeTeams.append(fantasyTeam)
                 } else {
                     eliminatedTeams.append(fantasyTeam)
-//                    print("     ☠️ GRAVEYARD: \(finalManagerName) - NO PLAYERS")
                 }
                 
                 allTeams.append(fantasyTeam)
-            }
-            
-//            print("🔥 CHOPPED SEPARATION RESULTS:")
-//            print("   - Total teams: \(allTeams.count)")
-//            print("   - Active teams (have players): \(activeTeams.count)")
-//            print("   - Eliminated teams (no players): \(eliminatedTeams.count)")
-            
-            if !eliminatedTeams.isEmpty {
-//                print("💀 ELIMINATED TEAMS:")
-                for team in eliminatedTeams {
-//                    print("   - \(team.ownerName)")
-                }
             }
             
             // Create rankings for active teams only - IGNORE POINTS FOR ELIMINATION STATUS
@@ -272,8 +221,6 @@ extension FantasyViewModel {
                     totalTeams: totalActiveTeams
                 )
                 
-                print("   Active Team \(rank): \(team.ownerName) - \(teamScore) pts - \(status.displayName)")
-                
                 return FantasyTeamRanking(
                     id: team.id,
                     team: team,
@@ -290,7 +237,6 @@ extension FantasyViewModel {
             return (activeRankings: activeRankings, eliminatedTeams: eliminatedTeams)
             
         } catch {
-//            print("❌ Failed to fetch chopped team data: \(error)")
             return (activeRankings: [], eliminatedTeams: [])
         }
     }

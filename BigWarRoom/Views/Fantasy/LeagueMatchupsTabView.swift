@@ -21,10 +21,10 @@ struct LeagueMatchupsTabView: View {
     @State private var navigatingDirection: NavigationDirection? = nil
     @Environment(\.dismiss) private var dismiss
     
-    // 🔥 FIX: Add animation trigger that actually changes
+    // FIX: Add animation trigger that actually changes
     @State private var animationTrigger = false
     
-    // 🔥 NEW: Navigation direction enum
+    // NEW: Navigation direction enum
     enum NavigationDirection {
         case left, right
     }
@@ -45,7 +45,7 @@ struct LeagueMatchupsTabView: View {
     }
     
     var body: some View {
-        // 🔥 FIX: Use .background() modifier instead of ZStack to avoid layout conflicts
+        // FIX: Use .background() modifier instead of ZStack to avoid layout conflicts
         VStack(spacing: 0) {
             // Header with navigation controls
             headerView
@@ -81,7 +81,7 @@ struct LeagueMatchupsTabView: View {
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
         .preferredColorScheme(.dark)
-        // 🔥 FIX: Use background modifier instead of ZStack - this doesn't affect layout
+        // FIX: Use background modifier instead of ZStack - this doesn't affect layout
         .background(
             ZStack {
                 Color.black
@@ -93,11 +93,10 @@ struct LeagueMatchupsTabView: View {
             .ignoresSafeArea(.all)
         )
         .onAppear {
-            // 🔥 FIX: Start loading immediately instead of async delay
-            print("🔥 IMMEDIATE: Starting matchup loading process")
+            // FIX: Start loading immediately instead of async delay
             isLoadingAllMatchups = true // Show loading state IMMEDIATELY
             
-            // 🔥 FIX: Start animation trigger
+            // FIX: Start animation trigger
             animationTrigger.toggle()
             
             Task {
@@ -259,7 +258,7 @@ struct LeagueMatchupsTabView: View {
     private var mainTabView: some View {
         TabView(selection: $selectedIndex) {
             ForEach(Array(displayMatchups.enumerated()), id: \.element.id) { index, matchup in
-                // 🔥 FIX: Remove background from FantasyMatchupDetailView since we handle it here
+                // FIX: Remove background from FantasyMatchupDetailView since we handle it here
                 FantasyMatchupDetailView(
                     matchup: matchup,
                     fantasyViewModel: fantasyViewModel,
@@ -270,8 +269,8 @@ struct LeagueMatchupsTabView: View {
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
-        .frame(maxWidth: .infinity) // 🔥 FIX: Ensure TabView itself uses full width
-        // 🔥 FIX: Don't clip the TabView - let content handle its own boundaries
+        .frame(maxWidth: .infinity) // FIX: Ensure TabView itself uses full width
+        // FIX: Don't clip the TabView - let content handle its own boundaries
     }
     
     // MARK: - Computed Properties
@@ -284,9 +283,8 @@ struct LeagueMatchupsTabView: View {
     
     private var headerView: some View {
         HStack {
-            // 🔥 FIXED: Always show exit button on left
+            // FIXED: Always show exit button on left
             Button(action: {
-                print("🔥 DEBUG: Dismissing to Mission Control from LeagueMatchupsTabView")
                 dismiss()
             }) {
                 HStack(spacing: 4) {
@@ -381,14 +379,10 @@ struct LeagueMatchupsTabView: View {
     /// Fetch all matchups for the current league and week
     private func fetchAllLeagueMatchups() async {
         guard let selectedLeague = fantasyViewModel.selectedLeague else {
-            print("🔥 DEBUG: No selected league available")
             return
         }
         
-        print("🔥 DEBUG: Fetching all matchups for league: \(selectedLeague.league.name)")
-        print("🔥 DEBUG: Current matchups count: \(fantasyViewModel.matchups.count)")
-        
-        // 🔥 ALWAYS fetch fresh data - don't trust existing matchups count
+        // ALWAYS fetch fresh data - don't trust existing matchups count
         // Mission Control only has the user's matchups, we need ALL league matchups
         
         isLoadingAllMatchups = true
@@ -401,14 +395,11 @@ struct LeagueMatchupsTabView: View {
         
         await MainActor.run {
             fetchedAllMatchups = fantasyViewModel.matchups
-            print("🔥 DEBUG: After fetch: \(fetchedAllMatchups.count) total matchups")
             
             // Update the selected index to point to the correct matchup
             if let newIndex = fetchedAllMatchups.firstIndex(where: { $0.id == startingMatchup.id }) {
                 selectedIndex = newIndex
-                print("🔥 DEBUG: Updated selectedIndex to \(newIndex)")
             } else {
-                print("🔥 DEBUG: ⚠️ Could not find starting matchup in fetched matchups!")
                 selectedIndex = 0 // Fallback to first matchup
             }
             

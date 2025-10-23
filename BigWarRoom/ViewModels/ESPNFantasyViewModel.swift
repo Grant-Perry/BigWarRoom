@@ -118,7 +118,6 @@ final class ESPNFantasyViewModel: ObservableObject {
                 }
             }, receiveValue: { [weak self] model in
                 self?.espnFantasyModel = model
-                // x// x Print("✅ ESPN data fetched: \(model.teams.count) teams, \(model.schedule.count) schedule entries")
             })
             .store(in: &cancellables)
     }

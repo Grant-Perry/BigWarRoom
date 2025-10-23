@@ -60,30 +60,30 @@ final class CentralizedAppLoader: ObservableObject {
         isLoading = false
         hasCompletedInitialization = true
         
-        print("✅ Progressive app initialization completed")
+//        print("✅ Progressive app initialization completed")
     }
     
     /// Load shared stats first to eliminate redundant API calls
     private func loadSharedStats() async {
         do {
             let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
-            print("✅ CentralizedAppLoader: Shared stats loaded")
+//            print("✅ CentralizedAppLoader: Shared stats loaded")
         } catch {
-            print("❌ CentralizedAppLoader: Failed to load shared stats: \(error)")
+//            print("❌ CentralizedAppLoader: Failed to load shared stats: \(error)")
             // Continue anyway - app can still function
         }
     }
     
     /// Load matchups in background without blocking UI
     private func loadMatchupsInBackground() async {
-        print("🚀 CentralizedAppLoader: Loading matchups in background...")
+//        print("🚀 CentralizedAppLoader: Loading matchups in background...")
         await MatchupsHubViewModel.shared.loadAllMatchups()
-        print("✅ CentralizedAppLoader: Background matchup loading completed")
+//        print("✅ CentralizedAppLoader: Background matchup loading completed")
     }
     
     /// Load player data in background
     private func loadPlayerDataInBackground() async {
-        print("🚀 CentralizedAppLoader: Loading player data in background...")
+//        print("🚀 CentralizedAppLoader: Loading player data in background...")
         
         if !AllLivePlayersViewModel.shared.statsLoaded {
             await AllLivePlayersViewModel.shared.loadPlayerStats()
@@ -105,7 +105,7 @@ final class CentralizedAppLoader: ObservableObject {
             AllLivePlayersViewModel.shared.lastUpdateTime = Date()
         }
         
-        print("✅ CentralizedAppLoader: Player data processing completed")
+//        print("✅ CentralizedAppLoader: Player data processing completed")
     }
     
     /// 🔥 DEPRECATED: Old "load everything first" method

@@ -75,16 +75,9 @@ struct PlayerStatsCardView: View {
                     team: currentTeam,
                     loadingMessage: playerStatsViewModel.loadingMessage
                 )
-                .onAppear {
-                    print("🔧 UI DEBUG: Showing PlayerStatsLoadingView for \(currentPlayer.fullName)")
-                    print("🔧 UI DEBUG: Loading message: '\(playerStatsViewModel.loadingMessage)'")
-                }
             } else {
                 // 🔧 BLANK SHEET FIX: Show main content once loaded (even with partial data after timeout)
                 mainContentView
-                    .onAppear {
-                        print("🔧 UI DEBUG: Showing mainContentView for \(currentPlayer.fullName)")
-                    }
                     .overlay(alignment: .top) {
                         // 🔧 BLANK SHEET FIX: Show timeout warning banner if loading failed but we have partial data
                         if playerStatsViewModel.hasLoadingError {
@@ -103,27 +96,12 @@ struct PlayerStatsCardView: View {
         .task(id: currentPlayer.playerID) { // 🏈 PLAYER NAVIGATION: Re-run task when player changes
             // 🔧 BLANK SHEET FIX: Initialize ViewModel with player data
             // This triggers the loading process which will set isLoadingPlayerData = true
-            print("🔧 UI DEBUG: .task called for \(currentPlayer.fullName)")
-            print("🔧 UI DEBUG: Initial isLoadingPlayerData = \(playerStatsViewModel.isLoadingPlayerData)")
             playerStatsViewModel.setupPlayer(currentPlayer)
-        }
-        .onAppear {
-            print("🔧 UI DEBUG: PlayerStatsCardView appeared for \(currentPlayer.fullName)")
-        }
-        .onDisappear {
-            print("🔧 UI DEBUG: PlayerStatsCardView disappeared for \(currentPlayer.fullName)")
         }
     }
     
     // 🏈 PLAYER NAVIGATION: Callback to update current player from depth chart
     private func updateCurrentPlayer(_ newPlayer: SleeperPlayer) {
-        print("🏈 NAVIGATION DEBUG: Updating current player from \(currentPlayer.fullName) to \(newPlayer.fullName)")
-        print("🏈 NAVIGATION DEBUG: New player details:")
-        print("   - Full Name: '\(newPlayer.fullName)'")
-        print("   - Team: '\(newPlayer.team ?? "nil")'")
-        print("   - Position: '\(newPlayer.position ?? "nil")'")
-        print("   - Direct ESPN ID: '\(newPlayer.espnID ?? "NONE")'")
-        
         // Update the current player and team
         currentPlayer = newPlayer
         currentTeam = NFLTeam.team(for: newPlayer.team ?? "")
@@ -189,7 +167,7 @@ struct PlayerStatsCardView: View {
                     PlayerRosteredSectionView(
                         player: currentPlayer, 
                         team: currentTeam,
-                        matchups: MatchupsHubViewModel.shared.myMatchups // 🔥 PASS MATCHUPS DATA
+                        matchups: MatchupsHubViewModel.shared.myMatchups // Pass matchups data
                     )
                         .padding(.horizontal, 24) // Much more padding to each section
                     

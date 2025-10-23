@@ -76,10 +76,6 @@ extension AllLivePlayersViewModel {
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
                     let freshScore = freshPlayer.currentPoints ?? 0.0
-                    // 🔥 DEBUG: Log score updates during background refresh
-                    if abs(freshScore - (player.currentPoints ?? 0.0)) > 0.01 {
-                        print("📈 SCORE UPDATE: \(player.fullName) \(player.currentPoints ?? 0.0) → \(freshScore)")
-                    }
                     return freshScore
                 }
             }
@@ -87,10 +83,6 @@ extension AllLivePlayersViewModel {
             // Sleeper leagues - use calculated score from provider
             if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
                 let freshScore = cachedProvider.getPlayerScore(playerId: player.id)
-                // 🔥 DEBUG: Log score updates during background refresh
-                if abs(freshScore - (player.currentPoints ?? 0.0)) > 0.01 {
-                    print("📈 SCORE UPDATE: \(player.fullName) \(player.currentPoints ?? 0.0) → \(freshScore)")
-                }
                 return freshScore
             }
         }
@@ -150,8 +142,6 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Surgical Data Update (Silent Background Updates)
     internal func updatePlayerDataSurgically() async {
-        print("🔇 SILENT UPDATE: Starting surgical data update - NO UI state changes")
-        
         let allPlayerEntries = extractAllPlayers()
         guard !allPlayerEntries.isEmpty else { return }
         
@@ -161,8 +151,6 @@ extension AllLivePlayersViewModel {
         
         // 🔥 CRITICAL FIX: Notify SwiftUI that data changed without triggering loading states
         objectWillChange.send()
-        
-        print("🔇 SILENT UPDATE: Completed with SwiftUI notification")
     }
     
     // 🔥 NEW: Truly silent update that doesn't trigger UI changes
@@ -229,14 +217,10 @@ extension AllLivePlayersViewModel {
         
         // 🔥 FIX: Apply filters silently without triggering state changes
         applySilentPositionFilter()
-        
-        print("🔇 SILENT UPDATE: Updated \(allPlayers.count) players, filtered to \(filteredPlayers.count)")
     }
     
     // 🔥 NEW: Silent filter application (called during background updates)
     private func applySilentPositionFilter() {
-        print("🔇 SILENT FILTER: Applying filters without UI state changes - Search: '\(searchText)', RosteredOnly: \(showRosteredOnly)")
-        
         guard !allPlayers.isEmpty else {
             filteredPlayers = []
             return
@@ -248,35 +232,21 @@ extension AllLivePlayersViewModel {
         if isSearching {
             if showRosteredOnly {
                 // ROSTERED ONLY SEARCH: Filter existing league players by search terms
-                print("🔇 SILENT: Searching ROSTERED players for '\(searchText)'")
-                
                 players = allPlayers.filter { livePlayer in
-                    let matches = playerNameMatches(livePlayer.playerName, searchQuery: searchText)
-                    if matches {
-                        print("🔇 ROSTERED MATCH: '\(searchText)' matches '\(livePlayer.playerName)'")
-                    }
-                    return matches
+                    return playerNameMatches(livePlayer.playerName, searchQuery: searchText)
                 }
-                
-                print("🔇 SILENT: Found \(players.count) rostered players matching '\(searchText)'")
                 
                 // IMPORTANT: Don't apply any other filters when doing rostered search
                 // Skip to the final steps to preserve the search results
             } else {
                 // FULL NFL SEARCH: Search all NFL players and create search entries
-                print("🔇 SILENT: Searching ALL NFL players for '\(searchText)'")
-                
                 guard !allNFLPlayers.isEmpty else {
                     filteredPlayers = []
                     return
                 }
                 
                 let matchingNFLPlayers = allNFLPlayers.filter { player in
-                    let matches = sleeperPlayerMatches(player, searchQuery: searchText)
-                    if matches {
-                        print("🔇 NFL MATCH: '\(searchText)' matches '\(player.fullName)'")
-                    }
-                    return matches
+                    return sleeperPlayerMatches(player, searchQuery: searchText)
                 }.prefix(50)
                 
                 // Convert to LivePlayerEntry format for display
@@ -314,8 +284,6 @@ extension AllLivePlayersViewModel {
                         performanceTier: .average
                     )
                 }
-                
-                print("🔇 SILENT: Found \(players.count) NFL players matching '\(searchText)'")
             }
         } else {
             // Apply normal filters when not searching
@@ -376,7 +344,6 @@ extension AllLivePlayersViewModel {
 
         // Apply sorting silently
         filteredPlayers = sortPlayersSilently(updatedPlayers)
-        print("🔇 SILENT FILTER: Completed - \(filteredPlayers.count) players")
     }
     
     // 🔥 NEW: Silent sorting (no UI changes)

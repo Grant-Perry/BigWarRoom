@@ -144,12 +144,6 @@ extension MatchupsHubViewModel {
             }
         }
         
-        if !eliminatedTeams.isEmpty {
-            for team in eliminatedTeams {
-                print("   - \(team.ownerName)")
-            }
-        }
-        
         // Store eliminated teams for graveyard (we'll need to modify the summary creation)
         self.graveyardTeams = eliminatedTeams
         

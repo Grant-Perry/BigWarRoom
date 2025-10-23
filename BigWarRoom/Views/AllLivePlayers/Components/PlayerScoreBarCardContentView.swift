@@ -16,6 +16,7 @@ struct PlayerScoreBarCardContentView: View {
     
     @ObservedObject var viewModel: AllLivePlayersViewModel
     @StateObject private var watchService = PlayerWatchService.shared
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared // 🔥 NEW: For injury data
     
     @State private var showingScoreBreakdown = false
     
@@ -175,34 +176,41 @@ struct PlayerScoreBarCardContentView: View {
             // NOW overlay the player image on top - unconstrained!
             HStack {
                 ZStack {
-                    // 🔥 FIXED: Large floating team logo behind player - positioned further right and lower
+                    // 🔥 FIXED: Large floating team logo behind player
                     let teamCode = playerEntry.player.team ?? ""
-                    // 🔥 NEW: Use TeamCodeNormalizer for consistent team mapping
                     let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
                     
                     if let team = NFLTeam.team(for: normalizedTeamCode) {
+                        // Team logo
                         TeamAssetManager.shared.logoOrFallback(for: team.id)
                             .frame(width: 140, height: 140)
                             .opacity(0.25)
-                            .offset(x: 20, y: 15) // 🔥 FIXED: Moved down from y: -5 to y: 10
+                            .offset(x: 20, y: 15)
                             .zIndex(0)
-                    } else {
-                        let _ = print("🔍 DEBUG - No team logo for player: \(playerEntry.player.shortName), team: '\(teamCode)' (normalized: '\(normalizedTeamCode)')")
                     }
                     
                     // Player image in front - FIXED HEIGHT
                     PlayerScoreBarCardPlayerImageView(playerEntry: playerEntry)
                         .zIndex(1)
                         .offset(x: -35) // 🔥 NEW: Move player left to clip off shoulder
+                    
+                    // 🔥 INJURY BADGE: RIGHT SHOULDER of player - positioned relative to player image
+                    if let injuryStatus = getSleeperPlayerData()?.injuryStatus, !injuryStatus.isEmpty {
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .scaleEffect(0.8)
+                            .offset(x: 25, y: 5) // RIGHT SHOULDER: Same position as test badge
+                            .zIndex(15) // Higher than player image zIndex
+                    }
                 }
                 .frame(height: 80) // Constrain height
                 .frame(maxWidth: 180) // 🔥 INCREASED: Wider to accommodate offset logo (was 120)
-				.offset(x: -10)
+                .offset(x: -10)
                 Spacer()
             }
         }
         .frame(height: cardHeight) // Apply the card height constraint
-        .clipShape(RoundedRectangle(cornerRadius: 12)) // Clip the entire thing
+        .clipShape(RoundedRectangle(cornerRadius: 12)) // Restore clipping
+        
         .sheet(isPresented: $showingScoreBreakdown) {
             let leagueContext = LeagueContext(
                 leagueID: playerEntry.matchup.league.league.leagueID,
@@ -221,6 +229,21 @@ struct PlayerScoreBarCardContentView: View {
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(.clear)
         }
+    }
+    
+    // 🔥 NEW: Get Sleeper player data for injury status - REMOVED DEBUG
+    private func getSleeperPlayerData() -> SleeperPlayer? {
+        let playerName = playerEntry.player.fullName.lowercased()
+        let shortName = playerEntry.player.shortName.lowercased()
+        let team = playerEntry.player.team?.lowercased()
+        
+        let result = playerDirectory.players.values.first { sleeperPlayer in
+            sleeperPlayer.fullName.lowercased() == playerName ||
+            (sleeperPlayer.shortName.lowercased() == shortName &&
+             sleeperPlayer.team?.lowercased() == team)
+        }
+        
+        return result
     }
     
     // MARK: - Watch Functionality
@@ -381,3 +404,5 @@ extension Color {
         return (lighter + 0.05) / (darker + 0.05)
     }
 }
+
+//

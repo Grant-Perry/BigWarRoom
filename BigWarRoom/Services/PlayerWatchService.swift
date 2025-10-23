@@ -23,7 +23,7 @@ final class PlayerWatchService: ObservableObject {
     @Published var settings = WatchSettings()
     @Published var isManuallyOrdered = false // Track if user has manually reordered
     @Published var sortHighToLow = true // Track sort direction for threat mode
-    @Published var sortMethod: WatchSortMethod = .delta // 🔥 NEW: Sort method with Delta as default
+    @Published var sortMethod: WatchSortMethod = .delta // Sort method with Delta as default
     
     // MARK: - Private Properties
     
@@ -38,7 +38,7 @@ final class PlayerWatchService: ObservableObject {
     private let watchSettingsKey = "BigWarRoom_WatchSettings"
     private let manualOrderKey = "BigWarRoom_WatchedPlayers_ManualOrder"
     private let sortDirectionKey = "BigWarRoom_WatchedPlayers_SortDirection"
-    private let sortMethodKey = "BigWarRoom_WatchedPlayers_SortMethod" // 🔥 NEW: Persist sort method
+    private let sortMethodKey = "BigWarRoom_WatchedPlayers_SortMethod" // Persist sort method
     
     // MARK: - Initialization
     
@@ -61,20 +61,16 @@ final class PlayerWatchService: ObservableObject {
     }
     
     private func handleWeekChange(_ newWeek: Int) async {
-        print("🎯 Week changed to \(newWeek), handling watched players...")
-        
         guard !watchedPlayers.isEmpty else { return }
         
         // Option 1: Clear all watched players when week changes (clean slate)
         // This might be more user-friendly since historical watches are less relevant
         if settings.clearWatchedPlayersOnWeekChange {
             clearAllWatchedPlayers()
-            print("🎯 Cleared all watched players due to week change")
             return
         }
         
         // Option 2: Update scores for new week (keep existing watches but with new data)
-        print("🎯 Updating watched player scores for new week...")
         
         // Get fresh data from AllLivePlayersViewModel for the new week
         let allLiveVM = AllLivePlayersViewModel.shared
@@ -95,7 +91,6 @@ final class PlayerWatchService: ObservableObject {
         }
         
         updateWatchedPlayerScores(allOpponentPlayers)
-        print("🎯 Updated \(watchedPlayers.count) watched players for week \(newWeek)")
     }
     
     // MARK: - Public Interface
@@ -113,7 +108,6 @@ final class PlayerWatchService: ObservableObject {
         
         // Check watch limit
         if watchedPlayers.count >= maxWatchedPlayers {
-            print("🎯 Watch limit reached (\(maxWatchedPlayers))")
             return false
         }
         
@@ -131,7 +125,6 @@ final class PlayerWatchService: ObservableObject {
         watchedPlayers.append(watchedPlayer)
         saveWatchedPlayers()
         
-        print("🎯 Started watching \(player.playerName) (initial: \(player.currentScore) pts)")
         return true
     }
     
@@ -140,7 +133,6 @@ final class PlayerWatchService: ObservableObject {
     func unwatchPlayer(_ playerID: String) {
         watchedPlayers.removeAll { $0.playerID == playerID }
         saveWatchedPlayers()
-        print("🎯 Stopped watching player: \(playerID)")
     }
     
     /// Check if a player is being watched
@@ -154,18 +146,15 @@ final class PlayerWatchService: ObservableObject {
     func clearAllWatchedPlayers() {
         watchedPlayers.removeAll()
         saveWatchedPlayers()
-        print("🎯 Cleared all watched players")
     }
     
     /// Reset delta for a specific watched player (set initialScore to currentScore)
     /// - Parameter playerID: The player ID to reset delta for
     func resetPlayerDelta(_ playerID: String) {
         guard let index = watchedPlayers.firstIndex(where: { $0.playerID == playerID }) else {
-            print("⚠️ Attempted to reset delta for unwatched player: \(playerID)")
             return
         }
         
-        let oldInitialScore = watchedPlayers[index].initialScore
         let currentScore = watchedPlayers[index].currentScore
         
         // Create new WatchedPlayer with reset initialScore and updated timestamp
@@ -175,8 +164,8 @@ final class PlayerWatchService: ObservableObject {
             playerName: watchedPlayers[index].playerName,
             position: watchedPlayers[index].position,
             team: watchedPlayers[index].team,
-            watchStartTime: Date(), // 🔥 Reset watch time to now
-            initialScore: currentScore, // 🔥 Set baseline to current score
+            watchStartTime: Date(), // Reset watch time to now
+            initialScore: currentScore, // Set baseline to current score
             opponentReferences: watchedPlayers[index].opponentReferences,
             currentScore: currentScore,
             isLive: watchedPlayers[index].isLive
@@ -184,19 +173,12 @@ final class PlayerWatchService: ObservableObject {
         
         watchedPlayers[index] = resetPlayer
         saveWatchedPlayers()
-        
-        let deltaWasReset = currentScore - oldInitialScore
-        print("🔄 Reset delta for \(resetPlayer.playerName): was \(String(format: "%.1f", deltaWasReset)), now 0.0")
     }
     
     /// Reset deltas for ALL watched players (set initialScore to currentScore for all)
     func resetAllDeltas() {
-        guard !watchedPlayers.isEmpty else {
-            print("⚠️ No watched players to reset deltas for")
-            return
-        }
+        guard !watchedPlayers.isEmpty else { return }
         
-        let resetCount = watchedPlayers.count
         let currentTime = Date()
         
         // Reset all players' deltas
@@ -209,8 +191,8 @@ final class PlayerWatchService: ObservableObject {
                 playerName: watchedPlayers[i].playerName,
                 position: watchedPlayers[i].position,
                 team: watchedPlayers[i].team,
-                watchStartTime: currentTime, // 🔥 Reset watch time to now for all
-                initialScore: currentScore, // 🔥 Set baseline to current score for all
+                watchStartTime: currentTime, // Reset watch time to now for all
+                initialScore: currentScore, // Set baseline to current score for all
                 opponentReferences: watchedPlayers[i].opponentReferences,
                 currentScore: currentScore,
                 isLive: watchedPlayers[i].isLive
@@ -218,7 +200,6 @@ final class PlayerWatchService: ObservableObject {
         }
         
         saveWatchedPlayers()
-        print("🔄 Reset deltas for ALL \(resetCount) watched players - fresh start!")
     }
     
     /// Update scores for all watched players
@@ -269,7 +250,6 @@ final class PlayerWatchService: ObservableObject {
         if removedCount > 0 {
             watchedPlayers = activePlayers
             saveWatchedPlayers()
-            print("🎯 Auto-removed \(removedCount) watched players (games completed)")
         }
     }
     
@@ -286,8 +266,6 @@ final class PlayerWatchService: ObservableObject {
         
         saveWatchedPlayers()
         saveManualOrderFlag()
-        
-        print("🎯 Manually reordered watched players - auto-sorting disabled")
     }
     
     /// Get watched players in current display order (for drag consistency)
@@ -305,7 +283,6 @@ final class PlayerWatchService: ObservableObject {
         watchedPlayers = applySorting()
         saveWatchedPlayers()
         saveManualOrderFlag()
-        print("🎯 Reset to automatic \(sortMethod.displayName) sorting")
     }
     
     /// Toggle sort direction for automatic sorting
@@ -315,17 +292,15 @@ final class PlayerWatchService: ObservableObject {
             watchedPlayers = applySorting()
         }
         saveSortDirection()
-        print("🎯 Toggled sort direction to \(sortHighToLow ? "High→Low" : "Low→High")")
     }
     
-    /// 🔥 NEW: Change sort method
+    /// Change sort method
     func setSortMethod(_ method: WatchSortMethod) {
         sortMethod = method
         if !isManuallyOrdered {
             watchedPlayers = applySorting()
         }
         saveSortMethod()
-        print("🎯 Changed sort method to \(method.displayName)")
     }
     
     /// Apply current sorting method
@@ -408,8 +383,6 @@ final class PlayerWatchService: ObservableObject {
             recentNotifications = Array(recentNotifications.prefix(20))
         }
         
-        print("🔔 \(notification.message)")
-        
         // Trigger system notification if enabled
         triggerSystemNotification(notification)
     }
@@ -449,7 +422,6 @@ final class PlayerWatchService: ObservableObject {
     private func saveWatchedPlayers() {
         if let data = try? JSONEncoder().encode(watchedPlayers) {
             userDefaults.set(data, forKey: watchedPlayersKey)
-            print("🎯 Saved \(watchedPlayers.count) watched players (identities only)")
         }
     }
     
@@ -457,11 +429,10 @@ final class PlayerWatchService: ObservableObject {
         if let data = userDefaults.data(forKey: watchedPlayersKey),
            let players = try? JSONDecoder().decode([WatchedPlayer].self, from: data) {
             watchedPlayers = players
-            print("🎯 Loaded \(watchedPlayers.count) watched players - scores will refresh dynamically")
         }
         loadManualOrderFlag() // Load the manual order flag too
         loadSortDirection() // Load the sort direction too
-        loadSortMethod() // 🔥 NEW: Load the sort method too
+        loadSortMethod() // Load the sort method too
     }
     
     private func saveSettings() {
@@ -493,7 +464,7 @@ final class PlayerWatchService: ObservableObject {
         if let savedDirection = userDefaults.object(forKey: sortDirectionKey) as? Bool {
             sortHighToLow = savedDirection
         } else {
-            // 🔥 NEW: Default sort direction based on method
+            // Default sort direction based on method
             switch sortMethod {
             case .delta, .threat, .current:
                 sortHighToLow = true // High to Low for scores (biggest deltas first)
@@ -503,7 +474,7 @@ final class PlayerWatchService: ObservableObject {
         }
     }
     
-    // 🔥 NEW: Sort method persistence
+    // Sort method persistence
     private func saveSortMethod() {
         userDefaults.set(sortMethod.rawValue, forKey: sortMethodKey)
     }
@@ -572,13 +543,13 @@ extension PlayerWatchService {
     }
 }
 
-// MARK: - 🔥 NEW: Watch Sort Methods
+// MARK: - Watch Sort Methods
 
 /// Sorting methods for watched players
 enum WatchSortMethod: String, CaseIterable {
     case delta = "delta"
     case threat = "threat"
-    case current = "current"  // 🔥 RENAMED: This is the "Score" option
+    case current = "current"  // This is the "Score" option
     case name = "name"
     case position = "position"
     
@@ -586,7 +557,7 @@ enum WatchSortMethod: String, CaseIterable {
         switch self {
         case .delta: return "Delta"
         case .threat: return "Threat"
-        case .current: return "Score"  // 🔥 CHANGED: From "Current" to "Score"
+        case .current: return "Score"  // From "Current" to "Score"
         case .name: return "Name"
         case .position: return "Position"
         }

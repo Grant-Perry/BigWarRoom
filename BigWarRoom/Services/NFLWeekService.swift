@@ -34,8 +34,6 @@ final class NFLWeekService: ObservableObject {
             await fetchCurrentNFLWeek()
             setupPeriodicUpdates()
         }
-        
-        print("🏈 NFLWeekService: Initialized with estimated week \(currentWeek)")
     }
     
     // MARK: -> Static Helper
@@ -72,7 +70,6 @@ final class NFLWeekService: ObservableObject {
     /// Get current week with debug override (but still use REAL week by default)
     func getCurrentWeek(debugWeek: Int? = nil) -> Int {
         if let debugWeek = debugWeek, AppConstants.debug {
-            // x// x Print("🏈 NFLWeekService: Using EXPLICIT debug week \(debugWeek)")
             return debugWeek
         }
         // ALWAYS return the real current week (even in debug mode unless explicitly overridden)
@@ -83,7 +80,6 @@ final class NFLWeekService: ObservableObject {
     
     /// Fetch current NFL week from Sleeper API
     private func fetchCurrentNFLWeek() async {
-        // x// x Print("🏈 NFLWeekService: Fetching current NFL week...")
         isLoading = true
         
         do {
@@ -95,10 +91,7 @@ final class NFLWeekService: ObservableObject {
             seasonType = nflState.seasonType
             lastUpdated = Date()
             
-            // x// x Print("🏈 NFLWeekService: Updated to Week \(currentWeek), Year \(currentYear), Season Type: \(seasonType)")
-            
         } catch {
-            // x// x Print("❌ NFLWeekService: Error fetching NFL state: \(error)")
             // Keep existing values on error
         }
         

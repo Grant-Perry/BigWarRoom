@@ -20,18 +20,15 @@ struct PlayerStatsHeaderView: View {
     // 🗞️ NEWS: Player news sheet state
     @State private var showingPlayerNews = false
     
-    // 🔥 NEW: Computed ESPN ID that tries multiple methods to find ESPN ID
+    // NEW: Computed ESPN ID that tries multiple methods to find ESPN ID
     private var resolvedESPNID: String? {
-        print("🔍 DEBUG: Starting ESPN ID resolution for \(player.fullName)")
         
         // Method 1: Try the direct ESPN ID from Sleeper
         if let espnID = player.espnID {
-            print("🔍 DEBUG: Found direct ESPN ID: \(espnID)")
             return espnID
         }
         
         // Method 2: Try PlayerMatchService to find another Sleeper player with ESPN ID
-        print("🔍 DEBUG: No direct ESPN ID, trying PlayerMatchService...")
         let matchService = PlayerMatchService.shared
         let matchResult = matchService.matchPlayerWithConfidence(
             fullName: player.fullName,
@@ -41,23 +38,19 @@ struct PlayerStatsHeaderView: View {
         )
         
         if let matchedPlayer = matchResult.player, let espnID = matchedPlayer.espnID {
-            print("🎯 SUCCESS: Resolved ESPN ID via PlayerMatchService: \(espnID)")
             return espnID
         }
         
         // Method 3: Try fallback mapping service for high-profile players
-        print("🔍 DEBUG: No ESPN ID via PlayerMatchService, trying fallback mapping...")
         let fallbackService = ESPNIDMappingService.shared
         if let fallbackESPNID = fallbackService.getFallbackESPNID(
             fullName: player.fullName,
             team: player.team,
             position: player.position
         ) {
-            print("🎯 SUCCESS: Resolved ESPN ID via fallback mapping: \(fallbackESPNID)")
             return fallbackESPNID
         }
         
-        print("🔍 DEBUG: Final result - NO ESPN ID found for \(player.fullName) via any method")
         return nil
     }
     
@@ -65,10 +58,6 @@ struct PlayerStatsHeaderView: View {
         VStack(spacing: 16) {
             // TAPPABLE PLAYER IMAGE FOR NEWS with NOTIFICATION BADGE
             Button(action: {
-                print("🗞️ BUTTON TAPPED: \(player.fullName)")
-                print("🗞️ Direct ESPN ID from Sleeper: \(player.espnID ?? "NONE")")
-                print("🗞️ Resolved ESPN ID: \(resolvedESPNID ?? "NONE")")
-                print("🗞️ Current news count: \(playerNewsViewModel.newsItems.count)")
                 showingPlayerNews = true
             }) {
                 PlayerImageView(
@@ -88,7 +77,7 @@ struct PlayerStatsHeaderView: View {
                 resolvedESPNID != nil && playerNewsViewModel.newsItems.count > 0 ? 1.25 : 1.0,
                 anchor: .topTrailing
             )
-            .padding(.bottom, 12) // 👤 NEW: Add space between image and player name
+            .padding(.bottom, 12) // Add space between image and player name
             
             // Original player info
             VStack(spacing: 8) {
@@ -98,7 +87,7 @@ struct PlayerStatsHeaderView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                     
-                    // 👁️ NEW: Watch toggle button
+                    // NEW: Watch toggle button
                     Button(action: {
                         toggleWatchStatus()
                     }) {
@@ -181,14 +170,10 @@ struct PlayerStatsHeaderView: View {
         .background(teamBackgroundView)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .onAppear {
-            print("🔍 DEBUG: PlayerStatsHeaderView.onAppear for \(player.fullName)")
             
             // Load news when view appears if player has ESPN ID (resolved)
             if let espnID = resolvedESPNID, let espnIDInt = Int(espnID) {
-                print("🔍 DEBUG: Loading news with ESPN ID: \(espnIDInt)")
                 playerNewsViewModel.loadPlayerNews(espnId: espnIDInt)
-            } else {
-                print("🔍 DEBUG: No ESPN ID resolved, skipping news load")
             }
         }
         .sheet(isPresented: $showingPlayerNews) {
@@ -245,7 +230,7 @@ struct PlayerStatsHeaderView: View {
         }
     }
     
-    // MARK: - 👁️ Watch Status Helpers
+    // MARK: - Watch Status Helpers
     
     /// Check if current player is being watched
     private var isPlayerWatched: Bool {
@@ -263,7 +248,7 @@ struct PlayerStatsHeaderView: View {
                 let opponentReferences = createOpponentReferences()
                 let success = watchService.watchPlayer(opponentPlayer, opponentReferences: opponentReferences)
                 if !success {
-                    print("⚠️ Failed to watch player \(player.fullName) - limit reached or already watching")
+                    // Handle failure silently
                 }
             }
         }

@@ -40,8 +40,7 @@ extension AllLivePlayersViewModel {
         dataState = .loading
         isLoading = true
         errorMessage = nil
-        print("🔥 DATA FETCH: Fetching new data from APIs")
-        
+
         do {
             // Load stats if needed
             if !statsLoaded {
@@ -69,7 +68,6 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Process Existing Data (No Loading State)
     private func processExistingData() async {
-        print("🔥 DATA PROCESSING: Using existing fresh data")
         applyPositionFilter() // Instant
         dataState = allPlayers.isEmpty ? .empty : .loaded
         isLoading = false
@@ -112,7 +110,6 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Manual Refresh
     internal func performManualRefresh() async {
-        print("🔄 MANUAL REFRESH: User initiated refresh - showing loading")
         lastLoadTime = nil // Force fresh fetch
         await performDataLoad()
     }
@@ -120,9 +117,8 @@ extension AllLivePlayersViewModel {
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
         guard isDataLoaded else { return }
-        print("🔄 BACKGROUND UPDATE: Silently refreshing player scores")
         
-        // 🔥 FIX: Ensure we refresh underlying matchup data for fresh scores
+        // FIX: Ensure we refresh underlying matchup data for fresh scores
         await matchupsHubViewModel.loadAllMatchups()
         
         // Then update our player data surgically
@@ -135,16 +131,13 @@ extension AllLivePlayersViewModel {
             .removeDuplicates()
             .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
             .sink { [weak self] newWeek in
-                print("🔄 WEEK CHANGE: Week changed to \(newWeek) - preserving search state")
                 self?.debounceTask?.cancel()
                 self?.debounceTask = Task { @MainActor in
-                    // 🔥 PRESERVE SEARCH STATE: Don't clear search data during week changes
+                    // PRESERVE SEARCH STATE: Don't clear search data during week changes
                     let wasSearching = self?.isSearching ?? false
                     let searchText = self?.searchText ?? ""
                     let showRosteredOnly = self?.showRosteredOnly ?? false
                     let preservedNFLPlayers = self?.allNFLPlayers ?? []
-                    
-                    print("🔄 WEEK CHANGE: Preserving search state - wasSearching: \(wasSearching), searchText: '\(searchText)', NFL players: \(preservedNFLPlayers.count)")
                     
                     // Reset stats for new week
                     self?.statsLoaded = false
@@ -155,9 +148,8 @@ extension AllLivePlayersViewModel {
                         await self?.loadPlayerStats()
                     }
                     
-                    // 🔥 RESTORE SEARCH STATE: Put search state back after week change
+                    // RESTORE SEARCH STATE: Put search state back after week change
                     if wasSearching {
-                        print("🔄 WEEK CHANGE: Restoring search state")
                         self?.isSearching = wasSearching
                         self?.searchText = searchText
                         self?.showRosteredOnly = showRosteredOnly
@@ -171,12 +163,10 @@ extension AllLivePlayersViewModel {
     }
     
     // MARK: - OLD SUBSCRIPTION METHODS - REMOVED
-    // 🔥 REMOVED: subscribeToMatchupsChanges() and processMatchupsData() 
     // These are no longer needed with centralized initialization
     
     // MARK: - Force Methods (For Compatibility)
     func forceLoadAllPlayers() async {
-        print("🔥 FORCE: Force loading all players (bypassing cache)")
         lastLoadTime = nil
         await performDataLoad()
     }

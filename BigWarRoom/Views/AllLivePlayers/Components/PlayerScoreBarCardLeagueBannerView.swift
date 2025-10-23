@@ -15,7 +15,7 @@ struct PlayerScoreBarCardLeagueBannerView: View {
             // 🔥 DEBUG: Add logging to see actual leagueSource values
             Group {
                 let leagueSourceValue = playerEntry.leagueSource
-                let _ = print("🔍 DEBUG - League source: '\(leagueSourceValue)' (lowercased: '\(leagueSourceValue.lowercased())') for league: '\(playerEntry.leagueName)'")
+//                let _ = print("🔍 DEBUG - League source: '\(leagueSourceValue)' (lowercased: '\(leagueSourceValue.lowercased())') for league: '\(playerEntry.leagueName)'")
                 
                 switch leagueSourceValue.lowercased() {
                 case "espn":

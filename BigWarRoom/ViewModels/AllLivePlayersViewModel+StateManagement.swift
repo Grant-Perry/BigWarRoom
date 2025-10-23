@@ -12,8 +12,6 @@ extension AllLivePlayersViewModel {
     // MARK: - State Recovery Methods
     
     func hardResetFilteringState() async {
-        print("🔄 HARD RESET: Resetting all filtering state to defaults")
-        
         // Reset all filtering state
         showActiveOnly = false
         selectedPosition = .all
@@ -33,8 +31,6 @@ extension AllLivePlayersViewModel {
     }
 
     func refreshWithFilterPreservation() async {
-        print("🔄 FILTER PRESERVATION: Refreshing while preserving user filter settings")
-        
         // Store current filter settings
         let currentActiveOnly = showActiveOnly
         let currentPosition = selectedPosition
@@ -55,8 +51,6 @@ extension AllLivePlayersViewModel {
     }
 
     func recoverFromStuckState() {
-        print("🔧 RECOVERY: Attempting to recover from stuck filter state")
-        
         // Reset filters to safe defaults
         showActiveOnly = false
         selectedPosition = .all
@@ -114,68 +108,6 @@ extension AllLivePlayersViewModel {
             "activeLiveGames": activeLiveGamesCount,
             "lastUpdateTime": lastUpdateTime
         ]
-    }
-    
-    // MARK: - Debug Utilities
-    
-    func debugESPNIDCoverage() {
-        print("🔍 ESPN ID COVERAGE ANALYSIS")
-        print(String(repeating: "=", count: 50))
-        
-        var totalPlayers = 0
-        var playersWithESPNID = 0
-        var coverageByPosition: [String: (Int, Int)] = [:]
-        
-        for entry in allPlayers {
-            totalPlayers += 1
-            let position = entry.position
-            
-            let current = coverageByPosition[position] ?? (0, 0)
-            coverageByPosition[position] = (current.0 + 1, current.1)
-            
-            if entry.player.espnID != nil {
-                playersWithESPNID += 1
-                coverageByPosition[position] = (current.0 + 1, current.1 + 1)
-            }
-        }
-        
-        let coveragePercentage = totalPlayers > 0 ? (Double(playersWithESPNID) / Double(totalPlayers) * 100) : 0
-        
-        print("📊 OVERALL COVERAGE:")
-        print("   Total Players: \(totalPlayers)")
-        print("   With ESPN ID: \(playersWithESPNID)")
-        print("   Coverage: \(String(format: "%.1f", coveragePercentage))%")
-        print()
-        
-        print("📍 BY POSITION:")
-        for (position, counts) in coverageByPosition.sorted(by: { $0.key < $1.key }) {
-            let positionCoverage = counts.0 > 0 ? (Double(counts.1) / Double(counts.0) * 100) : 0
-            print("   \(position): \(counts.1)/\(counts.0) (\(String(format: "%.1f", positionCoverage))%)")
-        }
-        
-        print(String(repeating: "=", count: 50))
-    }
-    
-    func debugCurrentState() {
-        print("🔍 CURRENT STATE DEBUG")
-        print(String(repeating: "=", count: 50))
-        
-        let metrics = getPerformanceMetrics()
-        for (key, value) in metrics {
-            print("   \(key): \(value)")
-        }
-        
-        let issues = validateDataConsistency()
-        if !issues.isEmpty {
-            print("\n❌ DATA CONSISTENCY ISSUES:")
-            for issue in issues {
-                print("   - \(issue)")
-            }
-        } else {
-            print("\n✅ No data consistency issues detected")
-        }
-        
-        print(String(repeating: "=", count: 50))
     }
     
     // MARK: - Batch Update Control

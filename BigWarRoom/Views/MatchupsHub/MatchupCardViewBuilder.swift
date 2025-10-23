@@ -29,6 +29,22 @@ struct MatchupCardViewBuilder: View {
         }
     }
     
+    // MARK: - Game Start Detection
+    
+    /// Check if games haven't started yet (both scores are 0 and it's 50-50)
+    private var gamesHaventStarted: Bool {
+        guard let myScore = matchup.myTeam?.currentScore,
+              let opponentScore = matchup.opponentTeam?.currentScore else {
+            return true // If we can't get scores, assume games haven't started
+        }
+        
+        // Games haven't started if both scores are 0.0 and it's essentially 50-50
+        let bothScoresZero = myScore == 0.0 && opponentScore == 0.0
+        let is50Percent = abs((myScore + opponentScore)) < 0.1 // Within 0.1 of zero total
+        
+        return bothScoresZero || is50Percent
+    }
+    
     // MARK: -> Micro Card
     
     private var microCardView: some View {
@@ -167,7 +183,20 @@ struct MatchupCardViewBuilder: View {
             }
         } else {
             // Non-live games
-            if isWinning {
+            if gamesHaventStarted {
+                // 🔥 NEW: Games haven't started - blue gradient to indicate "about to start"
+                borderColors = [
+                    Color.gpBlue,
+                    Color.marlinsPrimary,
+                    Color.gpBlue.opacity(0.8),
+                    Color.marlinsPrimary.opacity(0.9),
+                    Color.gpBlue
+                ]
+                borderWidth = 1.8
+                borderOpacity = 0.8
+                shadowColor = Color.gpBlue.opacity(0.3)
+                shadowRadius = 4
+            } else if isWinning {
                 // Winning: Keep the original blue theme
                 borderColors = [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
                 borderWidth = 1.5

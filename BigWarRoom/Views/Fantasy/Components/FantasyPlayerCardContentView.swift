@@ -133,7 +133,7 @@ struct FantasyPlayerCardHeadshotView: View {
             }
             
             // 🔥 NEW: Injury Status Badge (positioned at bottom-right of headshot)
-            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+            if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
                 VStack {
                     Spacer()
                     HStack {
@@ -146,14 +146,6 @@ struct FantasyPlayerCardHeadshotView: View {
         }
         .offset(x: -20, y: -8)
         .zIndex(2)
-    }
-    
-    // 🔥 NEW: Get injury status from Sleeper player data
-    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
-        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
-            return nil
-        }
-        return playerDirectory.injuryStatus
     }
 }
 
@@ -191,7 +183,7 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
             }
             
             // 🔥 NEW: Injury Status Badge (for fallback images too)
-            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+            if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
                 VStack {
                     Spacer()
                     HStack {
@@ -202,14 +194,6 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
                 }
             }
         }
-    }
-    
-    // 🔥 NEW: Get injury status from Sleeper player data
-    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
-        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
-            return nil
-        }
-        return playerDirectory.injuryStatus
     }
 }
 
@@ -236,7 +220,7 @@ struct FantasyPlayerCardDefaultCircleView: View {
                 .foregroundColor(.white)
             
             // 🔥 NEW: Injury Status Badge (even for default circles)
-            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+            if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
                 VStack {
                     Spacer()
                     HStack {
@@ -248,14 +232,6 @@ struct FantasyPlayerCardDefaultCircleView: View {
             }
         }
         .opacity(isPlayerLive ? 1.0 : 0.85)
-    }
-    
-    // 🔥 NEW: Get injury status from Sleeper player data
-    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
-        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
-            return nil
-        }
-        return playerDirectory.injuryStatus
     }
 }
 

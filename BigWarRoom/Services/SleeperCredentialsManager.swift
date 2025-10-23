@@ -195,7 +195,6 @@ final class SleeperCredentialsManager: ObservableObject {
             
             cacheDiscoveredLeagues(leagueIDs)
         } catch {
-            // x// x Print("❌ Failed to refresh Sleeper league cache: \(error)")
         }
     }
     

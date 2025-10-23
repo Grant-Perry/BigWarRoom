@@ -101,8 +101,6 @@ final class GameAlertsManager: ObservableObject {
         if alerts.count > maxAlerts {
             alerts = Array(alerts.prefix(maxAlerts))
         }
-        
-        print("🚨 GAME ALERT: \(alert.alertText) in \(leagueName)")
     }
     
     /// Add some test alerts for testing the UI
@@ -142,21 +140,17 @@ final class GameAlertsManager: ObservableObject {
             pointsScored: 15.60,
             leagueName: "Dynasty League"
         )
-        
-        print("🚨 GAME ALERTS: Added \(alerts.count) test alerts")
     }
     
     /// Start a new refresh cycle
     func startNewRefreshCycle() {
         currentRefreshCycle += 1
-        print("🔄 GAME ALERTS: Starting refresh cycle #\(currentRefreshCycle)")
     }
     
     /// Clear all alerts (for testing)
     func clearAlerts() {
         alerts.removeAll()
         currentRefreshCycle = 0
-        print("🗑️ GAME ALERTS: Cleared all alerts")
     }
     
     /// Get alerts for current session

@@ -317,7 +317,7 @@ final class MatchupsHubViewModel: ObservableObject {
     internal func cacheProvider(_ provider: LeagueMatchupProvider, for league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String) {
         let cacheKey = "\(league.id)_\(week)_\(year)"
         cachedProviders[cacheKey] = provider
-        print("🔥 CACHE: Stored provider for \(league.league.name) (key: \(cacheKey))")
+//        print("🔥 CACHE: Stored provider for \(league.league.name) (key: \(cacheKey))")
     }
 }
 

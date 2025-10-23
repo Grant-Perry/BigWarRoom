@@ -55,18 +55,15 @@ final class SharedStatsService: ObservableObject {
         
         // Return cached data if available
         if let cachedStats = weeklyStatsCache[cacheKey] {
-            print("📊 SharedStatsService: Returning cached stats for Week \(week) \(year) (\(cachedStats.count) players)")
             return cachedStats
         }
         
         // Check if we're already loading this week
         if let existingTask = loadingTasks[cacheKey] {
-            print("📊 SharedStatsService: Waiting for existing load task for Week \(week) \(year)")
             return try await existingTask.value
         }
         
         // Start new loading task
-        print("📊 SharedStatsService: Starting fresh load for Week \(week) \(year)")
         let loadingTask = Task<[String: [String: Double]], Error> {
             try await fetchWeekStats(week: week, year: year)
         }
@@ -81,8 +78,6 @@ final class SharedStatsService: ObservableObject {
             loadingTasks.removeValue(forKey: cacheKey)
             lastLoadTime = Date()
             
-            print("✅ SharedStatsService: Successfully cached stats for Week \(week) \(year) (\(stats.count) players)")
-            
             // Also update PlayerStatsCache for backward compatibility
             await PlayerStatsCache.shared.updateWeeklyStats(stats, for: week)
             
@@ -90,7 +85,6 @@ final class SharedStatsService: ObservableObject {
             
         } catch {
             loadingTasks.removeValue(forKey: cacheKey)
-            print("❌ SharedStatsService: Failed to load Week \(week) \(year): \(error)")
             throw error
         }
     }
@@ -118,7 +112,6 @@ final class SharedStatsService: ObservableObject {
         weeklyStatsCache.removeAll()
         loadingTasks.values.forEach { $0.cancel() }
         loadingTasks.removeAll()
-        print("🗑️ SharedStatsService: Cleared all cached stats")
     }
     
     /// Clear cache for a specific week
@@ -127,7 +120,6 @@ final class SharedStatsService: ObservableObject {
         weeklyStatsCache.removeValue(forKey: cacheKey)
         loadingTasks[cacheKey]?.cancel()
         loadingTasks.removeValue(forKey: cacheKey)
-        print("🗑️ SharedStatsService: Cleared cache for Week \(week) \(year)")
     }
     
     // MARK: - Private Implementation
@@ -141,15 +133,11 @@ final class SharedStatsService: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
-        print("🔍 SharedStatsService: Fetching stats from: \(url)")
-        
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
             
             // Check HTTP response
             if let httpResponse = response as? HTTPURLResponse {
-                print("📊 SharedStatsService: API Response: \(httpResponse.statusCode)")
-                
                 guard httpResponse.statusCode == 200 else {
                     throw StatsError.httpError(httpResponse.statusCode)
                 }
@@ -158,34 +146,11 @@ final class SharedStatsService: ObservableObject {
             // Decode the stats data
             let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
             
-            // Log success
-            let playerCount = statsData.keys.count
-            let totalPoints = statsData.values.compactMap { $0["pts_ppr"] }.reduce(0, +)
-            
-            print("✅ SharedStatsService: Successfully loaded player stats:")
-            print("   📊 Total players: \(playerCount)")
-            print("   📊 Total PPR points: \(String(format: "%.2f", totalPoints))")
-            print("   📊 Week: \(week), Year: \(year)")
-            
             return statsData
             
         } catch let decodingError as DecodingError {
-            print("❌ SharedStatsService: JSON decoding error:")
-            switch decodingError {
-            case .dataCorrupted(let context):
-                print("   Data corrupted: \(context)")
-            case .keyNotFound(let key, let context):
-                print("   Key not found: \(key), context: \(context)")
-            case .typeMismatch(let type, let context):
-                print("   Type mismatch: \(type), context: \(context)")
-            case .valueNotFound(let value, let context):
-                print("   Value not found: \(value), context: \(context)")
-            @unknown default:
-                print("   Unknown decoding error: \(decodingError)")
-            }
             throw StatsError.decodingError(decodingError)
         } catch {
-            print("❌ SharedStatsService: Network error: \(error)")
             throw StatsError.networkError(error)
         }
     }
@@ -199,15 +164,13 @@ final class SharedStatsService: ObservableObject {
         if newWeek != currentWeek || newYear != currentYear {
             currentWeek = newWeek
             currentYear = newYear
-            
-            print("📊 SharedStatsService: Week changed to \(newWeek) \(newYear)")
-            
+
             // Preload stats for the new week
             Task {
                 do {
                     let _ = try await loadWeekStats(week: newWeek, year: newYear)
                 } catch {
-                    print("❌ SharedStatsService: Failed to preload Week \(newWeek) \(newYear): \(error)")
+                    // Silent error handling
                 }
             }
         }

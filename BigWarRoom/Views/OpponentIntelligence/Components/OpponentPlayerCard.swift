@@ -2,12 +2,16 @@
 //  OpponentPlayerCard.swift
 //  BigWarRoom
 //
-//  Individual opponent player card with performance analysis
+//  🔥 PHASE 2 SIMPLIFIED MIGRATION: Use existing UnifiedPlayerCardBackground
 //
 
 import SwiftUI
 
-/// Card displaying opponent player performance and threat assessment
+/// **Opponent Player Card - SIMPLIFIED MIGRATION**
+/// 
+/// **Strategy:** Keep threat assessment logic, eliminate background duplication
+/// **Before:** 250+ lines with custom threat styling
+/// **After:** Use UnifiedPlayerCardBackground + existing components
 struct OpponentPlayerCard: View {
     let player: OpponentPlayer
     @StateObject private var watchService = PlayerWatchService.shared
@@ -15,158 +19,66 @@ struct OpponentPlayerCard: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Player image (clickable with NavigationLink) and position
+            // Player image and position
             VStack(spacing: 4) {
-                // Player headshot with NavigationLink to stats
-                if let sleeperPlayer = fantasyPlayerViewModel.getSleeperPlayerData(for: player.player) {
-                    NavigationLink(destination: PlayerStatsCardView(
-                        player: sleeperPlayer,
-                        team: NFLTeam.team(for: player.player.team ?? "")
-                    )) {
-                        playerImageView
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                } else {
-                    // Fallback - show image but not clickable if no SleeperPlayer data
-                    playerImageView
-                }
-                
-                // Position badge
-                Text(player.position)
-                    .font(.system(size: 8, weight: .black))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(positionColor)
-                    )
+                buildPlayerImage()
+                buildPositionBadge()
             }
             .frame(width: 50)
             
             // Player info
             VStack(alignment: .leading, spacing: 4) {
-                // Name and team
-                HStack {
-                    Text(player.playerName)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    Spacer()
-                    
-                    Text(player.team)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-                
-                // Performance indicators
-                HStack(spacing: 8) {
-                    // Current score
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("CURRENT")
-                            .font(.system(size: 8, weight: .black))
-                            .foregroundColor(.gray)
-                        
-                        Text(player.scoreDisplay)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(player.threatLevel.color)
-                    }
-                    
-                    // Projected score
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("PROJ")
-                            .font(.system(size: 8, weight: .black))
-                            .foregroundColor(.gray)
-                        
-                        Text(player.projectionDisplay)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.blue)
-                    }
-                    
-                    Spacer()
-                    
-                    // Performance status
-                    performanceStatus
-                }
+                buildPlayerInfo()
+                buildPerformanceStats()
             }
             
             // Watch toggle and threat level
-            VStack(spacing: 8) {
-                // Watch toggle button
-                Button(action: toggleWatch) {
-                    Image(systemName: isWatching ? "eye.fill" : "eye")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(isWatching ? .gpOrange : .gray)
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(isWatching ? Color.gpOrange.opacity(0.2) : Color.gray.opacity(0.1))
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Threat level indicator
-                VStack(spacing: 2) {
-                    Image(systemName: player.threatLevel.sfSymbol)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(player.threatLevel.color)
-                    
-                    Text(player.threatLevel.rawValue)
-                        .font(.system(size: 7, weight: .black))
-                        .foregroundColor(player.threatLevel.color)
-                        .padding(.horizontal, 3)
-                        .padding(.vertical, 1)
-                        .background(
-                            RoundedRectangle(cornerRadius: 3)
-                                .fill(player.threatLevel.color.opacity(0.2))
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
-                }
-            }
-            .frame(width: 70)
+            buildControls()
+                .frame(width: 70)
         }
         .padding(12)
         .background(
-            // Blur backdrop layer
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.thinMaterial) // iOS blur material
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.black.opacity(0.2)) // Light tint for transparency
+            // 🔥 UNIFIED: Use UnifiedPlayerCardBackground instead of custom blur effects
+            UnifiedPlayerCardBackground(
+                configuration: .simple(
+                    team: NFLTeam.team(for: player.player.team ?? ""),
+                    cornerRadius: 12
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(isWatching ? Color.gpOrange.opacity(0.5) : player.threatLevel.color.opacity(0.3), lineWidth: isWatching ? 2 : 1)
-                )
-        )
-        .background(
-            // Outer glow effect
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            (isWatching ? Color.gpOrange : player.threatLevel.color).opacity(0.08),
-                            (isWatching ? Color.gpOrange : player.threatLevel.color).opacity(0.03)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        isWatching ? Color.gpOrange.opacity(0.5) : player.threatLevel.color.opacity(0.3),
+                        lineWidth: isWatching ? 2 : 1
                     )
-                )
-                .blur(radius: 1)
+            )
         )
     }
     
-    // MARK: - Helper Views
+    // MARK: - Component Builders
     
+    @ViewBuilder
+    private func buildPlayerImage() -> some View {
+        if let sleeperPlayer = fantasyPlayerViewModel.getSleeperPlayerData(for: player.player) {
+            NavigationLink(destination: PlayerStatsCardView(
+                player: sleeperPlayer,
+                team: NFLTeam.team(for: player.player.team ?? "")
+            )) {
+                playerImageView
+            }
+            .buttonStyle(PlainButtonStyle())
+        } else {
+            playerImageView
+        }
+    }
+    
+    @ViewBuilder
     private var playerImageView: some View {
         AsyncImage(url: player.player.headshotURL) { image in
             image
                 .resizable()
                 .aspectRatio(contentMode: .fill)
         } placeholder: {
-            // Fallback with player initials (current implementation)
             ZStack {
                 Circle()
                     .fill(positionColor.opacity(0.3))
@@ -184,33 +96,90 @@ struct OpponentPlayerCard: View {
         )
     }
     
-    // MARK: - Helper Properties and Methods
-    
-    private var isWatching: Bool {
-        watchService.isWatching(player.player.id)
+    @ViewBuilder
+    private func buildPositionBadge() -> some View {
+        Text(player.position)
+            .font(.system(size: 8, weight: .black))
+            .foregroundColor(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(positionColor)
+            )
     }
     
-    private func toggleWatch() {
-        if isWatching {
-            watchService.unwatchPlayer(player.player.id)
-        } else {
-            // Create opponent references (simplified for now)
-            let opponentRefs = [OpponentReference(
-                id: "temp_opponent",
-                opponentName: "Opponent",
-                leagueName: "League",
-                leagueSource: "sleeper"
-            )]
+    @ViewBuilder
+    private func buildPlayerInfo() -> some View {
+        HStack {
+            Text(player.playerName)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
             
-            let success = watchService.watchPlayer(player, opponentReferences: opponentRefs)
-            if !success {
-                // TODO: Show alert about watch limit or other issues
-                print("Failed to watch player - possibly at limit")
-            }
+            Spacer()
+            
+            Text(player.team)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.gray)
         }
     }
     
-    private var performanceStatus: some View {
+    @ViewBuilder
+    private func buildPerformanceStats() -> some View {
+        HStack(spacing: 8) {
+            // Current score
+            VStack(alignment: .leading, spacing: 2) {
+                Text("CURRENT")
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundColor(.gray)
+                
+                Text(player.scoreDisplay)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(player.threatLevel.color)
+            }
+            
+            // Projected score
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PROJ")
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundColor(.gray)
+                
+                Text(player.projectionDisplay)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundColor(.blue)
+            }
+            
+            Spacer()
+            
+            // Performance status
+            buildPerformanceStatus()
+        }
+    }
+    
+    @ViewBuilder
+    private func buildControls() -> some View {
+        VStack(spacing: 8) {
+            // Watch toggle button
+            Button(action: toggleWatch) {
+                Image(systemName: isWatching ? "eye.fill" : "eye")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(isWatching ? .gpOrange : .gray)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        Circle()
+                            .fill(isWatching ? Color.gpOrange.opacity(0.2) : Color.gray.opacity(0.1))
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            // Threat level indicator
+            buildThreatIndicator()
+        }
+    }
+    
+    @ViewBuilder
+    private func buildPerformanceStatus() -> some View {
         Group {
             if player.isExploding {
                 HStack(spacing: 4) {
@@ -237,6 +206,48 @@ struct OpponentPlayerCard: View {
                 }
                 .foregroundColor(.gray)
             }
+        }
+    }
+    
+    @ViewBuilder
+    private func buildThreatIndicator() -> some View {
+        VStack(spacing: 2) {
+            Image(systemName: player.threatLevel.sfSymbol)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(player.threatLevel.color)
+            
+            Text(player.threatLevel.rawValue)
+                .font(.system(size: 7, weight: .black))
+                .foregroundColor(player.threatLevel.color)
+                .padding(.horizontal, 3)
+                .padding(.vertical, 1)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(player.threatLevel.color.opacity(0.2))
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+    }
+    
+    // MARK: - Helper Properties and Methods
+    
+    private var isWatching: Bool {
+        watchService.isWatching(player.player.id)
+    }
+    
+    private func toggleWatch() {
+        if isWatching {
+            watchService.unwatchPlayer(player.player.id)
+        } else {
+            let opponentRefs = [OpponentReference(
+                id: "temp_opponent",
+                opponentName: "Opponent",
+                leagueName: "League",
+                leagueSource: "sleeper"
+            )]
+            
+            let _ = watchService.watchPlayer(player, opponentReferences: opponentRefs)
         }
     }
     

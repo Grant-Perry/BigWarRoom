@@ -352,20 +352,6 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        // 🔥 DEBUG: Log Daniel Jones info in roster
-        for player in filteredPlayers {
-            if player.fullName.contains("Daniel Jones") {
-                print("🎯 ROSTER DEBUG: \(player.fullName)")
-                print("   Team: \(team.name)")
-                print("   Team Index: \(teamIndex)")
-                print("   League ID: \(matchup.leagueID)")
-                print("   Player ID: \(player.id)")
-                print("   Current Points: \(player.currentPoints ?? 0.0)")
-                print("   ESPN ID: \(player.espnID ?? "nil")")
-                print("   Sleeper ID: \(player.sleeperID ?? "nil")")
-            }
-        }
-        
         return filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:
@@ -658,11 +644,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        // 🔥 DEBUG: Log initial player count
-        print("🎯 FILTER DEBUG - Team: \(team.name)")
-        print("🎯 Initial players: \(filteredPlayers.count)")
-        print("🎯 Filters - Position: \(selectedPosition.displayName), Active: \(showActiveOnly)")
-        
         let originalCount = filteredPlayers.count
         
         // Step 2: Apply position filter
@@ -677,13 +658,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
                 }
                 
-                let matches = playerPosition == filterPosition
-                if !matches {
-                    print("🎯 Position filter: \(player.fullName) (\(playerPosition)) filtered out (looking for \(filterPosition))")
-                }
-                return matches
+                return playerPosition == filterPosition
             }
-            print("🎯 After position filter: \(beforeCount) -> \(filteredPlayers.count)")
         }
         
         // Step 3: Apply active only filter
@@ -692,28 +668,17 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             filteredPlayers = filteredPlayers.filter { player in
                 // "Active" means player's team is currently in a LIVE game
                 guard let playerTeam = player.team else {
-                    print("🎯 Active filter: \(player.fullName) has no team - filtered out")
                     return false
                 }
                 
                 // Check if player's team is in a live game using NFLGameDataService
                 if let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) {
-                    let isInLiveGame = gameInfo.isLive
-                    
-                    if !isInLiveGame {
-                        print("🎯 Active filter: \(player.fullName) (\(playerTeam)) not in live game (\(gameInfo.gameStatus)) - filtered out")
-                    } else {
-                        print("🎯 Active filter: \(player.fullName) (\(playerTeam)) IS in live game (\(gameInfo.gameStatus)) - keeping")
-                    }
-                    
-                    return isInLiveGame
+                    return gameInfo.isLive
                 } else {
                     // No game info available - assume not in live game
-                    print("🎯 Active filter: \(player.fullName) (\(playerTeam)) no game info - filtered out")
                     return false
                 }
             }
-            print("🎯 After active filter: \(beforeCount) -> \(filteredPlayers.count)")
         }
         
         // Step 4: Apply sorting
@@ -735,8 +700,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             case .score:
                 let points1 = player1.currentPoints ?? 0.0
                 let points2 = player2.currentPoints ?? 0.0
-                let result = highToLow ? points1 > points2 : points1 < points2
-                return result
+                return highToLow ? points1 > points2 : points1 < points2
                 
             case .name:
                 let name1 = player1.fullName.lowercased()
@@ -748,11 +712,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
             }
-        }
-        
-        print("🎯 Final filtered players: \(filteredPlayers.count) (from \(originalCount))")
-        for player in filteredPlayers.prefix(3) {
-            print("🎯   - \(player.fullName) (\(player.position)) \(player.currentPoints ?? 0.0) pts")
         }
         
         return filteredPlayers
@@ -868,11 +827,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        // 🔥 DEBUG: Log initial player count
-        print("🎯 BENCH FILTER DEBUG - Team: \(team.name)")
-        print("🎯 Initial bench players: \(filteredPlayers.count)")
-        print("🎯 Filters - Position: \(selectedPosition.displayName), Active: \(showActiveOnly)")
-        
         let originalCount = filteredPlayers.count
         
         // Step 2: Apply position filter
@@ -889,7 +843,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 
                 return playerPosition == filterPosition
             }
-            print("🎯 After position filter: \(beforeCount) -> \(filteredPlayers.count)")
         }
         
         // Step 3: Apply active only filter
@@ -901,19 +854,12 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 
                 // Check if player's team is in a live game using NFLGameDataService
                 if let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) {
-                    let isInLiveGame = gameInfo.isLive
-                    
-                    if !isInLiveGame {
-                        print("🎯 Bench Active filter: \(player.fullName) (\(playerTeam)) not in live game - filtered out")
-                    }
-                    
-                    return isInLiveGame
+                    return gameInfo.isLive
                 } else {
                     // No game info available - assume not in live game
                     return false
                 }
             }
-            print("🎯 After bench active filter: \(beforeCount) -> \(filteredPlayers.count)")
         }
         
         // Step 4: Apply sorting
@@ -947,8 +893,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 return highToLow ? team1 > team2 : team1 < team2
             }
         }
-        
-        print("🎯 Final filtered bench players: \(filteredPlayers.count) (from \(originalCount))")
         
         return filteredPlayers
     }

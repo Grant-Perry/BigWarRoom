@@ -39,7 +39,6 @@ final class SeasonYearManager: ObservableObject {
     private init() {
         // Start with current ESPN league year from AppConstants
         self.selectedYear = AppConstants.ESPNLeagueYear
-        print("🗓️ SeasonYearManager: Initialized to Year \(selectedYear)")
     }
     
     // MARK: - Public Interface
@@ -48,8 +47,6 @@ final class SeasonYearManager: ObservableObject {
     /// This will propagate to ALL subscribers across the app
     func selectYear(_ year: String) {
         guard year != selectedYear, availableYears.contains(year) else { return }
-        
-        print("🗓️ SeasonYearManager: Changing year from \(selectedYear) to \(year)")
         
         selectedYear = year
         lastChanged = Date()

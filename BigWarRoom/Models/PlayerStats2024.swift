@@ -256,15 +256,11 @@ final class PlayerStatsStore: ObservableObject {
         
         if let stats = await loadFromNFLAPI() {
             self.stats = stats
-            // x// x Print("📊 Loaded \(stats.count) real player stats from NFL API")
         } else if let stats = await loadFromESPNAPI() {
             self.stats = stats
-            // x// x Print("📊 Loaded \(stats.count) real player stats from ESPN")
         } else if let stats = await loadFromBundledRealData() {
             self.stats = stats
-            // x// x Print("📊 Loaded \(stats.count) real player stats from bundled data")
         } else {
-            // x// x Print("❌ Failed to load real stats - using empty dataset")
             self.stats = [:]
         }
         
@@ -280,7 +276,6 @@ final class PlayerStatsStore: ObservableObject {
             // Parse NFL API response and convert to PlayerStats2024
             return parseNFLAPIData(data)
         } catch {
-            // x// x Print("Failed to load from NFL API: \(error)")
             return nil
         }
     }
@@ -309,7 +304,6 @@ final class PlayerStatsStore: ObservableObject {
             let (data, _) = try await URLSession.shared.data(from: url)
             return parseESPNData(data, position: position)
         } catch {
-            // x// x Print("Failed to load \(position) from ESPN: \(error)")
             return nil
         }
     }
@@ -317,7 +311,6 @@ final class PlayerStatsStore: ObservableObject {
     private func loadFromBundledRealData() async -> [String: PlayerStats2024]? {
         // Load from bundled real 2024 stats JSON file
         guard let url = Bundle.main.url(forResource: "nfl_2024_stats", withExtension: "json") else {
-            // x// x Print("❌ No bundled real stats file found - add nfl_2024_stats.json to bundle")
             return nil
         }
         
@@ -327,7 +320,6 @@ final class PlayerStatsStore: ObservableObject {
             let statsArray = try decoder.decode([PlayerStats2024].self, from: data)
             return Dictionary(uniqueKeysWithValues: statsArray.map { ($0.playerID, $0) })
         } catch {
-            // x// x Print("❌ Failed to parse bundled real stats: \(error)")
             return nil
         }
     }
@@ -346,4 +338,3 @@ final class PlayerStatsStore: ObservableObject {
         return nil
     }
 }
-

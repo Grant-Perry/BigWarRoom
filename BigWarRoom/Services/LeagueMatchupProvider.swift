@@ -107,7 +107,6 @@ final class LeagueMatchupProvider {
             return nil
         }
         
-
         // Resolve username to user ID if needed
         let resolvedUserID: String
         do {
@@ -125,11 +124,6 @@ final class LeagueMatchupProvider {
         
         do {
             let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
-
-            for roster in rosters {
-                print("   - Roster \(roster.rosterID): Owner '\(roster.ownerID ?? "nil")'")
-            }
-            
             let userRoster = rosters.first { $0.ownerID == resolvedUserID }
             
             if let userRoster = userRoster {
@@ -142,7 +136,7 @@ final class LeagueMatchupProvider {
         }
     }
     
-    /// Get current user's team ID for ESPN leagues - WITH DEBUG LOGGING
+    /// Get current user's team ID for ESPN leagues
     private func getESPNUserTeamID() async -> String? {
         let myESPNID = AppConstants.GpESPNID
 
@@ -150,19 +144,13 @@ final class LeagueMatchupProvider {
             let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
 
             if let teams = espnLeague.teams {
-
                 for team in teams {
-                    let managerName = espnLeague.getManagerName(for: team.owners)
-
                     if let owners = team.owners {
                         if owners.contains(myESPNID) {
                             return String(team.id)
                         }
-                    } else {
                     }
                 }
-                
-            } else {
             }
             return nil
         } catch {
@@ -205,24 +193,16 @@ final class LeagueMatchupProvider {
         return choppedSummary
     }
     
-    /// Find user's matchup by team ID - WITH DEBUG LOGGING
+    /// Find user's matchup by team ID
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
-        print("🔍 FIND MATCHUP: Looking for team ID '\(myTeamID)' in \(matchups.count) matchups for league \(league.league.name)")
-        
         for (index, matchup) in matchups.enumerated() {
-            print("   Matchup \(index + 1): Home='\(matchup.homeTeam.id)' (\(matchup.homeTeam.ownerName)) vs Away='\(matchup.awayTeam.id)' (\(matchup.awayTeam.ownerName))")
-            
             if matchup.homeTeam.id == myTeamID {
-                print("✅ FIND MATCHUP: Found as HOME team in matchup \(index + 1)")
                 return matchup
             } else if matchup.awayTeam.id == myTeamID {
-                print("✅ FIND MATCHUP: Found as AWAY team in matchup \(index + 1)")
                 return matchup
             }
         }
         
-        print("❌ FIND MATCHUP: Team ID '\(myTeamID)' not found in any of the \(matchups.count) matchups")
-        print("❌ FIND MATCHUP: Available team IDs: \(matchups.flatMap { [$0.homeTeam.id, $0.awayTeam.id] })")
         return nil
     }
     
@@ -412,38 +392,9 @@ final class LeagueMatchupProvider {
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let settings = json["scoring_settings"] as? [String: Any] {
                 sleeperLeagueSettings = settings
-                
-                // 🔥 DEBUG: Log scoring settings fetch for this specific league
-                print("✅ CHOPPED: Loaded \(settings.count) league scoring settings")
-                print("   🏈 League: \(league.league.name)")
-                print("   🏈 League ID: \(league.league.leagueID)")
-                
-                if let passYd = settings["pass_yd"] as? Double,
-                   let passTd = settings["pass_td"] as? Double,
-                   let rushYd = settings["rush_yd"] as? Double {
-                    print("   rec_yd: \(settings["rec_yd"] ?? "nil")")
-                    print("   pass_int: \(settings["pass_int"] ?? "nil")")
-                    print("   def_st_ff: \(settings["def_st_ff"] ?? "nil")")
-                    print("   pts_allow_1_6: \(settings["pts_allow_1_6"] ?? "nil")")
-                    print("   pass_2pt: \(settings["pass_2pt"] ?? "nil")")
-                    print("   def_td: \(settings["def_td"] ?? "nil")")
-                    print("   pts_allow_14_20: \(settings["pts_allow_14_20"] ?? "nil")")
-                    print("   fgm_20_29: \(settings["fgm_20_29"] ?? "nil")")
-                    print("   pass_td: \(passTd)")
-                    print("   ff: \(settings["ff"] ?? "nil")")
-                    
-                    // 🔥 NEW: Highlight Chopped Shootout league specifically
-                    if league.league.name.contains("Chopped Shootout") {
-                        print("   🎯 THIS IS THE CHOPPED SHOOTOUT LEAGUE!")
-                        print("   🎯 pass_yd scoring: \(passYd)")
-                        print("   🎯 Expected Bo Nix score with these settings: ~10.76")
-                    }
-                }
-                print("🔥 Week \(week) Stats Summary (Year \(year) via SSOT): \(playerStats.keys.count) players, Total Points: \(playerStats.values.compactMap { $0["pts_ppr"] }.reduce(0, +))")
-                print("✅ Week \(week) stats loaded - scores should now appear!")
             }
         } catch {
-            print("❌ CHOPPED: Failed to load scoring settings for \(league.league.name): \(error)")
+            // Silent fail
         }
     }
     
@@ -452,61 +403,8 @@ final class LeagueMatchupProvider {
         do {
             let sharedStats = try await SharedStatsService.shared.loadWeekStats(week: week, year: year)
             playerStats = sharedStats
-            
-            // 🔥 SUCCESS LOGGING: Show what we loaded (reduced logging)
-            let playerCount = playerStats.keys.count
-            let totalPoints = playerStats.values.compactMap { $0["pts_ppr"] }.reduce(0, +)
-            
-            print("✅ [LeagueMatchupProvider] Using cached stats from SharedStatsService:")
-            print("   📊 Total players: \(playerCount)")
-            print("   📊 League: \(league.league.name)")
-            
-            // 🔥 REDUCED: Only debug Bo Nix for Chopped Shootout specifically
-            if league.league.name.contains("Chopped Shootout") {
-                await debugBoNixForChoppedShootout()
-            }
-            
         } catch {
-            print("❌ [LeagueMatchupProvider] Failed to load shared stats for \(league.league.name): \(error)")
             playerStats = [:]  // Set empty to prevent crashes
-        }
-    }
-    
-    /// Debug Bo Nix specifically for Chopped Shootout league
-    private func debugBoNixForChoppedShootout() async {
-        print("🎯 DEBUGGING BO NIX for Chopped Shootout:")
-        
-        // Look for Bo Nix in the stats (he's usually around player ID 11563)
-        let possibleBoNixIDs = ["11563", "11564", "11562"]
-        
-        for playerID in possibleBoNixIDs {
-            if let playerData = playerStats[playerID] {
-                print("   🎯 FOUND POTENTIAL BO NIX: Player \(playerID)")
-                print("   🎯 Passing Yards: \(playerData["pass_yd"] ?? 0)")
-                print("   🎯 Raw PPR Points: \(playerData["pts_ppr"] ?? 0)")
-                
-                if let passYds = playerData["pass_yd"], passYds > 0 {
-                    let calculatedScore = calculateSleeperPlayerScore(playerId: playerID)
-                    print("   🎯 CALCULATED CHOPPED SCORE: \(calculatedScore)")
-                }
-            }
-        }
-        
-        // Show top QBs for context
-        let allQuarterbacks = playerStats.filter { _, stats in
-            if let passYds = stats["pass_yd"], passYds > 0 {
-                return true
-            }
-            return false
-        }.sorted { first, second in
-            let firstYds = first.value["pass_yd"] ?? 0
-            let secondYds = second.value["pass_yd"] ?? 0
-            return firstYds > secondYds
-        }
-        
-        print("   🎯 Top 5 QBs this week:")
-        for (playerID, stats) in allQuarterbacks.prefix(5) {
-            print("     QB \(playerID): \(stats["pass_yd"] ?? 0) pass yds, \(stats["pts_ppr"] ?? 0) PPR")
         }
     }
     
@@ -570,42 +468,28 @@ final class LeagueMatchupProvider {
     
     private func fetchSleeperMatchups() async {
         guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)") else {
-            print("❌ [LeagueMatchupProvider] Invalid matchup URL for \(league.league.name)")
             return
         }
-        
-        print("🔍 [LeagueMatchupProvider] Fetching matchups for: \(league.league.name)")
-        print("🔍 [LeagueMatchupProvider] URL: \(url)")
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
             
-            print("🔍 [LeagueMatchupProvider] Received \(sleeperMatchups.count) matchups for \(league.league.name)")
-            
             if sleeperMatchups.isEmpty {
                 detectedAsChoppedLeague = true
-                
-                // 🔥 NEW: For Chopped leagues, still calculate player scores using this league's settings
-                print("🎯 CHOPPED LEAGUE DETECTED: \(league.league.name)")
-                print("🎯 Will calculate player scores using this league's scoring settings")
                 await processChoppedLeaguePlayerScores()
-                
                 return
             }
             
-            print("🔍 [LeagueMatchupProvider] Processing regular matchups for: \(league.league.name)")
             await processSleeperMatchups(sleeperMatchups)
             
         } catch {
-            print("❌ [LeagueMatchupProvider] Error fetching matchups for \(league.league.name): \(error)")
+            // Silent fail
         }
     }
     
     // 🔥 NEW: Process player scores for Chopped leagues using their specific scoring settings
     private func processChoppedLeaguePlayerScores() async {
-        print("🎯 Processing Chopped league player scores for: \(league.league.name)")
-        
         // Get all players from the stats API that have passing yards > 100 (QBs like Bo Nix)
         let quarterbacks = playerStats.filter { playerID, stats in
             if let passYards = stats["pass_yd"], passYards > 100 {
@@ -614,34 +498,10 @@ final class LeagueMatchupProvider {
             return false
         }
         
-        print("🎯 Found \(quarterbacks.count) QBs with passing stats for \(league.league.name)")
-        
         // Calculate scores for these players using THIS league's scoring settings
         for (playerID, stats) in quarterbacks {
             let calculatedScore = calculateSleeperPlayerScore(playerId: playerID)
-            
-            // 🔥 DEBUG: Show the calculation for this specific league
-            if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
-                let firstName = sleeperPlayer.firstName ?? "Unknown"
-                let lastName = sleeperPlayer.lastName ?? "Player"
-                
-                print("🎯 CHOPPED PLAYER: \(firstName) \(lastName)")
-                print("   League: \(league.league.name)")
-                print("   Calculated Score: \(calculatedScore)")
-                
-                // Special handling for Bo Nix - safely unwrap lastName
-                if let playerLastName = sleeperPlayer.lastName,
-                   playerLastName.lowercased().contains("nix") {
-                    print("   🏈 BO NIX FOUND IN CHOPPED LEAGUE!")
-                    print("   🏈 Score: \(calculatedScore) (Expected: 10.76)")
-                    print("   🏈 This should be the authoritative score for \(league.league.name)")
-                }
-            }
         }
-        
-        // Store that we processed player data
-        print("🔥 Week \(week) Chopped League Stats Summary: \(quarterbacks.count) QBs processed")
-        print("✅ Chopped league player scores calculated!")
     }
     
     private func processSleeperMatchups(_ sleeperMatchups: [SleeperMatchupResponse]) async {
@@ -805,16 +665,6 @@ final class LeagueMatchupProvider {
         
         let score = calculateSleeperPlayerScore(playerId: playerId)
         
-        // 🔥 DEBUG: Log when we're providing a score for this league
-        if let sleeperPlayer = playerDirectoryStore.player(for: playerId),
-           let playerLastName = sleeperPlayer.lastName,
-           playerLastName.lowercased().contains("nix") {
-            let firstName = sleeperPlayer.firstName ?? "Unknown"
-            print("🎯 PROVIDING SCORE for \(firstName) \(playerLastName)")
-            print("   League: \(league.league.name)")
-            print("   Score: \(score)")
-        }
-        
         return score
     }
     
@@ -828,33 +678,11 @@ final class LeagueMatchupProvider {
     private func calculateSleeperPlayerScore(playerId: String) -> Double {
         guard let playerStats = playerStats[playerId],
               let scoringSettings = sleeperLeagueSettings else {
-            // print("🔍 [LeagueMatchupProvider] No stats/settings for player \(playerId)")
             return 0.0
         }
         
         // 🔥 NEVER USE OFFICIAL POINTS - ALWAYS CALCULATE WITH LEAGUE SETTINGS
         // We need to calculate using this league's specific scoring settings, not Sleeper's official points
-        
-        // 🔥 DEBUG: Enhanced Bo Nix debugging with league context
-        let hasPassingStats = playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 })
-        if hasPassingStats {
-            print("🏈 [LeagueMatchupProvider] MANUAL CALCULATION (No Official Points):")
-            print("   Player ID: \(playerId)")
-            print("   League: \(league.league.name)")
-            print("   League ID: \(league.league.leagueID)")
-            print("   Raw Stats: \(playerStats)")
-            print("   Scoring Settings Count: \(scoringSettings.count)")
-            print("   Key scoring rules: pass_yd=\(scoringSettings["pass_yd"] ?? "nil"), pass_td=\(scoringSettings["pass_td"] ?? "nil"), rush_yd=\(scoringSettings["rush_yd"] ?? "nil")")
-            
-            // 🔥 NEW: Show if this is the Chopped Shootout league specifically  
-            if league.league.name.contains("Chopped Shootout") {
-                print("   🎯 THIS IS THE CHOPPED SHOOTOUT LEAGUE!")
-                print("   🎯 Expected final score: ~10.76 (NOT 11.6!)")
-                print("   🎯 We will calculate using CHOPPED scoring settings")
-            } else {
-                print("   ⚠️  This is NOT Chopped Shootout - this is \(league.league.name)")
-            }
-        }
         
         var totalScore = 0.0
         
@@ -862,22 +690,6 @@ final class LeagueMatchupProvider {
             if let scoring = scoringSettings[statKey] as? Double {
                 let points = statValue * scoring
                 totalScore += points
-                
-                // 🔥 DEBUG: Log each stat calculation for Bo Nix
-                if hasPassingStats && points != 0.0 {
-                    print("   \(statKey): \(statValue) × \(scoring) = \(points)")
-                }
-            }
-        }
-        
-        // 🔥 DEBUG: Log final total for Bo Nix
-        if hasPassingStats {
-            print("   [LeagueMatchupProvider] CALCULATED TOTAL: \(totalScore)")
-            if league.league.name.contains("Chopped Shootout") {
-                print("   🎯 CHOPPED SHOOTOUT RESULT: \(totalScore) (Expected: ~10.76)")
-                print("   🎯 This should be DIFFERENT from the 11.6 in other leagues!")
-            } else {
-                print("   ⚠️  LEAGUE (\(league.league.name)) RESULT: \(totalScore)")
             }
         }
         

@@ -58,6 +58,22 @@ struct NonMicroCardContent: View {
         .frame(height: dualViewMode ? 142 : 120)
     }
     
+    // MARK: - Game Start Detection
+    
+    /// Check if games haven't started yet (both scores are 0 and it's 50-50)
+    private var gamesHaventStarted: Bool {
+        guard let myScore = matchup.myTeam?.currentScore,
+              let opponentScore = matchup.opponentTeam?.currentScore else {
+            return true // If we can't get scores, assume games haven't started
+        }
+        
+        // Games haven't started if both scores are 0.0 and it's essentially 50-50
+        let bothScoresZero = myScore == 0.0 && opponentScore == 0.0
+        let is50Percent = abs((myScore + opponentScore)) < 0.1 // Within 0.1 of zero total
+        
+        return bothScoresZero || is50Percent
+    }
+    
     // MARK: - 🔥 CELEBRATION: Border Overlays
     
     /// Celebration border overlay for the entire card
@@ -193,7 +209,16 @@ struct NonMicroCardContent: View {
             }
         } else {
             // Non-live games
-            if isWinning {
+            if gamesHaventStarted {
+                // 🔥 NEW: Games haven't started - blue gradient to indicate "about to start"
+                return [
+                    .gpBlue,
+                    .marlinsPrimary,
+                    .gpBlue.opacity(0.8),
+                    .marlinsPrimary.opacity(0.9),
+                    .gpBlue
+                ]
+            } else if isWinning {
                 // Winning: Keep the original blue theme
                 return [.blue.opacity(0.6), .cyan.opacity(0.4), .blue.opacity(0.6)]
             } else {
@@ -216,6 +241,9 @@ struct NonMicroCardContent: View {
         } else if matchup.isLive {
             // 🔥 FIXED: Different widths for winning vs losing live games
             return isWinning ? 2.0 : 2.4
+        } else if gamesHaventStarted {
+            // 🔥 NEW: Medium border width for games about to start
+            return 1.8
         } else {
             // 🔥 NEW: Thicker border for losing matchups to make them stand out
             return isWinning ? 1.5 : 2.2
@@ -228,6 +256,9 @@ struct NonMicroCardContent: View {
         } else if matchup.isLive {
             // 🔥 FIXED: Higher opacity for losing live games
             return isWinning ? 0.8 : 0.9
+        } else if gamesHaventStarted {
+            // 🔥 NEW: Good visibility for games about to start
+            return 0.8
         } else {
             // 🔥 NEW: Higher opacity for losing matchups to make them more dramatic
             return isWinning ? 0.7 : 0.85
@@ -248,6 +279,9 @@ struct NonMicroCardContent: View {
                 // Losing LIVE game: Cool reddish glow with slight blue tint
                 return .gpRedPink.opacity(0.4)
             }
+        } else if gamesHaventStarted {
+            // 🔥 NEW: Blue glow for games about to start
+            return .gpBlue.opacity(0.3)
         } else {
             // 🔥 NEW: Different shadow colors for winning vs losing
             if isWinning {
@@ -265,6 +299,9 @@ struct NonMicroCardContent: View {
         } else if matchup.isLive {
             // 🔥 FIXED: Larger shadow for losing live games
             return isWinning ? 6 : 7
+        } else if gamesHaventStarted {
+            // 🔥 NEW: Medium shadow for games about to start
+            return 4
         } else {
             // 🔥 NEW: Larger shadow radius for losing cards for more drama
             return isWinning ? 3 : 5

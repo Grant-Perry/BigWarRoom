@@ -104,16 +104,16 @@ struct UnifiedPlayerCardBackground: View {
             .fill(
                 LinearGradient(
                     colors: [
-                        Color.black, 
-                        configuration.teamColor.opacity(0.1), 
-                        Color.black
+                        configuration.teamColor.opacity(0.9),
+                        Color.black.opacity(0.7), 
+                        configuration.teamColor.opacity(0.8)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
             )
             .shadow(
-                color: configuration.teamColor.opacity(0.3),
+                color: configuration.teamColor.opacity(0.4),
                 radius: configuration.shadowRadius,
                 x: 0,
                 y: 0
@@ -141,20 +141,41 @@ struct UnifiedPlayerCardBackground: View {
     
     @ViewBuilder
     private func buildFantasyBorder() -> some View {
-        RoundedRectangle(cornerRadius: configuration.cornerRadius)
-            .stroke(
-                LinearGradient(
-                    colors: [
-                        configuration.teamColor.opacity(0.8),
-                        Color.clear,
-                        configuration.teamColor.opacity(0.6)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: configuration.borderWidth
-            )
-            .opacity(0.7)
+        if configuration.isLive {
+            // 🔥 LIVE: Bright green animated border with glow
+            RoundedRectangle(cornerRadius: configuration.cornerRadius)
+                .stroke(
+                    LinearGradient(
+                        colors: [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: configuration.borderWidth
+                )
+                .opacity(0.9)
+                .shadow(
+                    color: .gpGreen.opacity(0.8),
+                    radius: 15,
+                    x: 0,
+                    y: 0
+                )
+        } else {
+            // 🔥 NON-LIVE: Subtle border to indicate not live
+            RoundedRectangle(cornerRadius: configuration.cornerRadius)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            configuration.teamColor.opacity(0.6),
+                            Color.clear,
+                            configuration.teamColor.opacity(0.4)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: configuration.borderWidth
+                )
+                .opacity(0.5)
+        }
     }
     
     // MARK: - Score Bar Components
@@ -296,6 +317,7 @@ struct BackgroundConfiguration {
     let borderWidth: CGFloat
     let showBorder: Bool
     let jerseyNumber: String?
+    let isLive: Bool
     
     /// **Simple Background Factory**
     static func simple(team: NFLTeam?, cornerRadius: CGFloat = 12) -> BackgroundConfiguration {
@@ -307,7 +329,8 @@ struct BackgroundConfiguration {
             shadowRadius: 0,
             borderWidth: 0,
             showBorder: false,
-            jerseyNumber: nil
+            jerseyNumber: nil,
+            isLive: false
         )
     }
     
@@ -316,17 +339,19 @@ struct BackgroundConfiguration {
         team: NFLTeam?,
         jerseyNumber: String? = nil,
         cornerRadius: CGFloat = 15,
-        showBorder: Bool = true
+        showBorder: Bool = true,
+        isLive: Bool = false
     ) -> BackgroundConfiguration {
         BackgroundConfiguration(
             style: .fantasy,
             team: team,
             cornerRadius: cornerRadius,
             teamColor: team?.primaryColor ?? .nyyDark,
-            shadowRadius: 8,
-            borderWidth: 2,
+            shadowRadius: isLive ? 15 : 8,
+            borderWidth: isLive ? 6 : 2,
             showBorder: showBorder,
-            jerseyNumber: jerseyNumber
+            jerseyNumber: jerseyNumber,
+            isLive: isLive
         )
     }
     
@@ -344,7 +369,8 @@ struct BackgroundConfiguration {
             shadowRadius: 0,
             borderWidth: 0,
             showBorder: false,
-            jerseyNumber: nil
+            jerseyNumber: nil,
+            isLive: false
         )
     }
 }

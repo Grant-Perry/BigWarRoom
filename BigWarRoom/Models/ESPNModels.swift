@@ -273,11 +273,8 @@ struct ESPNTeam: Codable, Identifiable {
             if let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerID) {
                 return sleeperPlayer.playerID
             }
-            // x// x Print("⚠️ Could not find Sleeper player for ESPN ID: \(espnPlayerID)")
             return nil
         } ?? []
-        
-        // x// x Print("🔄 Converted ESPN roster: \(roster?.entries?.count ?? 0) ESPN players -> \(sleeperPlayerIDs.count) Sleeper players")
         
         let recordString = record?.overall.map { overall in
             "\(overall.wins)-\(overall.losses)-\(overall.ties)"
@@ -533,7 +530,6 @@ struct ESPNDraftPick: Codable, Identifiable {
         // Convert ESPN player ID to Sleeper player ID using espnID matching
         let espnPlayerIDString = String(playerId)
         guard let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerIDString) else {
-//            // x// x Print("⚠️ Could not find Sleeper player for ESPN draft pick ID: \(espnPlayerIDString)")
             return nil
         }
         

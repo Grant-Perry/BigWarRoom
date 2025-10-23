@@ -80,16 +80,16 @@ final class AppInitializationManager: ObservableObject {
     // MARK: - Main Initialization
     func initializeApp() async {
         guard !isInitialized else { 
-            print("🚀 APP INIT: Already initialized, skipping")
+//            print("🚀 APP INIT: Already initialized, skipping")
             return 
         }
         
         guard !isLoading else { 
-            print("🚀 APP INIT: Already loading, skipping")
+//            print("🚀 APP INIT: Already loading, skipping")
             return 
         }
         
-        print("🚀 APP INIT: Starting centralized app initialization")
+//        print("🚀 APP INIT: Starting centralized app initialization")
         isLoading = true
         errorMessage = nil
         

@@ -23,7 +23,6 @@ extension AllLivePlayersViewModel {
     }
 
     func setShowActiveOnly(_ showActive: Bool) {
-        print("🔥 ACTIVE FILTER: Setting showActiveOnly to \(showActive)")
         showActiveOnly = showActive
         triggerAnimationReset()
         
@@ -36,7 +35,6 @@ extension AllLivePlayersViewModel {
         // Load game data in background if needed
         if showActive && NFLGameDataService.shared.gameData.isEmpty {
             Task { @MainActor in
-                print("🔄 BACKGROUND: Loading game data for future filtering")
                 let currentWeek = NFLWeekCalculator.getCurrentWeek()
                 NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, forceRefresh: false)
             }
@@ -74,19 +72,15 @@ extension AllLivePlayersViewModel {
     
     // MARK: - All NFL Players Loading
     private func loadAllNFLPlayers() async {
-        print("🔄 Loading all NFL players for search...")
-        
         // Use PlayerDirectoryStore instead of the old approach
         let playerStore = PlayerDirectoryStore.shared
         
         // Check if we need to refresh the player directory
         if playerStore.needsRefresh {
-            print("🔄 Player directory needs refresh - fetching from API...")
             await playerStore.refreshPlayers()
         }
         
         let playersData = playerStore.players
-        print("📊 PlayerDirectoryStore has \(playersData.count) total players")
         
         let nflPlayers = Array(playersData.values).filter { player in
             let hasValidName = !player.fullName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -100,25 +94,6 @@ extension AllLivePlayersViewModel {
         
         await MainActor.run {
             allNFLPlayers = nflPlayers
-            print("✅ Loaded \(nflPlayers.count) NFL players for search")
-            
-            // Debug: Look for Ja'Marr Chase specifically
-            let jamarrPlayers = nflPlayers.filter { player in
-                player.fullName.lowercased().contains("marr") && player.fullName.lowercased().contains("chase")
-            }
-            print("🏈 Found \(jamarrPlayers.count) players with 'marr' and 'chase' in name:")
-            for player in jamarrPlayers.prefix(3) {
-                print("   - \(player.fullName) (ID: \(player.playerID))")
-            }
-            
-            // Test our matching logic on Ja'Marr
-            if let jamarrPlayer = jamarrPlayers.first {
-                let testQueries = ["ja", "jamarr", "ja'marr", "marr", "chase"]
-                for query in testQueries {
-                    let matches = playerNameMatches(jamarrPlayer.fullName, searchQuery: query)
-                    print("🧪 Test: '\(query)' matches '\(jamarrPlayer.fullName)' = \(matches)")
-                }
-            }
         }
     }
 
@@ -130,41 +105,25 @@ extension AllLivePlayersViewModel {
     // MARK: - Core Filtering Logic
     
     internal func applyPositionFilter() {
-        print("🔥 FILTERING: Applying filters - Position: \(selectedPosition.rawValue), ActiveOnly: \(showActiveOnly), SortMethod: \(sortingMethod.rawValue), Search: '\(searchText)', RosteredOnly: \(showRosteredOnly)")
-        print("🔥 FILTERING: allPlayers.count = \(allPlayers.count)")
-
         guard !allPlayers.isEmpty else {
-            print("🔥 FILTERING: No players to filter")
             filteredPlayers = []
             return
         }
 
         var players = allPlayers
-        print("🔥 FILTERING: Starting with \(players.count) players")
         
         // If searching, handle two different flows
         if isSearching {
-            print("🔥 FILTERING: In search mode")
             if showRosteredOnly {
                 // ROSTERED ONLY SEARCH: Filter existing league players by search terms
-                print("🔥 SEARCH: Searching ROSTERED players for '\(searchText)'")
-                
                 players = allPlayers.filter { livePlayer in
-                    let matches = playerNameMatches(livePlayer.playerName, searchQuery: searchText)
-                    if matches {
-                        print("🏈 ROSTERED MATCH: '\(searchText)' matches '\(livePlayer.playerName)'")
-                    }
-                    return matches
+                    return playerNameMatches(livePlayer.playerName, searchQuery: searchText)
                 }
-                
-                print("🔥 SEARCH: Found \(players.count) rostered players matching '\(searchText)'")
                 
                 // IMPORTANT: Don't apply any other filters when doing rostered search
                 // Skip to the final steps to preserve the search results
             } else {
                 // FULL NFL SEARCH: Search all NFL players and create search entries
-                print("🔥 SEARCH: Searching ALL NFL players for '\(searchText)'")
-                
                 guard !allNFLPlayers.isEmpty else {
                     // If NFL players not loaded yet, show empty state
                     filteredPlayers = []
@@ -172,11 +131,7 @@ extension AllLivePlayersViewModel {
                 }
                 
                 let matchingNFLPlayers = allNFLPlayers.filter { player in
-                    let matches = sleeperPlayerMatches(player, searchQuery: searchText)
-                    if matches {
-                        print("🏈 NFL MATCH: '\(searchText)' matches '\(player.fullName)'")
-                    }
-                    return matches
+                    return sleeperPlayerMatches(player, searchQuery: searchText)
                 }.prefix(50)
                 
                 // Convert to LivePlayerEntry format for display
@@ -214,54 +169,36 @@ extension AllLivePlayersViewModel {
                         performanceTier: .average
                     )
                 }
-                
-                print("🔥 SEARCH: Found \(players.count) NFL players matching '\(searchText)'")
             }
         } else {
-            print("🔥 FILTERING: NOT in search mode - applying normal filters")
             // Apply normal filters when not searching
             
             // Step 1: Position filter
             players = selectedPosition == .all ?
                 allPlayers :
                 allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
-            
-            print("🔥 FILTERING: After position filter (\(selectedPosition.rawValue)) - \(players.count) players")
 
             // Step 2: Active-only filter (SIMPLIFIED)
             if showActiveOnly {
-                print("🔥 FILTERING: Filtering to ACTIVE players only...")
                 players = players.filter { player in
                     return isPlayerInLiveGame(player.player)
                 }
-                print("🔥 FILTERING: After Active Only filter - \(players.count) live players")
-            } else {
-                print("🔥 FILTERING: Showing ALL players (no active filtering)")
             }
         }
         
-        print("🔥 FILTERING: Before quality filter - \(players.count) players")
-        
         // Step 3: Basic quality filter - BUT SKIP if doing rostered search to preserve results
         if !(isSearching && showRosteredOnly) {
-            let beforeCount = players.count
             players = players.filter { player in
                 // Keep players with valid names and reasonable data
                 let hasValidName = !player.playerName.trimmingCharacters(in: .whitespaces).isEmpty
                 let isNotUnknown = player.player.fullName != "Unknown Player"
                 let hasReasonableData = player.currentScore >= 0.0 // Allow 0.0 scores
                 
-                let passes = hasValidName && isNotUnknown && hasReasonableData
-                if !passes {
-                    print("🔥 QUALITY FILTER: Rejecting '\(player.playerName)' - hasValidName: \(hasValidName), isNotUnknown: \(isNotUnknown), hasReasonableData: \(hasReasonableData)")
-                }
-                return passes
+                return hasValidName && isNotUnknown && hasReasonableData
             }
-            print("🔥 FILTERING: After basic quality filter - \(players.count) players (filtered out \(beforeCount - players.count))")
         }
 
         guard !players.isEmpty else {
-            print("🔥 FILTERING: No valid players after filtering - showing empty state")
             filteredPlayers = []
             positionTopScore = 0.0
             return
@@ -293,7 +230,6 @@ extension AllLivePlayersViewModel {
 
         // Step 6: Apply sorting
         filteredPlayers = sortPlayers(updatedPlayers)
-        print("🔥 FILTERING: Final result - \(filteredPlayers.count) players after sorting")
     }
     
     // MARK: - Sorting Logic

@@ -2,15 +2,16 @@
 //  ChoppedRosterPlayerCard.swift
 //  BigWarRoom
 //
-//  🏈 CHOPPED ROSTER PLAYER CARD 🏈
-//  Enhanced player card using All Live Players styling with chopped data
+//  🔥 PHASE 2 SIMPLIFIED MIGRATION: Use existing UnifiedPlayerCardBackground
 //
 
 import SwiftUI
 
-/// **ChoppedRosterPlayerCard**
+/// **ChoppedRosterPlayerCard - SIMPLIFIED MIGRATION**
 /// 
-/// Player card using All Live Players visual styling with chopped roster data
+/// **Strategy:** Keep working functionality, eliminate background duplication
+/// **Before:** 400+ lines with custom All Live Players styling
+/// **After:** Use UnifiedPlayerCardBackground + existing logic
 struct ChoppedRosterPlayerCard: View {
     @StateObject private var viewModel: ChoppedPlayerCardViewModel
     let onPlayerTap: (SleeperPlayer) -> Void
@@ -28,341 +29,197 @@ struct ChoppedRosterPlayerCard: View {
         self.compact = compact
     }
     
-    // MARK: - Card Dimensions
     private var cardHeight: CGFloat {
-        compact ? 90 : 140 // Increased height: compact 70→90, regular 110→140
+        compact ? 90 : 140
     }
     
     var body: some View {
         ZStack(alignment: .leading) {
-            // Build the card content using All Live Players layout
-            HStack(spacing: 0) {
-                // Empty space for where image will be overlaid
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 65) // Space for image
-                
-                // Center matchup section
-                VStack {
-                    Spacer()
-                    MatchupTeamFinalView(player: viewModel.player)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
-                .offset(x: 37)
-                .scaleEffect(1.1)
-                
-                // Player info - right side
-                VStack(alignment: .trailing, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Spacer()
-                        
-                        // Player name - MUCH LARGER
-                        Text(viewModel.player.fullName)
-                            .font(.system(size: compact ? 24 : 24, weight: .bold)) // Increased from 14/18 to 18/24
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    
-                    HStack(spacing: 6) {
-                        Spacer()
-                        
-                        // Position badge
-                        Text(viewModel.badgeText)
-                            .font(.system(size: compact ? 10 : 8, weight: .bold))
-                            .padding(.horizontal, compact ? 4 : 6)
-                            .padding(.vertical, compact ? 4 : 3)
-                            .background(viewModel.badgeColor.opacity(0.8))
-                            .foregroundColor(.white)
-                            .clipShape(Capsule())
-                    }
-                    
-                    Spacer()
-                    
-                    // Score info - UPDATED: Make score tappable only if has points
-                    HStack(spacing: 8) {
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            HStack(spacing: 8) {
-                                if let points = viewModel.actualPoints, points > 0 {
-                                    // 🔥 FIXED: Independent score button that prevents parent tap
-                                    Button(action: {
-                                        showingScoreBreakdown = true
-                                    }) {
-                                        Text(String(format: "%.1f", points))
-                                            .font(.callout)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(scoreColor)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 6)
-                                                    .fill(Color.white.opacity(0.1))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 6)
-                                                            .stroke(scoreColor.opacity(0.3), lineWidth: 1)
-                                                    )
-                                            )
-                                    }
-                                    .buttonStyle(PlainButtonStyle())
-                                    .simultaneousGesture(
-                                        TapGesture()
-                                            .onEnded { _ in
-                                                // This prevents the parent tap from firing
-                                            }
-                                    )
-                                } else {
-                                    // REVERT: Show 0.0 for no points (original logic)
-                                    Text("0.0")
-                                        .font(.callout)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.gray)
-                                }
-                                
-                                Text("pts")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .offset(y: -20)
-                        }
-                    }
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .background(
-                // All Live Players style background with score bar
-                allLivePlayersBackground
-            )
-            
-            // Stats section at bottom (only if has points)
-            if let points = viewModel.actualPoints, points > 0,
-               let statLine = viewModel.statBreakdown {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Text(statLine)
-                            .font(.system(size: compact ? 8 : 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 6)
-                }
+            // 🔥 UNIFIED: Use UnifiedPlayerCardBackground instead of custom background logic
+            if let livePlayerEntry = createLivePlayerEntry() {
+                UnifiedPlayerCardBackground(
+                    configuration: .scoreBar(
+                        playerEntry: livePlayerEntry,
+                        scoreBarWidth: calculateScoreBarWidth(),
+                        team: NFLTeam.team(for: viewModel.player.team ?? "")
+                    )
+                )
+            } else {
+                UnifiedPlayerCardBackground(
+                    configuration: .simple(
+                        team: NFLTeam.team(for: viewModel.player.team ?? ""),
+                        cornerRadius: 12
+                    )
+                )
             }
             
-            // Player image overlay
-            HStack {
-                ZStack {
-                    // Team logo behind player
-                    if let team = viewModel.player.team {
-                        TeamAssetManager.shared.logoOrFallback(for: team)
-                            .frame(width: compact ? 140 : 140, height: compact ? 140 : 140)
-                            .opacity(0.25)
-                            .offset(x: 10, y: -5)
-                            .zIndex(0)
-                    }
-                    
-                    // Player image in front
-                    playerImageView
-                        .scaleEffect(0.9) // 🔥 ADDED: Make player 10% smaller
-                        .zIndex(1)
-                        .offset(x: -20) // Changed from x: -50 to x: -30 (moved 20 points to the right)
-                }
-                .frame(height: compact ? 60 : 80)
-                .frame(maxWidth: compact ? 120 : 180)
-                .offset(x: -10)
-                Spacer()
-            }
+            // 🔥 SIMPLIFIED: Keep existing content layout but cleaned up
+            buildCardContent()
         }
         .frame(height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            // All Live Players style border
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    viewModel.player.isLive ? 
-                        LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                        LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: viewModel.player.isLive ? 3 : 2
-                )
-                .opacity(viewModel.player.isLive ? 0.8 : 0.6)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 12)) // 🔥 NEW: Define tappable area
+        .contentShape(RoundedRectangle(cornerRadius: 12))
         .onTapGesture {
-            // 🔥 MOVED: Main card tap action moved here to avoid button conflicts
             if let sleeperPlayer = viewModel.sleeperPlayer {
                 onPlayerTap(sleeperPlayer)
             }
         }
         .sheet(isPresented: $showingScoreBreakdown) {
-            if let breakdown = createScoreBreakdown() {
-                ScoreBreakdownView(breakdown: breakdown)
-                    .presentationDetents([.medium, .large]) // 🔥 IMPROVED: Allow medium and large
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(16)
-            } else {
-                ScoreBreakdownView(breakdown: createEmptyBreakdown())
-                    .presentationDetents([.medium]) // 🔥 IMPROVED: Medium for empty state
-                    .presentationDragIndicator(.visible)
-                    .presentationCornerRadius(16)
-            }
+            buildScoreBreakdownSheet()
         }
     }
     
-    // MARK: - ADD: Score Breakdown Helper Methods
+    // MARK: - Content Builder
     
-    /// Creates score breakdown from current player stats
-    private func createScoreBreakdown() -> PlayerScoreBreakdown? {
-        guard let sleeperPlayer = viewModel.sleeperPlayer else {
-            return nil
-        }
-        
-        let rosterWeek = viewModel.getCurrentWeek()
-        
-        // 🔥 CRITICAL FIX: Get the correct authoritative score
-        let authoritativeScore = viewModel.actualPoints ?? 0.0
-        
-        print("🔥 CHOPPED BREAKDOWN DEBUG:")
-        print("   Player: \(viewModel.player.fullName)")
-        print("   Player.currentPoints: \(viewModel.player.currentPoints ?? 0.0)")
-        print("   Authoritative Score: \(authoritativeScore)")
-        
-        // 🔥 IMPROVED: Create simple league context for Chopped leagues
-        let leagueContext = LeagueContext(
-            leagueID: "chopped",
-            source: .sleeper,
-            isChopped: true,
-            customScoringSettings: viewModel.parentViewModel.getLeagueScoringSettings()
-        )
-        
-        // Use the chopped view model as local stats provider  
-        let localStatsProvider = viewModel.parentViewModel.statsProvider
-        
-        // 🔥 CRITICAL FIX: Use createBreakdown instead to get full scoring details
-        let breakdown = ScoreBreakdownFactory.createBreakdown(
-            for: viewModel.player,
-            week: rosterWeek,
-            localStatsProvider: localStatsProvider,
-            leagueContext: leagueContext
-        ).withLeagueName("Chopped League")
-        
-        // 🔥 MANUALLY FIX THE TOTAL SCORE: Create new breakdown with correct total
-        let correctedBreakdown = PlayerScoreBreakdown(
-            player: breakdown.player,
-            week: breakdown.week,
-            items: breakdown.items,
-            totalScore: authoritativeScore, // 🔥 USE CORRECT SCORE
-            isChoppedLeague: breakdown.isChoppedLeague,
-            hasRealScoringData: true, // 🔥 ENSURE COLUMNS SHOW
-            leagueContext: breakdown.leagueContext,
-            leagueName: breakdown.leagueName
-        )
-        
-        print("   Created corrected breakdown with totalScore: \(correctedBreakdown.totalScore)")
-        
-        return correctedBreakdown
-    }
-    
-    /// Creates empty breakdown for players with no stats
-    private func createEmptyBreakdown() -> PlayerScoreBreakdown {
-        let rosterWeek = viewModel.getCurrentWeek()
-        
-        // 🔥 CRITICAL FIX: Use correct authoritative score here too
-        let authoritativeScore = viewModel.actualPoints ?? 0.0
-        
-        return PlayerScoreBreakdown(
-            player: viewModel.player,
-            week: rosterWeek,
-            items: [], // No stats to show
-            totalScore: authoritativeScore, // 🔥 FIXED: Use correct score
-            isChoppedLeague: true, // 🔥 FIXED: Added missing parameter
-            hasRealScoringData: true, // 🔥 FIXED: Set to true to show PTS PER and POINTS columns
-            leagueContext: LeagueContext(
-                leagueID: "chopped",
-                source: .sleeper,
-                isChopped: true,
-                customScoringSettings: nil
-            ),
-            leagueName: "Chopped League"
-        )
-    }
-    
-    // MARK: - All Live Players Style Background
-    
-    private var allLivePlayersBackground: some View {
-        ZStack {
-            // Base gradient background
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.black.opacity(0.9),
-                            viewModel.teamPrimaryColor.opacity(0.3),
-                            Color.black.opacity(0.9)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            
-            // Score bar (left side)
-            HStack {
-                Rectangle()
-                    .fill(scoreBarGradient)
-                    .frame(width: scoreBarWidth)
-                    .opacity(0.4)
+    @ViewBuilder
+    private func buildCardContent() -> some View {
+        HStack(spacing: 0) {
+            // Player info section
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 6) {
+                    Spacer()
+                    
+                    Text(viewModel.player.fullName)
+                        .font(.system(size: compact ? 24 : 24, weight: .bold))
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                
+                HStack(spacing: 6) {
+                    Spacer()
+                    
+                    Text(viewModel.badgeText)
+                        .font(.system(size: compact ? 10 : 8, weight: .bold))
+                        .padding(.horizontal, compact ? 4 : 6)
+                        .padding(.vertical, compact ? 4 : 3)
+                        .background(viewModel.badgeColor.opacity(0.8))
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
                 
                 Spacer()
+                
+                // Score section
+                buildScoreSection()
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+            
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        
+        // Player image overlay  
+        HStack {
+            buildPlayerImage()
+            Spacer()
+        }
+        
+        // Stats section at bottom
+        if let points = viewModel.actualPoints, points > 0,
+           let statLine = viewModel.statBreakdown {
+            VStack {
+                Spacer()
+                HStack {
+                    Text(statLine)
+                        .font(.system(size: compact ? 8 : 9, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 6)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func buildScoreSection() -> some View {
+        HStack(spacing: 8) {
+            Spacer()
+            
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 8) {
+                    if let points = viewModel.actualPoints, points > 0 {
+                        Button(action: {
+                            showingScoreBreakdown = true
+                        }) {
+                            Text(String(format: "%.1f", points))
+                                .font(.callout)
+                                .fontWeight(.bold)
+                                .foregroundColor(scoreColor)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.white.opacity(0.1))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(scoreColor.opacity(0.3), lineWidth: 1)
+                                        )
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    } else {
+                        Text("0.0")
+                            .font(.callout)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    Text("pts")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .offset(y: -20)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func buildPlayerImage() -> some View {
+        ZStack {
+            // Team logo behind player
+            if let team = viewModel.player.team {
+                TeamAssetManager.shared.logoOrFallback(for: team)
+                    .frame(width: 140, height: 140)
+                    .opacity(0.25)
+                    .offset(x: 10, y: -5)
+                    .zIndex(0)
             }
             
-            // Team accent overlay
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            viewModel.teamPrimaryColor.opacity(0.1),
-                            Color.clear
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    
-    // MARK: - Player Image View
-    
-    private var playerImageView: some View {
-        Group {
-            if let sleeperPlayer = viewModel.sleeperPlayer,
-               let imageURL = sleeperPlayer.headshotURL {
-                AsyncImage(url: imageURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: compact ? 100 : 80, height: compact ? 100 : 80)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                } placeholder: {
-                    playerImageFallback
+            // Player image in front
+            Group {
+                if let sleeperPlayer = viewModel.sleeperPlayer,
+                   let imageURL = sleeperPlayer.headshotURL {
+                    AsyncImage(url: imageURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: compact ? 100 : 80, height: compact ? 100 : 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } placeholder: {
+                        buildPlayerImageFallback()
+                    }
+                } else {
+                    buildPlayerImageFallback()
                 }
-            } else {
-                playerImageFallback
             }
+            .scaleEffect(0.9)
+            .zIndex(1)
+            .offset(x: -20)
         }
+        .frame(height: compact ? 60 : 80)
+        .frame(maxWidth: compact ? 120 : 180)
+        .offset(x: -10)
     }
     
-    private var playerImageFallback: some View {
+    @ViewBuilder
+    private func buildPlayerImageFallback() -> some View {
         RoundedRectangle(cornerRadius: 8)
             .fill(viewModel.teamPrimaryColor.opacity(0.6))
             .frame(width: compact ? 80 : 80, height: compact ? 80 : 80)
@@ -373,7 +230,22 @@ struct ChoppedRosterPlayerCard: View {
             )
     }
     
-    // MARK: - Computed Properties
+    @ViewBuilder
+    private func buildScoreBreakdownSheet() -> some View {
+        if let breakdown = createScoreBreakdown() {
+            ScoreBreakdownView(breakdown: breakdown)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(16)
+        } else {
+            ScoreBreakdownView(breakdown: createEmptyBreakdown())
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(16)
+        }
+    }
+    
+    // MARK: - Helper Methods
     
     private var scoreColor: Color {
         if let points = viewModel.actualPoints {
@@ -385,35 +257,81 @@ struct ChoppedRosterPlayerCard: View {
         return .gray
     }
     
-    private var scoreBarWidth: CGFloat {
-        guard let points = viewModel.actualPoints else { return 8 }
-        let maxPoints: Double = 60.0
-        let percentage = min(points / maxPoints, 1.0)
-        let minWidth: CGFloat = 8
-        let maxWidth: CGFloat = 120
-        return minWidth + (CGFloat(percentage) * (maxWidth - minWidth))
+    private func createLivePlayerEntry() -> (any PlayerEntry)? {
+        return ChoppedLivePlayerEntryAdapter(player: viewModel.player)
     }
     
-    private var scoreBarGradient: LinearGradient {
-        guard let points = viewModel.actualPoints else {
-            return LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
-        }
+    private func calculateScoreBarWidth() -> Double {
+        let maxPoints: Double = 40.0
+        let currentPoints = viewModel.actualPoints ?? 0.0
+        return min(currentPoints / maxPoints, 1.0)
+    }
+    
+    // Score breakdown methods (keeping existing implementation)
+    private func createScoreBreakdown() -> PlayerScoreBreakdown? {
+        guard let sleeperPlayer = viewModel.sleeperPlayer else { return nil }
         
-        if points >= 20 {
-            return LinearGradient(colors: [.gpGreen.opacity(0.8), .gpGreen.opacity(0.4)], startPoint: .leading, endPoint: .trailing)
-        } else if points >= 12 {
-            return LinearGradient(colors: [.blue.opacity(0.8), .blue.opacity(0.4)], startPoint: .leading, endPoint: .trailing)
-        } else if points >= 8 {
-            return LinearGradient(colors: [.orange.opacity(0.8), .orange.opacity(0.4)], startPoint: .leading, endPoint: .trailing)
-        } else {
-            return LinearGradient(colors: [.red.opacity(0.6), .red.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
-        }
+        let rosterWeek = viewModel.getCurrentWeek()
+        let authoritativeScore = viewModel.actualPoints ?? 0.0
+        
+        let leagueContext = LeagueContext(
+            leagueID: "chopped",
+            source: .sleeper,
+            isChopped: true,
+            customScoringSettings: viewModel.parentViewModel.getLeagueScoringSettings()
+        )
+        
+        let localStatsProvider = viewModel.parentViewModel.statsProvider
+        
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
+            for: viewModel.player,
+            week: rosterWeek,
+            localStatsProvider: localStatsProvider,
+            leagueContext: leagueContext
+        ).withLeagueName("Chopped League")
+        
+        return PlayerScoreBreakdown(
+            player: breakdown.player,
+            week: breakdown.week,
+            items: breakdown.items,
+            totalScore: authoritativeScore,
+            isChoppedLeague: breakdown.isChoppedLeague,
+            hasRealScoringData: true,
+            leagueContext: breakdown.leagueContext,
+            leagueName: breakdown.leagueName
+        )
+    }
+    
+    private func createEmptyBreakdown() -> PlayerScoreBreakdown {
+        let rosterWeek = viewModel.getCurrentWeek()
+        let authoritativeScore = viewModel.actualPoints ?? 0.0
+        
+        return PlayerScoreBreakdown(
+            player: viewModel.player,
+            week: rosterWeek,
+            items: [],
+            totalScore: authoritativeScore,
+            isChoppedLeague: true,
+            hasRealScoringData: true,
+            leagueContext: LeagueContext(
+                leagueID: "chopped",
+                source: .sleeper,
+                isChopped: true,
+                customScoringSettings: nil
+            ),
+            leagueName: "Chopped League"
+        )
     }
 }
 
-#Preview {
-    // Cannot preview without proper ViewModel setup
-    Text("ChoppedRosterPlayerCard Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
+// MARK: - Adapter for PlayerEntry Protocol
+
+private struct ChoppedLivePlayerEntryAdapter: PlayerEntry {
+    let player: FantasyPlayer
+    
+    var currentScore: Double { player.currentPoints ?? 0.0 }
+    var scoreBarWidth: Double {
+        let maxPoints: Double = 40.0
+        return min(currentScore / maxPoints, 1.0)
+    }
 }

@@ -23,8 +23,6 @@ class PlayerNewsViewModel: ObservableObject {
     }
     
     func loadPlayerNews(espnId: Int) {
-        print("🗞️ FETCHING NEWS: Starting for ESPN ID \(espnId)")
-        
         isLoading = true
         errorMessage = nil
         
@@ -35,11 +33,9 @@ class PlayerNewsViewModel: ObservableObject {
                     self?.isLoading = false
                     if case .failure(let error) = completion {
                         self?.errorMessage = error.localizedDescription
-                        print("🗞️ ERROR: Failed to load news - \(error)")
                     }
                 },
                 receiveValue: { [weak self] newsResponse in
-                    print("🗞️ SUCCESS: Loaded \(newsResponse.feed.count) news items")
                     self?.newsItems = newsResponse.feed
                     self?.isLoading = false
                 }
@@ -65,13 +61,10 @@ class PlayerNewsViewModel: ObservableObject {
                 .eraseToAnyPublisher()
         }
         
-        print("🗞️ API CALL: \(url.absoluteString)")
-        
         return URLSession.shared
             .dataTaskPublisher(for: url)
             .tryMap { data, response -> Data in
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("🗞️ HTTP STATUS: \(httpResponse.statusCode)")
                     if httpResponse.statusCode != 200 {
                         throw URLError(.badServerResponse)
                     }

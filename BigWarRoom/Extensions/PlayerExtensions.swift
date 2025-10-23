@@ -10,27 +10,21 @@ import Foundation
 // MARK: - FantasyPlayer Extensions
 
 extension FantasyPlayer {
-    /// Get formatted injury status string
+    /// Get formatted injury status string from PlayerDirectoryStore
     /// Replaces 4+ duplicate getInjuryStatus() implementations across views
     var injuryStatus: String? {
-        guard let nflPlayer = nflPlayer else { return nil }
-        return nflPlayer.injuryStatus?.lowercased().capitalized
+        // Get Sleeper player data from PlayerDirectoryStore
+        guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: self.id) else {
+            return nil
+        }
+        return sleeperPlayer.injuryStatus?.lowercased().capitalized
     }
 }
 
 // MARK: - SleeperPlayer Extensions
 
 extension SleeperPlayer {
-    /// Get formatted injury status string
-    var injuryStatus: String? {
-        return injury_status?.lowercased().capitalized
-    }
-}
-
-// MARK: - NFLPlayer Extensions
-
-extension NFLPlayer {
-    /// Get formatted injury status with proper capitalization
+    /// Get formatted injury status string with proper capitalization
     var formattedInjuryStatus: String? {
         return injuryStatus?.lowercased().capitalized
     }

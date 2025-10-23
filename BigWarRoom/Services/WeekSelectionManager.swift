@@ -50,12 +50,12 @@ final class WeekSelectionManager: ObservableObject {
         // Trigger immediate fetch if NFL service hasn't loaded yet
         Task {
             if nflWeekService.lastUpdated == nil {
-                print("🗓️ WeekSelectionManager: NFLWeekService hasn't loaded yet, triggering fetch...")
+//                print("🗓️ WeekSelectionManager: NFLWeekService hasn't loaded yet, triggering fetch...")
                 await nflWeekService.refresh()
             }
         }
         
-        print("🗓️ WeekSelectionManager: Initialized to Week \(selectedWeek)")
+//        print("🗓️ WeekSelectionManager: Initialized to Week \(selectedWeek)")
     }
     
     // MARK: - Public Interface
@@ -65,7 +65,7 @@ final class WeekSelectionManager: ObservableObject {
     func selectWeek(_ week: Int) {
         guard week != selectedWeek else { return }
         
-        print("🗓️ WeekSelectionManager: Changing week from \(selectedWeek) to \(week)")
+//        print("🗓️ WeekSelectionManager: Changing week from \(selectedWeek) to \(week)")
         
         selectedWeek = week
         lastChanged = Date()
@@ -78,7 +78,7 @@ final class WeekSelectionManager: ObservableObject {
     /// Reset to current NFL week (useful for "Current Week" button)
     func resetToCurrentWeek() {
         let currentWeek = nflWeekService.currentWeek
-        print("🗓️ WeekSelectionManager: Resetting to current NFL week \(currentWeek)")
+//        print("🗓️ WeekSelectionManager: Resetting to current NFL week \(currentWeek)")
         selectWeek(currentWeek)
     }
     
@@ -101,11 +101,11 @@ final class WeekSelectionManager: ObservableObject {
             .sink { [weak self] newNFLWeek in
                 guard let self = self else { return }
                 
-                print("🗓️ WeekSelectionManager: NFL week updated to \(newNFLWeek)")
+//                print("🗓️ WeekSelectionManager: NFL week updated to \(newNFLWeek)")
                 
                 // If we're still waiting for the real week (first load), update to it
                 if self.isWaitingForRealWeek && newNFLWeek != 1 {
-                    print("🗓️ WeekSelectionManager: First real NFL week received, updating from \(self.selectedWeek) to \(newNFLWeek)")
+//                    print("🗓️ WeekSelectionManager: First real NFL week received, updating from \(self.selectedWeek) to \(newNFLWeek)")
                     self.selectedWeek = newNFLWeek
                     self.isWaitingForRealWeek = false
                     self.lastChanged = Date()
@@ -115,7 +115,7 @@ final class WeekSelectionManager: ObservableObject {
                 // If user was viewing current week and NFL advances, update selection
                 // This handles week transitions automatically
                 if self.selectedWeek == newNFLWeek - 1 && !self.isWaitingForRealWeek {
-                    print("🗓️ WeekSelectionManager: Auto-advancing to new current week \(newNFLWeek)")
+//                    print("🗓️ WeekSelectionManager: Auto-advancing to new current week \(newNFLWeek)")
                     self.selectedWeek = newNFLWeek
                     self.lastChanged = Date()
                 }
@@ -130,7 +130,7 @@ final class WeekSelectionManager: ObservableObject {
                 
                 // If we're still waiting and the real week is different, update
                 if self.isWaitingForRealWeek && self.selectedWeek != self.nflWeekService.currentWeek {
-                    print("🗓️ WeekSelectionManager: NFL service loaded, updating week to \(self.nflWeekService.currentWeek)")
+//                    print("🗓️ WeekSelectionManager: NFL service loaded, updating week to \(self.nflWeekService.currentWeek)")
                     self.selectedWeek = self.nflWeekService.currentWeek
                     self.isWaitingForRealWeek = false
                     self.lastChanged = Date()

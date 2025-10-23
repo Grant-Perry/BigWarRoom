@@ -36,21 +36,13 @@ extension AllLivePlayersViewModel {
         // Start new refresh cycle
         GameAlertsManager.shared.startNewRefreshCycle()
         
-        print("🚨 GAME ALERTS DEBUG: Processing \(playerEntries.count) players, have \(prevScores.count) previous scores")
-        
         // Find the highest scoring play (biggest delta) in this refresh
         var highestScoringPlay: (entry: LivePlayerEntry, pointsGained: Double)? = nil
-        var allDeltas: [(String, Double)] = []
         
         for entry in playerEntries {
             let currentScore = entry.currentScore
             let previousScore = prevScores[entry.player.id] ?? 0.0
             let pointsGained = currentScore - previousScore
-            
-            // Track all deltas for debugging
-            if pointsGained != 0.0 {
-                allDeltas.append((entry.playerName, pointsGained))
-            }
             
             // LOWERED THRESHOLD: Only consider gains > 0.01 points (was 0.1)
             if pointsGained > 0.01 {
@@ -58,17 +50,6 @@ extension AllLivePlayersViewModel {
                     highestScoringPlay = (entry, pointsGained)
                 }
             }
-        }
-        
-        // Log all significant deltas for debugging
-        let positiveDeltas = allDeltas.filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }
-        if positiveDeltas.count > 0 {
-            print("🚨 GAME ALERTS DEBUG: Top 5 positive deltas this refresh:")
-            for (i, delta) in positiveDeltas.prefix(5).enumerated() {
-                print("   \(i+1). \(delta.0): +\(String(format: "%.2f", delta.1)) pts")
-            }
-        } else {
-            print("🚨 GAME ALERTS DEBUG: No positive deltas found this refresh")
         }
         
         // Add game alert for highest scoring play
@@ -80,9 +61,6 @@ extension AllLivePlayersViewModel {
                 pointsScored: highestPlay.pointsGained,
                 leagueName: highestPlay.entry.leagueName
             )
-            print("🚨 GAME ALERT CREATED: \(highestPlay.entry.playerName) +\(String(format: "%.2f", highestPlay.pointsGained)) pts")
-        } else {
-            print("🚨 GAME ALERTS DEBUG: No qualifying play found (all deltas < 0.01 pts)")
         }
         
         // Update previous scores for next refresh
@@ -91,15 +69,12 @@ extension AllLivePlayersViewModel {
             newPreviousScores[entry.player.id] = entry.currentScore
         }
         previousPlayerScores = newPreviousScores
-        
-        print("🚨 GAME ALERTS DEBUG: Stored \(newPreviousScores.count) player scores for next refresh")
     }
     
     /// Clear game alerts and reset previous scores (for testing)
     func clearGameAlertsData() {
         GameAlertsManager.shared.clearAlerts()
         previousPlayerScores = [:]
-        print("🗑️ GAME ALERTS: Cleared all alerts and previous scores")
     }
     
     /// Test the game alerts system with direct manager calls (for development)
@@ -135,7 +110,5 @@ extension AllLivePlayersViewModel {
             pointsScored: 8.75,
             leagueName: "Friends League"
         )
-        
-        print("🧪 GAME ALERTS: Added test alerts for 3 refresh cycles")
     }
 }

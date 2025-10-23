@@ -38,7 +38,6 @@ extension AllLivePlayersViewModel {
     
     internal func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
         guard let team = player.team else {
-            print("🔥 LIVE CHECK: No team for player \(player.fullName)")
             return false
         }
         
@@ -48,33 +47,25 @@ extension AllLivePlayersViewModel {
         if let cachedResult = liveGameCache[cacheKey],
            let cacheTime = liveGameCacheTimestamp,
            Date().timeIntervalSince(cacheTime) < liveGameCacheExpiration {
-            print("🔥 LIVE CHECK: Using cached result for \(team): \(cachedResult)")
             return cachedResult
         }
 
         // Determine if game is actually LIVE right now
         var isLive = false
-        var detectionMethod = "none"
 
         // Primary source: NFLGameDataService
         if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
             // Only consider live if status is "in" AND it's marked as live
             isLive = gameInfo.gameStatus.lowercased() == "in" && gameInfo.isLive
-            detectionMethod = "NFLGameDataService(\(gameInfo.gameStatus), isLive: \(gameInfo.isLive))"
 
             // Additional safety: Ensure scores are actually updating (not stuck at 0-0)
             if isLive && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
                 // Still allow it - game could be 0-0 but actively playing
             }
-            print("🔥 LIVE CHECK: \(team) -> \(isLive) via \(detectionMethod)")
         } else {
-            // Fallback: Player's game status with better logging
+            // Fallback: Player's game status
             if let playerGameStatus = player.gameStatus?.status {
                 isLive = playerGameStatus.lowercased() == "in"
-                detectionMethod = "PlayerGameStatus(\(playerGameStatus))"
-                print("🔥 LIVE CHECK: \(team) -> \(isLive) via \(detectionMethod) (fallback)")
-            } else {
-                print("🔥 LIVE CHECK: \(team) -> false (no game data available)")
             }
         }
         
@@ -90,7 +81,6 @@ extension AllLivePlayersViewModel {
     // MARK: - Cache Management
     
     internal func clearLiveGameCache() {
-        print("🔄 LIVE CACHE: Clearing live game cache")
         liveGameCache = [:]
         liveGameCacheTimestamp = nil
     }
@@ -108,7 +98,6 @@ extension AllLivePlayersViewModel {
     // MARK: - Live Game Status Helpers
     
     var activeLiveGamesCount: Int {
-        let currentTime = Date()
         return NFLGameDataService.shared.gameData.values.filter { gameInfo in
             gameInfo.gameStatus.lowercased() == "in" && gameInfo.isLive
         }.count / 2 // Divide by 2 since each game has 2 teams

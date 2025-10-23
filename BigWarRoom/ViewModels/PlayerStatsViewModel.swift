@@ -45,10 +45,9 @@ final class PlayerStatsViewModel: ObservableObject {
     
     /// Initialize the view model with player data
     func setupPlayer(_ player: SleeperPlayer) {
-        print("🔧 PLAYER STATS DEBUG: setupPlayer called for \(player.fullName)")
         currentPlayer = player
         
-        // 🔥 CRITICAL FIX: Reset loading state EVERY time setupPlayer is called
+        // CRITICAL FIX: Reset loading state EVERY time setupPlayer is called
         // This ensures fresh state even if ViewModel instance is reused by SwiftUI
         isLoadingPlayerData = true
         hasLoadingError = false
@@ -62,18 +61,14 @@ final class PlayerStatsViewModel: ObservableObject {
     /// AFTER: Sets loading states immediately and provides progressive feedback
     private func loadPlayerData() {
         guard let player = currentPlayer else { 
-            print("🔧 PLAYER STATS DEBUG: No current player, exiting")
             return 
         }
-        
-        print("🔧 PLAYER STATS DEBUG: Starting loadPlayerData for \(player.fullName)")
         
         // 🔧 BLANK SHEET FIX: Cancel any existing loading task to prevent race conditions
         loadingTask?.cancel()
         
         // 🔧 BLANK SHEET FIX: Set loading state IMMEDIATELY when method is called
         // This triggers the UI to show PlayerStatsLoadingView instead of blank screen
-        print("🔧 PLAYER STATS DEBUG: Setting isLoadingPlayerData = true")
         isLoadingPlayerData = true
         hasLoadingError = false
         loadingMessage = "Loading player data..."
@@ -81,53 +76,39 @@ final class PlayerStatsViewModel: ObservableObject {
         // 🔧 BLANK SHEET FIX: Wrapped all loading logic in a Task with @MainActor
         // to ensure UI updates happen on main thread and provide progress updates
         loadingTask = Task { @MainActor in
-            print("🔧 PLAYER STATS DEBUG: Task started, checking stats loaded status")
             
             // 🔧 BLANK SHEET FIX: Step 1 - The SLOW part that was causing blank screens
             // This loadStatsIfNeeded() call can take 4-6 seconds but now user sees progress
             if !livePlayersViewModel.statsLoaded {
-                print("🔧 PLAYER STATS DEBUG: Stats not loaded, loading...")
                 loadingMessage = "Loading league statistics..." // Progress update 1
                 await loadStatsIfNeeded()
-                print("🔧 PLAYER STATS DEBUG: Stats loading completed")
-            } else {
-                print("🔧 PLAYER STATS DEBUG: Stats already loaded, skipping")
             }
             
             // 🔧 BLANK SHEET FIX: Steps 2-4 - Fast operations with progress feedback
-            print("🔧 PLAYER STATS DEBUG: Generating player stats data")
             loadingMessage = "Processing player information..." // Progress update 2
             generatePlayerStatsData(for: player)
             
-            print("🔧 PLAYER STATS DEBUG: Generating depth chart data")
             loadingMessage = "Loading team depth chart..." // Progress update 3
             generateDepthChartData(for: player)
             
-            print("🔧 PLAYER STATS DEBUG: Generating fantasy analysis data")
             loadingMessage = "Analyzing fantasy data..." // Progress update 4
             generateFantasyAnalysisData(for: player)
             
             // 🔧 BLANK SHEET FIX: Clear loading state when complete
             // This triggers UI to switch from loading view to main content view
             if !Task.isCancelled {
-                print("🔧 PLAYER STATS DEBUG: All loading complete, setting isLoadingPlayerData = false")
                 isLoadingPlayerData = false
                 hasLoadingError = false
                 loadingMessage = ""
-            } else {
-                print("🔧 PLAYER STATS DEBUG: Task was cancelled")
             }
         }
     }
     
     /// Load stats from live players ViewModel if needed
     private func loadStatsIfNeeded() async {
-        print("🔧 PLAYER STATS DEBUG: loadStatsIfNeeded called, statsLoaded = \(livePlayersViewModel.statsLoaded)")
         if !livePlayersViewModel.statsLoaded {
-            print("🔧 PLAYER STATS DEBUG: Starting livePlayersViewModel.loadAllPlayers()")
             isLoadingStats = true
             await livePlayersViewModel.loadAllPlayers()
-            print("🔧 PLAYER STATS DEBUG: Finished livePlayersViewModel.loadAllPlayers()")
             isLoadingStats = false
         }
     }
@@ -137,12 +118,10 @@ final class PlayerStatsViewModel: ObservableObject {
     /// Generate player stats data
     private func generatePlayerStatsData(for player: SleeperPlayer) {
         guard let stats = getPlayerStats(for: player) else {
-            print("🔧 PLAYER STATS DEBUG: No stats found for \(player.fullName)")
             playerStatsData = nil
             return
         }
         
-        print("🔧 PLAYER STATS DEBUG: Generated stats data for \(player.fullName)")
         playerStatsData = PlayerStatsData(
             playerID: player.playerID,
             stats: stats,
@@ -171,13 +150,11 @@ final class PlayerStatsViewModel: ObservableObject {
         }
         
         depthChartData = depthData
-        print("🔧 PLAYER STATS DEBUG: Generated depth chart for \(depthData.count) positions")
     }
     
     /// Generate fantasy analysis data
     private func generateFantasyAnalysisData(for player: SleeperPlayer) {
         guard let searchRank = player.searchRank else {
-            print("🔧 PLAYER STATS DEBUG: No search rank for \(player.fullName)")
             fantasyAnalysisData = nil
             return
         }
@@ -192,8 +169,6 @@ final class PlayerStatsViewModel: ObservableObject {
             tierDescription: getTierDescription(tier: tier, position: position),
             positionAnalysis: getPositionAnalysis(searchRank: searchRank, position: position)
         )
-        
-        print("🔧 PLAYER STATS DEBUG: Generated fantasy analysis for \(player.fullName)")
     }
     
     // MARK: - Private Business Logic Methods

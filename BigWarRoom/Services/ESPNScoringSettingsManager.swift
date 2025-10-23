@@ -626,30 +626,6 @@ final class ScoringSettingsManager: ObservableObject {
         // For now, return original points - trust the league configuration
         return originalPoints
         
-        // 🔥 OLD PROBLEMATIC CODE (REMOVED):
-        // This was zeroing out legitimate league settings like return yards, QB hits, etc.
-        // If a commissioner actually enabled these stats, we should respect their league config
-        
-        /* REMOVED - TRUST LEAGUE SETTINGS:
-        switch statId {
-        case 206: // pass_air_yd 
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 209: // pass_yac
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 198: // qb_hit
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 201: // pass_drop
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 63: // punt_yd
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 37: // kick_ret_yd
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        case 38: // punt_ret_yd
-            return 0.0  // 🚨 BAD: What if league actually uses this?
-        default:
-            break
-        }
-        */
     }
     
     // MARK: - Sleeper Integration
