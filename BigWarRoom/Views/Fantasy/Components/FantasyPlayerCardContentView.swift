@@ -109,29 +109,51 @@ struct FantasyPlayerCardHeadshotView: View {
     let isPlayerLive: Bool
     
     var body: some View {
-        AsyncImage(url: player.headshotURL) { phase in
-            switch phase {
-            case .empty:
-                ProgressView()
-                    .frame(width: 95, height: 95)
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 95, height: 95)
-                    .clipped()
-                    .opacity(isPlayerLive ? 1.0 : 0.85)
-            case .failure:
-                FantasyPlayerCardFallbackHeadshotView(
-                    player: player,
-                    isPlayerLive: isPlayerLive
-                )
-            @unknown default:
-                EmptyView()
+        ZStack {
+            AsyncImage(url: player.headshotURL) { phase in
+                switch phase {
+                case .empty:
+                    ProgressView()
+                        .frame(width: 95, height: 95)
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 95, height: 95)
+                        .clipped()
+                        .opacity(isPlayerLive ? 1.0 : 0.85)
+                case .failure:
+                    FantasyPlayerCardFallbackHeadshotView(
+                        player: player,
+                        isPlayerLive: isPlayerLive
+                    )
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            
+            // 🔥 NEW: Injury Status Badge (positioned at bottom-right of headshot)
+            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .offset(x: -4, y: -4) // Position as subscript to headshot
+                    }
+                }
             }
         }
         .offset(x: -20, y: -8)
         .zIndex(2)
+    }
+    
+    // 🔥 NEW: Get injury status from Sleeper player data
+    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
+        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
+            return nil
+        }
+        return playerDirectory.injuryStatus
     }
 }
 
@@ -141,31 +163,53 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
     let isPlayerLive: Bool
     
     var body: some View {
-        Group {
-            if let espnURL = player.espnHeadshotURL {
-                AsyncImage(url: espnURL) { phase2 in
-                    switch phase2 {
-                    case .success(let image2):
-                        image2
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 95, height: 95)
-                            .clipped()
-                            .opacity(isPlayerLive ? 1.0 : 0.85)
-                    default:
-                        FantasyPlayerCardDefaultCircleView(
-                            player: player,
-                            isPlayerLive: isPlayerLive
-                        )
+        ZStack {
+            Group {
+                if let espnURL = player.espnHeadshotURL {
+                    AsyncImage(url: espnURL) { phase2 in
+                        switch phase2 {
+                        case .success(let image2):
+                            image2
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 95, height: 95)
+                                .clipped()
+                                .opacity(isPlayerLive ? 1.0 : 0.85)
+                        default:
+                            FantasyPlayerCardDefaultCircleView(
+                                player: player,
+                                isPlayerLive: isPlayerLive
+                            )
+                        }
+                    }
+                } else {
+                    FantasyPlayerCardDefaultCircleView(
+                        player: player,
+                        isPlayerLive: isPlayerLive
+                    )
+                }
+            }
+            
+            // 🔥 NEW: Injury Status Badge (for fallback images too)
+            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .offset(x: -4, y: -4)
                     }
                 }
-            } else {
-                FantasyPlayerCardDefaultCircleView(
-                    player: player,
-                    isPlayerLive: isPlayerLive
-                )
             }
         }
+    }
+    
+    // 🔥 NEW: Get injury status from Sleeper player data
+    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
+        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
+            return nil
+        }
+        return playerDirectory.injuryStatus
     }
 }
 
@@ -190,8 +234,28 @@ struct FantasyPlayerCardDefaultCircleView: View {
             Text(player.shortName.prefix(2))
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(.white)
+            
+            // 🔥 NEW: Injury Status Badge (even for default circles)
+            if let injuryStatus = getInjuryStatus(for: player), !injuryStatus.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .offset(x: -4, y: -4)
+                    }
+                }
+            }
         }
         .opacity(isPlayerLive ? 1.0 : 0.85)
+    }
+    
+    // 🔥 NEW: Get injury status from Sleeper player data
+    private func getInjuryStatus(for player: FantasyPlayer) -> String? {
+        guard let playerDirectory = PlayerDirectoryStore.shared.player(for: player.id) else {
+            return nil
+        }
+        return playerDirectory.injuryStatus
     }
 }
 

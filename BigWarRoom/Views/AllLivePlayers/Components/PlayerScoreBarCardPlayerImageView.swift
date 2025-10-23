@@ -89,6 +89,18 @@ struct PlayerScoreBarCardPlayerImageView: View {
                     .frame(width: 150, height: 180)
                 }
             }
+            
+            // 🔥 NEW: Injury Status Badge (positioned at bottom-right of image)
+            if let injuryStatus = getInjuryStatus(), !injuryStatus.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .offset(x: -8, y: -8) // Position as subscript to image
+                    }
+                }
+            }
         }
         .onTapGesture {
             showingPlayerDetail = true
@@ -105,6 +117,14 @@ struct PlayerScoreBarCardPlayerImageView: View {
                 }
             }
         }
+    }
+    
+    // 🔥 NEW: Get injury status from Sleeper player data
+    private func getInjuryStatus() -> String? {
+        if let sleeperPlayer = getSleeperPlayerData() {
+            return sleeperPlayer.injuryStatus
+        }
+        return nil
     }
     
     // 🔥 NEW: Helper to identify defense/special teams players

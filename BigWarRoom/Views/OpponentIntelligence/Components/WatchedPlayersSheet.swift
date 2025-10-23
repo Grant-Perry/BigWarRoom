@@ -101,21 +101,36 @@ struct WatchedPlayersSheet: View {
         HStack {
             Spacer()
             
-            // Sort Method Toggle - Make it clickable when STATIC
-            Button(action: {
-                if watchService.isManuallyOrdered {
-                    // If currently manual, reset to automatic with current sort method
-                    watchService.resetToAutomaticSorting()
-                } else {
-                    // If automatic, cycle through sort methods or show menu
-                    cycleToNextSortMethod()
+            // 🔥 UPDATED: Sort Method Menu (like AllLivePlayersView)
+            Menu {
+                ForEach(WatchSortMethod.allCases, id: \.rawValue) { method in
+                    Button(action: {
+                        if watchService.isManuallyOrdered {
+                            // Reset to automatic first
+                            watchService.resetToAutomaticSorting()
+                        }
+                        watchService.setSortMethod(method)
+                    }) {
+                        HStack {
+                            Text(method.displayName)
+                            if watchService.sortMethod == method && !watchService.isManuallyOrdered {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
                 }
-            }) {
+            } label: {
                 VStack(spacing: 2) {
-                    Text(watchService.isManuallyOrdered ? "STATIC" : watchService.sortMethod.displayName.uppercased())
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .gpGreen)
+                    HStack(spacing: 4) {
+                        Text(watchService.isManuallyOrdered ? "STATIC" : watchService.sortMethod.displayName.uppercased())
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                            .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .gpGreen)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .gpGreen)
+                    }
                     
                     Text("Sort Order")
                         .font(.caption2)
@@ -123,11 +138,10 @@ struct WatchedPlayersSheet: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .buttonStyle(PlainButtonStyle())
             
             Spacer()
             
-            // Sort Direction with Up/Down Chevron - Always show
+            // 🔥 UPDATED: Direction with Text + Chevron (like AllLivePlayersView)
             Button(action: {
                 if watchService.isManuallyOrdered {
                     // Reset to automatic when clicked in manual mode
@@ -139,15 +153,17 @@ struct WatchedPlayersSheet: View {
             }) {
                 VStack(spacing: 2) {
                     HStack(spacing: 4) {
-                        // 🔥 NEW: Always show up/down chevron
-                        Image(systemName: watchService.sortHighToLow ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
-                        
-                        Text(directionText)
+                        Text(watchService.isManuallyOrdered ? "CUSTOM" : sortDirectionDisplayText)
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundColor(watchService.isManuallyOrdered ? .gpOrange : .purple)
+                        
+                        // Show chevron for non-manual sorting
+                        if !watchService.isManuallyOrdered {
+                            Image(systemName: watchService.sortHighToLow ? "chevron.up" : "chevron.down")
+                                .font(.caption)
+                                .foregroundColor(.purple)
+                        }
                     }
                     
                     Text("Direction")
@@ -180,25 +196,13 @@ struct WatchedPlayersSheet: View {
         .background(Color.black.opacity(0.1))
     }
     
-    // 🔥 NEW: Cycle through sort methods
-    private func cycleToNextSortMethod() {
-        let allMethods = WatchSortMethod.allCases
-        let currentIndex = allMethods.firstIndex(of: watchService.sortMethod) ?? 0
-        let nextIndex = (currentIndex + 1) % allMethods.count
-        watchService.setSortMethod(allMethods[nextIndex])
-    }
-    
-    // 🔥 NEW: Dynamic direction text based on sort method
-    private var directionText: String {
-        if watchService.isManuallyOrdered {
-            return "CUSTOM"
-        }
-        
+    // 🔥 NEW: Sort direction display text (like AllLivePlayersViewModel)
+    private var sortDirectionDisplayText: String {
         switch watchService.sortMethod {
         case .delta, .threat, .current:
-            return watchService.sortHighToLow ? "HIGH→LOW" : "LOW→HIGH"
+            return watchService.sortHighToLow ? "Highest" : "Lowest"
         case .name, .position:
-            return watchService.sortHighToLow ? "Z→A" : "A→Z"
+            return watchService.sortHighToLow ? "A to Z" : "Z to A"
         }
     }
 
@@ -237,18 +241,28 @@ struct WatchedPlayerCard: View {
     
     @ObservedObject private var watchService = PlayerWatchService.shared
     @StateObject private var fantasyPlayerViewModel = FantasyPlayerViewModel()
+    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
     
     // 🔥 NEW: State for player stats sheet
     @State private var showingPlayerStats = false
     
     // Computed properties to break up complex ViewBuilder
     private var sleeperPlayerData: SleeperPlayer? {
-        PlayerMatchService.shared.matchPlayer(
-            fullName: watchedPlayer.playerName,
-            shortName: watchedPlayer.playerName,
-            team: watchedPlayer.team,
-            position: watchedPlayer.position.uppercased()
-        )
+        // 🔥 FIXED: Use direct search like PlayerScoreBarCardPlayerImageView instead of PlayerMatchService
+        let playerName = watchedPlayer.playerName.lowercased()
+        let team = watchedPlayer.team?.lowercased()
+        let position = watchedPlayer.position.uppercased()
+        
+        return playerDirectory.players.values.first { sleeperPlayer in
+            let sleeperName = sleeperPlayer.fullName.lowercased()
+            let sleeperTeam = sleeperPlayer.team?.lowercased()
+            let sleeperPos = sleeperPlayer.position?.uppercased()
+            
+            return (sleeperName == playerName || 
+                    sleeperPlayer.shortName.lowercased() == playerName) &&
+                   sleeperTeam == team &&
+                   sleeperPos == position
+        }
     }
     
     private var teamGradient: LinearGradient {
@@ -642,40 +656,60 @@ struct WatchedPlayerCard: View {
     // MARK: - Helper Views
     
     private var playerImageView: some View {
-        AsyncImage(url: createHeadshotURL()) { phase in
-            switch phase {
-            case .empty:
-                Rectangle()
-                    .fill(teamGradient)
-                    .overlay(
-                        ProgressView()
-                            .scaleEffect(0.6)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    )
-            case .success(let image):
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            case .failure(_):
-                Rectangle()
-                    .fill(teamGradient)
-                    .overlay(
-                        Text(String(watchedPlayer.playerName.prefix(1).uppercased()))
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                    )
-            @unknown default:
-                Rectangle()
-                    .fill(teamGradient)
-                    .overlay(
-                        Text(String(watchedPlayer.playerName.prefix(1).uppercased()))
-                            .font(.system(size: 24, weight: .bold))
-                            .foregroundColor(.white)
-                    )
+        ZStack {
+            AsyncImage(url: createHeadshotURL()) { phase in
+                switch phase {
+                case .empty:
+                    Rectangle()
+                        .fill(teamGradient)
+                        .overlay(
+                            ProgressView()
+                                .scaleEffect(0.6)
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        )
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure(_):
+                    Rectangle()
+                        .fill(teamGradient)
+                        .overlay(
+                            Text(String(watchedPlayer.playerName.prefix(1).uppercased()))
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                @unknown default:
+                    Rectangle()
+                        .fill(teamGradient)
+                        .overlay(
+                            Text(String(watchedPlayer.playerName.prefix(1).uppercased()))
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+            }
+            .frame(width: 70, height: 90)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            
+            // 🔥 NEW: Injury Status Badge (positioned at bottom-right of player image)
+            if let injuryStatus = getWatchedPlayerInjuryStatus(), !injuryStatus.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                            .scaleEffect(0.8) // Smaller for watched player cards
+                            .offset(x: -6, y: -6) // Position as subscript to image
+                    }
+                }
             }
         }
-        .frame(width: 70, height: 90)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+    
+    // 🔥 NEW: Get injury status from Sleeper player data for watched players
+    private func getWatchedPlayerInjuryStatus() -> String? {
+        return sleeperPlayerData?.injuryStatus
     }
     
     // MARK: - Helper Methods

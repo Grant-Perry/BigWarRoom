@@ -578,17 +578,17 @@ extension PlayerWatchService {
 enum WatchSortMethod: String, CaseIterable {
     case delta = "delta"
     case threat = "threat"
+    case current = "current"  // 🔥 RENAMED: This is the "Score" option
     case name = "name"
     case position = "position"
-    case current = "current"
     
     var displayName: String {
         switch self {
         case .delta: return "Delta"
         case .threat: return "Threat"
+        case .current: return "Score"  // 🔥 CHANGED: From "Current" to "Score"
         case .name: return "Name"
         case .position: return "Position"
-        case .current: return "Current"
         }
     }
     
@@ -596,9 +596,9 @@ enum WatchSortMethod: String, CaseIterable {
         switch self {
         case .delta: return "Score Change"
         case .threat: return "Threat Level"
+        case .current: return "Current Score"  // Keep detailed description
         case .name: return "Player Name"
         case .position: return "Position"
-        case .current: return "Current Score"
         }
     }
 }
