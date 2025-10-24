@@ -547,7 +547,7 @@ final class ESPNAPIClient: DraftAPIClient {
         
         guard let scoringSettings = espnLeague.scoringSettings,
               let scoringItems = scoringSettings.scoringItems else {
-            print("⚠️ ESPN: No scoring settings found for league \(leagueID)")
+            logWarning("ESPN: No scoring settings found for league \(leagueID)", category: "ESPN")
             return [:]
         }
         
@@ -566,7 +566,11 @@ final class ESPNAPIClient: DraftAPIClient {
             }
         }
         
-        print("✅ ESPN: Loaded \(scoringMap.count) scoring rules for league \(leagueID)")
+        if scoringMap.isEmpty {
+            logWarning("ESPN: No scoring settings found for league \(leagueID)", category: "ESPN")
+        } else {
+            logInfo("ESPN: Loaded \(scoringMap.count) scoring rules for league \(leagueID)", category: "ESPN")
+        }
         return scoringMap
     }
     

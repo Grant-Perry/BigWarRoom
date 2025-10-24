@@ -20,7 +20,7 @@ struct AppInitializationLoadingView: View {
                 .ignoresSafeArea(.all)
             
             VStack(spacing: 40) {
-                // App Logo/Title - REMOVED BigWarRoom text
+                // App Logo/Title
                 VStack(spacing: 16) {
                     Image(systemName: "target")
                         .font(.system(size: 80))
@@ -31,33 +31,7 @@ struct AppInitializationLoadingView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // Loading Progress
-                VStack(spacing: 24) {
-                    // 🔥 FIXED: Use orbs loading animation
-                    FantasyLoadingIndicator()
-                        .scaleEffect(1.5)
-                    
-                    // Progress Bar
-                    VStack(spacing: 12) {
-                        Text(initManager.currentLoadingStage.displayText)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                        
-                        ProgressView(value: initManager.loadingProgress)
-                            .progressViewStyle(LinearProgressViewStyle(tint: .gpOrange))
-                            .frame(height: 8)
-                            .background(Color.gray.opacity(0.3))
-                            .cornerRadius(4)
-                            .padding(.horizontal, 20)
-                        
-                        Text("\(Int(initManager.loadingProgress * 100))%")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Error State
+                // Error State (show this first if there's an error)
                 if let errorMessage = initManager.errorMessage {
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -81,11 +55,70 @@ struct AppInitializationLoadingView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
+                        
+                        // Skip button for development
+                        Button("Skip to App") {
+                            initManager.isInitialized = true
+                            initManager.isLoading = false
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.regular)
                     }
                     .padding(.top, 20)
+                } else {
+                    // Loading Progress (only show if no error)
+                    VStack(spacing: 24) {
+                        // Spinning orbs
+                        FantasyLoadingIndicator()
+                            .scaleEffect(1.5)
+                        
+                        // Progress Bar
+                        VStack(spacing: 12) {
+                            Text(initManager.currentLoadingStage.displayText)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                            
+                            ProgressView(value: initManager.loadingProgress)
+                                .progressViewStyle(LinearProgressViewStyle(tint: .gpOrange))
+                                .frame(height: 8)
+                                .background(Color.gray.opacity(0.3))
+                                .cornerRadius(4)
+                                .padding(.horizontal, 20)
+                            
+                            Text("\(Int(initManager.loadingProgress * 100))%")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // 🔥 DEBUG: Force initialize button if stuck
+                        if !initManager.isLoading && initManager.loadingProgress == 0.0 {
+                            VStack(spacing: 12) {
+                                Text("Stuck? Try manual initialization")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                                
+                                Button("Force Initialize") {
+                                    Task {
+                                        await initManager.initializeApp()
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                            .padding(.top, 20)
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 40)
+        }
+        .onAppear {
+            logInfo("AppInitializationLoadingView appeared", category: "LoadingView")
+            logInfo("Current stage: \(initManager.currentLoadingStage.displayText)", category: "LoadingView")
+            logInfo("Progress: \(initManager.loadingProgress)", category: "LoadingView")
+            logInfo("Error: \(initManager.errorMessage ?? "none")", category: "LoadingView")
+            logInfo("IsLoading: \(initManager.isLoading), IsInitialized: \(initManager.isInitialized)", category: "LoadingView")
         }
     }
 }

@@ -67,23 +67,23 @@ final class AllLivePlayersViewModel: ObservableObject {
         matchupsSubscription?.cancel()
     }
     
-    // 🔥 NEW: Subscribe to MatchupsHubViewModel updates
+    // 🔥 THROTTLED: Subscribe to MatchupsHubViewModel updates with longer debounce
     private func subscribeToMatchupsUpdates() {
-        print("🔄 LIVE PLAYERS DEBUG: Setting up subscription to MatchupsHub updates")
+//        print("🔄 LIVE PLAYERS DEBUG: Setting up subscription to MatchupsHub updates")
         matchupsSubscription = matchupsHubViewModel.$lastUpdateTime
             .removeDuplicates()
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .debounce(for: .seconds(5), scheduler: DispatchQueue.main) // Increased from 500ms to 5 seconds
             .sink { [weak self] updateTime in
                 guard let self = self,
                       !self.allPlayers.isEmpty,
                       !self.matchupsHubViewModel.isLoading else { 
                     let playersCount = self?.allPlayers.count ?? 0
                     let isLoading = self?.matchupsHubViewModel.isLoading ?? true
-                    print("🔄 LIVE PLAYERS DEBUG: Subscription triggered but conditions not met - players: \(playersCount), loading: \(isLoading)")
+//                    print("🔄 LIVE PLAYERS DEBUG: Subscription triggered but conditions not met - players: \(playersCount), loading: \(isLoading)")
                     return 
                 }
                 
-                print("🔄 LIVE PLAYERS DEBUG: MatchupsHub updated at \(updateTime), triggering player data refresh")
+//                print("🔄 LIVE PLAYERS DEBUG: MatchupsHub updated at \(updateTime), triggering player data refresh")
                 
                 Task { @MainActor in
                     await self.performLiveUpdate()

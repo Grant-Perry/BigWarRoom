@@ -437,7 +437,7 @@ final class FantasyViewModel: ObservableObject {
                 continue 
             }
             
-            // 🔥 FIX: Use direct ESPN stat ID to Sleeper key mapping
+            // Use direct ESPN stat ID to Sleeper key mapping
             if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                 scoringMap[sleeperKey] = points
             }

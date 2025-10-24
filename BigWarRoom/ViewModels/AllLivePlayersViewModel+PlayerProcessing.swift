@@ -79,7 +79,7 @@ extension AllLivePlayersViewModel {
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
                     let freshScore = freshPlayer.currentPoints ?? 0.0
-                    print("🔄 SCORE CALC DEBUG: \(player.fullName) ESPN fresh score: \(freshScore) pts")
+//                    print("🔄 SCORE CALC DEBUG: \(player.fullName) ESPN fresh score: \(freshScore) pts")
                     return freshScore
                 }
             }
@@ -87,7 +87,7 @@ extension AllLivePlayersViewModel {
             // For Sleeper leagues, use calculated score from provider
             if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
                 let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
-                print("🔄 SCORE CALC DEBUG: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
+//                print("🔄 SCORE CALC DEBUG: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
                 return calculatedScore
             }
         }
@@ -97,7 +97,7 @@ extension AllLivePlayersViewModel {
         
         // Final fallback to cached score
         let fallbackScore = player.currentPoints ?? 0.0
-        print("🔄 SCORE CALC DEBUG: \(player.fullName) fallback score: \(fallbackScore) pts")
+//        print("🔄 SCORE CALC DEBUG: \(player.fullName) fallback score: \(fallbackScore) pts")
         return fallbackScore
     }
     
@@ -152,30 +152,31 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Surgical Data Update (Silent Background Updates)
     internal func updatePlayerDataSurgically() async {
-        print("🔄 SURGICAL UPDATE DEBUG: Starting surgical update")
+//        print("🔄 SURGICAL UPDATE DEBUG: Starting surgical update")
         let allPlayerEntries = extractAllPlayers()
         guard !allPlayerEntries.isEmpty else { 
-            print("🔄 SURGICAL UPDATE DEBUG: No player entries found")
+//            print("🔄 SURGICAL UPDATE DEBUG: No player entries found")
             return 
         }
         
-        print("🔄 SURGICAL UPDATE DEBUG: Extracted \(allPlayerEntries.count) player entries")
+//        print("🔄 SURGICAL UPDATE DEBUG: Extracted \(allPlayerEntries.count) player entries")
         
         // Log a few sample scores for comparison
         let samplePlayers = Array(allPlayerEntries.prefix(3))
         for player in samplePlayers {
-            print("🔄 SURGICAL UPDATE DEBUG: Sample - \(player.playerName): \(player.currentScore) pts")
+//            print("🔄 SURGICAL UPDATE DEBUG: Sample - \(player.playerName): \(player.currentScore) pts")
         }
         
         // 🔥 FIX: Update data silently but NOTIFY SwiftUI of changes
         await updatePlayerDataSilently(from: allPlayerEntries)
         lastUpdateTime = Date()
         
-        print("🔄 SURGICAL UPDATE DEBUG: Updated lastUpdateTime to \(lastUpdateTime)")
+//        print("🔄 SURGICAL UPDATE DEBUG: Updated lastUpdateTime to \(lastUpdateTime)")
         
-        // 🔥 CRITICAL FIX: Notify SwiftUI that data changed without triggering loading states
-        objectWillChange.send()
-        print("🔄 SURGICAL UPDATE DEBUG: Sent objectWillChange notification")
+        // 🔥 REMOVED: Don't send objectWillChange during surgical updates - causes excessive rebuilds
+        // Only the @Published properties changing should trigger updates
+        // objectWillChange.send()
+//        print("🔄 SURGICAL UPDATE DEBUG: Sent objectWillChange notification")
     }
     
     // 🔥 NEW: Truly silent update that doesn't trigger UI changes

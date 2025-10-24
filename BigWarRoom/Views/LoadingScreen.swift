@@ -63,8 +63,8 @@ struct LoadingScreen: View {
             BokehLayer()
                 .opacity(0.6)
             
-            // 🔥 NEW: Spinning Orbs around the football
-            SpinningOrbsView(rotation: orbRotation)
+            // 🔥 FIXED: Use standalone SpinningOrbsView component
+            SpinningOrbsView()
                 .opacity(textOpacity)
             
             // Main content
@@ -427,73 +427,5 @@ struct BokehLayer: View {
 #Preview {
     LoadingScreen { _ in
         // x// x Print("Splash complete!")
-    }
-}
-
-// 🔥 NEW: Spinning Orbs View Component
-struct SpinningOrbsView: View {
-    let rotation: Double
-    
-    var body: some View {
-        ZStack {
-            // Outer ring of orbs (8 orbs)
-            ForEach(0..<8, id: \.self) { index in
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.gpGreen, .gpBlue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 12, height: 12)
-                    .shadow(color: .gpGreen, radius: 4)
-                    .offset(y: -180) // Distance from center
-                    .rotationEffect(.degrees(Double(index) * 45 + rotation))
-            }
-            
-            // Middle ring of orbs (6 orbs)
-            ForEach(0..<6, id: \.self) { index in
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.gpOrange, .gpRedPink],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 10, height: 10)
-                    .shadow(color: .gpOrange, radius: 3)
-                    .offset(y: -140) // Distance from center
-                    .rotationEffect(.degrees(Double(index) * 60 + rotation * -0.7)) // Counter rotation
-            }
-            
-            // Inner ring of orbs (4 orbs)
-            ForEach(0..<4, id: \.self) { index in
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.purple, .blue],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 8, height: 8)
-                    .shadow(color: .purple, radius: 2)
-                    .offset(y: -100) // Distance from center
-                    .rotationEffect(.degrees(Double(index) * 90 + rotation * 0.5)) // Slower rotation
-            }
-            
-            // Tiny sparkle orbs (12 orbs)
-            ForEach(0..<12, id: \.self) { index in
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 4, height: 4)
-                    .shadow(color: .white, radius: 1)
-                    .offset(y: -220) // Outermost ring
-                    .rotationEffect(.degrees(Double(index) * 30 + rotation * 1.5)) // Fastest rotation
-                    .opacity(0.8)
-            }
-        }
     }
 }

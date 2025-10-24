@@ -54,8 +54,15 @@ struct PlayerStatsHeaderView: View {
         return nil
     }
     
+    // 🔥 NEW: Check if player has injury badge to determine centering offset
+    private var hasInjuryBadge: Bool {
+        return player.injuryStatus != nil && !player.injuryStatus!.isEmpty
+    }
+    
+    // MARK: -> Injury Offset
+    
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             // TAPPABLE PLAYER IMAGE FOR NEWS with NOTIFICATION BADGE
             Button(action: {
                 showingPlayerNews = true
@@ -65,8 +72,11 @@ struct PlayerStatsHeaderView: View {
                     size: 120,
                     team: team
                 )
+                .offset(x: hasInjuryBadge ? 20 : 0) // 🔥 CENTERING FIX: Center the player+badge unit over name
             }
             .buttonStyle(.plain)
+//            .frame(width: 180, height: 100) // 🔥 FIX: Expand button touch area to include badge
+            .contentShape(Rectangle()) // 🔥 FIX: Make entire area tappable
             .notificationBadge(
                 count: resolvedESPNID != nil ? playerNewsViewModel.newsItems.count : 0,
                 xOffset: 8,
@@ -77,8 +87,8 @@ struct PlayerStatsHeaderView: View {
                 resolvedESPNID != nil && playerNewsViewModel.newsItems.count > 0 ? 1.25 : 1.0,
                 anchor: .topTrailing
             )
-            .padding(.bottom, 12) // Add space between image and player name
-            
+            .padding(.bottom, 10) // Add space between image and player name
+
             // Original player info
             VStack(spacing: 8) {
                 // Player name with watch toggle

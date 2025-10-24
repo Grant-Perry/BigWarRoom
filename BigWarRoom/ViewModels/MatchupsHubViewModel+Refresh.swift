@@ -17,7 +17,7 @@ extension MatchupsHubViewModel {
         
         guard autoRefreshEnabled else { return }
         
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { _ in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
                 if UIApplication.shared.applicationState == .active && !self.isLoading {
                     await self.refreshMatchups()

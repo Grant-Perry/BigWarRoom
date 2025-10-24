@@ -71,8 +71,8 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
     
     /// Filter matchups by selected NFL teams using ScheduleGame object
     func filterMatchups(for game: ScheduleGame) {
-        print("🔍 FILTER INIT: Filtering requested for game ID: \(game.id)")
-        print("🔍 FILTER INIT: isReadyToFilter: \(isReadyToFilter), Hub matchups: \(matchupsHubViewModel.myMatchups.count)")
+        logInfo("Filtering requested for game ID: \(game.id)", category: "TeamFilter")
+        logDebug("isReadyToFilter: \(isReadyToFilter), Hub matchups: \(matchupsHubViewModel.myMatchups.count)", category: "TeamFilter")
 
         // Clear filtered matchups to force empty state while loading
         filteredMatchups = []
@@ -87,30 +87,10 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         // Explicitly set loading state
         isLoading = true
 
-        print("🔍 FILTER INIT: Set loading state - isLoading: \(isLoading)")
+        logDebug("Set loading state - isLoading: \(isLoading)", category: "TeamFilter")
 
         // IMPORTANT: Don't call performFiltering() here - let the Combine pipeline handle it
         // This prevents the double-call race condition
-    }
-
-    /// DEPRECATED: Keep for backward compatibility but redirect to new method
-    func filterMatchups(awayTeam: String, homeTeam: String) {
-        print("🔍 FILTER INIT: DEPRECATED - Creating temp game object for \(awayTeam) vs \(homeTeam)")
-        
-        // Create a minimal ScheduleGame object for backward compatibility
-        let tempGame = ScheduleGame(
-            id: "\(awayTeam)@\(homeTeam)",
-            awayTeam: awayTeam,
-            homeTeam: homeTeam,
-            awayScore: 0,
-            homeScore: 0,
-            gameStatus: "scheduled",
-            gameTime: "",
-            startDate: Date(),
-            isLive: false
-        )
-        
-        filterMatchups(for: tempGame)
     }
     
     /// Refresh the filtered data
@@ -134,7 +114,7 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         let readyStatePublisher = matchupsHubViewModel.$myMatchups
             .map { !$0.isEmpty }
             .map { hasMatchups in
-                print("🔄 READY STATE: Matchups loaded: \(hasMatchups), Ready: \(hasMatchups)")
+                logDebug("Matchups loaded: \(hasMatchups), Ready: \(hasMatchups)", category: "TeamFilter")
                 return hasMatchups
             }
             .removeDuplicates()
@@ -152,14 +132,14 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
         .sink { [weak self] isReady, game in
             guard let self = self, isReady, let game = game else { 
-                print("🔄 FILTER SKIPPED: Ready: \(isReady), Game: \(game?.id ?? "nil")")
+                logDebug("Filter skipped - Ready: \(isReady), Game: \(game?.id ?? "nil")", category: "TeamFilter")
                 return 
             }
             
-            print("🔄 EXECUTING FILTER: Game data ready: \(game.id)")
+            logDebug("Executing filter: Game data ready: \(game.id)", category: "TeamFilter")
             self.performFiltering()
             self.isLoading = false
-            print("🔄 FILTER COMPLETE: Cleared loading states")
+            logDebug("Filter complete: Cleared loading states", category: "TeamFilter")
         }
         .store(in: &cancellables)
         
@@ -171,7 +151,7 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
                 return self.gameData != nil && self.isReadyToFilter
             }
             .sink { [weak self] _ in
-                print("🔄 MATCHUPS UPDATED: Refiltering...")
+                logDebug("Matchups updated: Refiltering...", category: "TeamFilter")
                 self?.performFiltering()
             }
             .store(in: &cancellables)
@@ -179,17 +159,16 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
     
     /// Perform the actual filtering logic
     private func performFiltering() {
-        print("🔍 PERFORM FILTERING START: gameData exists: \(gameData != nil)")
-        print("🔍 PERFORM FILTERING START: isReadyToFilter: \(isReadyToFilter)")
+        logDebug("Perform filtering start: gameData exists: \(gameData != nil)", category: "TeamFilter")
 
         guard let game = gameData else {
-            print("🔍 FILTER DEBUG: No game data to filter with.")
+            logDebug("No game data to filter with", category: "TeamFilter")
             filteredMatchups = []
             return
         }
 
         guard isReadyToFilter else {
-            print("🔍 FILTER DEBUG: Not ready to filter yet")
+            logDebug("Not ready to filter yet", category: "TeamFilter")
             return
         }
 
@@ -198,37 +177,24 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         let normalizedHome = normalizeTeamCode(game.homeTeam)
         let targetTeams = Set([normalizedAway, normalizedHome])
 
-        print("🔍 FILTER DEBUG: Filtering for normalized teams: \(targetTeams)")
-        print("🔍 FILTER DEBUG: Available matchups: \(matchupsHubViewModel.myMatchups.count)")
+        logDebug("Filtering for normalized teams: \(targetTeams)", category: "TeamFilter")
+        logDebug("Available matchups: \(matchupsHubViewModel.myMatchups.count)", category: "TeamFilter")
 
         var foundMatchups: [UnifiedMatchup] = []
-        var debugInfo: [String] = []
 
-        for (index, matchup) in matchupsHubViewModel.myMatchups.enumerated() {
+        for matchup in matchupsHubViewModel.myMatchups {
             let hasPlayers = hasPlayersFromTeams(in: matchup, teams: targetTeams)
-
-            let leagueName = matchup.league.league.name
-            let myTeamPlayerCount = matchup.myTeam?.roster.count ?? 0
-            let opponentTeamPlayerCount = matchup.opponentTeam?.roster.count ?? 0
-
-            debugInfo.append("Matchup \(index + 1): \(leagueName) - My players: \(myTeamPlayerCount), Opponent: \(opponentTeamPlayerCount), Has target teams: \(hasPlayers)")
 
             if hasPlayers {
                 foundMatchups.append(matchup)
             }
         }
 
-        print("🔍 FILTER DEBUG: Matchup analysis:")
-        for info in debugInfo {
-            print("   \(info)")
-        }
-
         filteredMatchups = foundMatchups
-
         lastFilteredAwayTeam = normalizedAway
         lastFilteredHomeTeam = normalizedHome
 
-        print("🔍 FILTER COMPLETE: Found \(foundMatchups.count) matching matchups for game \(game.id)")
+        logInfo("Found \(foundMatchups.count) matching matchups for game \(game.id)", category: "TeamFilter")
     }
     
     /// Check if a matchup has players from the specified NFL teams
@@ -239,10 +205,6 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         }
 
         let myPlayers = myTeam.roster
-        
-
-        var foundTeams: Set<String> = []
-        var playerTeamCounts: [String: Int] = [:]
 
         // Check if any of YOUR players are on the target NFL teams
         let hasMatchingPlayers = myPlayers.contains { player in
@@ -251,10 +213,6 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
             }
 
             let playerTeam = normalizeTeamCode(rawTeam)
-
-            foundTeams.insert(playerTeam)
-            playerTeamCounts[playerTeam, default: 0] += 1
-
             return teams.contains(playerTeam)
         }
 
@@ -338,7 +296,7 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
     
     /// 🔥 Clear filter state to prevent stale data on next sheet open
     func clearFilterState() {
-        print("🔥 CLEAR STATE: Clearing filter state")
+        logInfo("Clearing filter state", category: "TeamFilter")
         filteredMatchups = []
         gameData = nil
         isLoading = false

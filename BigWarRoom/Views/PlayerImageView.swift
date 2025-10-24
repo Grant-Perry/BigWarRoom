@@ -48,7 +48,8 @@ struct PlayerImageView: View {
                         Spacer()
                         InjuryStatusBadgeView(injuryStatus: injuryStatus)
                             .scaleEffect(badgeScale) // Scale based on image size
-                            .offset(x: badgeOffset, y: badgeOffset) // Position as subscript
+                            .offset(x: -30, y: badgeOffset) // Position as subscript
+//                            .offset(x: badgeOffset, y: badgeOffset) // Position as subscript
                     }
                 }
             }
@@ -70,10 +71,10 @@ struct PlayerImageView: View {
     /// Offset badge based on image size
     private var badgeOffset: CGFloat {
         switch size {
-        case 0..<40: return -3
-        case 40..<60: return -4
-        case 60..<80: return -6
-        default: return -8
+        case 0..<40: return -1
+        case 40..<60: return -2
+        case 60..<80: return -3
+        default: return -4 // Much closer to the player image
         }
     }
 }

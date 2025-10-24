@@ -2,8 +2,7 @@
 //  AppInitializationManager.swift
 //  BigWarRoom
 //
-//  🔥 SOLUTION: Centralized app initialization that loads ALL data before showing tabs
-//  This eliminates race conditions between different views trying to load independently
+//  🔥 UNIFIED: Single initialization system for the entire app
 //
 
 import Foundation
@@ -16,10 +15,11 @@ final class AppInitializationManager: ObservableObject {
     
     // MARK: - Published Properties
     @Published var isInitialized = false
-    @Published var isLoading = true
+    @Published var isLoading = false // 🔥 FIX: Start with false, not true
     @Published var currentLoadingStage: LoadingStage = .starting
     @Published var loadingProgress: Double = 0.0
     @Published var errorMessage: String?
+    @Published var canShowPartialData = false // Progressive loading support
     
     // MARK: - Dependencies
     private let matchupsHubViewModel = MatchupsHubViewModel.shared
@@ -31,6 +31,7 @@ final class AppInitializationManager: ObservableObject {
     enum LoadingStage {
         case starting
         case loadingCredentials
+        case loadingSharedStats
         case loadingLeagues
         case loadingMatchups
         case loadingPlayerStats
@@ -45,6 +46,8 @@ final class AppInitializationManager: ObservableObject {
                 return "Initializing BigWarRoom..."
             case .loadingCredentials:
                 return "Checking credentials..."
+            case .loadingSharedStats:
+                return "Loading shared statistics..."
             case .loadingLeagues:
                 return "Finding your leagues..."
             case .loadingMatchups:
@@ -65,10 +68,11 @@ final class AppInitializationManager: ObservableObject {
         var progress: Double {
             switch self {
             case .starting: return 0.0
-            case .loadingCredentials: return 0.15
-            case .loadingLeagues: return 0.25
-            case .loadingMatchups: return 0.50
-            case .loadingPlayerStats: return 0.75
+            case .loadingCredentials: return 0.1
+            case .loadingSharedStats: return 0.2
+            case .loadingLeagues: return 0.3
+            case .loadingMatchups: return 0.5
+            case .loadingPlayerStats: return 0.7
             case .processingPlayers: return 0.85
             case .finalizing: return 0.95
             case .completed: return 1.0
@@ -80,22 +84,27 @@ final class AppInitializationManager: ObservableObject {
     // MARK: - Main Initialization
     func initializeApp() async {
         guard !isInitialized else { 
-//            print("🚀 APP INIT: Already initialized, skipping")
+            logInfo("Already initialized, skipping", category: "AppInit")
             return 
         }
-        
         guard !isLoading else { 
-//            print("🚀 APP INIT: Already loading, skipping")
+            logInfo("Already loading, skipping", category: "AppInit")
             return 
         }
         
-//        print("🚀 APP INIT: Starting centralized app initialization")
+        logInfo("Starting centralized app initialization", category: "AppInit")
         isLoading = true
         errorMessage = nil
         
         do {
             try await updateLoadingStage(.loadingCredentials)
             try await checkCredentials()
+            
+            try await updateLoadingStage(.loadingSharedStats)
+            try await loadSharedStats()
+            
+            // Enable partial data showing after shared stats
+            canShowPartialData = true
             
             try await updateLoadingStage(.loadingLeagues)
             try await loadLeagues()
@@ -117,10 +126,11 @@ final class AppInitializationManager: ObservableObject {
             isInitialized = true
             isLoading = false
             
-            print("✅ APP INIT: Centralized initialization completed successfully")
+            logInfo("Centralized initialization completed successfully", category: "AppInit")
             
         } catch {
-            print("❌ APP INIT: Failed - \(error)")
+            logError("Initialization failed: \(error)", category: "AppInit")
+            logError("Error details: \(error.localizedDescription)", category: "AppInit")
             currentLoadingStage = .error(error.localizedDescription)
             errorMessage = error.localizedDescription
             isLoading = false
@@ -132,148 +142,136 @@ final class AppInitializationManager: ObservableObject {
     private func updateLoadingStage(_ stage: LoadingStage) async throws {
         currentLoadingStage = stage
         loadingProgress = stage.progress
-        print("🚀 APP INIT: \(stage.displayText) (\(Int(stage.progress * 100))%)")
+        logInfo("\(stage.displayText) (\(Int(stage.progress * 100))%)", category: "AppInit")
         
-        // Small delay to show progress visually
+        // Visual delay for progress
         try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
     }
     
     private func checkCredentials() async throws {
-        // 🗑️ CLEANUP: Remove old game alerts data from UserDefaults 
+        logInfo("Checking credentials...", category: "AppInit")
         cleanupGameAlertsData()
         
-        // Check if we have valid credentials
         let sleeperManager = SleeperCredentialsManager.shared
         let espnManager = ESPNCredentialsManager.shared
         
-        print("🚀 APP INIT: Sleeper valid: \(sleeperManager.hasValidCredentials)")
-        print("🚀 APP INIT: ESPN valid: \(espnManager.hasValidCredentials)")
+        logInfo("Sleeper valid: \(sleeperManager.hasValidCredentials)", category: "AppInit")
+        logInfo("ESPN valid: \(espnManager.hasValidCredentials)", category: "AppInit")
         
         if !sleeperManager.hasValidCredentials && !espnManager.hasValidCredentials {
+            logError("No valid credentials found", category: "AppInit")
             throw AppInitError.noCredentials
+        }
+        
+        logInfo("Credentials check passed", category: "AppInit")
+    }
+    
+    private func loadSharedStats() async throws {
+        do {
+            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            logInfo("Shared stats loaded successfully", category: "AppInit")
+        } catch {
+            logWarning("Failed to load shared stats: \(error)", category: "AppInit")
+            // Continue anyway - app can still function
         }
     }
     
-    // MARK: - Game Alerts Cleanup
+    private func loadLeagues() async throws {
+        logInfo("Loading leagues through Mission Control...", category: "AppInit")
+        
+        await matchupsHubViewModel.loadAllMatchups()
+        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        
+        let matchupCount = matchupsHubViewModel.myMatchups.count
+        logInfo("After loading, got \(matchupCount) matchups", category: "AppInit")
+        
+        if matchupCount == 0 {
+            logWarning("No matchups loaded, but continuing...", category: "AppInit")
+        }
+        
+        logInfo("League loading completed with \(matchupCount) matchups", category: "AppInit")
+    }
     
-    /// Clean up old game alerts data from UserDefaults
-    /// 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
+    private func loadMatchups() async throws {
+        logInfo("Matchups already loaded - \(matchupsHubViewModel.myMatchups.count) total", category: "AppInit")
+    }
+    
+    private func loadPlayerStats() async throws {
+        logInfo("Loading shared player statistics...", category: "AppInit")
+        
+        do {
+            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            logInfo("Shared stats loaded successfully", category: "AppInit")
+            
+            if !allLivePlayersViewModel.statsLoaded {
+                await allLivePlayersViewModel.loadPlayerStats()
+            }
+            
+        } catch {
+            logWarning("Failed to load shared stats: \(error)", category: "AppInit")
+        }
+    }
+    
+    private func processPlayers() async throws {
+        logInfo("Processing player data...", category: "AppInit")
+        
+        if !matchupsHubViewModel.myMatchups.isEmpty {
+            let playerEntries = allLivePlayersViewModel.extractAllPlayers()
+            await allLivePlayersViewModel.buildPlayerData(from: playerEntries)
+            
+            logInfo("Processed \(allLivePlayersViewModel.allPlayers.count) players", category: "AppInit")
+        } else {
+            logInfo("No matchups to process players from", category: "AppInit")
+        }
+    }
+    
+    private func finalizingSetup() async throws {
+        logInfo("Running final setup tasks...", category: "AppInit")
+        
+        if allLivePlayersViewModel.allPlayers.isEmpty {
+            logInfo("No players processed - setting empty state", category: "AppInit")
+            allLivePlayersViewModel.dataState = .empty
+        } else {
+            logInfo("\(allLivePlayersViewModel.allPlayers.count) players processed - setting loaded state", category: "AppInit")
+            allLivePlayersViewModel.dataState = .loaded
+            
+            logInfo("Applying initial filters...", category: "AppInit")
+            allLivePlayersViewModel.applyPositionFilter()
+            logInfo("Filters applied - filteredPlayers count: \(allLivePlayersViewModel.filteredPlayers.count)", category: "AppInit")
+        }
+        
+        allLivePlayersViewModel.lastUpdateTime = Date()
+    }
+    
+    // MARK: - Game Alerts Cleanup
     private func cleanupGameAlertsData() {
         let userDefaults = UserDefaults.standard
-        
-        // Remove game alerts UserDefaults keys
-        let gameAlertsKeys = [
-            "AllLivePlayers_PreviousScores"
-        ]
+        let gameAlertsKeys = ["AllLivePlayers_PreviousScores"]
         
         var removedCount = 0
         for key in gameAlertsKeys {
             if userDefaults.object(forKey: key) != nil {
                 userDefaults.removeObject(forKey: key)
                 removedCount += 1
-                print("🗑️ CLEANUP: Removed UserDefaults key: \(key)")
+                logInfo("Removed UserDefaults key: \(key)", category: "Cleanup")
             }
         }
         
         if removedCount > 0 {
-            print("🗑️ CLEANUP: Removed \(removedCount) game alerts data entries from UserDefaults")
+            logInfo("Removed \(removedCount) game alerts data entries from UserDefaults", category: "Cleanup")
         } else {
-            print("🗑️ CLEANUP: No game alerts data found in UserDefaults")
+            logInfo("No game alerts data found in UserDefaults", category: "Cleanup")
         }
-    }
-    
-    private func loadLeagues() async throws {
-        // Use Mission Control's league loading
-        print("🚀 APP INIT: Loading leagues through Mission Control...")
-        
-        // This loads all leagues and handles all the heavy lifting
-        await matchupsHubViewModel.loadAllMatchups()
-        
-        // Wait a bit for all async operations to complete
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-        
-        // Verify we got some leagues
-        let matchupCount = matchupsHubViewModel.myMatchups.count
-        print("🚀 APP INIT: After loading, got \(matchupCount) matchups")
-        
-        if matchupCount == 0 {
-            print("🚀 APP INIT: Warning - No matchups loaded, but continuing...")
-            // Don't throw error - could be offseason or no active leagues
-        }
-        
-        print("🚀 APP INIT: League loading completed with \(matchupCount) matchups")
-    }
-    
-    private func loadMatchups() async throws {
-        // Matchups are already loaded in the previous step
-        // This stage is for any additional matchup processing if needed
-        print("🚀 APP INIT: Matchups already loaded - \(matchupsHubViewModel.myMatchups.count) total")
-    }
-    
-    private func loadPlayerStats() async throws {
-        // 🔥 FIX: Load stats once using SharedStatsService instead of per-league loading
-        print("🚀 APP INIT: Loading shared player statistics...")
-        
-        do {
-            // Load current week stats once for ALL leagues
-            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
-            print("🚀 APP INIT: Shared stats loaded successfully")
-            
-            // Also load Live Players stats if needed
-            if !allLivePlayersViewModel.statsLoaded {
-                await allLivePlayersViewModel.loadPlayerStats()
-            }
-            
-        } catch {
-            print("🚀 APP INIT: Warning - Failed to load shared stats: \(error)")
-            // Don't throw - continue with initialization even if stats fail
-        }
-    }
-    
-    private func processPlayers() async throws {
-        // Process players for Live Players view
-        print("🚀 APP INIT: Processing player data...")
-        
-        if !matchupsHubViewModel.myMatchups.isEmpty {
-            // Extract and build player data
-            let playerEntries = allLivePlayersViewModel.extractAllPlayers()
-            await allLivePlayersViewModel.buildPlayerData(from: playerEntries)
-            
-            print("🚀 APP INIT: Processed \(allLivePlayersViewModel.allPlayers.count) players")
-        } else {
-            print("🚀 APP INIT: No matchups to process players from")
-        }
-    }
-    
-    private func finalizingSetup() async throws {
-        // Any final setup tasks
-        print("🚀 APP INIT: Running final setup tasks...")
-        
-        // Update All Live Players state
-        if allLivePlayersViewModel.allPlayers.isEmpty {
-            print("🚀 APP INIT: No players processed - setting empty state")
-            allLivePlayersViewModel.dataState = .empty
-        } else {
-            print("🚀 APP INIT: \(allLivePlayersViewModel.allPlayers.count) players processed - setting loaded state")
-            allLivePlayersViewModel.dataState = .loaded
-            
-            // 🔥 IMPORTANT: Apply filters AFTER confirming we have data
-            print("🚀 APP INIT: Applying initial filters...")
-            allLivePlayersViewModel.applyPositionFilter()
-            print("🚀 APP INIT: Filters applied - filteredPlayers count: \(allLivePlayersViewModel.filteredPlayers.count)")
-        }
-        
-        // Mark last load time
-        allLivePlayersViewModel.lastUpdateTime = Date()
     }
     
     // MARK: - Retry Logic
     func retry() async {
-        print("🔄 APP INIT: Retrying initialization...")
+        logInfo("Retrying initialization...", category: "AppInit")
         isInitialized = false
         currentLoadingStage = .starting
         loadingProgress = 0.0
         errorMessage = nil
+        canShowPartialData = false
         
         await initializeApp()
     }
@@ -285,6 +283,7 @@ final class AppInitializationManager: ObservableObject {
         currentLoadingStage = .starting
         loadingProgress = 0.0
         errorMessage = nil
+        canShowPartialData = false
     }
 }
 

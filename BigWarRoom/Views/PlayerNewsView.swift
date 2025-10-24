@@ -159,7 +159,7 @@ struct PlayerNewsView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 ForEach(viewModel.filteredNewsItems) { newsItem in
-                    NewsItemCard(newsItem: newsItem)
+                    NewsItemCard(newsItem: newsItem, playerName: player.fullName)
                 }
             }
             .padding()
@@ -258,10 +258,13 @@ struct CategoryFilterButton: View {
 
 struct NewsItemCard: View {
     let newsItem: PlayerNewsItem
+    let playerName: String // NEW: Pass player name for detail view
+    
+    @State private var showingDetailView = false // NEW: Sheet state
     
     var body: some View {
         Button(action: {
-            openArticle()
+            showingDetailView = true // Show detail sheet instead of broken URL
         }) {
             VStack(alignment: .leading, spacing: 12) {
                 // Header
@@ -282,13 +285,13 @@ struct NewsItemCard: View {
                     
                     Spacer()
                     
-                    // Time + Link indicator
+                    // Time + tap indicator
                     HStack(spacing: 4) {
                         Text(newsItem.timeAgo)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                         
-                        Image(systemName: "arrow.up.right")
+                        Image(systemName: "chevron.right")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                     }
@@ -318,7 +321,7 @@ struct NewsItemCard: View {
                     
                     Spacer()
                     
-                    Text("Tap to read more")
+                    Text("Tap to read full article")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -334,35 +337,9 @@ struct NewsItemCard: View {
             )
         }
         .buttonStyle(.plain)
-    }
-    
-    private func openArticle() {
-        // Try to construct ESPN article URL
-        if let articleURL = constructESPNURL() {
-            print("🔗 OPENING ARTICLE: \(articleURL)")
-            if UIApplication.shared.canOpenURL(articleURL) {
-                UIApplication.shared.open(articleURL)
-            }
-        } else {
-            print("🔗 NO URL AVAILABLE for article ID: \(newsItem.id)")
+        .sheet(isPresented: $showingDetailView) {
+            PlayerNewsDetailView(newsItem: newsItem, playerName: playerName)
         }
-    }
-    
-    private func constructESPNURL() -> URL? {
-        // Try different ESPN URL patterns
-        let possibleURLs = [
-            "https://www.espn.com/nfl/story/_/id/\(newsItem.id)",
-            "https://www.espn.com/fantasy/football/story/_/id/\(newsItem.id)",
-            "https://www.espn.com/nfl/news/story?id=\(newsItem.id)"
-        ]
-        
-        for urlString in possibleURLs {
-            if let url = URL(string: urlString) {
-                return url
-            }
-        }
-        
-        return nil
     }
     
     private func cleanStoryText(_ story: String) -> String {

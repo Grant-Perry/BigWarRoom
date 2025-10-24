@@ -65,21 +65,33 @@ struct TeamFilteredMatchupsView: View {
         // .onAppear { ... }
         // .onDisappear { ... }
         .onAppear {
-            print("🔍 SHEET DEBUG: TeamFilteredMatchupsView appeared")
-            print("🔍 SHEET DEBUG: Away team: \(awayTeam), Home team: \(homeTeam)")
-            print("🔍 SHEET DEBUG: Passed game data: \(gameData?.scoreDisplay ?? "nil")")
-            print("🔍 SHEET DEBUG: shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
+            logInfo("TeamFilteredMatchupsView appeared", category: "TeamFilter")
+            logDebug("Away team: \(awayTeam), Home team: \(homeTeam)", category: "TeamFilter")
+            logDebug("Passed game data: \(gameData?.scoreDisplay ?? "nil")", category: "TeamFilter")
+            logDebug("shouldShowLoadingState: \(viewModel.shouldShowLoadingState)", category: "TeamFilter")
             
-            // Use the game object if available, otherwise fall back to team strings
+            // Use the game object if available, otherwise create a temporary one
             if let gameData = gameData {
-                print("🔍 SHEET DEBUG: Using passed game data for filtering")
+                logDebug("Using passed game data for filtering", category: "TeamFilter")
                 viewModel.filterMatchups(for: gameData)
             } else {
-                print("🔍 SHEET DEBUG: Falling back to team strings for filtering")
-                viewModel.filterMatchups(awayTeam: awayTeam, homeTeam: homeTeam)
+                logDebug("Creating temporary game object for filtering", category: "TeamFilter")
+                // Create a minimal ScheduleGame object for backward compatibility
+                let tempGame = ScheduleGame(
+                    id: "\(awayTeam)@\(homeTeam)",
+                    awayTeam: awayTeam,
+                    homeTeam: homeTeam,
+                    awayScore: 0,
+                    homeScore: 0,
+                    gameStatus: "scheduled",
+                    gameTime: "",
+                    startDate: Date(),
+                    isLive: false
+                )
+                viewModel.filterMatchups(for: tempGame)
             }
             
-            print("🔍 SHEET DEBUG: After filterMatchups call - shouldShowLoadingState: \(viewModel.shouldShowLoadingState)")
+            logDebug("After filterMatchups call - shouldShowLoadingState: \(viewModel.shouldShowLoadingState)", category: "TeamFilter")
         }
         .refreshable {
             await handlePullToRefresh()
@@ -489,8 +501,8 @@ struct TeamFilteredMatchupsView: View {
                 HStack(spacing: 24) {
                     // Away team section
                     Button(action: {
-                        print("🏈 SUCCESS: Button tapped for \(awayTeam)")
-                        navigateToTeam = awayTeam // Remove TEST_ prefix for real navigation
+                        logInfo("Button tapped for \(awayTeam)", category: "TeamFilter")
+                        navigateToTeam = awayTeam
                     }) {
                         VStack(spacing: 4) {
                             ZStack {
@@ -529,8 +541,8 @@ struct TeamFilteredMatchupsView: View {
                     
                     // Home team section
                     Button(action: {
-                        print("🏈 SUCCESS: Button tapped for \(homeTeam)")
-                        navigateToTeam = homeTeam // Remove TEST_ prefix for real navigation
+                        logInfo("Button tapped for \(homeTeam)", category: "TeamFilter")
+                        navigateToTeam = homeTeam
                     }) {
                         VStack(spacing: 4) {
                             ZStack {

@@ -19,6 +19,8 @@ extension AllLivePlayersViewModel {
             } else {
                 UserDefaults.standard.removeObject(forKey: "AllLivePlayers_LastLoadTime")
             }
+            // 🔥 CRITICAL FIX: Don't store massive playerStats in UserDefaults
+            // Only store simple timestamp, not the huge stats dictionary
         }
     }
     
@@ -138,12 +140,9 @@ extension AllLivePlayersViewModel {
         print("🔄 LIVE UPDATE DEBUG: Starting background update")
         let startTime = Date()
         
-        // 🔥 CRITICAL FIX: Use background refresh instead of full loadAllMatchups()
-        print("🔄 LIVE UPDATE DEBUG: Performing background matchup refresh")
-        await matchupsHubViewModel.performManualRefresh() // Background refresh, no loading screen
-        
-        // Then update our player data surgically
-        print("🔄 LIVE UPDATE DEBUG: Updating player data surgically")
+        // 🔥 FIXED: Don't trigger more MatchupsHub refreshes - just update our player data
+        // The MatchupsHub has already been updated, we just need to process the fresh data
+        print("🔄 LIVE UPDATE DEBUG: Updating player data surgically from existing matchup data")
         await updatePlayerDataSurgically()
         
         let endTime = Date()
