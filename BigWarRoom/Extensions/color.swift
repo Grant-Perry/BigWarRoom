@@ -9,7 +9,15 @@ import SwiftUI
 
 extension Color {
 
-   static let gpPastelMint = Color(#colorLiteral(red: 0.816, green: 1, blue: 0.647, alpha: 1)) // Pastel mint
+   init(rgb: Int...) {
+	  if rgb.count == 3 {
+		 self.init(red: Double(rgb[0]) / 255.0, green: Double(rgb[1]) / 255.0, blue: Double(rgb[2]) / 255.0)
+	  } else {
+		 self.init(red: 1.0, green: 0.5, blue: 1.0)
+	  }
+   }
+
+   static let gpPastelMint = Color(#colorLiteral(red: 0.816, green: 1, blue: 0.647, alpha: 1)) 
    static let gpGreen = Color(#colorLiteral(red: 0.3911147745, green: 0.8800172018, blue: 0.2343971767, alpha: 1))
    static let gpMinty = Color(#colorLiteral(red: 0.5960784314, green: 1, blue: 0.5960784314, alpha: 1))
    static let gpFlatGreen = Color(#colorLiteral(red: 0.03852885208, green: 0.6235294342, blue: 0.3622174664, alpha: 1))
@@ -147,15 +155,66 @@ extension Color {
    static let whiteSoxPrimary = Color(#colorLiteral(red: 0.0, green: 0.0, blue: 0.0, alpha: 1)) // #000000
    static let whiteSoxDark = Color(#colorLiteral(red: 0.2, green: 0.2, blue: 0.2, alpha: 1)) // #333333
 
-}
+	  /// Calculate luminance using WCAG formula
+   func luminance() -> Double {
+	  let uiColor = UIColor(self)
+	  var red: CGFloat = 0
+	  var green: CGFloat = 0
+	  var blue: CGFloat = 0
 
-   // UTILIZATION: Color(rgb: 220, 123, 35)
-extension Color {
-   init(rgb: Int...) {
-	  if rgb.count == 3 {
-		 self.init(red: Double(rgb[0]) / 255.0, green: Double(rgb[1]) / 255.0, blue: Double(rgb[2]) / 255.0)
-	  } else {
-		 self.init(red: 1.0, green: 0.5, blue: 1.0)
+	  uiColor.getRed(&red, green: &green, blue: &blue, alpha: nil)
+
+		 // Apply gamma correction according to WCAG
+	  func adjustComponent(_ component: CGFloat) -> CGFloat {
+		 return component <= 0.03928 ? component / 12.92 : pow((component + 0.055) / 1.055, 2.4)
 	  }
+
+	  let adjRed = adjustComponent(red)
+	  let adjGreen = adjustComponent(green)
+	  let adjBlue = adjustComponent(blue)
+
+		 // WCAG luminance formula
+	  return 0.2126 * Double(adjRed) + 0.7152 * Double(adjGreen) + 0.0722 * Double(adjBlue)
+   }
+
+	  /// Determine if color is light based on luminance
+   func isLight() -> Bool {
+	  return luminance() > 0.5
+   }
+
+	  /// Return appropriate contrasting text color (black or white)
+   func adaptedTextColor() -> Color {
+	  return isLight() ? Color.black : Color.white
+   }
+
+	  /// Calculate WCAG contrast ratio against another color
+   func contrastRatio(against color: Color) -> Double {
+	  let luminance1 = self.luminance()
+	  let luminance2 = color.luminance()
+	  let lighter = max(luminance1, luminance2)
+	  let darker = min(luminance1, luminance2)
+	  return (lighter + 0.05) / (darker + 0.05)
+   }
+
+   func interpolated(with color: Color, by factor: Double) -> Color {
+	  let factor = max(0, min(1, factor)) // Clamp factor between 0 and 1
+
+		 // Convert SwiftUI Colors to UIColors for easier interpolation
+	  let uiColor1 = UIColor(self)
+	  let uiColor2 = UIColor(color)
+
+	  var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+	  var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+
+	  uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+	  uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+
+	  let r = r1 + (r2 - r1) * factor
+	  let g = g1 + (g2 - g1) * factor
+	  let b = b1 + (b2 - b1) * factor
+	  let a = a1 + (a2 - a1) * factor
+
+	  return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: Double(a))
    }
 }
+

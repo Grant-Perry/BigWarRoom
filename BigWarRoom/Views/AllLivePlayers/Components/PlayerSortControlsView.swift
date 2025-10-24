@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sorting method and direction controls
 struct PlayerSortControlsView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var sortHighToLow: Bool
     let onSortChange: () -> Void
     
@@ -21,12 +21,12 @@ struct PlayerSortControlsView: View {
                     ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                         Button(action: {
                             // 🔥 FIXED: Proper sort method change with animation reset
-                            viewModel.setSortingMethod(method)
+                            allLivePlayersViewModel.setSortingMethod(method)
                             onSortChange()
                         }) {
                             HStack {
                                 Text(method.displayName)
-                                if viewModel.sortingMethod == method {
+                                if allLivePlayersViewModel.sortingMethod == method {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -34,7 +34,7 @@ struct PlayerSortControlsView: View {
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Text(viewModel.sortingMethod.displayName)
+                        Text(allLivePlayersViewModel.sortingMethod.displayName)
                             .fontWeight(.semibold)
                             .font(.subheadline)
                             .lineLimit(1)
@@ -54,12 +54,12 @@ struct PlayerSortControlsView: View {
             // Sort direction toggle
             Button(action: {
                 // 🔥 FIXED: Update ViewModel first, then sync local binding
-                let newDirection = !viewModel.sortHighToLow
-                viewModel.setSortDirection(highToLow: newDirection)
+                let newDirection = !allLivePlayersViewModel.sortHighToLow
+                allLivePlayersViewModel.setSortDirection(highToLow: newDirection)
                 sortHighToLow = newDirection // Sync the binding
                 onSortChange()
             }) {
-                Text(viewModel.sortDirectionText)
+                Text(allLivePlayersViewModel.sortDirectionText)
                     .fontWeight(.semibold)
                     .font(.subheadline)
                     .lineLimit(1)
@@ -71,11 +71,11 @@ struct PlayerSortControlsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
-        .onChange(of: viewModel.sortingMethod) { _, _ in
+        .onChange(of: allLivePlayersViewModel.sortingMethod) { _, _ in
             // 🔥 NEW: Reset animations when sorting method changes from ViewModel
             onSortChange()
         }
-        .onChange(of: viewModel.sortHighToLow) { _, newValue in
+        .onChange(of: allLivePlayersViewModel.sortHighToLow) { _, newValue in
             // 🔥 FIXED: Keep binding in sync with ViewModel
             sortHighToLow = newValue
         }
@@ -84,7 +84,7 @@ struct PlayerSortControlsView: View {
 
 #Preview {
     PlayerSortControlsView(
-        viewModel: AllLivePlayersViewModel.shared,
+        allLivePlayersViewModel: AllLivePlayersViewModel.shared,
         sortHighToLow: .constant(true),
         onSortChange: {}
     )

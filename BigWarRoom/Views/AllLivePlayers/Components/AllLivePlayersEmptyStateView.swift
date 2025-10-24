@@ -9,16 +9,16 @@ import SwiftUI
 
 /// Shows appropriate empty state based on current filter conditions
 struct AllLivePlayersEmptyStateView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     let onAnimationReset: () -> Void
     
     var body: some View {
         VStack(spacing: 24) {
             // Icon and title based on state
             Group {
-                if viewModel.hasNoLeagues {
+                if allLivePlayersViewModel.hasNoLeagues {
                     // No leagues connected at all
-                    AllLivePlayersNoLeaguesView(viewModel: viewModel)
+                    AllLivePlayersNoLeaguesView(allLivePlayersViewModel: allLivePlayersViewModel)
                 } else {
                     // Has leagues but no players matching filters
                     noPlayersContent
@@ -32,7 +32,7 @@ struct AllLivePlayersEmptyStateView: View {
     private var noPlayersContent: some View {
         VStack(spacing: 24) {
             // 🔥 NEW: Different messaging for Active Only vs other filters
-            if viewModel.showActiveOnly {
+            if allLivePlayersViewModel.showActiveOnly {
                 activeOnlyEmptyState
             } else {
                 standardEmptyState
@@ -55,7 +55,7 @@ struct AllLivePlayersEmptyStateView: View {
             
             // 🔥 NEW: Better messaging for Active Only filter
             VStack(spacing: 12) {
-                Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+                Text("No players found for \(allLivePlayersViewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -81,8 +81,8 @@ struct AllLivePlayersEmptyStateView: View {
             
             // Reset Filters button
             Button(action: {
-                viewModel.setShowActiveOnly(false)
-                viewModel.setPositionFilter(.all)
+                allLivePlayersViewModel.setShowActiveOnly(false)
+                allLivePlayersViewModel.setPositionFilter(.all)
                 onAnimationReset()
             }) {
                 HStack(spacing: 8) {
@@ -118,14 +118,14 @@ struct AllLivePlayersEmptyStateView: View {
                 .foregroundColor(.primary)
             
             // Description
-            Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+            Text("No players found for \(allLivePlayersViewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             
             // Reset Filters button
             Button(action: {
-                viewModel.setPositionFilter(.all)
+                allLivePlayersViewModel.setPositionFilter(.all)
                 onAnimationReset()
             }) {
                 HStack(spacing: 8) {
@@ -150,5 +150,5 @@ struct AllLivePlayersEmptyStateView: View {
 
 #Preview {
     let viewModel = AllLivePlayersViewModel.shared
-    return AllLivePlayersEmptyStateView(viewModel: viewModel, onAnimationReset: {})
+    return AllLivePlayersEmptyStateView(allLivePlayersViewModel: viewModel, onAnimationReset: {})
 }

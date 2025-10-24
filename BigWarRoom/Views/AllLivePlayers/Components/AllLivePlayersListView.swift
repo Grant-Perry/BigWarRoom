@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Scrollable list of players with staggered animations and NavigationLink (NO MORE SHEETS!)
 struct AllLivePlayersListView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var animatedPlayers: [String]
     let onPlayerTap: (UnifiedMatchup) -> Void // 🔥 DEPRECATED: Will be removed
     
@@ -17,26 +17,26 @@ struct AllLivePlayersListView: View {
         ScrollView {
             // 🔥 FIXED: Use stable ID and reset animations when sort changes
             LazyVStack(spacing: 8) { // Reduced from 12 to 8 for tighter spacing
-                ForEach(viewModel.filteredPlayers, id: \.id) { playerEntry in
+                ForEach(allLLivePlayersViewModel.filteredPlayers, id: \.id) { playerEntry in
                     // 🔥 SIMPLE: No NavigationLink wrapper - all navigation handled by buttons within the card
                     PlayerScoreBarCardView(
                         playerEntry: playerEntry,
                         animateIn: shouldAnimatePlayer(playerEntry.id),
                         onTap: nil, // No card-level tap - use individual buttons instead
-                        viewModel: viewModel
+                        viewModel: allLLivePlayersViewModel
                     )
                     .onAppear {
                         handlePlayerAppearance(playerEntry)
                     }
                 }
             }
-            .id(viewModel.sortChangeID) // 🔥 FIXED: Force LazyVStack to rebuild when sort changes
+            .id(allLLivePlayersViewModel.sortChangeID) // 🔥 FIXED: Force LazyVStack to rebuild when sort changes
             .padding(.horizontal, 20) // 🔥 FIXED: Increased horizontal padding from default to 20 to prevent edge clipping
             .padding(.top, 4) // 🔥 REDUCED: From 12 to 4 for tighter spacing
             .padding(.bottom, 12) // Keep bottom padding for safe area
         }
         .clipped() // Prevent scroll view overflow during fast scrolling
-        .onChange(of: viewModel.shouldResetAnimations) { _, shouldReset in
+        .onChange(of: allLLivePlayersViewModel.shouldResetAnimations) { _, shouldReset in
             if shouldReset {
                 // 🔥 FIXED: Clear animation state when sorting changes
                 animatedPlayers.removeAll()
@@ -61,7 +61,7 @@ struct AllLivePlayersListView: View {
         guard shouldAnimatePlayer(playerEntry.id) else { return }
         
         // Get the index for staggered animation
-        let index = viewModel.filteredPlayers.firstIndex(where: { $0.id == playerEntry.id }) ?? 0
+        let index = allLLivePlayersViewModel.filteredPlayers.firstIndex(where: { $0.id == playerEntry.id }) ?? 0
         
         // Optimized staggered animation with shorter delays
         let delay = min(Double(index) * 0.03, 0.8) // Reduced delay and cap
@@ -69,7 +69,7 @@ struct AllLivePlayersListView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             // Check if view is still alive and player still exists
             guard !Task.isCancelled,
-                  viewModel.filteredPlayers.contains(where: { $0.id == playerEntry.id }),
+                  allLLivePlayersViewModel.filteredPlayers.contains(where: { $0.id == playerEntry.id }),
                   shouldAnimatePlayer(playerEntry.id) else { return }
             
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -82,7 +82,7 @@ struct AllLivePlayersListView: View {
 #Preview {
     NavigationView {
         AllLivePlayersListView(
-            viewModel: AllLivePlayersViewModel.shared,
+            allLLivePlayersViewModel: AllLivePlayersViewModel.shared,
             animatedPlayers: .constant([]),
             onPlayerTap: { _ in }
         )

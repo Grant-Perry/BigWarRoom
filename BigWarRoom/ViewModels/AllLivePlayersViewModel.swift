@@ -50,19 +50,45 @@ final class AllLivePlayersViewModel: ObservableObject {
     
     // MARK: - Internal State (not published)
     internal var weekSubscription: AnyCancellable?
+    internal var matchupsSubscription: AnyCancellable?
     internal var debounceTask: Task<Void, Never>?
     internal var isBatchingUpdates = false
     
     // MARK: - Private Init
     private init() {
         subscribeToWeekChanges()
-        // 🔥 REMOVED: subscribeToMatchupsChanges() - no longer needed with centralized loading
+        subscribeToMatchupsUpdates()
     }
     
     // MARK: - Cleanup
     deinit {
         debounceTask?.cancel()
         weekSubscription?.cancel()
+        matchupsSubscription?.cancel()
+    }
+    
+    // 🔥 NEW: Subscribe to MatchupsHubViewModel updates
+    private func subscribeToMatchupsUpdates() {
+        print("🔄 LIVE PLAYERS DEBUG: Setting up subscription to MatchupsHub updates")
+        matchupsSubscription = matchupsHubViewModel.$lastUpdateTime
+            .removeDuplicates()
+            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
+            .sink { [weak self] updateTime in
+                guard let self = self,
+                      !self.allPlayers.isEmpty,
+                      !self.matchupsHubViewModel.isLoading else { 
+                    let playersCount = self?.allPlayers.count ?? 0
+                    let isLoading = self?.matchupsHubViewModel.isLoading ?? true
+                    print("🔄 LIVE PLAYERS DEBUG: Subscription triggered but conditions not met - players: \(playersCount), loading: \(isLoading)")
+                    return 
+                }
+                
+                print("🔄 LIVE PLAYERS DEBUG: MatchupsHub updated at \(updateTime), triggering player data refresh")
+                
+                Task { @MainActor in
+                    await self.performLiveUpdate()
+                }
+            }
     }
 }
 

@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sheet for filtering and sorting all live players data
 struct AllLivePlayersFiltersSheet: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -74,10 +74,10 @@ struct AllLivePlayersFiltersSheet: View {
                 ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                     FilterChip(
                         title: position.displayName,
-                        isSelected: viewModel.selectedPosition == position,
+                        isSelected: allLivePlayersViewModel.selectedPosition == position,
                         color: positionColor(for: position.rawValue)
                     ) {
-                        viewModel.setPositionFilter(position)
+                        allLivePlayersViewModel.setPositionFilter(position)
                     }
                 }
             }
@@ -94,10 +94,10 @@ struct AllLivePlayersFiltersSheet: View {
                 ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                     FilterChip(
                         title: method.displayName,
-                        isSelected: viewModel.sortingMethod == method,
+                        isSelected: allLivePlayersViewModel.sortingMethod == method,
                         color: .purple
                     ) {
-                        viewModel.setSortingMethod(method)
+                        allLivePlayersViewModel.setSortingMethod(method)
                     }
                 }
             }
@@ -113,18 +113,18 @@ struct AllLivePlayersFiltersSheet: View {
                 HStack(spacing: 12) {
                     FilterChip(
                         title: "High to Low",
-                        isSelected: viewModel.sortHighToLow,
+                        isSelected: allLivePlayersViewModel.sortHighToLow,
                         color: .blue
                     ) {
-                        viewModel.setSortDirection(highToLow: true)
+                        allLivePlayersViewModel.setSortDirection(highToLow: true)
                     }
                     
                     FilterChip(
                         title: "Low to High",
-                        isSelected: !viewModel.sortHighToLow,
+                        isSelected: !allLivePlayersViewModel.sortHighToLow,
                         color: .blue
                     ) {
-                        viewModel.setSortDirection(highToLow: false)
+                        allLivePlayersViewModel.setSortDirection(highToLow: false)
                     }
                 }
             }
@@ -139,8 +139,8 @@ struct AllLivePlayersFiltersSheet: View {
             
             // Active players only toggle
             HStack {
-                Image(systemName: viewModel.showActiveOnly ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(viewModel.showActiveOnly ? .green : .gray)
+                Image(systemName: allLivePlayersViewModel.showActiveOnly ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(allLivePlayersViewModel.showActiveOnly ? .green : .gray)
                     .font(.system(size: 20))
                 
                 VStack(alignment: .leading, spacing: 2) {
@@ -157,7 +157,7 @@ struct AllLivePlayersFiltersSheet: View {
             }
             .contentShape(Rectangle())
             .onTapGesture {
-                viewModel.setShowActiveOnly(!viewModel.showActiveOnly)
+                allLivePlayersViewModel.setShowActiveOnly(!allLivePlayersViewModel.showActiveOnly)
             }
             .padding()
             .background(
@@ -170,10 +170,10 @@ struct AllLivePlayersFiltersSheet: View {
     // MARK: - Helper Methods
     
     private func resetFilters() {
-        viewModel.setPositionFilter(.all)
-        viewModel.setSortingMethod(.score)
-        viewModel.setSortDirection(highToLow: true)
-        viewModel.setShowActiveOnly(false)
+        allLivePlayersViewModel.setPositionFilter(.all)
+        allLivePlayersViewModel.setSortingMethod(.score)
+        allLivePlayersViewModel.setSortDirection(highToLow: true)
+        allLivePlayersViewModel.setShowActiveOnly(false)
     }
     
     private func positionColor(for position: String) -> Color {
@@ -218,6 +218,6 @@ private struct FilterChip: View {
 }
 
 #Preview("All Live Players Filters Sheet") {
-    AllLivePlayersFiltersSheet(viewModel: AllLivePlayersViewModel.shared)
+    AllLivePlayersFiltersSheet(allLivePlayersViewModel: AllLivePlayersViewModel.shared)
         .preferredColorScheme(.dark)
 }

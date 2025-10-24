@@ -41,7 +41,7 @@ struct AllLivePlayersView: View {
                 VStack(spacing: 0) {
                     // 🔥 FIXED: Header with NO top padding
                     AllLivePlayersHeaderView(
-                        viewModel: allLivePlayersViewModel,
+                        allLivePlayersViewModel: allLivePlayersViewModel,
                         sortHighToLow: $sortHighToLow,
                         showingWeekPicker: $showingWeekPicker,
                         onAnimationReset: resetAnimations,
@@ -93,7 +93,7 @@ struct AllLivePlayersView: View {
             WeekPickerView(isPresented: $showingWeekPicker)
         }
         .sheet(isPresented: $showingFilters) {
-            AllLivePlayersFiltersSheet(viewModel: allLivePlayersViewModel)
+            AllLivePlayersFiltersSheet(allLivePlayersViewModel: allLivePlayersViewModel)
         }
         .sheet(isPresented: $showingWatchedPlayers) {
             WatchedPlayersSheet(watchService: watchService)
@@ -145,14 +145,14 @@ struct AllLivePlayersView: View {
             if allLivePlayersViewModel.filteredPlayers.isEmpty {
                 return AnyView(
                     AllLivePlayersEmptyStateView(
-                        viewModel: allLivePlayersViewModel,
+                        allLivePlayersViewModel: allLivePlayersViewModel,
                         onAnimationReset: resetAnimations
                     )
                 )
             } else {
                 return AnyView(
                     AllLivePlayersListView(
-                        viewModel: allLivePlayersViewModel,
+                        allLLivePlayersViewModel: allLivePlayersViewModel,
                         animatedPlayers: $animatedPlayers,
                         onPlayerTap: handlePlayerTap
                     )
@@ -162,7 +162,7 @@ struct AllLivePlayersView: View {
         case .empty:
             return AnyView(
                 AllLivePlayersEmptyStateView(
-                    viewModel: allLivePlayersViewModel,
+                    allLivePlayersViewModel: allLivePlayersViewModel,
                     onAnimationReset: resetAnimations
                 )
             )

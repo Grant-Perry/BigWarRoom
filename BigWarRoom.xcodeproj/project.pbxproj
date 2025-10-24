@@ -50,8 +50,8 @@
 		9B6733512E5CD535005F2CAF = {
 			isa = PBXGroup;
 			children = (
-				9B61A8B42EA028D900E8E313 /* File.txt */,
 				9B67335C2E5CD535005F2CAF /* BigWarRoom */,
+				9B61A8B42EA028D900E8E313 /* File.txt */,
 				9B67335B2E5CD535005F2CAF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -289,7 +289,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.57.15;
+				MARKETING_VERSION = 8.57.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -327,7 +327,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.57.15;
+				MARKETING_VERSION = 8.57.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

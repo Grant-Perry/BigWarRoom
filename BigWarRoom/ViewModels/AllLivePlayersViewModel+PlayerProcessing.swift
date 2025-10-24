@@ -63,32 +63,42 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Score Calculation
     private func getCalculatedPlayerScore(for player: FantasyPlayer, in matchup: UnifiedMatchup) -> Double {
+        // 🔥 CRITICAL FIX: Use the same logic as FantasyViewModel.getCorrectedPlayerScore()
         let currentWeek = WeekSelectionManager.shared.selectedWeek
         let currentYear = AppConstants.currentSeasonYear
         
+        // Get cached provider from MatchupsHubViewModel (same as FantasyViewModel)
         if let cachedProvider = matchupsHubViewModel.getCachedProvider(
             for: matchup.league, 
             week: currentWeek, 
             year: currentYear
         ) {
-            // ESPN leagues - get fresh score from cached matchup
+            // For ESPN leagues, get fresh score from the cached matchup data
             if matchup.league.source == .espn {
+                // Check if there's a fresh score from the current matchups
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
                     let freshScore = freshPlayer.currentPoints ?? 0.0
+                    print("🔄 SCORE CALC DEBUG: \(player.fullName) ESPN fresh score: \(freshScore) pts")
                     return freshScore
                 }
             }
             
-            // Sleeper leagues - use calculated score from provider
+            // For Sleeper leagues, use calculated score from provider
             if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
-                let freshScore = cachedProvider.getPlayerScore(playerId: player.id)
-                return freshScore
+                let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
+                print("🔄 SCORE CALC DEBUG: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
+                return calculatedScore
             }
         }
         
-        // Fallback to cached score
-        return player.currentPoints ?? 0.0
+        // 🔥 REMOVE: Manual playerStats lookup - it was causing incorrect scores
+        // The cached provider approach is the correct way
+        
+        // Final fallback to cached score
+        let fallbackScore = player.currentPoints ?? 0.0
+        print("🔄 SCORE CALC DEBUG: \(player.fullName) fallback score: \(fallbackScore) pts")
+        return fallbackScore
     }
     
     // MARK: - Build Player Data with Statistics
@@ -142,15 +152,30 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Surgical Data Update (Silent Background Updates)
     internal func updatePlayerDataSurgically() async {
+        print("🔄 SURGICAL UPDATE DEBUG: Starting surgical update")
         let allPlayerEntries = extractAllPlayers()
-        guard !allPlayerEntries.isEmpty else { return }
+        guard !allPlayerEntries.isEmpty else { 
+            print("🔄 SURGICAL UPDATE DEBUG: No player entries found")
+            return 
+        }
+        
+        print("🔄 SURGICAL UPDATE DEBUG: Extracted \(allPlayerEntries.count) player entries")
+        
+        // Log a few sample scores for comparison
+        let samplePlayers = Array(allPlayerEntries.prefix(3))
+        for player in samplePlayers {
+            print("🔄 SURGICAL UPDATE DEBUG: Sample - \(player.playerName): \(player.currentScore) pts")
+        }
         
         // 🔥 FIX: Update data silently but NOTIFY SwiftUI of changes
         await updatePlayerDataSilently(from: allPlayerEntries)
         lastUpdateTime = Date()
         
+        print("🔄 SURGICAL UPDATE DEBUG: Updated lastUpdateTime to \(lastUpdateTime)")
+        
         // 🔥 CRITICAL FIX: Notify SwiftUI that data changed without triggering loading states
         objectWillChange.send()
+        print("🔄 SURGICAL UPDATE DEBUG: Sent objectWillChange notification")
     }
     
     // 🔥 NEW: Truly silent update that doesn't trigger UI changes

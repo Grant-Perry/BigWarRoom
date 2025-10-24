@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CentralizedLoadingView: View {
-    @ObservedObject var loader: CentralizedAppLoader
+    @ObservedObject var centralizedAppLoader: CentralizedAppLoader
     @StateObject private var sharedStats = SharedStatsService.shared  // 🔥 NEW: Monitor stats loading
     
     @State private var animationOffset: CGFloat = 0
@@ -47,23 +47,23 @@ struct CentralizedLoadingView: View {
                 VStack(spacing: 16) {
                     // Progress bar
                     VStack(spacing: 8) {
-                        ProgressView(value: loader.loadingProgress)
+                        ProgressView(value: centralizedAppLoader.loadingProgress)
                             .progressViewStyle(LinearProgressViewStyle(tint: progressBarColor))
                             .scaleEffect(y: 2.0)
                             .frame(width: 250)
                         
-                        Text("\(Int(loader.loadingProgress * 100))%")
+                        Text("\(Int(centralizedAppLoader.loadingProgress * 100))%")
                             .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(progressColor(for: loader.loadingProgress))
-                            .animation(.easeInOut(duration: 0.3), value: loader.loadingProgress)
+                            .foregroundColor(progressColor(for: centralizedAppLoader.loadingProgress))
+                            .animation(.easeInOut(duration: 0.3), value: centralizedAppLoader.loadingProgress)
                     }
                     
                     // Current loading message
-                    Text(loader.currentLoadingMessage)
+                    Text(centralizedAppLoader.currentLoadingMessage)
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.white.opacity(0.9))
                         .multilineTextAlignment(.center)
-                        .animation(.easeInOut(duration: 0.3), value: loader.currentLoadingMessage)
+                        .animation(.easeInOut(duration: 0.3), value: centralizedAppLoader.currentLoadingMessage)
                     
                     // 🔥 NEW: Show stats loading status
                     if sharedStats.isLoading {
@@ -76,7 +76,7 @@ struct CentralizedLoadingView: View {
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.blue.opacity(0.8))
                         }
-                    } else if loader.canShowPartialData && loader.loadingProgress > 0.4 {
+                    } else if centralizedAppLoader.canShowPartialData && centralizedAppLoader.loadingProgress > 0.4 {
                         Text("Ready to show data")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.green.opacity(0.8))
@@ -100,7 +100,7 @@ struct CentralizedLoadingView: View {
     
     // 🔥 NEW: Dynamic loading message based on progress
     private var dynamicLoadingMessage: String {
-        switch loader.loadingProgress {
+        switch centralizedAppLoader.loadingProgress {
         case 0.0..<0.2:
             return "Starting up..."
         case 0.2..<0.4:
@@ -110,13 +110,13 @@ struct CentralizedLoadingView: View {
         case 0.8..<1.0:
             return "Finalizing..."
         default:
-            return loader.canShowPartialData ? "Ready!" : "Loading your fantasy data..."
+            return centralizedAppLoader.canShowPartialData ? "Ready!" : "Loading your fantasy data..."
         }
     }
     
     // 🔥 NEW: Progress bar color changes with loading stage
     private var progressBarColor: Color {
-        switch loader.loadingProgress {
+        switch centralizedAppLoader.loadingProgress {
         case 0.0..<0.4:
             return .blue
         case 0.4..<0.8:
@@ -250,30 +250,6 @@ struct CentralizedLoadingView: View {
 }
 
 #Preview {
-    CentralizedLoadingView(loader: CentralizedAppLoader.shared)
+    CentralizedLoadingView(centralizedAppLoader: CentralizedAppLoader.shared)
         .preferredColorScheme(.dark)
-}
-
-// MARK: - Color Extension for Interpolation
-extension Color {
-    func interpolated(with color: Color, by factor: Double) -> Color {
-        let factor = max(0, min(1, factor)) // Clamp factor between 0 and 1
-        
-        // Convert SwiftUI Colors to UIColors for easier interpolation
-        let uiColor1 = UIColor(self)
-        let uiColor2 = UIColor(color)
-        
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        
-        uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        
-        let r = r1 + (r2 - r1) * factor
-        let g = g1 + (g2 - g1) * factor
-        let b = b1 + (b2 - b1) * factor
-        let a = a1 + (a2 - a1) * factor
-        
-        return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: Double(a))
-    }
 }

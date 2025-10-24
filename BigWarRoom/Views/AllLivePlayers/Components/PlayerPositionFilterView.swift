@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Position filter dropdown menu component
 struct PlayerPositionFilterView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     let onPositionChange: () -> Void
     
     var body: some View {
@@ -17,13 +17,13 @@ struct PlayerPositionFilterView: View {
             ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        viewModel.setPositionFilter(position)
+                        allLivePlayersViewModel.setPositionFilter(position)
                         onPositionChange()
                     }
                 }) {
                     HStack {
                         Text(position.displayName)
-                        if viewModel.selectedPosition == position {
+                        if allLivePlayersViewModel.selectedPosition == position {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -31,7 +31,7 @@ struct PlayerPositionFilterView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Text(viewModel.selectedPosition.displayName)
+                Text(allLivePlayersViewModel.selectedPosition.displayName)
                     .fontWeight(.semibold)
                     .font(.subheadline)
                 
@@ -49,7 +49,7 @@ struct PlayerPositionFilterView: View {
 
 #Preview {
     PlayerPositionFilterView(
-        viewModel: AllLivePlayersViewModel.shared,
+        allLivePlayersViewModel: AllLivePlayersViewModel.shared,
         onPositionChange: {}
     )
 }

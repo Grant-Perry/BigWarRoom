@@ -28,7 +28,7 @@ struct ProgressiveAppView: View {
         Group {
             if appLoader.isLoading || !appLoader.hasCompletedInitialization {
                 // 🔥 FIX: Use progressive loading instead of blocking "load everything"
-                CentralizedLoadingView(loader: appLoader)
+                CentralizedLoadingView(centralizedAppLoader: appLoader)
                     .onAppear {
                         if !appLoader.hasCompletedInitialization {
                             Task {

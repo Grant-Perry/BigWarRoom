@@ -10,7 +10,7 @@ import Combine
 
 /// Complete header section with manager info, controls, and stats
 struct AllLivePlayersHeaderView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var sortHighToLow: Bool
     @Binding var showingWeekPicker: Bool
     let onAnimationReset: () -> Void
@@ -40,7 +40,7 @@ struct AllLivePlayersHeaderView: View {
             weekPickerWithIconsRow
             
             // Search bar (when active) - should appear RIGHT AFTER the week/icons row
-            if viewModel.isSearching {
+            if allLivePlayersViewModel.isSearching {
                 searchBarSection
             }
             
@@ -55,19 +55,19 @@ struct AllLivePlayersHeaderView: View {
         .padding(.bottom, 8)  // Minimal bottom padding
         .onAppear {
             // 🔥 FIX: Sync initial state between View and ViewModel
-            sortHighToLow = viewModel.sortHighToLow
+            sortHighToLow = allLivePlayersViewModel.sortHighToLow
             startGlobalRefreshCycle()
         }
         .onDisappear {
             stopGlobalRefreshCycle()
         }
-        .onChange(of: viewModel.sortHighToLow) { _, newValue in
+        .onChange(of: allLivePlayersViewModel.sortHighToLow) { _, newValue in
             // 🔥 FIX: Keep View state in sync when ViewModel changes
             sortHighToLow = newValue
         }
-        .onReceive(viewModel.objectWillChange) { _ in
+        .onReceive(allLivePlayersViewModel.objectWillChange) { _ in
             // 🔥 FIX: Update stable manager when new data is available
-            if let newManager = viewModel.firstAvailableManager {
+            if let newManager = allLivePlayersViewModel.firstAvailableManager {
                 stableManager = newManager
             }
         }
@@ -155,12 +155,12 @@ struct AllLivePlayersHeaderView: View {
                         Menu {
                             ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                                 Button(method.displayName) {
-                                    viewModel.setSortingMethod(method)
+                                    allLivePlayersViewModel.setSortingMethod(method)
                                 }
                             }
                         } label: {
                             VStack(spacing: 2) {
-                                Text(viewModel.sortingMethod.displayName.uppercased())
+                                Text(allLivePlayersViewModel.sortingMethod.displayName.uppercased())
                                     .font(.caption)  // Reduced from .subheadline to .caption
                                     .fontWeight(.bold)
                                     .foregroundColor(.purple)
@@ -168,7 +168,7 @@ struct AllLivePlayersHeaderView: View {
                                     .minimumScaleFactor(0.6)
                                 
                                 // Show sort direction text when Score is selected, otherwise "Sort By"
-                                Text(viewModel.sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
+                                Text(allLivePlayersViewModel.sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
                                     .font(.caption2)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
@@ -179,9 +179,9 @@ struct AllLivePlayersHeaderView: View {
                         .menuStyle(BorderlessButtonMenuStyle())
                         
                         // Sort Direction Arrow (only show for Score)
-                        if viewModel.sortingMethod == .score {
+                        if allLivePlayersViewModel.sortingMethod == .score {
                             Button(action: {
-                                viewModel.toggleSortDirection()
+                                allLivePlayersViewModel.toggleSortDirection()
                             }) {
                                 // Up arrow for Highest (sortHighToLow = true), Down arrow for Lowest
                                 Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
@@ -198,15 +198,15 @@ struct AllLivePlayersHeaderView: View {
                     Menu {
                         ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                             Button(position.displayName) {
-                                viewModel.setPositionFilter(position)
+                                allLivePlayersViewModel.setPositionFilter(position)
                             }
                         }
                     } label: {
                         VStack(spacing: 2) {
-                            Text(viewModel.selectedPosition.displayName.uppercased())
+                            Text(allLivePlayersViewModel.selectedPosition.displayName.uppercased())
                                 .font(.subheadline)
                                 .fontWeight(.bold)
-                                .foregroundColor(viewModel.selectedPosition == .all ? .gpBlue : .purple)
+                                .foregroundColor(allLivePlayersViewModel.selectedPosition == .all ? .gpBlue : .purple)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                             
@@ -224,13 +224,13 @@ struct AllLivePlayersHeaderView: View {
                     
                     // Active Only toggle (toggles between "Yes" and "No")
                     Button(action: { 
-                        viewModel.setShowActiveOnly(!viewModel.showActiveOnly)
+                        allLivePlayersViewModel.setShowActiveOnly(!allLivePlayersViewModel.showActiveOnly)
                     }) {
                         VStack(spacing: 2) {
-                            Text(viewModel.showActiveOnly ? "Yes" : "No")
+                            Text(allLivePlayersViewModel.showActiveOnly ? "Yes" : "No")
                                 .font(.subheadline)
                                 .fontWeight(.bold)
-                                .foregroundColor(viewModel.showActiveOnly ? .gpGreen : .gpRedPink)
+                                .foregroundColor(allLivePlayersViewModel.showActiveOnly ? .gpGreen : .gpRedPink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
                             
@@ -248,11 +248,11 @@ struct AllLivePlayersHeaderView: View {
                     
                     // Search toggle button
                     Button(action: {
-                        if viewModel.isSearching {
-                            viewModel.clearSearch()
+                        if allLivePlayersViewModel.isSearching {
+                            allLivePlayersViewModel.clearSearch()
                             isSearchFocused = false // Clear focus when closing search
                         } else {
-                            viewModel.isSearching = true
+                            allLivePlayersViewModel.isSearching = true
                             // 🔥 FIX: Focus the search field automatically when opening search
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                 isSearchFocused = true
@@ -260,10 +260,10 @@ struct AllLivePlayersHeaderView: View {
                         }
                     }) {
                         VStack(spacing: 2) {
-                            Image(systemName: viewModel.isSearching ? "xmark" : "magnifyingglass")
+                            Image(systemName: allLivePlayersViewModel.isSearching ? "xmark" : "magnifyingglass")
                                 .font(.subheadline)
                                 .fontWeight(.bold)
-                                .foregroundColor(viewModel.isSearching ? .gpRedPink : .gpBlue)
+                                .foregroundColor(allLivePlayersViewModel.isSearching ? .gpRedPink : .gpBlue)
                             
                             Text("Search")
                                 .font(.caption2)
@@ -300,7 +300,7 @@ struct AllLivePlayersHeaderView: View {
         VStack(spacing: 8) {
             // Search input row
             HStack {
-                TextField("Search players by name...", text: $viewModel.searchText)
+                TextField("Search players by name...", text: $allLivePlayersViewModel.searchText)
                     .font(.system(size: 16, weight: .medium))
                     .foregroundColor(.black)
                     .padding(.horizontal, 16)
@@ -318,12 +318,12 @@ struct AllLivePlayersHeaderView: View {
                             isSearchFocused = true
                         }
                     }
-                    .onChange(of: viewModel.searchText) { _, newValue in
-                        viewModel.setSearchText(newValue)
+                    .onChange(of: allLivePlayersViewModel.searchText) { _, newValue in
+                        allLivePlayersViewModel.setSearchText(newValue)
                     }
                 
                 Button("Cancel") {
-                    viewModel.clearSearch()
+                    allLivePlayersViewModel.clearSearch()
                     isSearchFocused = false // 🔥 FIX: Clear focus on cancel
                 }
                 .foregroundColor(.gpBlue)
@@ -333,12 +333,12 @@ struct AllLivePlayersHeaderView: View {
             HStack {
                 // Rostered Only checkbox
                 Button(action: {
-                    viewModel.toggleRosteredFilter()
+                    allLivePlayersViewModel.toggleRosteredFilter()
                 }) {
                     HStack(spacing: 8) {
-                        Image(systemName: viewModel.showRosteredOnly ? "checkmark.square.fill" : "square")
+                        Image(systemName: allLivePlayersViewModel.showRosteredOnly ? "checkmark.square.fill" : "square")
                             .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(viewModel.showRosteredOnly ? .gpGreen : .secondary)
+                            .foregroundColor(allLivePlayersViewModel.showRosteredOnly ? .gpGreen : .secondary)
                         
                         Text("Rostered Only")
                             .font(.subheadline)
@@ -351,7 +351,7 @@ struct AllLivePlayersHeaderView: View {
                 Spacer()
                 
                 // Results count
-                Text("\(viewModel.filteredPlayers.count) results")
+                Text("\(allLivePlayersViewModel.filteredPlayers.count) results")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -364,7 +364,7 @@ struct AllLivePlayersHeaderView: View {
                 .fill(Color.clear)
                 .frame(height: 0)
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.isSearching)
+        .animation(.easeInOut(duration: 0.3), value: allLivePlayersViewModel.isSearching)
     }
     
     // MARK: - Stats Overview Section (Intelligence style)
@@ -399,21 +399,21 @@ struct AllLivePlayersHeaderView: View {
             .buttonStyle(PlainButtonStyle())
             
             StatCardView(
-                value: String(format: "%.1f", viewModel.topScore),
+                value: String(format: "%.1f", allLivePlayersViewModel.topScore),
                 label: "TOP SCORE",
                 color: .gpGreen
             )
             
             StatCardView(
-                value: viewModel.selectedPosition.displayName.uppercased(),
+                value: allLivePlayersViewModel.selectedPosition.displayName.uppercased(),
                 label: "POSITION",
                 color: .purple
             )
             
             StatCardView(
-                value: viewModel.showActiveOnly ? "YES" : "NO",
+                value: allLivePlayersViewModel.showActiveOnly ? "YES" : "NO",
                 label: "ACTIVE ONLY",
-                color: viewModel.showActiveOnly ? .gpGreen : .gpRedPink
+                color: allLivePlayersViewModel.showActiveOnly ? .gpGreen : .gpRedPink
             )
         }
         .padding(.horizontal, 8)
@@ -434,9 +434,9 @@ struct AllLivePlayersHeaderView: View {
     }
     
     private func getOverallPerformanceEmoji() -> String {
-        let totalPlayers = viewModel.filteredPlayers.count
-        let highPerformers = viewModel.filteredPlayers.filter { $0.currentScore > 15.0 }.count
-        let lowPerformers = viewModel.filteredPlayers.filter { $0.currentScore < 5.0 }.count
+        let totalPlayers = allLivePlayersViewModel.filteredPlayers.count
+        let highPerformers = allLivePlayersViewModel.filteredPlayers.filter { $0.currentScore > 15.0 }.count
+        let lowPerformers = allLivePlayersViewModel.filteredPlayers.filter { $0.currentScore < 5.0 }.count
         
         if totalPlayers == 0 { return "📊" }
         
@@ -464,13 +464,13 @@ struct AllLivePlayersHeaderView: View {
     // 🔥 NEW: Computed property that provides stable manager info
     private var currentManager: ManagerInfo? {
         // Prefer fresh data, fallback to stable version during refresh
-        return viewModel.firstAvailableManager ?? stableManager
+        return allLivePlayersViewModel.firstAvailableManager ?? stableManager
     }
     
     // MARK: - Background Refresh (No UI Resets)
     private func performBackgroundRefresh() async {
         // 🔥 FIXED: Use silent live update instead of full refresh to prevent spinning orbs
-        await viewModel.performLiveUpdate()
+        await allLivePlayersViewModel.performLiveUpdate()
         resetCountdown()
         // DO NOT call onAnimationReset() here - that causes the jarring refresh
     }
@@ -478,7 +478,7 @@ struct AllLivePlayersHeaderView: View {
     // 🔥 NEW: Refresh with UI reset - for manual refresh button
     private func performRefreshWithReset() async {
         // 🔥 NUCLEAR OPTION: Complete state reset to fix filtering bugs
-        await viewModel.hardResetFilteringState()
+        await allLivePlayersViewModel.hardResetFilteringState()
         onAnimationReset() // Reset animations and UI state
         resetCountdown()
     }
@@ -488,14 +488,14 @@ struct AllLivePlayersHeaderView: View {
         stopGlobalRefreshCycle()
         
         // Initialize stable manager on first load
-        if let manager = viewModel.firstAvailableManager {
+        if let manager = allLivePlayersViewModel.firstAvailableManager {
             stableManager = manager
         }
         
         // Start the actual refresh timer (every 15 seconds)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !viewModel.isLoading {
+                if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
                 }

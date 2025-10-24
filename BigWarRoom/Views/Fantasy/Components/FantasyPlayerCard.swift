@@ -39,6 +39,23 @@ struct FantasyPlayerCard: View {
                     )
                 )
                 
+                // 🔥 FIX: Team logo overlay behind player content (like WatchedPlayersSheet)
+                HStack {
+                    Spacer()
+                    VStack {
+                        if let team = NFLTeam.team(for: player.team ?? "") {
+                            TeamAssetManager.shared.logoOrFallback(for: team.id)
+                                .frame(width: 90, height: 90)
+                                .opacity(viewModel.isPlayerLive(player) ? 0.4 : 0.25)
+                                .offset(x: 10, y: 10)
+                                .zIndex(0)
+                        }
+                        Spacer()
+                    }
+                }
+                .padding(.top, 20)
+                .padding(.trailing, 15)
+                
                 // 🔥 SIMPLIFIED: Reuse existing content components but cleaned up
                 buildMainContent()
             }

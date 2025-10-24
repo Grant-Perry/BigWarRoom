@@ -9,20 +9,20 @@ import SwiftUI
 
 /// Stats summary display with player count, top score, and position filter
 struct AllLivePlayersStatsSummaryView: View {
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
     let onPositionChange: () -> Void
     
     var body: some View {
         HStack(spacing: 20) {
             StatBlock(
                 title: "Players",
-                value: "\(viewModel.filteredPlayers.count)",
+                value: "\(allLivePlayersViewModel.filteredPlayers.count)",
                 color: .gpGreen
             )
             
             StatBlock(
                 title: "Top Score",
-                value: String(format: "%.1f", viewModel.positionTopScore > 0 ? viewModel.positionTopScore : viewModel.topScore),
+                value: String(format: "%.1f", allLivePlayersViewModel.positionTopScore > 0 ? allLivePlayersViewModel.positionTopScore : allLivePlayersViewModel.topScore),
                 color: .blue
             )
             
@@ -30,13 +30,13 @@ struct AllLivePlayersStatsSummaryView: View {
                 ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                     Button(action: {
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.setPositionFilter(position)
+                            allLivePlayersViewModel.setPositionFilter(position)
                             onPositionChange()
                         }
                     }) {
                         HStack {
                             Text(position.displayName)
-                            if viewModel.selectedPosition == position {
+                            if allLivePlayersViewModel.selectedPosition == position {
                                 Image(systemName: "checkmark")
                             }
                         }
@@ -45,7 +45,7 @@ struct AllLivePlayersStatsSummaryView: View {
             } label: {
                 StatBlock(
                     title: "Position",
-                    value: viewModel.selectedPosition.displayName,
+                    value: allLivePlayersViewModel.selectedPosition.displayName,
                     color: .orange
                 )
             }
@@ -53,7 +53,7 @@ struct AllLivePlayersStatsSummaryView: View {
             
             // Completed games filter styled as stat blocks
             CompletedGamesFilterView(
-                viewModel: viewModel,
+                allLivePlayersViewModel: allLivePlayersViewModel,
                 onFilterChange: onPositionChange
             )
             
@@ -64,7 +64,7 @@ struct AllLivePlayersStatsSummaryView: View {
 
 #Preview {
     AllLivePlayersStatsSummaryView(
-        viewModel: AllLivePlayersViewModel.shared,
+        	  allLivePlayersViewModel: AllLivePlayersViewModel.shared,
         onPositionChange: {}
     )
 }

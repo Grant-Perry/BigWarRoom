@@ -80,8 +80,11 @@ extension AllLivePlayersViewModel {
         let currentYear = AppConstants.currentSeasonYear
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(selectedWeek)"
+        
+        print("🔄 STATS DEBUG: Loading player stats from \(urlString)")
 
         guard let url = URL(string: urlString) else {
+            print("🔄 STATS DEBUG: Invalid URL, marking stats as loaded")
             await MainActor.run { self.statsLoaded = true }
             return
         }
@@ -92,14 +95,25 @@ extension AllLivePlayersViewModel {
             guard !Task.isCancelled else { return }
 
             let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+            
+            print("🔄 STATS DEBUG: Successfully loaded stats for \(statsData.keys.count) players")
+            
+            // Log a few sample player scores for debugging
+            let sampleStats = Array(statsData.prefix(3))
+            for (playerId, stats) in sampleStats {
+                let fantasyPoints = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
+                print("🔄 STATS DEBUG: Sample - Player \(playerId): \(fantasyPoints) pts")
+            }
 
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.playerStats = statsData
                 self.statsLoaded = true
+                print("🔄 STATS DEBUG: Updated playerStats on main thread")
                 self.objectWillChange.send()
             }
         } catch {
+            print("🔄 STATS DEBUG: Failed to load stats: \(error)")
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.statsLoaded = true
@@ -116,13 +130,24 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
-        guard isDataLoaded else { return }
+        guard isDataLoaded else { 
+            print("🔄 LIVE UPDATE DEBUG: Skipping - data not loaded yet")
+            return 
+        }
         
-        // FIX: Ensure we refresh underlying matchup data for fresh scores
-        await matchupsHubViewModel.loadAllMatchups()
+        print("🔄 LIVE UPDATE DEBUG: Starting background update")
+        let startTime = Date()
+        
+        // 🔥 CRITICAL FIX: Use background refresh instead of full loadAllMatchups()
+        print("🔄 LIVE UPDATE DEBUG: Performing background matchup refresh")
+        await matchupsHubViewModel.performManualRefresh() // Background refresh, no loading screen
         
         // Then update our player data surgically
+        print("🔄 LIVE UPDATE DEBUG: Updating player data surgically")
         await updatePlayerDataSurgically()
+        
+        let endTime = Date()
+        print("🔄 LIVE UPDATE DEBUG: Completed background update in \(endTime.timeIntervalSince(startTime)) seconds")
     }
     
     // MARK: - Week Changes Subscription
@@ -161,10 +186,7 @@ extension AllLivePlayersViewModel {
                 }
             }
     }
-    
-    // MARK: - OLD SUBSCRIPTION METHODS - REMOVED
-    // These are no longer needed with centralized initialization
-    
+
     // MARK: - Force Methods (For Compatibility)
     func forceLoadAllPlayers() async {
         lastLoadTime = nil

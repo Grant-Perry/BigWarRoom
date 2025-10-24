@@ -9,7 +9,7 @@ import SwiftUI
 
 /// No players for position view component
 struct AllLivePlayersNoPlayersView: View {
-    let viewModel: AllLivePlayersViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     let onAnimationReset: () -> Void
     
     var body: some View {
@@ -23,17 +23,17 @@ struct AllLivePlayersNoPlayersView: View {
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
             
-            Text("No players found for \(viewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
+            Text("No players found for \(allLivePlayersViewModel.selectedPosition.displayName). Try selecting a different position or check if games are currently active.")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
             // 🔥 NEW: Recovery button for stuck filter states
-            if viewModel.hasNoPlayersWithRecovery {
+            if allLivePlayersViewModel.hasNoPlayersWithRecovery {
                 Button(action: {
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        viewModel.recoverFromStuckState()
+                        allLivePlayersViewModel.recoverFromStuckState()
                         onAnimationReset()
                     }
                 }) {
@@ -54,14 +54,14 @@ struct AllLivePlayersNoPlayersView: View {
             
             // Show some stats about connected leagues
             VStack(spacing: 8) {
-                Text("✅ Connected: \(viewModel.connectedLeaguesCount) league\(viewModel.connectedLeaguesCount == 1 ? "" : "s")")
+                Text("✅ Connected: \(allLivePlayersViewModel.connectedLeaguesCount) league\(allLivePlayersViewModel.connectedLeaguesCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundColor(.green)
                 
-                if viewModel.selectedPosition != .all {
+                if allLivePlayersViewModel.selectedPosition != .all {
                     Button("Show All Positions") {
                         withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.setPositionFilter(.all)
+                            allLivePlayersViewModel.setPositionFilter(.all)
                             onAnimationReset()
                         }
                     }

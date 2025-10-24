@@ -9,7 +9,7 @@ import SwiftUI
 
 /// No leagues connected view component with enhanced visuals and integrated refresh
 struct AllLivePlayersNoLeaguesView: View {
-    let viewModel: AllLivePlayersViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     @State private var pulseAnimation = false
     @State private var gradientAnimation = false
     
@@ -19,7 +19,7 @@ struct AllLivePlayersNoLeaguesView: View {
             buildDramaticBackground()
             
             VStack(spacing: 24) {
-                if viewModel.isLoading {
+                if allLivePlayersViewModel.isLoading {
                     // Enhanced loading state
                     buildLoadingState()
                 } else {
@@ -202,8 +202,8 @@ struct AllLivePlayersNoLeaguesView: View {
     
     private func refreshData() {
         Task {
-            await viewModel.matchupsHubViewModel.loadAllMatchups()
-            await viewModel.loadAllPlayers()
+            await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
+            await allLivePlayersViewModel.loadAllPlayers()
         }
     }
 }
