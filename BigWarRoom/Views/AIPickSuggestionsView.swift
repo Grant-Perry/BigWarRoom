@@ -64,7 +64,9 @@ struct AIPickSuggestionsView: View {
     
     private func lockPlayerAsPick(_ suggestion: Suggestion) {
         viewModel.myPickInput = suggestion.player.shortKey
-        viewModel.lockMyPick()
+        Task {
+            await viewModel.lockMyPick()
+        }
         
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()

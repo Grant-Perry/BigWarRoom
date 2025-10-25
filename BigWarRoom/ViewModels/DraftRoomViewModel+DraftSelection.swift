@@ -38,25 +38,28 @@ extension DraftRoomViewModel {
                 let rosters = try await apiClient.fetchRosters(leagueID: leagueID)
                 allLeagueRosters = rosters
                 
-                DebugLogger.draft("Found \(rosters.count) rosters in league \(leagueID)")
+                logDebug("Found \(rosters.count) rosters in league \(leagueID)", category: "DraftRoom")
                 
                 await setupRosterIdentification(leagueWrapper: leagueWrapper, rosters: rosters)
                 await buildRosterDisplayInfo(rosters: rosters, leagueWrapper: leagueWrapper)
                 
+                // Update roster coordinator with current context
+                updateMyRosterInfo()
+                
                 // Only load actual roster if we have a roster ID
-                if _myRosterID != nil {
+                if myRosterID != nil {
                     await loadMyActualRoster()
                 }
                 
                 // Initialize pick tracking
                 lastPickCount = polling.allPicks.count
-                lastMyPickCount = polling.allPicks.filter { $0.rosterID == _myRosterID }.count
+                lastMyPickCount = polling.allPicks.filter { $0.rosterID == myRosterID }.count
                 
             } catch {
-                DebugLogger.error("Failed to fetch rosters for \(leagueWrapper.source.displayName) league: \(error)", category: .draft)
+                logError("Failed to fetch rosters for \(leagueWrapper.source.displayName) league: \(error)", category: "DraftRoom")
                 draftRosters = [:]
-                _myRosterID = nil
                 myDraftSlot = nil
+                updateMyRosterInfo()
             }
         }
         
@@ -67,36 +70,37 @@ extension DraftRoomViewModel {
     private func setupRosterIdentification(leagueWrapper: UnifiedLeagueManager.LeagueWrapper, rosters: [SleeperRoster]) async {
         // ESPN leagues: Use the pre-selected draft pick to find roster
         if leagueWrapper.source == .espn {
-            DebugLogger.draft("ESPN league - using pre-selected draft pick: \(myDraftSlot ?? -1)")
+            logDebug("ESPN league - using pre-selected draft pick: \(myDraftSlot ?? -1)", category: "DraftRoom")
             
-            // FIXED: Pure positional logic - ignore ESPN teamIds completely
             if let draftPosition = myDraftSlot {
-                // Don't try to match roster IDs - just use pure draft slot logic
-                _myRosterID = nil // Set to nil - we'll use draft slot matching instead
-                DebugLogger.draft("ESPN: Using pure positional logic for draft slot \(draftPosition)")
-                DebugLogger.draft("Your picks will be calculated using snake draft math from position \(draftPosition)")
+                // Use pure positional logic for ESPN - don't try to match roster IDs
+                logDebug("ESPN: Using pure positional logic for draft slot \(draftPosition)", category: "DraftRoom")
+                logDebug("Your picks will be calculated using snake draft math from position \(draftPosition)", category: "DraftRoom")
             } else {
-                DebugLogger.warning("Could not determine draft position for ESPN league", category: .draft)
+                logWarning("Could not determine draft position for ESPN league", category: "DraftRoom")
             }
             
         } else {
             // Sleeper leagues: Use Sleeper user ID matching
             if let userID = currentUserID {
-                DebugLogger.draft("Sleeper league - looking for my roster with userID: \(userID)")
+                logDebug("Sleeper league - looking for my roster with userID: \(userID)", category: "DraftRoom")
                 if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                    _myRosterID = myRoster.rosterID
+                    // Update roster coordinator
+                    if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                        defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
+                    }
                     myDraftSlot = myRoster.draftSlot
-                    DebugLogger.draft("Found MY Sleeper roster! RosterID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)")
+                    logDebug("Found MY Sleeper roster! RosterID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)", category: "DraftRoom")
                 } else {
-                    DebugLogger.warning("Could not find my roster with Sleeper userID: \(userID)", category: .draft)
+                    logWarning("Could not find my roster with Sleeper userID: \(userID)", category: "DraftRoom")
                 }
             }
         }
         
-        if _myRosterID == nil {
-            DebugLogger.warning("Could not identify my roster in this league", category: .draft)
+        if myRosterID == nil {
+            logWarning("Could not identify my roster in this league", category: "DraftRoom")
         } else {
-            DebugLogger.draft("Successfully identified my roster: ID=\(_myRosterID!), DraftSlot=\(myDraftSlot ?? -1)")
+            logDebug("Successfully identified my roster: ID=\(myRosterID!), DraftSlot=\(myDraftSlot ?? -1)", category: "DraftRoom")
         }
     }
     
@@ -122,21 +126,20 @@ extension DraftRoomViewModel {
         var displayName: String? = nil
 
         // For ESPN leagues accessed through Sleeper, ALWAYS try Sleeper user lookup FIRST
-        // Skip the generic ESPN team names and go straight to Sleeper user data
         if let ownerID = roster.ownerID, !ownerID.isEmpty {
             // Try cache first
             if let cached = userCache[ownerID] {
                 displayName = cached.displayName ?? cached.username
-                DebugLogger.draft("Using cached user: \(displayName ?? "nil")")
+                logDebug("Using cached user: \(displayName ?? "nil")", category: "DraftRoom")
             } else {
                 // Fetch and store in cache
                 do {
                     let fetched = try await sleeperClient.fetchUserByID(userID: ownerID)
                     userCache[ownerID] = fetched
                     displayName = fetched.displayName ?? fetched.username
-                    DebugLogger.draft("Fetched user: \(displayName ?? "nil") (username: \(fetched.username))")
+                    logDebug("Fetched user: \(displayName ?? "nil") (username: \(fetched.username))", category: "DraftRoom")
                 } catch {
-                    DebugLogger.warning("Could not fetch user for ownerID \(ownerID): \(error)", category: .draft)
+                    logWarning("Could not fetch user for ownerID \(ownerID): \(error)", category: "DraftRoom")
                     displayName = nil
                 }
             }
@@ -188,30 +191,30 @@ extension DraftRoomViewModel {
         do {
             let draft = try await apiClient.fetchDraft(draftID: draftID)
             
-            DebugLogger.draft("ESPN Draft Status: \(draft.status.rawValue)")
-            DebugLogger.draft("Draft Type: \(draft.type.rawValue)")
+            logDebug("ESPN Draft Status: \(draft.status.rawValue)", category: "DraftRoom")
+            logDebug("Draft Type: \(draft.type.rawValue)", category: "DraftRoom")
             
-            // FIXED: Be more liberal about when to poll - poll for any active/upcoming status
+            // Be more liberal about when to poll - poll for any active/upcoming status
             if draft.status.isActiveOrUpcoming {
-                DebugLogger.draft("ESPN draft is ACTIVE/UPCOMING (status: \(draft.status.rawValue)) - starting polling", level: .info)
+                logInfo("ESPN draft is ACTIVE/UPCOMING (status: \(draft.status.rawValue)) - starting polling", category: "DraftRoom")
                 polling.startPolling(draftID: draftID, apiClient: apiClient)
             } else {
-                DebugLogger.draft("ESPN draft is COMPLETED (status: \(draft.status.rawValue)) - fetching final picks only", level: .info)
+                logInfo("ESPN draft is COMPLETED (status: \(draft.status.rawValue)) - fetching final picks only", category: "DraftRoom")
                 
                 // Fetch picks once for display but don't start continuous polling
                 do {
                     let picks = try await apiClient.fetchDraftPicks(draftID: draftID)
-                    DebugLogger.draft("Fetched \(picks.count) completed draft picks for display", level: .info)
+                    logInfo("Fetched \(picks.count) completed draft picks for display", category: "DraftRoom")
                     
                     // Update polling service with the completed data without starting timer
                     await polling.setCompletedDraftData(draft: draft, picks: picks)
                 } catch {
-                    DebugLogger.warning("Could not fetch completed draft picks: \(error)", category: .draft)
+                    logWarning("Could not fetch completed draft picks: \(error)", category: "DraftRoom")
                 }
             }
         } catch {
-            DebugLogger.warning("Could not check ESPN draft status: \(error)", category: .draft)
-            DebugLogger.draft("Defaulting to polling (might be necessary for some ESPN leagues)")
+            logWarning("Could not check ESPN draft status: \(error)", category: "DraftRoom")
+            logDebug("Defaulting to polling (might be necessary for some ESPN leagues)", category: "DraftRoom")
             polling.startPolling(draftID: draftID, apiClient: apiClient)
         }
     }
@@ -219,14 +222,15 @@ extension DraftRoomViewModel {
     /// Handle ESPN draft pick selection
     func setESPNDraftPosition(_ position: Int) async {
         guard let pendingWrapper = pendingESPNLeagueWrapper else {
-            DebugLogger.warning("No pending ESPN league to configure", category: .draft)
+            logWarning("No pending ESPN league to configure", category: "DraftRoom")
             return
         }
         
-        DebugLogger.draft("ESPN draft pick selected: \(position)")
+        logDebug("ESPN draft pick selected: \(position)", category: "DraftRoom")
         
         // Set the position first
         myDraftSlot = position
+        updateMyRosterInfo()
         
         // Clear pending state
         pendingESPNLeagueWrapper = nil
@@ -235,10 +239,9 @@ extension DraftRoomViewModel {
         // Now complete the league selection with position set
         await completeLeagueSelection(pendingWrapper)
         
-        // FIXED: Auto-navigate to Fantasy tab for ANY draft position confirmation as requested by Gp
+        // Auto-navigate to Fantasy tab
         DispatchQueue.main.async {
             NSLog("🏈 Position \(position) selected - auto-navigating to Fantasy tab")
-            // Use notification to communicate with parent view
             NotificationCenter.default.post(
                 name: Notification.Name("NavigateToFantasy"), 
                 object: nil
@@ -250,7 +253,7 @@ extension DraftRoomViewModel {
     func cancelESPNPositionSelection() {
         pendingESPNLeagueWrapper = nil
         showingESPNPickPrompt = false
-        DebugLogger.draft("ESPN league selection cancelled")
+        logDebug("ESPN league selection cancelled", category: "DraftRoom")
     }
     
     // Legacy method for backward compatibility
@@ -275,7 +278,10 @@ extension DraftRoomViewModel {
                 
                 if let userID = currentUserID {
                     if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                        _myRosterID = myRoster.rosterID
+                        // Update roster coordinator
+                        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                            defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
+                        }
                         myDraftSlot = myRoster.draftSlot
                     }
                 }
@@ -294,13 +300,15 @@ extension DraftRoomViewModel {
                 await loadMyActualRoster()
                 
                 lastPickCount = polling.allPicks.count
-                lastMyPickCount = polling.allPicks.filter { $0.rosterID == _myRosterID }.count
+                lastMyPickCount = polling.allPicks.filter { $0.rosterID == myRosterID }.count
+                
+                updateMyRosterInfo()
                 
             } catch {
-                DebugLogger.error("Legacy draft selection failed: \(error)", category: .draft)
+                logError("Legacy draft selection failed: \(error)", category: "DraftRoom")
                 draftRosters = [:]
-                _myRosterID = nil
                 myDraftSlot = nil
+                updateMyRosterInfo()
             }
         }
         

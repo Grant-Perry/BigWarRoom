@@ -190,7 +190,13 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadPlayers() async {
+        // 🔥 PERFORMANCE FIX: Initialize DraftRoomViewModel data here instead of in init()
+        // This ensures UI shows first, then heavy data loading happens
         await AllLivePlayersViewModel.shared.loadAllPlayers()
+        
+        // Also initialize any DraftRoomViewModel data if needed
+        // Note: We'll need to get a reference to the DraftRoomViewModel instance
+        // This is handled by the MainTabView when it's ready
     }
     
     private func completeLoading() {
@@ -262,6 +268,7 @@ extension Color {
 struct MainTabView: View {
     @StateObject private var draftRoomViewModel = DraftRoomViewModel()
     @State private var selectedTab: Int
+    @State private var hasInitialized = false
     
     init(startOnSettings: Bool = false) {
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
@@ -325,6 +332,15 @@ struct MainTabView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
                 selectedTab = 0
+            }
+            .onAppear {
+                // 🔥 PERFORMANCE FIX: Initialize DraftRoomViewModel data after UI appears
+                if !hasInitialized {
+                    hasInitialized = true
+                    Task {
+                        await draftRoomViewModel.initializeDataAsync()
+                    }
+                }
             }
             
             // Version display

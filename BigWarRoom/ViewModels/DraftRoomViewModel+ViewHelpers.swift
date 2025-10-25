@@ -52,7 +52,9 @@ extension DraftRoomViewModel {
     /// Lock player as my pick
     func lockPlayerAsPick(_ suggestion: Suggestion) {
         myPickInput = suggestion.player.shortKey
-        lockMyPick()
+        Task {
+            await lockMyPick()
+        }
     }
     
     /// Get top suggestions for display (limited count)

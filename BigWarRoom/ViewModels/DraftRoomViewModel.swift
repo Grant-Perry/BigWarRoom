@@ -46,30 +46,42 @@ enum PositionFilter: CaseIterable, Identifiable {
 
 @MainActor
 final class DraftRoomViewModel: ObservableObject {
-    // MARK: - Published UI State
     
-    @Published var suggestions: [Suggestion] = []
-    @Published var selectedPositionFilter: PositionFilter = .all
-    @Published var selectedSortMethod: SortMethod = .wizard
+    // MARK: - Coordinators
+    
+    private let connectionCoordinator: DraftConnectionCoordinator
+    private let rosterCoordinator: DraftRosterCoordinator
+    private let suggestionsCoordinator: DraftSuggestionsCoordinator
+    
+    // MARK: - Forwarded Published Properties (from coordinators)
+    
+    // Connection properties
+    var connectionStatus: ConnectionStatus { connectionCoordinator.connectionStatus }
+    var sleeperDisplayName: String { connectionCoordinator.sleeperDisplayName }
+    var sleeperUsername: String { connectionCoordinator.sleeperUsername }
+    var allAvailableDrafts: [UnifiedLeagueManager.LeagueWrapper] { connectionCoordinator.allAvailableDrafts }
+    
+    // Roster properties
+    var roster: Roster { rosterCoordinator.roster }
+    var allDraftPicks: [EnhancedPick] { rosterCoordinator.allDraftPicks }
+    var recentLivePicks: [SleeperPick] { rosterCoordinator.recentLivePicks }
+    var myRosterID: Int? { rosterCoordinator.myRosterID }
+    
+    // Suggestions properties
+    var suggestions: [Suggestion] { suggestionsCoordinator.suggestions }
+    var selectedPositionFilter: PositionFilter { suggestionsCoordinator.selectedPositionFilter }
+    var selectedSortMethod: SortMethod { suggestionsCoordinator.selectedSortMethod }
+    
+    // MARK: - Published UI State (owned by ViewModel)
     
     @Published var picksFeed: String = ""
     @Published var myPickInput: String = ""
     
-    @Published var connectionStatus: ConnectionStatus = .disconnected
-    @Published var sleeperDisplayName: String = ""
-    @Published var sleeperUsername: String = ""
-    
-    @Published var allAvailableDrafts: [UnifiedLeagueManager.LeagueWrapper] = []
     @Published var selectedDraft: SleeperLeague?
     @Published var selectedLeagueWrapper: UnifiedLeagueManager.LeagueWrapper?
     
-    @Published var allDraftPicks: [EnhancedPick] = []
-    @Published var recentLivePicks: [SleeperPick] = []
-    
     @Published var pollingCountdown: Double = 0.0
     @Published var maxPollingInterval: Double = 15.0
-    
-    @Published var roster: Roster = .init()
     
     // MARK: - Pick Notifications
     
@@ -97,16 +109,13 @@ final class DraftRoomViewModel: ObservableObject {
     
     internal let sleeperClient = SleeperAPIClient.shared
     internal let espnClient = ESPNAPIClient.shared
-    internal let leagueManager = UnifiedLeagueManager()
     internal let playerDirectory = PlayerDirectoryStore.shared
     internal let polling = DraftPollingService.shared
-    internal let suggestionEngine = SuggestionEngine()
     
     // MARK: - Draft Context & User Tracking (Internal for extensions)
     
     internal var draftRosters: [Int: DraftRosterInfo] = [:]
     internal var currentUserID: String?
-    internal var _myRosterID: Int?  // Private storage
     internal var myDraftSlot: Int?
     internal var allLeagueRosters: [SleeperRoster] = []
     internal var lastPickCount = 0
@@ -115,25 +124,13 @@ final class DraftRoomViewModel: ObservableObject {
     // MARK: - Combine
     
     internal var cancellables = Set<AnyCancellable>()
-    internal var suggestionsTask: Task<Void, Never>?
     
     // MARK: - User cache for ownerID -> SleeperUser lookups
     internal var userCache: [String: SleeperUser] = [:]
     
-    // MARK: - Computed Properties for Views
-    
-    /// Expose myRosterID for UI components to identify user's picks
-    var myRosterID: Int? {
-        // For ESPN leagues using positional logic, return a synthetic roster ID
-        if _myRosterID == nil && myDraftSlot != nil {
-            // Use a synthetic ID based on draft slot for UI components
-            return myDraftSlot
-        }
-        return _myRosterID
-    }
+    // MARK: - Computed Properties
     
     /// Indicates whether we're using pure positional logic (for ESPN leagues and mock drafts)
-    /// This helps UI components know to ignore roster correlation and use snake draft math instead
     var isUsingPositionalLogic: Bool {
         // ESPN leagues ALWAYS use positional logic, even if they have roster info
         if selectedLeagueWrapper?.source == .espn {
@@ -141,7 +138,7 @@ final class DraftRoomViewModel: ObservableObject {
         }
         
         // Mock drafts and manual drafts without roster correlation
-        return _myRosterID == nil && myDraftSlot != nil
+        return myRosterID == nil && myDraftSlot != nil
     }
     
     /// Get the team count for the current draft (for positional calculations)
@@ -154,7 +151,6 @@ final class DraftRoomViewModel: ObservableObject {
         // Priority 1: Use pending ESPN league data if we're in the picker
         if let pendingWrapper = pendingESPNLeagueWrapper {
             let totalRosters = pendingWrapper.league.totalRosters
-            // x// x Print("🏈 maxTeamsInDraft - Using pending ESPN league: \(totalRosters)")
             return totalRosters
         }
         
@@ -164,7 +160,6 @@ final class DraftRoomViewModel: ObservableObject {
                       selectedDraft?.totalRosters ??
                       12 // Reduced default from 16 to 12 (more common)
         
-        // x// x Print("🏈 maxTeamsInDraft - Using fallback: \(fallback)")
         return fallback
     }
     
@@ -183,44 +178,64 @@ final class DraftRoomViewModel: ObservableObject {
     
     // MARK: - Init
     
-    init() {
+    init(
+        connectionCoordinator: DraftConnectionCoordinator? = nil,
+        rosterCoordinator: DraftRosterCoordinator? = nil,
+        suggestionsCoordinator: DraftSuggestionsCoordinator? = nil
+    ) {
+        // Use provided coordinators or create defaults
+        self.connectionCoordinator = connectionCoordinator ?? DefaultDraftConnectionCoordinator()
+        self.rosterCoordinator = rosterCoordinator ?? DefaultDraftRosterCoordinator()
+        self.suggestionsCoordinator = suggestionsCoordinator ?? DefaultDraftSuggestionsCoordinator()
+        
+        // Set up delegates
+        (self.connectionCoordinator as? DefaultDraftConnectionCoordinator)?.delegate = self
+        (self.rosterCoordinator as? DefaultDraftRosterCoordinator)?.delegate = self
+        (self.suggestionsCoordinator as? DefaultDraftSuggestionsCoordinator)?.delegate = self
+        
         bindToPollingService()
-        Task {
-            if playerDirectory.needsRefresh {
-                await playerDirectory.refreshPlayers()
-            }
-            await refreshSuggestions()
-        }
+        
+        // 🔥 PERFORMANCE FIX: Don't block init() with heavy operations!
+        // Let the loading screen handle data loading asynchronously
+        // This allows UI to show immediately while data loads in background
     }
     
-    // MARK: - Binding
+    // MARK: - Async Initialization (called after UI is shown)
+    
+    /// Initialize heavy data operations asynchronously
+    /// Call this from the loading screen or after UI appears
+    func initializeDataAsync() async {
+        // Only do heavy operations if needed
+        if playerDirectory.needsRefresh {
+            await playerDirectory.refreshPlayers()
+        }
+        await suggestionsCoordinator.refreshSuggestions()
+    }
+    
+    // MARK: - Polling Service Binding
     
     private func bindToPollingService() {
         polling.$allPicks
             .receive(on: DispatchQueue.main)
             .sink { [weak self] picks in
                 guard let self else { return }
-                self.recentLivePicks = Array(self.polling.recentPicks)
-                self.allDraftPicks = self.buildEnhancedPicks(from: picks)
                 
-                // Debug logging for mock draft tracking
-                if self.myDraftSlot != nil && self._myRosterID == nil {
-                    let mySlotPicks = picks.filter { $0.draftSlot == self.myDraftSlot }
-                    // x// x Print("🏈 Mock Draft Tracking - Slot \(self.myDraftSlot!): \(mySlotPicks.count) picks")
-                    for pick in mySlotPicks {
-                        if let playerID = pick.playerID,
-                           let player = self.playerDirectory.player(for: playerID) {
-                            // x// x Print("   • Pick \(pick.pickNo): \(player.shortName)")
-                        }
+                // Update roster coordinator with latest picks
+                let enhancedPicks = self.rosterCoordinator.buildEnhancedPicks(from: picks, draftRosters: self.draftRosters)
+                
+                // Manually update the published properties since we can't directly bind
+                Task { @MainActor in
+                    // Update roster coordinator's published properties
+                    if let defaultRosterCoordinator = self.rosterCoordinator as? DefaultDraftRosterCoordinator {
+                        defaultRosterCoordinator.recentLivePicks = Array(self.polling.recentPicks)
+                        defaultRosterCoordinator.allDraftPicks = enhancedPicks
                     }
-                }
-                
-                // Check for turn changes and new picks
-                Task { 
+                    
+                    // Check for turn changes and new picks
                     await self.checkForTurnChange()
                     await self.checkForMyNewPicks(picks)
-                    await self.updateMyRosterFromPicks(picks)
-                    await self.refreshSuggestions() 
+                    await self.rosterCoordinator.updateMyRosterFromPicks(picks)
+                    await self.suggestionsCoordinator.refreshSuggestions()
                 }
             }
             .store(in: &cancellables)
@@ -238,5 +253,204 @@ final class DraftRoomViewModel: ObservableObject {
                 self?.maxPollingInterval = interval
             }
             .store(in: &cancellables)
+    }
+    
+    // MARK: - Public Methods (Delegate to Coordinators)
+    
+    // Connection methods
+    func connectWithUsernameOrID(_ input: String, season: String = "2025") async {
+        await connectionCoordinator.connectWithUsernameOrID(input, season: season)
+    }
+    
+    func connectToESPNOnly() async {
+        await connectionCoordinator.connectToESPNOnly()
+    }
+    
+    func connectWithUserID(_ userID: String, season: String = "2025") async {
+        await connectionCoordinator.connectWithUserID(userID, season: season)
+    }
+    
+    func disconnectFromLive() {
+        // Clear local state
+        selectedDraft = nil
+        selectedLeagueWrapper = nil
+        polling.stopPolling()
+        currentUserID = nil
+        myDraftSlot = nil
+        allLeagueRosters = []
+        
+        // Reset manual draft state
+        isConnectedToManualDraft = false
+        manualDraftNeedsPosition = false
+        manualDraftInfo = nil
+        
+        // Update roster coordinator
+        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+            defaultRosterCoordinator.setMyRosterID(nil)
+            defaultRosterCoordinator.setMyDraftSlot(nil)
+        }
+        
+        // Delegate to connection coordinator
+        connectionCoordinator.disconnectFromLive()
+    }
+    
+    func refreshAllLeagues(season: String = "2025") async {
+        await connectionCoordinator.refreshAllLeagues(season: season)
+    }
+    
+    func debugESPNConnection() async {
+        await connectionCoordinator.debugESPNConnection()
+    }
+    
+    // Roster methods
+    func addFeedPick() {
+        rosterCoordinator.addFeedPick(picksFeed, playerDirectory: playerDirectory)
+    }
+    
+    func lockMyPick() async {
+        await rosterCoordinator.lockMyPick(myPickInput, playerDirectory: playerDirectory)
+        myPickInput = ""
+    }
+    
+    // Suggestions methods
+    func updatePositionFilter(_ filter: PositionFilter) async {
+        await suggestionsCoordinator.updatePositionFilter(filter)
+    }
+    
+    func updateSortMethod(_ method: SortMethod) async {
+        await suggestionsCoordinator.updateSortMethod(method)
+    }
+    
+    func refreshSuggestions() async {
+        await suggestionsCoordinator.refreshSuggestions()
+    }
+    
+    func forceRefresh() async {
+        await suggestionsCoordinator.forceRefresh()
+    }
+}
+
+// MARK: - DraftConnectionCoordinatorDelegate
+
+extension DraftRoomViewModel: DraftConnectionCoordinatorDelegate {
+    func connectionCoordinator(_ coordinator: DraftConnectionCoordinator, didConnectWithLeagues leagues: [UnifiedLeagueManager.LeagueWrapper]) {
+        // Handle successful connection - leagues are already updated in coordinator
+        AppLogger.info("DraftRoomViewModel: Connected with \(leagues.count) leagues", category: "DraftRoom")
+        
+        // Update our currentUserID to match
+        currentUserID = coordinator.currentUserID
+        
+        // Trigger UI update
+        objectWillChange.send()
+    }
+    
+    func connectionCoordinator(_ coordinator: DraftConnectionCoordinator, didFailWithError error: Error) {
+        AppLogger.error("DraftRoomViewModel: Connection failed: \(error)", category: "DraftRoom")
+    }
+    
+    func connectionCoordinator(_ coordinator: DraftConnectionCoordinator, didRefreshLeagues leagues: [UnifiedLeagueManager.LeagueWrapper]) {
+        AppLogger.info("DraftRoomViewModel: Refreshed \(leagues.count) leagues", category: "DraftRoom")
+        objectWillChange.send()
+    }
+    
+    func connectionCoordinatorDidDisconnect(_ coordinator: DraftConnectionCoordinator) {
+        AppLogger.info("DraftRoomViewModel: Disconnected from services", category: "DraftRoom")
+        currentUserID = nil
+        objectWillChange.send()
+    }
+}
+
+// MARK: - DraftRosterCoordinatorDelegate
+
+extension DraftRoomViewModel: DraftRosterCoordinatorDelegate {
+    func rosterCoordinator(_ coordinator: DraftRosterCoordinator, didUpdateRoster roster: Roster) {
+        AppLogger.info("DraftRoomViewModel: Roster updated with \(totalPlayersInRoster(roster)) players", category: "DraftRoom")
+        // Trigger suggestions refresh after roster update
+        Task {
+            await suggestionsCoordinator.refreshSuggestions()
+        }
+        objectWillChange.send()
+    }
+    
+    func rosterCoordinatorTeamCount(_ coordinator: DraftRosterCoordinator) -> Int {
+        return currentDraftTeamCount
+    }
+    
+    private func totalPlayersInRoster(_ roster: Roster) -> Int {
+        let starters = [roster.qb, roster.rb1, roster.rb2, roster.wr1, roster.wr2, roster.wr3,
+                       roster.te, roster.flex, roster.k, roster.dst].compactMap { $0 }.count
+        return starters + roster.bench.count
+    }
+}
+
+// MARK: - DraftSuggestionsCoordinatorDelegate
+
+extension DraftRoomViewModel: DraftSuggestionsCoordinatorDelegate {
+    func suggestionsCoordinatorGetContext(_ coordinator: DraftSuggestionsCoordinator) -> DraftSuggestionsContext? {
+        return DraftSuggestionsContext(
+            roster: roster,
+            selectedDraft: selectedDraft,
+            currentDraft: polling.currentDraft,
+            allPicks: polling.allPicks,
+            draftRosters: draftRosters,
+            myRosterPlayerIDs: rosterCoordinator.myRosterPlayerIDs()
+        )
+    }
+    
+    func suggestionsCoordinatorForceRefresh(_ coordinator: DraftSuggestionsCoordinator) async {
+        await polling.forceRefresh()
+    }
+}
+
+// MARK: - Internal Helper Methods (needed by extensions that remain)
+
+extension DraftRoomViewModel {
+    
+    // MARK: - Logging Helper Methods
+    
+    internal func logInfo(_ message: String, category: String) {
+        AppLogger.info(message, category: category)
+    }
+    
+    internal func logWarning(_ message: String, category: String) {
+        AppLogger.warning(message, category: category)
+    }
+    
+    internal func logError(_ message: String, category: String) {
+        AppLogger.error(message, category: category)
+    }
+    
+    internal func logDebug(_ message: String, category: String) {
+        AppLogger.debug(message, category: category)
+    }
+    
+    // MARK: - Roster Management Helpers
+    
+    internal func loadMyActualRoster() async {
+        await rosterCoordinator.loadMyActualRoster(from: allLeagueRosters)
+    }
+    
+    internal func updateMyRosterFromPicks(_ picks: [SleeperPick]) async {
+        await rosterCoordinator.updateMyRosterFromPicks(picks)
+        updateMyRosterInfo()
+    }
+    
+    internal func buildEnhancedPicks(from picks: [SleeperPick]) -> [EnhancedPick] {
+        return rosterCoordinator.buildEnhancedPicks(from: picks, draftRosters: draftRosters)
+    }
+    
+    internal func myRosterPlayerIDs() -> [String] {
+        return rosterCoordinator.myRosterPlayerIDs()
+    }
+    
+    internal func rostersAreEqual(_ r1: Roster, _ r2: Roster) -> Bool {
+        return rosterCoordinator.rostersAreEqual(r1, r2)
+    }
+    
+    internal func updateMyRosterInfo() {
+        // Update roster coordinator with current context
+        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+            defaultRosterCoordinator.setMyDraftSlot(self.myDraftSlot)
+        }
     }
 }

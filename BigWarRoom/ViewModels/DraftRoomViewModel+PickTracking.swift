@@ -8,13 +8,41 @@ import UIKit
 // MARK: - Pick Tracking, Turn Detection & Alerts
 extension DraftRoomViewModel {
     
+    /// Check if it's the user's turn to pick
+    internal func checkForTurnChange() async {
+        guard let draft = polling.currentDraft,
+              let myDraftSlot = myDraftSlot,
+              let teams = draft.settings?.teams else {
+            isMyTurn = false
+            return
+        }
+        
+        let currentPickNumber = polling.allPicks.count + 1
+        let wasMyTurn = isMyTurn
+        let newIsMyTurn = isMyTurnToPick(pickNumber: currentPickNumber, mySlot: myDraftSlot, totalTeams: teams)
+        
+        isMyTurn = newIsMyTurn
+        
+        // Show alert if it just became my turn
+        if newIsMyTurn && !wasMyTurn {
+            let round = ((currentPickNumber - 1) / teams) + 1
+            let pickInRound = ((currentPickNumber - 1) % teams) + 1
+            
+            pickAlertMessage = "⚡ IT'S YOUR PICK! ⚡\n\nRound \(round), Pick \(pickInRound)\n(\(currentPickNumber) overall)\n\nTime to make your selection!"
+            showingPickAlert = true
+            
+            // Haptic feedback
+            await triggerPickAlert()
+        }
+    }
+    
     /// Check for new picks I made and show confirmation
     internal func checkForMyNewPicks(_ picks: [SleeperPick]) async {
         var myPicks: [SleeperPick] = []
         var newMyPickCount = 0
         
         // Strategy 1: Use roster ID (for real Sleeper leagues)
-        if let myRosterID = _myRosterID {
+        if let myRosterID = myRosterID {
             myPicks = picks.filter { $0.rosterID == myRosterID }
             newMyPickCount = myPicks.count
         }
@@ -51,40 +79,13 @@ extension DraftRoomViewModel {
                     confirmationAlertMessage = "🎉 PICK CONFIRMED!\n\n\(player.fullName)\n\(player.position ?? "") • \(player.team ?? "")\n\nRound \(pick.round), Pick \(pick.pickNo)"
                     showingConfirmationAlert = true
                     
-                    // x// x Print("🏈 Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)")
+                    // Log the pick confirmation
+                    AppLogger.info("Confirmed your pick: \(player.shortName) at position \(pick.draftSlot)", category: "PickTracking")
                 }
             }
         }
         
         lastMyPickCount = newMyPickCount
-    }
-    
-    /// Check if it's the user's turn to pick
-    internal func checkForTurnChange() async {
-        guard let draft = polling.currentDraft,
-              let myDraftSlot = myDraftSlot,
-              let teams = draft.settings?.teams else {
-            isMyTurn = false
-            return
-        }
-        
-        let currentPickNumber = polling.allPicks.count + 1
-        let wasMyTurn = isMyTurn
-        let newIsMyTurn = isMyTurnToPick(pickNumber: currentPickNumber, mySlot: myDraftSlot, totalTeams: teams)
-        
-        isMyTurn = newIsMyTurn
-        
-        // Show alert if it just became my turn
-        if newIsMyTurn && !wasMyTurn {
-            let round = ((currentPickNumber - 1) / teams) + 1
-            let pickInRound = ((currentPickNumber - 1) % teams) + 1
-            
-            pickAlertMessage = "⚡ IT'S YOUR PICK! ⚡\n\nRound \(round), Pick \(pickInRound)\n(\(currentPickNumber) overall)\n\nTime to make your selection!"
-            showingPickAlert = true
-            
-            // Haptic feedback
-            await triggerPickAlert()
-        }
     }
     
     /// Calculate if it's my turn based on snake draft logic
@@ -138,25 +139,25 @@ extension DraftRoomViewModel {
     
     /// Public Team Name Helper with Debugging
     func teamDisplayName(for draftSlot: Int) -> String {
-        // x// x Print("🔍 DEBUG teamDisplayName for draftSlot \(draftSlot):")
-        // x// x Print("   draftRosters count: \(draftRosters.count)")
+        AppLogger.debug("Getting team display name for draftSlot \(draftSlot)", category: "PickTracking")
+        AppLogger.debug("draftRosters count: \(draftRosters.count)", category: "PickTracking")
         
         // Strategy 1: Find the rosterID that corresponds to this draft slot
         // Look through picks to find which roster ID is associated with this draft slot
         let picksForSlot = allDraftPicks.filter { $0.draftSlot == draftSlot }
-        // x// x Print("   Picks for slot \(draftSlot): \(picksForSlot.count)")
+        AppLogger.debug("Picks for slot \(draftSlot): \(picksForSlot.count)", category: "PickTracking")
         
         // Get the roster ID from any pick in this draft slot
         var rosterIDForSlot: Int? = nil
         if let firstPick = picksForSlot.first {
             rosterIDForSlot = firstPick.rosterInfo?.rosterID
-            // x// x Print("   Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)")
+            AppLogger.debug("Found rosterID \(rosterIDForSlot ?? -1) for draftSlot \(draftSlot)", category: "PickTracking")
         }
         
         // Strategy 2: If we found a roster ID, lookup its display name
         if let rosterID = rosterIDForSlot,
            let rosterInfo = draftRosters[rosterID] {
-            // x// x Print("   Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'")
+            AppLogger.debug("Found roster info for rosterID \(rosterID): '\(rosterInfo.displayName)'", category: "PickTracking")
             
             // Check if this is a real name (not generic "Team X")
             if !rosterInfo.displayName.isEmpty,
@@ -164,10 +165,10 @@ extension DraftRoomViewModel {
                rosterInfo.displayName != "Team \(draftSlot)",
                rosterInfo.displayName != "Team \(rosterID)",
                rosterInfo.displayName.count > 4 {
-                // x// x Print("   ✅ Using real name: '\(rosterInfo.displayName)'")
+                AppLogger.debug("Using real name: '\(rosterInfo.displayName)'", category: "PickTracking")
                 return rosterInfo.displayName
             } else {
-                // x// x Print("   ❌ Name '\(rosterInfo.displayName)' appears to be generic")
+                AppLogger.debug("Name '\(rosterInfo.displayName)' appears to be generic", category: "PickTracking")
             }
         }
         
@@ -180,7 +181,7 @@ extension DraftRoomViewModel {
             return directRoster.displayName
         }
         
-        // x// x Print("   ❌ No real name found, using fallback")
+        AppLogger.debug("No real name found, using fallback", category: "PickTracking")
         return "Team \(draftSlot)"
     }
 }

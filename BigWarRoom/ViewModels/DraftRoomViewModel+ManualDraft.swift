@@ -6,7 +6,9 @@ extension DraftRoomViewModel {
     func connectToManualDraft(draftID: String) async {
         // Start polling immediately to show picks
         polling.startPolling(draftID: draftID)
-        connectionStatus = .connected
+        
+        // Note: We can't directly modify connectionStatus since it's read-only from coordinator
+        // But we can track the manual draft connection separately
         isConnectedToManualDraft = true
         
         // Try to fetch draft info for basic display
@@ -72,7 +74,7 @@ extension DraftRoomViewModel {
                 // Ensure selectedManualPosition is valid for this draft
                 let teamCount = manualDraftInfo?.settings?.teams ?? selectedDraft?.totalRosters ?? 16
                 if selectedManualPosition > teamCount {
-                    selectedManualPosition = 1 // Reset to valid position
+                    selectedManualPosition = 1
                 }
             } else {
                 // Only close if we successfully auto-detected the roster
@@ -84,7 +86,7 @@ extension DraftRoomViewModel {
             // Ensure selectedManualPosition is valid for this draft
             let teamCount = manualDraftInfo?.settings?.teams ?? selectedDraft?.totalRosters ?? 16
             if selectedManualPosition > teamCount {
-                selectedManualPosition = 1 // Reset to valid position
+                selectedManualPosition = 1
             }
         }
         
@@ -105,22 +107,25 @@ extension DraftRoomViewModel {
             
             logDebug("Found league ID: \(leagueID)", category: "ManualDraft")
             
-            // Step 2: Fetch league info to create a SleeperLeague object
+            // Fetch league info to create a SleeperLeague object
             let league = try await sleeperClient.fetchLeague(leagueID: leagueID)
             logInfo("Fetched league: \(league.name)", category: "ManualDraft")
             
-            // Step 3: Fetch league rosters
+            // Fetch league rosters
             let rosters = try await sleeperClient.fetchRosters(leagueID: leagueID)
             allLeagueRosters = rosters
             
-            // Step 4: Find MY roster by matching owner ID with current user ID
+            // Find MY roster by matching owner ID with current user ID
             if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                _myRosterID = myRoster.rosterID
+                // Update roster coordinator
+                if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                    defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
+                }
                 myDraftSlot = myRoster.draftSlot
                 
                 logInfo("Found your roster! ID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)", category: "ManualDraft")
                 
-                // Step 5: Set up draft roster info for display
+                // Set up draft roster info for display
                 var info: [Int: DraftRosterInfo] = [:]
                 
                 for roster in rosters {
@@ -135,15 +140,17 @@ extension DraftRoomViewModel {
                 
                 draftRosters = info
                 
-                // Step 6: Update selectedDraft with real league info
+                // Update selectedDraft with real league info
                 selectedDraft = league
                 
-                // Step 7: Load your actual roster from the league
+                // Load your actual roster from the league
                 await loadMyActualRoster()
                 
-                // Step 8: Initialize pick tracking for alerts
+                // Initialize pick tracking for alerts
                 lastPickCount = polling.allPicks.count
-                lastMyPickCount = polling.allPicks.filter { $0.rosterID == _myRosterID }.count
+                lastMyPickCount = polling.allPicks.filter { $0.rosterID == myRosterID }.count
+                
+                updateMyRosterInfo()
                 
                 logInfo("Manual draft enhanced! Pick alerts and roster correlation enabled.", category: "ManualDraft")
                 return true
@@ -162,7 +169,7 @@ extension DraftRoomViewModel {
     private func resolveDisplayNameForManualDraft(roster: SleeperRoster) async -> String {
         var displayName: String? = nil
 
-        // Team name from roster metadata (usually blank unless user set it)
+        // Team name from roster metadata
         if let name = roster.metadata?.teamName, !name.isEmpty {
             displayName = name
         } else if let ownerName = roster.metadata?.ownerName, !ownerName.isEmpty {
@@ -197,12 +204,16 @@ extension DraftRoomViewModel {
     func setManualDraftPosition(_ position: Int) {
         myDraftSlot = position
         manualDraftNeedsPosition = false
+        updateMyRosterInfo()
         
         // For ESPN leagues, we need to find the roster ID that corresponds to this draft pick
         if let leagueWrapper = selectedLeagueWrapper, leagueWrapper.source == .espn {
             // Find the roster with this roster ID (ESPN roster ID = draft pick number)
             if let matchingRoster = allLeagueRosters.first(where: { $0.rosterID == position }) {
-                _myRosterID = matchingRoster.rosterID
+                // Update roster coordinator
+                if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                    defaultRosterCoordinator.setMyRosterID(matchingRoster.rosterID)
+                }
                 logInfo("ESPN: Set roster ID \(matchingRoster.rosterID) for draft pick \(position)", category: "ManualDraft")
                 
                 // Load the actual roster now that we know which one is mine
@@ -236,8 +247,6 @@ extension DraftRoomViewModel {
 
     func dismissManualPositionPrompt() {
         manualDraftNeedsPosition = false
-        
-        // Close the manual draft entry when they skip position selection
         showManualDraftEntry = false
     }
 }

@@ -21,13 +21,15 @@ struct AIPickSuggestionsFiltersView: View {
                 HStack(spacing: 12) {
                     ForEach(SortMethod.allCases) { method in
                         Button {
-                            viewModel.updateSortMethod(method)
+                            Task {
+                                await viewModel.updateSortMethod(method)
+                            }
                         } label: {
                             VStack(spacing: 4) {
                                 Text(method.displayName)
                                     .font(.system(size: 14, weight: .semibold))
                                 
-                                Text(method.description)
+                                Text(method.methodDescription)
                                     .font(.caption2)
                                     .multilineTextAlignment(.center)
                             }
@@ -59,7 +61,9 @@ struct AIPickSuggestionsFiltersView: View {
                     HStack(spacing: 8) {
                         ForEach(PositionFilter.allCases) { filter in
                             Button {
-                                viewModel.updatePositionFilter(filter)
+                                Task {
+                                    await viewModel.updatePositionFilter(filter)
+                                }
                             } label: {
                                 Text(filter.displayName)
                                     .font(.system(size: 13, weight: .medium))
@@ -86,5 +90,20 @@ struct AIPickSuggestionsFiltersView: View {
         .padding()
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - SortMethod Extension
+
+extension SortMethod {
+    var methodDescription: String {
+        switch self {
+        case .wizard:
+            return "AI-powered smart picks"
+        case .rankings:
+            return "Pure fantasy rankings"
+        case .all:
+            return "All available players"
+        }
     }
 }
