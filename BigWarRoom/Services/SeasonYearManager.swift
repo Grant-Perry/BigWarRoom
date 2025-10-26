@@ -15,7 +15,7 @@ import Combine
 /// 
 /// **Key Features:**
 /// - Singleton pattern for app-wide access
-/// - Defaults to current ESPN league year from AppConstants
+/// - Defaults to current NFL season year (2024)
 /// - When changed, propagates to ALL subscribers
 /// - Integrates with WeekPickerView for unified season/week control
 @MainActor
@@ -37,8 +37,15 @@ final class SeasonYearManager: ObservableObject {
     
     // MARK: - Initialization
     private init() {
-        // Start with current ESPN league year from AppConstants
-        self.selectedYear = AppConstants.ESPNLeagueYear
+        // 🔥 FIXED: Default to current NFL season (2025)
+        // Check if user has a saved preference, otherwise use 2025
+        let savedYear = AppConstants.ESPNLeagueYear
+        self.selectedYear = (savedYear == "2024") ? "2025" : savedYear
+        
+        // Ensure AppConstants matches
+        if AppConstants.ESPNLeagueYear != self.selectedYear {
+            AppConstants.ESPNLeagueYear = self.selectedYear
+        }
     }
     
     // MARK: - Public Interface

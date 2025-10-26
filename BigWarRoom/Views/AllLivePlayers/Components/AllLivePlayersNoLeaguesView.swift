@@ -146,7 +146,7 @@ struct AllLivePlayersNoLeaguesView: View {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.left.circle.fill")
                         .font(.subheadline)
-                    Text("Go to Mission Control")
+                    Text("Bump the data!")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                 }

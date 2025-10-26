@@ -12,13 +12,24 @@ extension AllLivePlayersViewModel {
     // MARK: - Player Extraction from Single Matchup
     internal func extractPlayersFromSingleMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
+        
+        print("🔥 EXTRACT MATCHUP: \(matchup.league.league.name) (\(matchup.league.source.rawValue))")
 
         // Regular matchups - extract from MY team only
         if let fantasyMatchup = matchup.fantasyMatchup {
+            print("🔥 EXTRACT: Regular matchup found")
             if let myTeam = matchup.myTeam {
                 let myStarters = myTeam.roster.filter { $0.isStarter }
+                print("🔥 EXTRACT: Found \(myStarters.count) starters in myTeam")
                 for player in myStarters {
                     let calculatedScore = getCalculatedPlayerScore(for: player, in: matchup)
+                    
+                    // 🔥 NEW: Track activity for recent sort
+                    let existingPlayer = allPlayers.first { $0.player.id == player.id }
+                    let previousScore = existingPlayer?.currentScore
+                    let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
+                    
+                    print("🔥 EXTRACT: Adding \(player.fullName) with score \(calculatedScore)")
                     
                     players.append(LivePlayerEntry(
                         id: "\(matchup.id)_my_\(player.id)",
@@ -30,18 +41,31 @@ extension AllLivePlayersViewModel {
                         isStarter: player.isStarter,
                         percentageOfTop: 0.0, // Calculated later
                         matchup: matchup,
-                        performanceTier: .average // Calculated later
+                        performanceTier: .average, // Calculated later
+                        lastActivityTime: activityTime,
+                        previousScore: previousScore
                     ))
                 }
+            } else {
+                print("🔥 EXTRACT: No myTeam found in regular matchup")
             }
         }
 
         // Chopped leagues - extract from my team ranking
         if let myTeamRanking = matchup.myTeamRanking {
+            print("🔥 EXTRACT: Chopped league found")
             let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
+            print("🔥 EXTRACT: Found \(myTeamStarters.count) starters in chopped team")
 
             for player in myTeamStarters {
                 let calculatedScore = getCalculatedPlayerScore(for: player, in: matchup)
+                
+                // 🔥 NEW: Track activity for recent sort
+                let existingPlayer = allPlayers.first { $0.player.id == player.id }
+                let previousScore = existingPlayer?.currentScore
+                let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
+                
+                print("🔥 EXTRACT: Adding chopped \(player.fullName) with score \(calculatedScore)")
                 
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
@@ -53,11 +77,14 @@ extension AllLivePlayersViewModel {
                     isStarter: player.isStarter,
                     percentageOfTop: 0.0, // Calculated later
                     matchup: matchup,
-                    performanceTier: .average // Calculated later
+                    performanceTier: .average, // Calculated later
+                    lastActivityTime: activityTime,
+                    previousScore: previousScore
                 ))
             }
         }
         
+        print("🔥 EXTRACT RESULT: Extracted \(players.count) players from matchup")
         return players
     }
     
@@ -67,37 +94,45 @@ extension AllLivePlayersViewModel {
         let currentWeek = WeekSelectionManager.shared.selectedWeek
         let currentYear = AppConstants.currentSeasonYear
         
+        print("🔥 SCORE CALC: \(player.fullName) - Week: \(currentWeek), Year: \(currentYear)")
+        
         // Get cached provider from MatchupsHubViewModel (same as FantasyViewModel)
         if let cachedProvider = matchupsHubViewModel.getCachedProvider(
             for: matchup.league, 
             week: currentWeek, 
             year: currentYear
         ) {
+            print("🔥 SCORE CALC: Found cached provider for \(matchup.league.source.rawValue)")
+            
             // For ESPN leagues, get fresh score from the cached matchup data
             if matchup.league.source == .espn {
+                print("🔥 SCORE CALC: ESPN league - checking myTeam roster")
                 // Check if there's a fresh score from the current matchups
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
                     let freshScore = freshPlayer.currentPoints ?? 0.0
-//                    print("🔄 SCORE CALC DEBUG: \(player.fullName) ESPN fresh score: \(freshScore) pts")
+                    print("🔥 SCORE CALC: \(player.fullName) ESPN fresh score: \(freshScore) pts")
                     return freshScore
+                } else {
+                    print("🔥 SCORE CALC: \(player.fullName) NOT found in myTeam roster")
                 }
             }
             
             // For Sleeper leagues, use calculated score from provider
             if matchup.league.source == .sleeper && cachedProvider.hasPlayerScores() {
                 let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
-//                print("🔄 SCORE CALC DEBUG: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
+                print("🔥 SCORE CALC: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
                 return calculatedScore
+            } else if matchup.league.source == .sleeper {
+                print("🔥 SCORE CALC: Sleeper provider has no player scores")
             }
+        } else {
+            print("🔥 SCORE CALC: NO cached provider found for \(matchup.league.source.rawValue)")
         }
-        
-        // 🔥 REMOVE: Manual playerStats lookup - it was causing incorrect scores
-        // The cached provider approach is the correct way
         
         // Final fallback to cached score
         let fallbackScore = player.currentPoints ?? 0.0
-//        print("🔄 SCORE CALC DEBUG: \(player.fullName) fallback score: \(fallbackScore) pts")
+        print("🔥 SCORE CALC: \(player.fullName) using fallback score: \(fallbackScore) pts")
         return fallbackScore
     }
     
@@ -142,7 +177,9 @@ extension AllLivePlayersViewModel {
                 isStarter: entry.isStarter,
                 percentageOfTop: percentage,
                 matchup: entry.matchup,
-                performanceTier: tier
+                performanceTier: tier,
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.previousScore
             )
         }
         
@@ -179,14 +216,15 @@ extension AllLivePlayersViewModel {
 //        print("🔄 SURGICAL UPDATE DEBUG: Sent objectWillChange notification")
     }
     
-    // 🔥 NEW: Truly silent update that doesn't trigger UI changes
-    private func updatePlayerDataSilently(from allPlayerEntries: [LivePlayerEntry]) async {
+    // 🔥 FIXED: Changed from private to internal so DataLoading extension can access it
+    internal func updatePlayerDataSilently(from allPlayerEntries: [LivePlayerEntry]) async {
+        print("🔥 SILENT UPDATE START: Processing \(allPlayerEntries.count) player entries")
+        
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
         
-        // 🚨 GAME ALERTS: Process game alerts during silent updates too
-        // 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns  
-        // TO RE-ENABLE: Uncomment the line below and ensure GameAlertsManager is active
-        // processGameAlerts(from: allPlayerEntries)
+        // Debug: Show score distribution
+        let topScores = Array(scores.prefix(5))
+        print("🔥 SILENT UPDATE SCORES: Top 5 scores = \(topScores)")
         
         // Update statistics silently
         let newTopScore = scores.first ?? 1.0
@@ -195,6 +233,7 @@ extension AllLivePlayersViewModel {
         
         // 🔥 FIX: Only update if values actually changed to minimize UI churn
         if abs(topScore - newTopScore) > 0.01 {
+            print("🔥 SILENT UPDATE: Updating topScore from \(topScore) to \(newTopScore)")
             topScore = newTopScore
         }
         if abs(scoreRange - newScoreRange) > 0.01 {
@@ -234,15 +273,26 @@ extension AllLivePlayersViewModel {
                 isStarter: entry.isStarter,
                 percentageOfTop: percentage,
                 matchup: entry.matchup,
-                performanceTier: tier
+                performanceTier: tier,
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.previousScore
             )
         }
         
-        // 🔥 FIX: Update allPlayers with fresh data
-        allPlayers = updatedPlayers
+        // Debug: Show before/after player counts
+        print("🔥 SILENT UPDATE: Updating allPlayers from \(allPlayers.count) to \(updatedPlayers.count) players")
         
-        // 🔥 FIX: Apply filters silently without triggering state changes
-        applySilentPositionFilter()
+        // 🔥 CRITICAL FIX: Update allPlayers with fresh data
+        let oldPlayerCount = allPlayers.count
+        allPlayers = updatedPlayers
+        print("🔥 SILENT UPDATE: allPlayers updated (was \(oldPlayerCount), now \(allPlayers.count))")
+        
+        // 🔥 CRITICAL FIX: Use the regular filter method instead of silent to trigger UI updates
+        let oldFilteredCount = filteredPlayers.count
+        applyPositionFilter()
+        print("🔥 SILENT UPDATE: filteredPlayers updated (was \(oldFilteredCount), now \(filteredPlayers.count))")
+        
+        print("🔥 SILENT UPDATE COMPLETE")
     }
     
     // 🔥 NEW: Silent filter application (called during background updates)
@@ -307,7 +357,9 @@ extension AllLivePlayersViewModel {
                         isStarter: false,
                         percentageOfTop: 0.0,
                         matchup: templateMatchup,
-                        performanceTier: .average
+                        performanceTier: .average,
+                        lastActivityTime: nil, // 🔥 NEW: No activity for search results
+                        previousScore: nil // 🔥 NEW: No previous score for search results
                     )
                 }
             }
@@ -364,7 +416,9 @@ extension AllLivePlayersViewModel {
                 isStarter: entry.isStarter,
                 percentageOfTop: percentage,
                 matchup: entry.matchup,
-                performanceTier: tier
+                performanceTier: tier,
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.previousScore
             )
         }
 
@@ -413,6 +467,20 @@ extension AllLivePlayersViewModel {
                     }
                     return positionPrioritySilent(player1.position) < positionPrioritySilent(player2.position)
                 }
+                
+        case .recent:
+            // Sort by most recent activity first, then by score as secondary sort
+            sortedPlayers = players.sorted { player1, player2 in
+                let time1 = player1.lastActivityTime ?? Date.distantPast
+                let time2 = player2.lastActivityTime ?? Date.distantPast
+                
+                if time1 != time2 {
+                    return time1 > time2 // Most recent first
+                }
+                
+                // Secondary sort by score
+                return player1.currentScore > player2.currentScore
+            }
         }
 
         return sortedPlayers

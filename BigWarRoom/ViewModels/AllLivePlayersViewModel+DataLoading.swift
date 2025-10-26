@@ -19,8 +19,8 @@ extension AllLivePlayersViewModel {
             } else {
                 UserDefaults.standard.removeObject(forKey: "AllLivePlayers_LastLoadTime")
             }
-            // 🔥 CRITICAL FIX: Don't store massive playerStats in UserDefaults
-            // Only store simple timestamp, not the huge stats dictionary
+            // 🔥 CRITICAL FIX: Never store massive playerStats in UserDefaults
+            // UserDefaults should only contain simple values, not 4MB+ dictionaries
         }
     }
     
@@ -112,14 +112,15 @@ extension AllLivePlayersViewModel {
                 self.playerStats = statsData
                 self.statsLoaded = true
                 print("🔄 STATS DEBUG: Updated playerStats on main thread")
-                self.objectWillChange.send()
+                
+                // 🔥 CRITICAL FIX: Don't trigger objectWillChange here
+                // Let the natural property change handle it to avoid duplicate updates
             }
         } catch {
             print("🔄 STATS DEBUG: Failed to load stats: \(error)")
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.statsLoaded = true
-                self.objectWillChange.send()
             }
         }
     }
@@ -133,20 +134,60 @@ extension AllLivePlayersViewModel {
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
         guard isDataLoaded else { 
-            print("🔄 LIVE UPDATE DEBUG: Skipping - data not loaded yet")
+            print("🔥 LIVE UPDATE BLOCKED: Data not loaded yet")
             return 
         }
         
-        print("🔄 LIVE UPDATE DEBUG: Starting background update")
+        print("🔥 LIVE UPDATE START: Beginning live update process...")
         let startTime = Date()
         
-        // 🔥 FIXED: Don't trigger more MatchupsHub refreshes - just update our player data
-        // The MatchupsHub has already been updated, we just need to process the fresh data
-        print("🔄 LIVE UPDATE DEBUG: Updating player data surgically from existing matchup data")
-        await updatePlayerDataSurgically()
+        // 🔥 CRITICAL FIX: Refresh matchups FIRST to get fresh scores
+        await matchupsHubViewModel.performManualRefresh()
+        print("🔥 LIVE UPDATE: Refreshed matchup data")
         
-        let endTime = Date()
-        print("🔄 LIVE UPDATE DEBUG: Completed background update in \(endTime.timeIntervalSince(startTime)) seconds")
+        // 🔥 FIXED: Now extract from refreshed matchup data 
+        let freshPlayerEntries = extractAllPlayers()
+        guard !freshPlayerEntries.isEmpty else {
+            print("🔥 LIVE UPDATE ERROR: No fresh player entries found")
+            return
+        }
+        
+        print("🔥 LIVE UPDATE DEBUG: Extracted \(freshPlayerEntries.count) players")
+        
+        // Debug: Show sample scores before update
+        let sampleBefore = Array(allPlayers.prefix(3))
+        for player in sampleBefore {
+            print("🔥 BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
+        }
+        
+        // Update player data with fresh scores from matchups
+        await updatePlayerDataSilently(from: freshPlayerEntries)
+        
+        // Debug: Show sample scores after update
+        let sampleAfter = Array(allPlayers.prefix(3))
+        for player in sampleAfter {
+            print("🔥 AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
+        }
+        
+        // Debug: Show filtered players
+        let filteredSample = Array(filteredPlayers.prefix(3))
+        for player in filteredSample {
+            print("🔥 FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
+        }
+        
+        // 🔥 CRITICAL: Update timestamp to trigger view updates
+        let oldTime = lastUpdateTime
+        lastUpdateTime = Date()
+        
+        print("🔥 LIVE UPDATE COMPLETE: Updated lastUpdateTime from \(oldTime) to \(lastUpdateTime)")
+        print("🔥 LIVE UPDATE STATS: allPlayers.count = \(allPlayers.count), filteredPlayers.count = \(filteredPlayers.count)")
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        print("✅ LIVE UPDATE: Completed in \(String(format: "%.2f", elapsed))s")
+        
+        // 🔥 FORCE UI UPDATE: Manually trigger objectWillChange as backup
+        objectWillChange.send()
+        print("🔥 SENT OBJECT WILL CHANGE")
     }
     
     // MARK: - Week Changes Subscription

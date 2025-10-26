@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Global application constants and feature flags.
 struct AppConstants {
-    @AppStorage("selectedESPNYear") static var ESPNLeagueYear: String = String(Calendar.current.component(.year, from: Date()))
+    // 🔥 FIXED: Default to current NFL season (2025), not calendar year
+    @AppStorage("selectedESPNYear") static var ESPNLeagueYear: String = "2025"
     
     // Dynamic debug mode - can be toggled in settings
     static var debug: Bool {

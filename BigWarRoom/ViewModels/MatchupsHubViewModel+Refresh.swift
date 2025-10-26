@@ -34,6 +34,10 @@ extension MatchupsHubViewModel {
             return
         }
         
+        // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
+        cachedProviders.removeAll()
+        print("🔥 REFRESH: Cleared cached providers for fresh scores")
+        
         // Get the currently selected week from WeekSelectionManager
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
@@ -169,6 +173,10 @@ extension MatchupsHubViewModel {
         let preservedMicroMode = microModeEnabled
         let preservedExpandedCard = expandedCardId
         let preservedBannerVisible = justMeModeBannerVisible // NEW: Preserve banner
+        
+        // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
+        cachedProviders.removeAll()
+        print("🔥 REFRESH: Cleared \(cachedProviders.count) cached providers for fresh scores")
         
         await MainActor.run {
             // Only update timestamp, don't change isLoading or show loading screen

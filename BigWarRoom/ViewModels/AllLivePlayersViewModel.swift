@@ -54,6 +54,9 @@ final class AllLivePlayersViewModel: ObservableObject {
     internal var debounceTask: Task<Void, Never>?
     internal var isBatchingUpdates = false
     
+    // 🔥 FIXED: Track last processed update time to prevent duplicate processing
+    internal var lastProcessedMatchupUpdate = Date.distantPast
+    
     // MARK: - Private Init
     private init() {
         subscribeToWeekChanges()
@@ -67,23 +70,34 @@ final class AllLivePlayersViewModel: ObservableObject {
         matchupsSubscription?.cancel()
     }
     
-    // 🔥 THROTTLED: Subscribe to MatchupsHubViewModel updates with longer debounce
+    // 🔥 FIXED: Subscribe to MatchupsHubViewModel updates with duplicate prevention
     private func subscribeToMatchupsUpdates() {
-//        print("🔄 LIVE PLAYERS DEBUG: Setting up subscription to MatchupsHub updates")
+        print("🔥 SUBSCRIPTION SETUP: Setting up matchups subscription")
         matchupsSubscription = matchupsHubViewModel.$lastUpdateTime
             .removeDuplicates()
-            .debounce(for: .seconds(5), scheduler: DispatchQueue.main) // Increased from 500ms to 5 seconds
+            .debounce(for: .milliseconds(750), scheduler: DispatchQueue.main) 
             .sink { [weak self] updateTime in
-                guard let self = self,
-                      !self.allPlayers.isEmpty,
-                      !self.matchupsHubViewModel.isLoading else { 
-                    let playersCount = self?.allPlayers.count ?? 0
-                    let isLoading = self?.matchupsHubViewModel.isLoading ?? true
-//                    print("🔄 LIVE PLAYERS DEBUG: Subscription triggered but conditions not met - players: \(playersCount), loading: \(isLoading)")
+                guard let self = self else { 
+                    print("🔥 SUBSCRIPTION ERROR: Self is nil")
                     return 
                 }
                 
-//                print("🔄 LIVE PLAYERS DEBUG: MatchupsHub updated at \(updateTime), triggering player data refresh")
+                print("🔥 SUBSCRIPTION TRIGGERED: MatchupsHub lastUpdateTime = \(updateTime)")
+                
+                // 🔥 CRITICAL FIX: Prevent duplicate processing of same update
+                guard updateTime > self.lastProcessedMatchupUpdate else {
+                    print("🔥 SUBSCRIPTION BLOCKED: Duplicate update from \(updateTime), last processed: \(self.lastProcessedMatchupUpdate)")
+                    return
+                }
+                
+                // Only process if we have initial data
+                guard !self.allPlayers.isEmpty else { 
+                    print("🔥 SUBSCRIPTION BLOCKED: No initial data yet (allPlayers.count = \(self.allPlayers.count))")
+                    return 
+                }
+                
+                print("🔥 SUBSCRIPTION PROCESSING: Starting live update for \(updateTime)")
+                self.lastProcessedMatchupUpdate = updateTime
                 
                 Task { @MainActor in
                     await self.performLiveUpdate()
@@ -120,6 +134,7 @@ extension AllLivePlayersViewModel {
         case score = "Score"
         case name = "Name"
         case team = "Team"
+        case recent = "Recent Activity" // 🔥 NEW: Recent Activity sort
 
         var id: String { rawValue }
         var displayName: String { rawValue }
@@ -136,6 +151,10 @@ extension AllLivePlayersViewModel {
         let percentageOfTop: Double
         let matchup: UnifiedMatchup
         let performanceTier: PerformanceTier
+        
+        // 🔥 NEW: Activity tracking for recent sort
+        var lastActivityTime: Date?
+        var previousScore: Double?
 
         var scoreBarWidth: Double {
             let minBarWidth: Double = 0.08
@@ -147,6 +166,18 @@ extension AllLivePlayersViewModel {
         var teamName: String { player.team ?? "" }
         var playerName: String { player.fullName }
         var currentScoreString: String { String(format: "%.2f", currentScore) }
+        
+        // 🔥 NEW: Check if player had recent activity
+        var hasRecentActivity: Bool {
+            guard let activityTime = lastActivityTime else { return false }
+            return Date().timeIntervalSince(activityTime) < 300 // 5 minutes
+        }
+        
+        // 🔥 NEW: Check if score changed (for activity tracking)
+        var scoreChanged: Bool {
+            guard let previous = previousScore else { return false }
+            return abs(currentScore - previous) > 0.01 // Account for floating point precision
+        }
     }
     
     enum PerformanceTier: String, CaseIterable {
@@ -258,6 +289,7 @@ extension AllLivePlayersViewModel {
         case .score: return sortHighToLow ? "Highest" : "Lowest"
         case .name: return sortHighToLow ? "A to Z" : "Z to A"
         case .team: return sortHighToLow ? "A to Z" : "Z to A"
+        case .recent: return "Most Recent"
         }
     }
 }

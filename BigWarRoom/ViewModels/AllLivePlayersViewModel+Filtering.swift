@@ -166,7 +166,9 @@ extension AllLivePlayersViewModel {
                         isStarter: false,
                         percentageOfTop: 0.0,
                         matchup: templateMatchup,
-                        performanceTier: .average
+                        performanceTier: .average,
+                        lastActivityTime: nil, // 🔥 NEW: No activity for search results
+                        previousScore: nil // 🔥 NEW: No previous score for search results
                     )
                 }
             }
@@ -224,7 +226,9 @@ extension AllLivePlayersViewModel {
                 isStarter: entry.isStarter,
                 percentageOfTop: percentage,
                 matchup: entry.matchup,
-                performanceTier: tier
+                performanceTier: tier,
+                lastActivityTime: entry.lastActivityTime, // 🔥 NEW: Preserve activity time
+                previousScore: entry.previousScore // 🔥 NEW: Preserve previous score
             )
         }
 
@@ -274,6 +278,20 @@ extension AllLivePlayersViewModel {
                     }
                     return positionPriority(player1.position) < positionPriority(player2.position)
                 }
+                
+        case .recent:
+            // Sort by most recent activity first, then by score as secondary sort
+            sortedPlayers = players.sorted { player1, player2 in
+                let time1 = player1.lastActivityTime ?? Date.distantPast
+                let time2 = player2.lastActivityTime ?? Date.distantPast
+                
+                if time1 != time2 {
+                    return time1 > time2 // Most recent first
+                }
+                
+                // Secondary sort by score
+                return player1.currentScore > player2.currentScore
+            }
         }
 
         return sortedPlayers
