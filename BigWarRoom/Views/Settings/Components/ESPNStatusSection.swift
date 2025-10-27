@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Status section with setup completion and continue button
 struct ESPNStatusSection: View {
-    @ObservedObject var viewModel: ESPNSetupViewModel
+    @Bindable var viewModel: ESPNSetupViewModel
     let onDismiss: () -> Void
     
     var body: some View {

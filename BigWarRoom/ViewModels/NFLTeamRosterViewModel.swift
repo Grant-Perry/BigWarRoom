@@ -8,7 +8,7 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// **NFLTeamRosterViewModel**
 /// 
@@ -17,15 +17,16 @@ import Combine
 /// - SMART FILTERING: Hides 0.0 point players in completed games ONLY
 /// - Position sorting: QB, RB, WR, TE, K, DST
 /// - Reuses existing stats and game status infrastructure
+@Observable
 @MainActor
-class NFLTeamRosterViewModel: ObservableObject {
+final class NFLTeamRosterViewModel {
     
-    // MARK: - Published Properties
-    @Published var isLoading = true
-    @Published var errorMessage: String?
-    @Published var teamInfo: NFLTeamInfo?
-    @Published var filteredPlayers: [SleeperPlayer] = []
-    @Published var loadingState: String = "Initializing..."
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var isLoading = true
+    var errorMessage: String?
+    var teamInfo: NFLTeamInfo?
+    var filteredPlayers: [SleeperPlayer] = []
+    var loadingState: String = "Initializing..."
     
     // MARK: - Private Properties
     private let teamCode: String

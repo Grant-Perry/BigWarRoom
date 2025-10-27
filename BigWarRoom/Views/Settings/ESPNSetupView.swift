@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ESPNSetupView: View {
-    @StateObject private var viewModel = ESPNSetupViewModel()
+    @State private var viewModel = ESPNSetupViewModel()
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

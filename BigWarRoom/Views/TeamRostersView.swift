@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct TeamRostersView: View {
-    @StateObject private var viewModel = TeamRostersViewModel()
+    @State private var viewModel = TeamRostersViewModel()
     @State private var nflGameService = NFLGameDataService.shared
     @State private var weekManager = WeekSelectionManager.shared
     @State private var selectedTeam: String = "SF"

@@ -9,11 +9,11 @@ import SwiftUI
 
 struct MyRosterView: View {
     @Bindable var draftRoomViewModel: DraftRoomViewModel
-    @StateObject private var myRosterViewModel: MyRosterViewModel
+    @State private var myRosterViewModel: MyRosterViewModel
     
     init(draftRoomViewModel: DraftRoomViewModel) {
         self.draftRoomViewModel = draftRoomViewModel
-        self._myRosterViewModel = StateObject(wrappedValue: MyRosterViewModel(draftRoomViewModel: draftRoomViewModel))
+        self.myRosterViewModel = MyRosterViewModel(draftRoomViewModel: draftRoomViewModel)
     }
     
     var body: some View {

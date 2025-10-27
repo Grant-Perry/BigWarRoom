@@ -1,9 +1,9 @@
 import Foundation
-import Combine
+import Observation
 
 /// Protocol for managing AI suggestions and player filtering
 @MainActor
-protocol DraftSuggestionsCoordinator: ObservableObject {
+protocol DraftSuggestionsCoordinator: AnyObject {
     var suggestions: [Suggestion] { get }
     var selectedPositionFilter: PositionFilter { get }
     var selectedSortMethod: SortMethod { get }
@@ -15,13 +15,14 @@ protocol DraftSuggestionsCoordinator: ObservableObject {
 }
 
 /// Concrete implementation of DraftSuggestionsCoordinator
+@Observable
 @MainActor
 final class DefaultDraftSuggestionsCoordinator: DraftSuggestionsCoordinator {
     
-    // MARK: - Published Properties
-    @Published var suggestions: [Suggestion] = []
-    @Published var selectedPositionFilter: PositionFilter = .all
-    @Published var selectedSortMethod: SortMethod = .wizard
+    // MARK: - Observable Properties
+    var suggestions: [Suggestion] = []
+    var selectedPositionFilter: PositionFilter = .all
+    var selectedSortMethod: SortMethod = .wizard
     
     // MARK: - Internal Properties
     private let suggestionEngine = SuggestionEngine()

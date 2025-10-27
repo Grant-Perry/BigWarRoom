@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SleeperSetupView: View {
-    @StateObject private var sleeperSetupViewModel = SleeperSetupViewModel()
+    @State private var sleeperSetupViewModel = SleeperSetupViewModel()
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

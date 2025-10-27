@@ -9,7 +9,7 @@ import SwiftUI
 
 /// League IDs management section
 struct ESPNLeagueIDsSection: View {
-    @ObservedObject var viewModel: ESPNSetupViewModel
+    @Bindable var viewModel: ESPNSetupViewModel
     
     var body: some View {
         Section {

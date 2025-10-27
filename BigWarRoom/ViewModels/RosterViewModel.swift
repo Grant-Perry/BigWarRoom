@@ -7,22 +7,23 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// ViewModel for RosterView with business logic
+@Observable
 @MainActor
-final class RosterViewModel: ObservableObject {
+final class RosterViewModel {
     
     // MARK: - Dependencies
     private let draftRoomViewModel: DraftRoomViewModel
     
-    // MARK: - Published States
-    @Published var expandedTeam: Int? = nil
-    @Published var selectedPlayerForStats: SleeperPlayer?
-    @Published var showingPlayerStats = false
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var expandedTeam: Int? = nil
+    var selectedPlayerForStats: SleeperPlayer?
+    var showingPlayerStats = false
     
     // MARK: - Styling Properties
-    @Published var boxGradient = LinearGradient(
+    var boxGradient = LinearGradient(
         gradient: Gradient(stops: [
             .init(color: Color.gpBlueDarkL, location: 0.0),
             .init(color: Color.clear, location: 1.0)
@@ -31,7 +32,7 @@ final class RosterViewModel: ObservableObject {
         endPoint: .bottom
     )
     
-    @Published var boxForeColor = Color.gpYellow
+    var boxForeColor = Color.gpYellow
     
     init(draftRoomViewModel: DraftRoomViewModel) {
         self.draftRoomViewModel = draftRoomViewModel

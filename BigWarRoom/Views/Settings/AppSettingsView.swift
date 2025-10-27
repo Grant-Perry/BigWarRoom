@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AppSettingsView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @State private var viewModel = SettingsViewModel()
     @State private var showingConnectionSuccess = false
     @State private var connectionSuccessMessage = ""
     @State private var nflWeekService = NFLWeekService.shared

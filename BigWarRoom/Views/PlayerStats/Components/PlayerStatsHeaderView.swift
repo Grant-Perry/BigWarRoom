@@ -14,7 +14,7 @@ struct PlayerStatsHeaderView: View {
     
     @State private var teamAssets = TeamAssetManager.shared
     @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
-    @StateObject private var playerNewsViewModel = PlayerNewsViewModel()
+    @State private var playerNewsViewModel = PlayerNewsViewModel()
     @State private var watchService = PlayerWatchService.shared
     
     // 🗞️ NEWS: Player news sheet state

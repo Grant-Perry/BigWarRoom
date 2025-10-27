@@ -7,16 +7,17 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
+@Observable
 @MainActor
-class TeamRostersViewModel: ObservableObject {
+final class TeamRostersViewModel {
     
-    // MARK: - Published Properties
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var teamRoster: [SleeperPlayer] = []
-    @Published var selectedTeam: String = "KC"
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var isLoading = false
+    var errorMessage: String?
+    var teamRoster: [SleeperPlayer] = []
+    var selectedTeam: String = "KC"
     
     // MARK: - Services (extending existing architecture)
     private let playerDirectoryStore = PlayerDirectoryStore.shared
@@ -32,7 +33,7 @@ class TeamRostersViewModel: ObservableObject {
         do {
             // TODO: Extend existing services to get full NFL team rosters
             // For now, we'll use placeholder logic that gets players from existing data
-            let fullRoster = await getFullTeamRoster(teamCode: teamCode)
+            let fullRoster = try await getFullTeamRoster(teamCode: teamCode)
             
             teamRoster = fullRoster.sorted(by: { player1, player2 in
                 // Sort by position order: QB, RB, WR, TE, K, DST

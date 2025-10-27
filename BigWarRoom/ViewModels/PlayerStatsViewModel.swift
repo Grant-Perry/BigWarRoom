@@ -9,24 +9,25 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class PlayerStatsViewModel: ObservableObject {
-    // MARK: - Published Properties
+final class PlayerStatsViewModel {
+    // MARK: - Observable Properties (No @Published needed with @Observable)
     
-    @Published var isLoadingStats = false
+    var isLoadingStats = false
     
     // 🔧 BLANK SHEET FIX: CRITICAL - Set isLoadingPlayerData to TRUE by default
     // BEFORE: Started as false, causing blank screen to show first
     // AFTER: Starts as true, showing loading view immediately when sheet opens
-    @Published var isLoadingPlayerData = true // FIXED: Changed from false to true
-    @Published var loadingMessage = "Loading player data..." // NEW: Progressive status messages for user feedback
-    @Published var hasLoadingError = false // NEW: Error state for timeout/failure handling
+    var isLoadingPlayerData = true // FIXED: Changed from false to true
+    var loadingMessage = "Loading player data..." // NEW: Progressive status messages for user feedback
+    var hasLoadingError = false // NEW: Error state for timeout/failure handling
     
-    @Published var playerStatsData: PlayerStatsData?
-    @Published var depthChartData: [String: DepthChartData] = [:]
-    @Published var fantasyAnalysisData: FantasyAnalysisData?
+    var playerStatsData: PlayerStatsData?
+    var depthChartData: [String: DepthChartData] = [:]
+    var fantasyAnalysisData: FantasyAnalysisData?
     
     // MARK: - Dependencies
     
@@ -299,13 +300,5 @@ final class PlayerStatsViewModel: ObservableObject {
         default:
             return "Draft in later rounds based on team needs"
         }
-    }
-    
-    // MARK: - Cleanup
-    
-    // 🔧 BLANK SHEET FIX: Added proper task cleanup to prevent memory leaks
-    // and cancel loading operations when view model is deallocated
-    deinit {
-        loadingTask?.cancel()
     }
 }

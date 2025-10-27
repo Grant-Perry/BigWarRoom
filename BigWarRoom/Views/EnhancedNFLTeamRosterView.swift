@@ -21,7 +21,7 @@ struct EnhancedNFLTeamRosterView: View {
     let rootDismiss: (() -> Void)? // 🔥 NEW: Optional root dismiss action
     
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel: NFLTeamRosterViewModel
+    @State private var viewModel: NFLTeamRosterViewModel
     @State private var nflGameService = NFLGameDataService.shared
     
     // UI State
@@ -34,7 +34,7 @@ struct EnhancedNFLTeamRosterView: View {
     init(teamCode: String, rootDismiss: (() -> Void)? = nil) {
         self.teamCode = teamCode
         self.rootDismiss = rootDismiss
-        self._viewModel = StateObject(wrappedValue: NFLTeamRosterViewModel(teamCode: teamCode))
+        self.viewModel = NFLTeamRosterViewModel(teamCode: teamCode)
     }
     
     var body: some View {

@@ -8,7 +8,7 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// **ChoppedPlayerCardViewModel**
 /// 
@@ -17,8 +17,9 @@ import Combine
 /// - Stats display formatting
 /// - Team color and styling logic
 /// - Positional rankings within team lineup
+@Observable
 @MainActor
-class ChoppedPlayerCardViewModel: ObservableObject {
+final class ChoppedPlayerCardViewModel {
     
     let player: FantasyPlayer
     let isStarter: Bool

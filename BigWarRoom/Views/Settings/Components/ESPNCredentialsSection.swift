@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Credentials section with SWID and ESPN_S2 fields
 struct ESPNCredentialsSection: View {
-    @ObservedObject var viewModel: ESPNSetupViewModel
+    @Bindable var viewModel: ESPNSetupViewModel
     
     var body: some View {
         Section {

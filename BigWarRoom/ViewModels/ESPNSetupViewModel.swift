@@ -6,22 +6,23 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class ESPNSetupViewModel: ObservableObject {
-    // MARK: - Published Properties
-    @Published var swid: String = ""
-    @Published var espnS2: String = ""
-    @Published var newLeagueID: String = ""
-    @Published var isValidating: Bool = false
-    @Published var validationMessage: String = ""
-    @Published var showingValidation: Bool = false
-    @Published var showingInstructions: Bool = false
-    @Published var showingClearConfirmation: Bool = false
-    @Published var showingClearResult: Bool = false
-    @Published var clearResultMessage: String = ""
-    @Published var pendingClearAction: (() -> Void)?
+final class ESPNSetupViewModel {
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var swid: String = ""
+    var espnS2: String = ""
+    var newLeagueID: String = ""
+    var isValidating: Bool = false
+    var validationMessage: String = ""
+    var showingValidation: Bool = false
+    var showingInstructions: Bool = false
+    var showingClearConfirmation: Bool = false
+    var showingClearResult: Bool = false
+    var clearResultMessage: String = ""
+    var pendingClearAction: (() -> Void)?
     
     // MARK: - Dependencies
     private let credentialsManager = ESPNCredentialsManager.shared
@@ -57,7 +58,6 @@ final class ESPNSetupViewModel: ObservableObject {
     func fillDefaultCredentials() {
         swid = AppConstants.SWID
         espnS2 = AppConstants.ESPN_S2
-        // x// x Print("🔧 Auto-filled with default ESPN credentials")
     }
     
     func saveCredentials() {
@@ -131,8 +131,6 @@ final class ESPNSetupViewModel: ObservableObject {
             clearResultMessage = "ℹ️ All default leagues already added"
         }
         showingClearResult = true
-        
-        // x// x Print("🔧 Added default ESPN league IDs: \(AppConstants.ESPNLeagueID)")
     }
     
     func validateCredentials() {
@@ -198,7 +196,6 @@ final class ESPNSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ ESPN credentials cleared (leagues kept)!"
         showingClearResult = true
-        // x// x Print("🧹 Cleared ESPN credentials only, kept league IDs")
     }
     
     private func performClearLeagueIDsOnly() {
@@ -208,7 +205,6 @@ final class ESPNSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Cleared \(clearedCount) league ID(s)!"
         showingClearResult = true
-        // x// x Print("🧹 Cleared ESPN league IDs only")
     }
     
     func confirmClearAction() {

@@ -19,13 +19,13 @@ struct NFLTeamRosterView: View {
     let teamCode: String
     
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel: NFLTeamRosterViewModel
+    @State private var viewModel: NFLTeamRosterViewModel
     
     // MARK: - Initialization
     
     init(teamCode: String) {
         self.teamCode = teamCode
-        self._viewModel = StateObject(wrappedValue: NFLTeamRosterViewModel(teamCode: teamCode))
+        self.viewModel = NFLTeamRosterViewModel(teamCode: teamCode)
     }
     
     var body: some View {

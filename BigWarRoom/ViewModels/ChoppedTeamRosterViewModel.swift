@@ -8,7 +8,7 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// **ChoppedTeamRosterViewModel**
 /// 
@@ -17,16 +17,17 @@ import Combine
 /// - Data processing and transformation
 /// - Week validation and points calculation
 /// - Player stats formatting and lookup
+@Observable
 @MainActor
-class ChoppedTeamRosterViewModel: ObservableObject {
+final class ChoppedTeamRosterViewModel {
     
-    // MARK: - Published Properties
+    // MARK: - Observable Properties (No @Published needed with @Observable)
     
-    @Published var rosterData: ChoppedTeamRoster?
-    @Published var isLoading = true
-    @Published var errorMessage: String?
-    @Published var opponentInfo: OpponentInfo?
-    @Published var gameDataLoaded = false
+    var rosterData: ChoppedTeamRoster?
+    var isLoading = true
+    var errorMessage: String?
+    var opponentInfo: OpponentInfo?
+    var gameDataLoaded = false
     
     // MARK: - Private Properties
     
@@ -416,9 +417,6 @@ class ChoppedTeamRosterViewModel: ObservableObject {
             let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
             
             self.playerStats = statsData
-            
-            // 🔥 NEW: Trigger UI refresh after stats are loaded
-            objectWillChange.send()
             
             // Debug: Check if this week actually has data
             let totalPointsThisWeek = statsData.values.reduce(0) { total, stats in

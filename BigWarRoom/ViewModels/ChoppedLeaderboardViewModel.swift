@@ -7,19 +7,20 @@
 //
 
 import SwiftUI
-import Combine
+import Observation
 
 /// **ChoppedLeaderboardViewModel**
 /// 
 /// Handles all business logic, animations, and state management for the Chopped Leaderboard.
 /// Follows MVVM pattern to keep views clean and focused on presentation.
+@Observable
 @MainActor
-class ChoppedLeaderboardViewModel: ObservableObject {
+final class ChoppedLeaderboardViewModel {
     
-    // MARK: - Published Properties
-    @Published var showEliminationCeremony = false
-    @Published var pulseAnimation = false
-    @Published var dangerPulse = false
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var showEliminationCeremony = false
+    var pulseAnimation = false
+    var dangerPulse = false
     
     // MARK: - Data Properties
     let choppedSummary: ChoppedWeekSummary

@@ -10,11 +10,11 @@ import SwiftUI
 
 struct LeagueDraftView: View {
     @Bindable var draftRoomViewModel: DraftRoomViewModel
-    @StateObject private var leagueDraftViewModel: LeagueDraftViewModel
+    @State private var leagueDraftViewModel: LeagueDraftViewModel
     
     init(viewModel: DraftRoomViewModel) {
         self.draftRoomViewModel = viewModel
-        self._leagueDraftViewModel = StateObject(wrappedValue: LeagueDraftViewModel(draftRoomViewModel: viewModel))
+        self._leagueDraftViewModel = State(wrappedValue: LeagueDraftViewModel(draftRoomViewModel: viewModel))
     }
     
     var body: some View {

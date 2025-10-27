@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Advanced section with reset options
 struct ESPNAdvancedSection: View {
-    @ObservedObject var viewModel: ESPNSetupViewModel
+    @Bindable var viewModel: ESPNSetupViewModel
     
     var body: some View {
         Section {

@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Quick setup section with default credentials
 struct ESPNQuickSetupSection: View {
-    @ObservedObject var viewModel: ESPNSetupViewModel
+    @Bindable var viewModel: ESPNSetupViewModel
     
     var body: some View {
         Section {

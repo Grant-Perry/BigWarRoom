@@ -7,14 +7,15 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// ViewModel responsible for LeagueDraftView business logic and data organization
+@Observable
 @MainActor
-final class LeagueDraftViewModel: ObservableObject {
-    @Published var showingRosterView = false
-    @Published var selectedPlayerForStats: SleeperPlayer?
-    @Published var showingPlayerStats = false
+final class LeagueDraftViewModel {
+    var showingRosterView = false
+    var selectedPlayerForStats: SleeperPlayer?
+    var showingPlayerStats = false
     
     private let draftRoomViewModel: DraftRoomViewModel
     

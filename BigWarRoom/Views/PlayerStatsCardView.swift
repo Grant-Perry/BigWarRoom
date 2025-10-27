@@ -54,7 +54,7 @@ struct PlayerStatsCardView: View {
     @State private var currentTeam: NFLTeam?
     
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var playerStatsViewModel = PlayerStatsViewModel()
+    @State private var playerStatsViewModel = PlayerStatsViewModel()
     
     // 🏈 PLAYER NAVIGATION: Keep original initializer for external navigation
     init(player: SleeperPlayer, team: NFLTeam?) {

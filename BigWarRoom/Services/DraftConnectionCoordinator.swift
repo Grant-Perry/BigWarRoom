@@ -1,9 +1,9 @@
 import Foundation
-import Combine
+import Observation
 
 /// Protocol for managing all draft connection and authentication functionality
 @MainActor
-protocol DraftConnectionCoordinator: ObservableObject {
+protocol DraftConnectionCoordinator: AnyObject {
     var connectionStatus: ConnectionStatus { get }
     var sleeperDisplayName: String { get }
     var sleeperUsername: String { get }
@@ -19,14 +19,15 @@ protocol DraftConnectionCoordinator: ObservableObject {
 }
 
 /// Concrete implementation of DraftConnectionCoordinator
+@Observable
 @MainActor
 final class DefaultDraftConnectionCoordinator: DraftConnectionCoordinator {
     
-    // MARK: - Published Properties
-    @Published var connectionStatus: ConnectionStatus = .disconnected
-    @Published var sleeperDisplayName: String = ""
-    @Published var sleeperUsername: String = ""
-    @Published var allAvailableDrafts: [UnifiedLeagueManager.LeagueWrapper] = []
+    // MARK: - Observable Properties
+    var connectionStatus: ConnectionStatus = .disconnected
+    var sleeperDisplayName: String = ""
+    var sleeperUsername: String = ""
+    var allAvailableDrafts: [UnifiedLeagueManager.LeagueWrapper] = []
     
     // MARK: - Internal Properties
     var currentUserID: String?

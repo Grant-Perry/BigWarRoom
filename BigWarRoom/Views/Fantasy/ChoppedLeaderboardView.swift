@@ -16,7 +16,7 @@ import SwiftUI
 /// - No computed properties that build views
 /// - DRY principles throughout
 struct ChoppedLeaderboardView: View {
-    @StateObject private var viewModel: ChoppedLeaderboardViewModel
+    @State private var viewModel: ChoppedLeaderboardViewModel
     let leagueID: String
 
     // MARK: - Configuration
@@ -27,10 +27,10 @@ struct ChoppedLeaderboardView: View {
 
     // MARK: - Initialization
     init(choppedSummary: ChoppedWeekSummary, leagueName: String, leagueID: String) {
-        self._viewModel = StateObject(wrappedValue: ChoppedLeaderboardViewModel(
+        self.viewModel = ChoppedLeaderboardViewModel(
             choppedSummary: choppedSummary,
             leagueName: leagueName
-        ))
+        )
         self.leagueID = leagueID
     }
 

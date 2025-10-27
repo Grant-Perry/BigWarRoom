@@ -13,18 +13,18 @@ import SwiftUI
 /// **Before:** 400+ lines with custom All Live Players styling
 /// **After:** Use UnifiedPlayerCardBackground + existing logic
 struct ChoppedRosterPlayerCard: View {
-    @StateObject private var viewModel: ChoppedPlayerCardViewModel
+    @State private var viewModel: ChoppedPlayerCardViewModel
     let onPlayerTap: (SleeperPlayer) -> Void
     let compact: Bool
     
     @State private var showingScoreBreakdown = false
     
     init(player: FantasyPlayer, isStarter: Bool, parentViewModel: ChoppedTeamRosterViewModel, onPlayerTap: @escaping (SleeperPlayer) -> Void, compact: Bool = false) {
-        self._viewModel = StateObject(wrappedValue: ChoppedPlayerCardViewModel(
+        self.viewModel = ChoppedPlayerCardViewModel(
             player: player,
             isStarter: isStarter,
             parentViewModel: parentViewModel
-        ))
+        )
         self.onPlayerTap = onPlayerTap
         self.compact = compact
     }

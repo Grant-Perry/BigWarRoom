@@ -6,22 +6,23 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class SleeperSetupViewModel: ObservableObject {
-    // MARK: - Published Properties
-    @Published var username: String = ""
-    @Published var userID: String = ""
-    @Published var selectedSeason: String = "2025"
-    @Published var isValidating: Bool = false
-    @Published var validationMessage: String = ""
-    @Published var showingValidation: Bool = false
-    @Published var showingInstructions: Bool = false
-    @Published var showingClearConfirmation: Bool = false
-    @Published var showingClearResult: Bool = false
-    @Published var clearResultMessage: String = ""
-    @Published var pendingClearAction: (() -> Void)?
+final class SleeperSetupViewModel {
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var username: String = ""
+    var userID: String = ""
+    var selectedSeason: String = "2025"
+    var isValidating: Bool = false
+    var validationMessage: String = ""
+    var showingValidation: Bool = false
+    var showingInstructions: Bool = false
+    var showingClearConfirmation: Bool = false
+    var showingClearResult: Bool = false
+    var clearResultMessage: String = ""
+    var pendingClearAction: (() -> Void)?
     
     // MARK: - Dependencies
     private let credentialsManager = SleeperCredentialsManager.shared
@@ -64,8 +65,6 @@ final class SleeperSetupViewModel: ObservableObject {
         
         // 🔥 FIX: Auto-save when using default credentials
         saveCredentials()
-        
-        // x// x Print("🔧 Auto-filled and saved default Sleeper credentials")
     }
     
     func saveCredentials() {
@@ -75,13 +74,6 @@ final class SleeperSetupViewModel: ObservableObject {
         print("   - Username to save: '\(username)'")
         print("   - UserID to save: '\(userID)'")
         print("   - Season: '\(selectedSeason)'")
-        
-        // OLD: Direct save without resolution
-        // credentialsManager.saveCredentials(
-        //     username: username.trimmingCharacters(in: .whitespacesAndNewlines),
-        //     userID: "", // 🔥 FIX: Always save empty user ID - let system resolve from username
-        //     season: selectedSeason
-        // )
         
         // NEW: Use resolution method to ensure we get numeric userID
         Task {
@@ -169,7 +161,6 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Sleeper credentials cleared (cache kept)!"
         showingClearResult = true
-        // x// x Print("🧹 Cleared Sleeper credentials only, kept league cache")
     }
     
     private func performClearCacheOnly() {
@@ -180,7 +171,6 @@ final class SleeperSetupViewModel: ObservableObject {
         
         clearResultMessage = "✅ Cleared \(clearedCount) cached league(s)!"
         showingClearResult = true
-        // x// x Print("🧹 Cleared Sleeper league cache only")
     }
     
     func confirmClearAction() {

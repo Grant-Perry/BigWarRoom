@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlayerNewsView: View {
     let player: PlayerData
-    @StateObject private var viewModel = PlayerNewsViewModel()
+    @State private var viewModel = PlayerNewsViewModel()
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

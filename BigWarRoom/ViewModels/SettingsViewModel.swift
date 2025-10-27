@@ -6,24 +6,25 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class SettingsViewModel: ObservableObject {
-    // MARK: - Published Properties (Settings)
-    @Published var selectedYear: String = AppConstants.ESPNLeagueYear
-    @Published var autoRefreshEnabled: Bool = true
-    @Published var debugModeEnabled: Bool = AppConstants.debug
-    @Published var isTestingConnection: Bool = false
+final class SettingsViewModel {
+    // MARK: - Observable Properties (Settings)
+    var selectedYear: String = AppConstants.ESPNLeagueYear
+    var autoRefreshEnabled: Bool = true
+    var debugModeEnabled: Bool = AppConstants.debug
+    var isTestingConnection: Bool = false
     
-    // MARK: - Published Properties (OnBoarding)
-    @Published var showingESPNSetup: Bool = false
-    @Published var showingSleeperSetup: Bool = false
-    @Published var showingAbout: Bool = false
-    @Published var showingClearConfirmation: Bool = false
-    @Published var showingClearResult: Bool = false
-    @Published var clearResultMessage: String = ""
-    @Published var pendingClearAction: (() -> Void)?
+    // MARK: - Observable Properties (OnBoarding)
+    var showingESPNSetup: Bool = false
+    var showingSleeperSetup: Bool = false
+    var showingAbout: Bool = false
+    var showingClearConfirmation: Bool = false
+    var showingClearResult: Bool = false
+    var clearResultMessage: String = ""
+    var pendingClearAction: (() -> Void)?
 
     // MARK: - Dependencies
     private let espnCredentials = ESPNCredentialsManager.shared
@@ -73,23 +74,7 @@ final class SettingsViewModel: ObservableObject {
     init() {
         // Load saved settings
         loadUserPreferences()
-        
-        // Watch for debug mode changes
-        $debugModeEnabled
-            .sink { [weak self] newValue in
-                self?.updateDebugMode(newValue)
-            }
-            .store(in: &cancellables)
-        
-        // Watch for year changes
-        $selectedYear
-            .sink { [weak self] newYear in
-                self?.updateSelectedYear(newYear)
-            }
-            .store(in: &cancellables)
     }
-    
-    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Settings Management
     
@@ -107,21 +92,40 @@ final class SettingsViewModel: ObservableObject {
             selectedYear = savedYear
             AppConstants.ESPNLeagueYear = savedYear
         }
+        
+        // Set up observers for changes (using withObservationTracking if needed)
+        Task {
+            await observeChanges()
+        }
+    }
+    
+    private func observeChanges() async {
+        // Use withObservationTracking to observe changes
+        withObservationTracking {
+            _ = debugModeEnabled
+        } onChange: {
+            Task { @MainActor in
+                self.updateDebugMode(self.debugModeEnabled)
+            }
+        }
+        
+        withObservationTracking {
+            _ = selectedYear
+        } onChange: {
+            Task { @MainActor in
+                self.updateSelectedYear(self.selectedYear)
+            }
+        }
     }
     
     private func updateDebugMode(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "debugModeEnabled")
-        
         NSLog("🔧 Debug mode \(enabled ? "enabled" : "disabled")")
     }
     
     func updateSelectedYear(_ newYear: String) {
-        // Don't set selectedYear here - it creates an infinite loop!
-        // selectedYear = newYear
-        
         AppConstants.ESPNLeagueYear = newYear
         UserDefaults.standard.set(newYear, forKey: "selectedYear")
-        
         NSLog("📅 Updated selected year to: \(newYear)")
     }
     
@@ -337,9 +341,6 @@ final class SettingsViewModel: ObservableObject {
                 }
                 
                 showingClearResult = true
-                
-                // Force UI refresh by triggering computed property updates
-                objectWillChange.send()
             }
         }
     }
@@ -347,8 +348,8 @@ final class SettingsViewModel: ObservableObject {
     // MARK: - Status Refresh
     
     func refreshConnectionStatus() {
-        // Force UI update by triggering objectWillChange
-        objectWillChange.send()
+        // With @Observable, changes are automatically tracked
+        // No need for objectWillChange.send()
     }
     
     // 🔥 NEW: Individual Disconnect Methods
@@ -359,9 +360,6 @@ final class SettingsViewModel: ObservableObject {
         clearResultMessage = "✅ ESPN Fantasy disconnected!\n\nYour ESPN credentials and league connections have been removed."
         showingClearResult = true
         
-        // Force UI refresh
-        objectWillChange.send()
-        
         NSLog("🔌 ESPN disconnected by user")
     }
     
@@ -370,9 +368,6 @@ final class SettingsViewModel: ObservableObject {
         
         clearResultMessage = "✅ Sleeper Fantasy disconnected!\n\nYour Sleeper credentials and league connections have been removed."
         showingClearResult = true
-        
-        // Force UI refresh
-        objectWillChange.send()
         
         NSLog("🔌 Sleeper disconnected by user")
     }

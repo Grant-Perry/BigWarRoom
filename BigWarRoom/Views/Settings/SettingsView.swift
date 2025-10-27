@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct OnBoardingView: View {
-    @StateObject private var viewModel = SettingsViewModel()
+    @State private var viewModel = SettingsViewModel()
     
     var body: some View {
         NavigationView {

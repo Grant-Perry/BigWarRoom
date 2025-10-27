@@ -7,15 +7,16 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// ViewModel responsible for MyRosterView business logic and data transformation
+@Observable
 @MainActor
-final class MyRosterViewModel: ObservableObject {
-    @Published var selectedPlayer: SleeperPlayer?
-    @Published var showStats = false
-    @Published var showStartingLineup = true
-    @Published var showBench = true
+final class MyRosterViewModel {
+    var selectedPlayer: SleeperPlayer?
+    var showStats = false
+    var showStartingLineup = true
+    var showBench = true
     
     private let draftRoomViewModel: DraftRoomViewModel
     

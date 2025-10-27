@@ -1,14 +1,13 @@
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-class PlayerNewsViewModel: ObservableObject {
-    @Published var newsItems: [PlayerNewsItem] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var selectedCategory: NewsCategory? = nil
-    
-    private var cancellables = Set<AnyCancellable>()
+final class PlayerNewsViewModel {
+    var newsItems: [PlayerNewsItem] = []
+    var isLoading = false
+    var errorMessage: String?
+    var selectedCategory: NewsCategory? = nil
     
     var filteredNewsItems: [PlayerNewsItem] {
         guard let selectedCategory = selectedCategory else {
@@ -26,29 +25,23 @@ class PlayerNewsViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        fetchPlayerNews(espnId: espnId)
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    self?.isLoading = false
-                    if case .failure(let error) = completion {
-                        self?.errorMessage = error.localizedDescription
-                    }
-                },
-                receiveValue: { [weak self] newsResponse in
-                    self?.newsItems = newsResponse.feed
-                    self?.isLoading = false
-                }
-            )
-            .store(in: &cancellables)
+        Task {
+            do {
+                let newsResponse = try await fetchPlayerNews(espnId: espnId)
+                newsItems = newsResponse.feed
+                isLoading = false
+            } catch {
+                errorMessage = error.localizedDescription
+                isLoading = false
+            }
+        }
     }
     
-    private func fetchPlayerNews(espnId: Int) -> AnyPublisher<PlayerNewsResponse, Error> {
+    private func fetchPlayerNews(espnId: Int) async throws -> PlayerNewsResponse {
         let urlString = "https://site.api.espn.com/apis/fantasy/v2/games/ffl/news/players"
         
         guard var urlComponents = URLComponents(string: urlString) else {
-            return Fail(error: URLError(.badURL))
-                .eraseToAnyPublisher()
+            throw URLError(.badURL)
         }
         
         urlComponents.queryItems = [
@@ -57,21 +50,17 @@ class PlayerNewsViewModel: ObservableObject {
         ]
         
         guard let url = urlComponents.url else {
-            return Fail(error: URLError(.badURL))
-                .eraseToAnyPublisher()
+            throw URLError(.badURL)
         }
         
-        return URLSession.shared
-            .dataTaskPublisher(for: url)
-            .tryMap { data, response -> Data in
-                if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode != 200 {
-                        throw URLError(.badServerResponse)
-                    }
-                }
-                return data
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode != 200 {
+                throw URLError(.badServerResponse)
             }
-            .decode(type: PlayerNewsResponse.self, decoder: JSONDecoder())
-            .eraseToAnyPublisher()
+        }
+        
+        return try JSONDecoder().decode(PlayerNewsResponse.self, from: data)
     }
 }

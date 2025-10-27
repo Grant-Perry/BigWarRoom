@@ -26,7 +26,7 @@ struct ChoppedTeamRosterView: View {
     let week: Int
     
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var viewModel: ChoppedTeamRosterViewModel
+    @State private var viewModel: ChoppedTeamRosterViewModel
     
     // NFL Game Data Integration - 🔥 PHASE 2.5: Use @State for @Observable
     @State private var nflGameService = NFLGameDataService.shared
@@ -47,11 +47,11 @@ struct ChoppedTeamRosterView: View {
         self.teamRanking = teamRanking
         self.leagueID = leagueID
         self.week = week
-        self._viewModel = StateObject(wrappedValue: ChoppedTeamRosterViewModel(
+        self.viewModel = ChoppedTeamRosterViewModel(
             teamRanking: teamRanking,
             leagueID: leagueID,
             week: week
-        ))
+        )
     }
 
     var body: some View {
