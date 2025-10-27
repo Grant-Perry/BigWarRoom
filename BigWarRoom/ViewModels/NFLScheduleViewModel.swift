@@ -200,20 +200,59 @@ struct ScheduleGame: Identifiable, Hashable {
     
     /// Parse ESPN game time format
     private func parseGameTime(_ time: String) -> String {
-        // Handle formats like "2nd Quarter", "Q2 14:32", etc.
-        let components = time.components(separatedBy: " ")
+        // 🔥 FIXED: Handle ESPN formats like "15:00 - 4th Quarter", "2:30 - 3rd Quarter"
+        let lowercaseTime = time.lowercased()
         
-        for component in components {
-            if component.lowercased().contains("1st") || component.contains("1") {
-                return extractTimeWithQuarter("Q1", from: components)
-            } else if component.lowercased().contains("2nd") || component.contains("2") {
-                return extractTimeWithQuarter("Q2", from: components)
-            } else if component.lowercased().contains("3rd") || component.contains("3") {
-                return extractTimeWithQuarter("Q3", from: components)
-            } else if component.lowercased().contains("4th") || component.contains("4") {
-                return extractTimeWithQuarter("Q4", from: components)
-            } else if component.lowercased().contains("ot") {
-                return "OT"
+        var quarterDisplay = ""
+        var timeDisplay = ""
+        
+        // 🔥 FIXED: Look for quarter information in the full string first
+        if lowercaseTime.contains("1st quarter") || lowercaseTime.contains("1st qtr") {
+            quarterDisplay = "Q1"
+        } else if lowercaseTime.contains("2nd quarter") || lowercaseTime.contains("2nd qtr") {
+            quarterDisplay = "Q2"
+        } else if lowercaseTime.contains("3rd quarter") || lowercaseTime.contains("3rd qtr") {
+            quarterDisplay = "Q3"
+        } else if lowercaseTime.contains("4th quarter") || lowercaseTime.contains("4th qtr") {
+            quarterDisplay = "Q4"
+        } else if lowercaseTime.contains("1st") {
+            quarterDisplay = "Q1"
+        } else if lowercaseTime.contains("2nd") {
+            quarterDisplay = "Q2"
+        } else if lowercaseTime.contains("3rd") {
+            quarterDisplay = "Q3"
+        } else if lowercaseTime.contains("4th") {
+            quarterDisplay = "Q4"
+        } else if lowercaseTime.contains("ot") || lowercaseTime.contains("overtime") {
+            quarterDisplay = "OT"
+        } else if lowercaseTime.contains("halftime") || lowercaseTime.contains("half") {
+            return "HALFTIME"
+        } else if lowercaseTime.contains("final") {
+            return "FINAL"
+        } else {
+            return "LIVE"
+        }
+        
+        // 🔥 FIXED: Extract time component from beginning of string (before the dash)
+        if let dashIndex = time.firstIndex(of: "-") {
+            let timeString = String(time[..<dashIndex]).trimmingCharacters(in: .whitespaces)
+            if timeString.contains(":") {
+                timeDisplay = timeString
+            }
+        } else {
+            // Fallback: look for time component in any part of the string
+            let components = time.components(separatedBy: " ")
+            if let timeComponent = components.first(where: { $0.contains(":") }) {
+                timeDisplay = timeComponent
+            }
+        }
+        
+        // Return formatted quarter and time
+        if !quarterDisplay.isEmpty {
+            if !timeDisplay.isEmpty {
+                return "\(quarterDisplay) \(timeDisplay)"
+            } else {
+                return quarterDisplay
             }
         }
         

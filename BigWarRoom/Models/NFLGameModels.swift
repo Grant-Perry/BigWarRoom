@@ -96,21 +96,28 @@ struct NFLGameInfo {
         case "in", "live":
             // Show quarter and time like "Q2 2:30"
             if !gameTime.isEmpty {
-                // ESPN sends various formats like:
-                // "1st 12:30", "2nd 5:45", "3rd 0:30", "4th 2:15", "Halftime", "Final"
+                // 🔥 FIXED: ESPN sends formats like "15:00 - 4th Quarter", "2:30 - 3rd Quarter"
                 let lowercaseTime = gameTime.lowercased()
                 
                 var quarterDisplay = ""
                 var timeDisplay = ""
                 
-                // Extract quarter information more accurately
-                if lowercaseTime.contains("1st") || lowercaseTime.hasPrefix("1 ") {
+                // 🔥 FIXED: Look for quarter information in the full string first
+                if lowercaseTime.contains("1st quarter") || lowercaseTime.contains("1st qtr") {
                     quarterDisplay = "Q1"
-                } else if lowercaseTime.contains("2nd") || lowercaseTime.hasPrefix("2 ") {
+                } else if lowercaseTime.contains("2nd quarter") || lowercaseTime.contains("2nd qtr") {
                     quarterDisplay = "Q2"
-                } else if lowercaseTime.contains("3rd") || lowercaseTime.hasPrefix("3 ") {
-                    quarterDisplay = "Q3"  
-                } else if lowercaseTime.contains("4th") || lowercaseTime.hasPrefix("4 ") {
+                } else if lowercaseTime.contains("3rd quarter") || lowercaseTime.contains("3rd qtr") {
+                    quarterDisplay = "Q3"
+                } else if lowercaseTime.contains("4th quarter") || lowercaseTime.contains("4th qtr") {
+                    quarterDisplay = "Q4"
+                } else if lowercaseTime.contains("1st") {
+                    quarterDisplay = "Q1"
+                } else if lowercaseTime.contains("2nd") {
+                    quarterDisplay = "Q2" 
+                } else if lowercaseTime.contains("3rd") {
+                    quarterDisplay = "Q3"
+                } else if lowercaseTime.contains("4th") {
                     quarterDisplay = "Q4"
                 } else if lowercaseTime.contains("ot") || lowercaseTime.contains("overtime") {
                     quarterDisplay = "OT"
@@ -119,16 +126,26 @@ struct NFLGameInfo {
                 } else if lowercaseTime.contains("final") {
                     return "FINAL"
                 } else {
+                    // 🔥 DEBUG: Log unexpected format for debugging
+                    print("🔥 NFL DEBUG: Unexpected gameTime format: '\(gameTime)' -> using LIVE")
                     return "LIVE"
                 }
                 
-                // Extract time component (look for MM:SS pattern)
-                let timeRegex = try? NSRegularExpression(pattern: "\\d{1,2}:\\d{2}", options: [])
-                if let regex = timeRegex {
-                    let nsString = gameTime as NSString
-                    let results = regex.matches(in: gameTime, options: [], range: NSRange(location: 0, length: nsString.length))
-                    if let match = results.first {
-                        timeDisplay = nsString.substring(with: match.range)
+                // 🔥 FIXED: Extract time component from beginning of string (before the dash)
+                if let dashIndex = gameTime.firstIndex(of: "-") {
+                    let timeString = String(gameTime[..<dashIndex]).trimmingCharacters(in: .whitespaces)
+                    if timeString.contains(":") {
+                        timeDisplay = timeString
+                    }
+                } else {
+                    // Fallback: look for MM:SS pattern anywhere
+                    let timeRegex = try? NSRegularExpression(pattern: "\\d{1,2}:\\d{2}", options: [])
+                    if let regex = timeRegex {
+                        let nsString = gameTime as NSString
+                        let results = regex.matches(in: gameTime, options: [], range: NSRange(location: 0, length: nsString.length))
+                        if let match = results.first {
+                            timeDisplay = nsString.substring(with: match.range)
+                        }
                     }
                 }
                 
@@ -136,9 +153,11 @@ struct NFLGameInfo {
                 if !quarterDisplay.isEmpty {
                     if !timeDisplay.isEmpty {
                         let result = "\(quarterDisplay) \(timeDisplay)"
+                        print("🔥 NFL DEBUG: '\(gameTime)' -> '\(result)'")
                         return result
                     } else {
                         let result = quarterDisplay
+                        print("🔥 NFL DEBUG: '\(gameTime)' -> '\(result)' (no time)")
                         return result
                     }
                 }
@@ -240,14 +259,20 @@ class NFLGameDataService: ObservableObject {
         if !forceRefresh, let lastRequest = lastRequestTimestamp,
            Date().timeIntervalSince(lastRequest) < minimumRequestInterval { return }
         
+        // 🔥 DEBUG: Always force refresh during debugging of quarter issues
+        let shouldForceRefresh = forceRefresh || true  // Temporary: always refresh
+        
         // Check cache first
-        if !forceRefresh, 
+        if !shouldForceRefresh, 
            let cache = cache,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration {
+            print("🔥 NFL CACHE: Using cached data from \(timestamp)")
             processGameData(cache)
             return
         }
+        
+        print("🔥 NFL FETCH: Fetching fresh data for week \(week), year \(currentYear)")
         
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(currentYear)") else {
             DispatchQueue.main.async {
@@ -274,12 +299,15 @@ class NFLGameDataService: ObservableObject {
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
+                        print("🔥 NFL ERROR: \(error.localizedDescription)")
                         self?.errorMessage = "Failed to fetch NFL data: \(error.localizedDescription)"
                     }
                 },
                 receiveValue: { [weak self] response in
                     // Remove from pending requests
                     self?.pendingRequests.remove(requestKey)
+                    
+                    print("🔥 NFL SUCCESS: Received fresh data with \(response.events.count) games")
                     
                     self?.cache = response
                     self?.cacheTimestamp = Date()
@@ -306,6 +334,17 @@ class NFLGameDataService: ObservableObject {
             let gameTime = status.detail
             let isCompleted = status.completed
             let isLive = gameStatus == "in"
+            
+            // 🔥 DEBUG: Log raw ESPN data for problematic games
+            if homeTeam == "IND" || homeTeam == "TEN" || homeTeam == "DAL" || homeTeam == "DEN" {
+                print("🔥 ESPN RAW DATA for \(awayTeam) vs \(homeTeam):")
+                print("   - status.state: '\(gameStatus)'")
+                print("   - status.detail: '\(gameTime)'")
+                print("   - status.shortDetail: '\(status.shortDetail)'")
+                print("   - status.description: '\(status.description)'")
+                print("   - status.completed: \(isCompleted)")
+                print("   - homeScore: \(homeScore), awayScore: \(awayScore)")
+            }
             
             var startDate: Date?
             let isoFormatter = ISO8601DateFormatter()

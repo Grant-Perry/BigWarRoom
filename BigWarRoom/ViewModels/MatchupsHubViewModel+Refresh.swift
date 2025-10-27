@@ -34,6 +34,14 @@ extension MatchupsHubViewModel {
             return
         }
         
+        // 🔥 LIGHT THROTTLING: Prevent rapid duplicate calls (3 seconds minimum)
+        let now = Date()
+        let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
+        guard timeSinceLastUpdate >= 3.0 else {
+            print("🔥 REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            return
+        }
+        
         // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
         cachedProviders.removeAll()
         print("🔥 REFRESH: Cleared cached providers for fresh scores")
@@ -141,7 +149,20 @@ extension MatchupsHubViewModel {
     /// Manual refresh trigger - BACKGROUND REFRESH (no loading screen)
     internal func performManualRefresh() async {
         // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
-        guard !isLoading else { return }
+        guard !isLoading else { 
+            print("🔥 MANUAL REFRESH BLOCKED: Already loading")
+            return 
+        }
+        
+        // 🔥 LIGHT THROTTLING: Prevent excessive manual refreshes (2 seconds minimum)
+        let now = Date()
+        let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
+        guard timeSinceLastUpdate >= 2.0 else {
+            print("🔥 MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
+            return
+        }
+        
+        print("🔥 MANUAL REFRESH START: Proceeding with manual refresh")
         
         // 🔥 PRESERVE Just Me Mode state during refresh
         let wasMicroModeEnabled = microModeEnabled

@@ -270,17 +270,21 @@ final class FantasyViewModel: ObservableObject {
     private func setupAutoRefresh() {
         refreshTimer?.invalidate()
         
+        // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
+        // Individual ViewModels should not have their own refresh timers to prevent conflicts
+        // Only MatchupsHubViewModel.shared should control the global refresh cycle
+        
         // Don't auto-refresh if MatchupsHub is controlling
-        if autoRefresh && !isControlledByMatchupsHub {
-            let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
-            refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
-                Task { @MainActor in
-                    if UIApplication.shared.applicationState == .active {
-                        await self.refreshMatchups()
-                    }
-                }
-            }
-        }
+        // if autoRefresh && !isControlledByMatchupsHub {
+        //     let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
+        //     refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
+        //         Task { @MainActor in
+        //             if UIApplication.shared.applicationState == .active {
+        //                 await self.refreshMatchups()
+        //             }
+        //         }
+        //     }
+        // }
     }
     
     // MARK: -> Week Selection (DEPRECATED - Now handled by WeekSelectionManager)

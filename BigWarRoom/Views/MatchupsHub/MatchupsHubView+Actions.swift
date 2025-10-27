@@ -35,16 +35,19 @@ extension MatchupsHubView {
         guard matchupsHubViewModel.autoRefreshEnabled else { return }
         stopPeriodicRefresh()
         
-        // Start the actual refresh timer (every AppConstants.MatchupRefresh seconds)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
-            Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !matchupsHubViewModel.isLoading {
-                    await matchupsHubViewModel.manualRefresh()
-                }
-            }
-        }
+        // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
+        // Only the ViewModel's master timer should control refreshing to prevent infinite loops
+        // This View only manages the visual countdown timer now
         
-        // Start the visual countdown timer
+        // refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
+        //     Task { @MainActor in
+        //         if UIApplication.shared.applicationState == .active && !matchupsHubViewModel.isLoading {
+        //             await matchupsHubViewModel.manualRefresh()
+        //         }
+        //     }
+        // }
+        
+        // Start the visual countdown timer only
         startCountdownTimer()
     }
     

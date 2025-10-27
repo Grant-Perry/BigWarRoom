@@ -492,17 +492,21 @@ struct AllLivePlayersHeaderView: View {
             stableManager = manager
         }
         
-        // Start the actual refresh timer (every 15 seconds)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
-            Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
-                    // Background refresh without UI disruption
-                    await performBackgroundRefresh()
-                }
-            }
-        }
+        // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
+        // Individual views should not create their own refresh timers to prevent conflicts
+        // Only MatchupsHubViewModel.shared should control the global refresh cycle
         
-        // Start the visual countdown timer (every 1 second)
+        // Start the actual refresh timer (every 15 seconds)
+        // refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
+        //     Task { @MainActor in
+        //         if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
+        //             // Background refresh without UI disruption
+        //             await performBackgroundRefresh()
+        //         }
+        //     }
+        // }
+        
+        // Keep the visual countdown timer only (every 1 second)
         startCountdownTimer()
     }
     
