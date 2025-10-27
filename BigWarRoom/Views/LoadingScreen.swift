@@ -22,10 +22,23 @@ struct LoadingScreen: View {
     /// Completion handler 
     let onComplete: (Bool) -> Void
     
-    /// Credentials managers for checking persistent data
-    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
-    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
-    @StateObject private var matchupsHub = MatchupsHubViewModel.shared // 🔥 NEW: Load data through this
+    /// 🔥 PHASE 2.5: Accept dependencies instead of using .shared
+    private let espnCredentials: ESPNCredentialsManager
+    private let sleeperCredentials: SleeperCredentialsManager
+    private let matchupsHub: MatchupsHubViewModel
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(
+        onComplete: @escaping (Bool) -> Void,
+        espnCredentials: ESPNCredentialsManager,
+        sleeperCredentials: SleeperCredentialsManager,
+        matchupsHub: MatchupsHubViewModel
+    ) {
+        self.onComplete = onComplete
+        self.espnCredentials = espnCredentials
+        self.sleeperCredentials = sleeperCredentials
+        self.matchupsHub = matchupsHub
+    }
 
     var body: some View {
         ZStack {
@@ -210,8 +223,8 @@ struct LoadingScreen: View {
             // Load the essential Mission Control data
             await matchupsHub.loadAllMatchups()
             
-            // Also preload other essential services
-            await AllLivePlayersViewModel.shared.loadAllPlayers()
+            // TODO: Update this when AllLivePlayersViewModel.shared is eliminated
+            // await AllLivePlayersViewModel.shared.loadAllPlayers()
             
             print("🔥 LOADING: Essential data loading complete")
             
@@ -419,13 +432,5 @@ struct BokehLayer: View {
                 return (CGPoint(x: newX, y: newY), size, color, opacity)
             }
         }
-    }
-}
-
-// MARK: - Preview
-
-#Preview {
-    LoadingScreen { _ in
-        // x// x Print("Splash complete!")
     }
 }

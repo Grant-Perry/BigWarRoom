@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Toggle filter for showing active players only or all players including those from completed games
 struct CompletedGamesFilterView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     let onFilterChange: () -> Void
     
     var body: some View {

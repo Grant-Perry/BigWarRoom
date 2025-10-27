@@ -31,17 +31,26 @@ final class DefaultDraftConnectionCoordinator: DraftConnectionCoordinator {
     // MARK: - Internal Properties
     var currentUserID: String?
     
-    // MARK: - Services
-    private let sleeperClient = SleeperAPIClient.shared
-    private let espnClient = ESPNAPIClient.shared
-    private let leagueManager = UnifiedLeagueManager()
+    // 🔥 PHASE 2.5: Inject dependencies instead of using .shared
+    private let sleeperClient: SleeperAPIClient
+    private let espnClient: ESPNAPIClient
+    private let leagueManager: UnifiedLeagueManager
+    private let espnCredentials: ESPNCredentialsManager
     
     // MARK: - Delegate
     weak var delegate: DraftConnectionCoordinatorDelegate?
     
-    init() {
-        // 🔥 PERFORMANCE FIX: Keep init lightweight and non-blocking
-        // No network calls or heavy operations here
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(
+        sleeperClient: SleeperAPIClient,
+        espnClient: ESPNAPIClient,
+        leagueManager: UnifiedLeagueManager,
+        espnCredentials: ESPNCredentialsManager
+    ) {
+        self.sleeperClient = sleeperClient
+        self.espnClient = espnClient
+        self.leagueManager = leagueManager
+        self.espnCredentials = espnCredentials
     }
     
     // MARK: - Connection Methods
@@ -86,7 +95,7 @@ final class DefaultDraftConnectionCoordinator: DraftConnectionCoordinator {
     func connectToESPNOnly() async {
         AppLogger.info("Starting ESPN-only connection", category: "DraftConnection")
 
-        guard ESPNCredentialsManager.shared.hasValidCredentials else {
+        guard espnCredentials.hasValidCredentials else {
             AppLogger.warning("No valid ESPN credentials available", category: "DraftConnection")
             return
         }
@@ -97,7 +106,7 @@ final class DefaultDraftConnectionCoordinator: DraftConnectionCoordinator {
         allAvailableDrafts.removeAll { $0.source == .espn }
         allAvailableDrafts.append(contentsOf: newESPNLeagues)
 
-        if let swid = ESPNCredentialsManager.shared.getSWID() {
+        if let swid = espnCredentials.getSWID() {
             currentUserID = swid
         }
 
@@ -140,7 +149,7 @@ final class DefaultDraftConnectionCoordinator: DraftConnectionCoordinator {
             AppLogger.info("No ESPN league IDs configured", category: "DraftConnection")
             return
         }
-        await ESPNAPIClient.shared.debugESPNConnection(leagueID: testLeagueID)
+        await espnClient.debugESPNConnection(leagueID: testLeagueID)
     }
 }
 

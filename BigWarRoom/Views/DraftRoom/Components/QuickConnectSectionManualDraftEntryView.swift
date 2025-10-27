@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct QuickConnectSectionManualDraftEntryView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var manualDraftID: String
     @Binding var isConnectingToDraft: Bool
     

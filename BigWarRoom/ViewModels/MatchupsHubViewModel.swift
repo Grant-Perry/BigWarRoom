@@ -6,81 +6,126 @@
 //
 
 import Foundation
-import Combine
 import SwiftUI
+import Observation
 
 /// Main MatchupsHub ViewModel - focuses on core state management and coordination
 @MainActor
-final class MatchupsHubViewModel: ObservableObject {
+@Observable
+final class MatchupsHubViewModel {
     
-    // 🔥 NEW: Shared singleton instance to ensure data consistency across views
-    static let shared = MatchupsHubViewModel()
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: MatchupsHubViewModel?
     
-    // MARK: - Published Properties
-    @Published var myMatchups: [UnifiedMatchup] = []
-    @Published var isLoading = false
-    @Published var lastUpdateTime = Date()
-    @Published var autoRefreshEnabled = true
+    static var shared: MatchupsHubViewModel {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default dependencies
+        let espnCredentials = ESPNCredentialsManager()
+        let sleeperCredentials = SleeperCredentialsManager(apiClient: SleeperAPIClient())
+        let instance = MatchupsHubViewModel(espnCredentials: espnCredentials, sleeperCredentials: sleeperCredentials)
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: MatchupsHubViewModel) {
+        _shared = instance
+    }
+    
+    // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
+    var myMatchups: [UnifiedMatchup] = []
+    var isLoading = false
+    var lastUpdateTime = Date()
+    var autoRefreshEnabled = true
 
     // MARK: - Just Me Mode State (Persistent across refreshes)
-    @Published var microModeEnabled = false // Changed from true to false - start with Just Me mode OFF
-    @Published var expandedCardId: String? = nil
-    @Published var justMeModeBannerVisible = false // Keep this false - no banner needed
+    var microModeEnabled = false // Changed from true to false - start with Just Me mode OFF
+    var expandedCardId: String? = nil
+    var justMeModeBannerVisible = false // Keep this false - no banner needed
     
     // MARK: - Loading State Management
-    @Published var loadingStates: [String: LeagueLoadingState] = [:]
-    @Published var errorMessage: String? = nil
-    @Published var currentLoadingLeague: String = ""
-    @Published var loadingProgress: Double = 0.0
+    var loadingStates: [String: LeagueLoadingState] = [:]
+    var errorMessage: String? = nil
+    var currentLoadingLeague: String = ""
+    var loadingProgress: Double = 0.0
     internal var totalLeagueCount: Int = 0
     internal var loadedLeagueCount: Int = 0
     
     // 🔥 NEW: Cache loaded LeagueMatchupProvider instances for score consistency
     internal var cachedProviders: [String: LeagueMatchupProvider] = [:]
     
-    // MARK: - Dependencies
-    internal let unifiedLeagueManager = UnifiedLeagueManager()
-    internal let sleeperCredentials = SleeperCredentialsManager.shared
+    // MARK: - Dependencies - Injected instead of .shared (PHASE 2 CORRECTED)
+    private let espnCredentials: ESPNCredentialsManager
+    internal let sleeperCredentials: SleeperCredentialsManager  // 🔥 CHANGED: Made internal for extensions
+    internal let unifiedLeagueManager: UnifiedLeagueManager
     internal var refreshTimer: Timer?
-    internal var cancellables = Set<AnyCancellable>()
+    
+    // 🔥 PHASE 3: Replace Combine with observation task
+    private var observationTask: Task<Void, Never>?
     
     // MARK: - Loading Guards
     internal var currentlyLoadingLeagues = Set<String>()
     internal let loadingLock = NSLock()
     internal let maxConcurrentLoads = 3
     
-    // MARK: - Initialization
-    init() {
+    // MARK: - Initialization with Dependency Injection (PHASE 2 CORRECTED)
+    init(espnCredentials: ESPNCredentialsManager, sleeperCredentials: SleeperCredentialsManager) {
+        self.espnCredentials = espnCredentials
+        self.sleeperCredentials = sleeperCredentials
+        
+        // 🔥 PHASE 2 CORRECTED: Create UnifiedLeagueManager with proper dependency injection
+        // We need to create API clients here - this is a bit complex but proper
+        let sleeperAPIClient = SleeperAPIClient()
+        let espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)
+        
+        self.unifiedLeagueManager = UnifiedLeagueManager(
+            sleeperClient: sleeperAPIClient,
+            espnClient: espnAPIClient,
+            espnCredentials: espnCredentials
+        )
+        
         setupAutoRefresh()
+        setupCredentialObservation()
+    }
+    
+    // MARK: - 🔥 PHASE 3: Replace Combine subscription with @Observable observation
+    private func setupCredentialObservation() {
+        print("🔥 CREDENTIALS OBSERVATION: Setting up @Observable-based credential monitoring")
         
-        // 🔥 NEW: Subscribe to Sleeper credentials changes for automatic refresh
-        sleeperCredentials.$hasValidCredentials
-            .dropFirst() // Skip initial value
-            .removeDuplicates()
-            .debounce(for: .seconds(1), scheduler: DispatchQueue.main) // Debounce rapid changes
-            .sink { [weak self] _ in
-                print("🔄 Sleeper credentials changed - refreshing leagues...")
-                Task { @MainActor in
-                    await self?.manualRefresh()
+        observationTask = Task { @MainActor in
+            var lastSleeperCredentials = sleeperCredentials.hasValidCredentials
+            var lastSleeperUsername = sleeperCredentials.currentUsername
+            
+            while !Task.isCancelled {
+                // Check if Sleeper credentials changed
+                let currentSleeperCredentials = sleeperCredentials.hasValidCredentials
+                let currentSleeperUsername = sleeperCredentials.currentUsername
+                
+                if currentSleeperCredentials != lastSleeperCredentials {
+                    print("🔄 Sleeper credentials changed - refreshing leagues...")
+                    await manualRefresh()
+                    lastSleeperCredentials = currentSleeperCredentials
                 }
-            }
-            .store(in: &cancellables)
-        
-        sleeperCredentials.$currentUsername
-            .dropFirst() // Skip initial value
-            .removeDuplicates()
-            .debounce(for: .seconds(1), scheduler: DispatchQueue.main) // Debounce rapid changes
-            .sink { [weak self] newUsername in
-                print("🔄 Sleeper username changed to '\(newUsername)' - refreshing leagues...")
-                Task { @MainActor in
-                    await self?.manualRefresh()
+                
+                if currentSleeperUsername != lastSleeperUsername {
+                    print("🔄 Sleeper username changed to '\(currentSleeperUsername)' - refreshing leagues...")
+                    await manualRefresh()
+                    lastSleeperUsername = currentSleeperUsername
                 }
+                
+                // Small delay to prevent excessive polling
+                try? await Task.sleep(for: .seconds(1))
             }
-            .store(in: &cancellables)
+        }
     }
     
     deinit {
-        refreshTimer?.invalidate()
+        Task { @MainActor in
+            refreshTimer?.invalidate()
+            observationTask?.cancel()
+        }
     }
     
     // MARK: - Public Interface
@@ -332,15 +377,15 @@ struct UnifiedMatchup: Identifiable {
     let myIdentifiedTeamID: String? // 🔥 NEW: Store the correctly identified team ID
     private let authenticatedUsername: String
     
-    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil) {
+    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil, authenticatedUsername: String) {
         self.id = id
         self.league = league
         self.fantasyMatchup = fantasyMatchup
         self.choppedSummary = choppedSummary
         self.lastUpdated = lastUpdated
         self.myTeamRanking = myTeamRanking
-        self.myIdentifiedTeamID = myIdentifiedTeamID // 🔥 NEW: Store the team ID
-        self.authenticatedUsername = SleeperCredentialsManager.shared.currentUsername
+        self.myIdentifiedTeamID = myIdentifiedTeamID
+        self.authenticatedUsername = authenticatedUsername
     }
     
     /// Create a configured FantasyViewModel for this matchup

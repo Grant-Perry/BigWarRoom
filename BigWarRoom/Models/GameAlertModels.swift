@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// Model for a single game alert representing the highest scoring play in a refresh cycle
 struct GameAlert: Identifiable {
@@ -56,19 +56,39 @@ struct GameAlert: Identifiable {
 }
 
 /// Manager for tracking and storing game alerts
+@Observable
 @MainActor
-final class GameAlertsManager: ObservableObject {
-    // MARK: - Published Properties
-    @Published var alerts: [GameAlert] = []
-    @Published var currentRefreshCycle: Int = 0
+final class GameAlertsManager {
+    
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: GameAlertsManager?
+    
+    static var shared: GameAlertsManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = GameAlertsManager()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: GameAlertsManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var alerts: [GameAlert] = []
+    var currentRefreshCycle: Int = 0
     
     // MARK: - Constants
     private let maxAlerts = 50
     
-    // MARK: - Shared Instance
-    static let shared = GameAlertsManager()
+    // MARK: - Initialization
     
-    private init() {}
+    // 🔥 PHASE 2.5: Default initializer for bridge pattern
+    init() {}
     
     // MARK: - Public Methods
     

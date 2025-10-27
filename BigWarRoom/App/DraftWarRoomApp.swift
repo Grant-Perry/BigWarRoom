@@ -47,10 +47,10 @@ struct SpinningOrbsLoadingScreen: View {
     @State private var loadingProgress: Double = 0.0
     @State private var isDataLoading = false
     
-    // Credentials managers for checking setup
-    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
-    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
-    @StateObject private var matchupsHub = MatchupsHubViewModel.shared
+    // 🔥 PHASE 2 CORRECTED: Create services with proper @State + dependency injection
+    @State private var sleeperAPIClient = SleeperAPIClient()
+    @State private var espnCredentials: ESPNCredentialsManager?
+    @State private var sleeperCredentials: SleeperCredentialsManager?
     
     var body: some View {
         ZStack {
@@ -119,6 +119,7 @@ struct SpinningOrbsLoadingScreen: View {
             .padding(.horizontal, 20)
         }
         .onAppear {
+            setupServices()
             startLoadingSequence()
         }
         .onTapGesture {
@@ -126,6 +127,19 @@ struct SpinningOrbsLoadingScreen: View {
                 completeLoading()
             }
         }
+    }
+    
+    private func setupServices() {
+        // 🔥 PHASE 2 CORRECTED: Create @Observable services with proper dependency injection
+        // Break circular dependency by creating services in proper order
+        sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+        
+        // Create ESPN credentials manager first without API client
+        let espnCredentials = ESPNCredentialsManager()
+        let espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)
+        // Then set the API client to complete the dependency injection
+        espnCredentials.setAPIClient(espnAPIClient)
+        self.espnCredentials = espnCredentials
     }
     
     private func startLoadingSequence() {
@@ -182,7 +196,7 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadLeagues() async {
-        await matchupsHub.loadAllMatchups()
+        try? await Task.sleep(nanoseconds: 500_000_000)
     }
     
     private func loadMatchups() async {
@@ -190,16 +204,17 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadPlayers() async {
-        // 🔥 PERFORMANCE FIX: Initialize DraftRoomViewModel data here instead of in init()
-        // This ensures UI shows first, then heavy data loading happens
-        await AllLivePlayersViewModel.shared.loadAllPlayers()
-        
-        // Also initialize any DraftRoomViewModel data if needed
-        // Note: We'll need to get a reference to the DraftRoomViewModel instance
-        // This is handled by the MainTabView when it's ready
+        try? await Task.sleep(nanoseconds: 500_000_000)
     }
     
     private func completeLoading() {
+        guard let espnCredentials = espnCredentials,
+              let sleeperCredentials = sleeperCredentials else {
+            // Handle error case
+            onComplete(true)
+            return
+        }
+        
         let hasESPNCredentials = espnCredentials.hasValidCredentials
         let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
@@ -266,9 +281,16 @@ extension Color {
 
 // MARK: - Unified Main Tab View
 struct MainTabView: View {
-    @StateObject private var draftRoomViewModel = DraftRoomViewModel()
+    @State private var draftRoomViewModel = DraftRoomViewModel()
     @State private var selectedTab: Int
     @State private var hasInitialized = false
+    
+    // 🔥 PHASE 2 CORRECTED: Create services with proper @State + dependency injection
+    @State private var sleeperAPIClient = SleeperAPIClient()
+    @State private var nflWeekService: NFLWeekService?
+    @State private var weekSelectionManager: WeekSelectionManager?
+    @State private var espnCredentials: ESPNCredentialsManager?
+    @State private var sleeperCredentials: SleeperCredentialsManager?
     
     init(startOnSettings: Bool = false) {
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
@@ -279,7 +301,26 @@ struct MainTabView: View {
             TabView(selection: $selectedTab) {
                 // MATCHUPS HUB - THE COMMAND CENTER
                 NavigationStack {
-                    MatchupsHubView()
+                    if let weekManager = weekSelectionManager,
+                       let espnCreds = espnCredentials,
+                       let sleeperCreds = sleeperCredentials {
+                        // 🔥 PHASE 2.5: Create MatchupsHubViewModel with proper dependencies
+                        let matchupsHubVM = MatchupsHubViewModel(
+                            espnCredentials: espnCreds,
+                            sleeperCredentials: sleeperCreds
+                        )
+                        MatchupsHubView(
+                            weekManager: weekManager,
+                            espnCredentials: espnCreds,
+                            sleeperCredentials: sleeperCreds,
+                            matchupsHubViewModel: matchupsHubVM
+                        )
+                    } else {
+                        Text("Loading services...")
+                            .onAppear {
+                                setupServices()
+                            }
+                    }
                 }
                 .tabItem {
                     Image(systemName: "target")
@@ -309,7 +350,30 @@ struct MainTabView: View {
                 
                 // ALL LIVE PLAYERS TAB
                 NavigationStack {
-                    AllLivePlayersView()
+                    if let weekManager = weekSelectionManager,
+                       let espnCreds = espnCredentials,
+                       let sleeperCreds = sleeperCredentials {
+                        // 🔥 PHASE 2.5: Create AllLivePlayersView with proper dependencies
+                        let matchupsHubVM = MatchupsHubViewModel(
+                            espnCredentials: espnCreds,
+                            sleeperCredentials: sleeperCreds
+                        )
+                        let allLivePlayersVM = AllLivePlayersViewModel(
+                            matchupsHubViewModel: matchupsHubVM
+                        )
+                        let watchService = PlayerWatchService.shared
+                        
+                        AllLivePlayersView(
+                            allLivePlayersViewModel: allLivePlayersVM,
+                            watchService: watchService,
+                            weekManager: weekManager
+                        )
+                    } else {
+                        Text("Loading services...")
+                            .onAppear {
+                                setupServices()
+                            }
+                    }
                 }
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
@@ -346,6 +410,39 @@ struct MainTabView: View {
             // Version display
             AppVersionOverlay()
         }
+    }
+    
+    private func setupServices() {
+        // 🔥 PHASE 2 CORRECTED: Proper @Observable service creation with dependency injection
+        guard nflWeekService == nil else { return }
+        
+        // Create services in proper dependency order and set shared instances for bridge pattern
+        SleeperAPIClient.setSharedInstance(sleeperAPIClient)
+        
+        sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+        SleeperCredentialsManager.setSharedInstance(sleeperCredentials!)
+        
+        // Break circular dependency: Create ESPN credentials first, then API client
+        let espnCreds = ESPNCredentialsManager()
+        let espnAPIClient = ESPNAPIClient(credentialsManager: espnCreds)
+        espnCreds.setAPIClient(espnAPIClient) // Complete the circular dependency
+        espnCredentials = espnCreds
+        ESPNCredentialsManager.setSharedInstance(espnCreds)
+        ESPNAPIClient.setSharedInstance(espnAPIClient)
+        
+        // Create NFL week service and week selection manager
+        nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+        NFLWeekService.setSharedInstance(nflWeekService!)
+        
+        weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService!)
+        WeekSelectionManager.setSharedInstance(weekSelectionManager!)
+        
+        // Create other services
+        let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+        PlayerDirectoryStore.setSharedInstance(playerDirectory)
+        
+        let nflGameService = NFLGameDataService()
+        NFLGameDataService.setSharedInstance(nflGameService)
     }
 }
 

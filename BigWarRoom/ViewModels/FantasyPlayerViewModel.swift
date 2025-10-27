@@ -7,19 +7,19 @@
 
 import Foundation
 import SwiftUI
-import Combine
 
 /// View model managing business logic for fantasy player card displays
 @MainActor
-class FantasyPlayerViewModel: ObservableObject {
+@Observable
+class FantasyPlayerViewModel {
     
-    // MARK: - Published Properties
-    @Published var teamColor: Color = .gray
-    @Published var nflPlayer: NFLPlayer?
-    @Published var glowIntensity: Double = 0.0
-    @Published var currentWeek: Int = NFLWeekService.shared.currentWeek
-    @Published var statsAvailable: Bool = false
-    @Published var showingPlayerDetail: Bool = false
+    // MARK: - Observable Properties
+    var teamColor: Color = .gray
+    var nflPlayer: NFLPlayer?
+    var glowIntensity: Double = 0.0
+    var currentWeek: Int = NFLWeekService.shared.currentWeek
+    var statsAvailable: Bool = false
+    var showingPlayerDetail: Bool = false
     
     // MARK: - Dependencies
     private let gameViewModel = NFLGameMatchupViewModel()
@@ -27,7 +27,42 @@ class FantasyPlayerViewModel: ObservableObject {
     private let livePlayersViewModel = AllLivePlayersViewModel.shared
     private let playerDirectory = PlayerDirectoryStore.shared
     
-    private var cancellables = Set<AnyCancellable>()
+    private var observationTask: Task<Void, Never>?
+    
+    // MARK: - Initialization
+    init() {
+        startObservingDependencies()
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
+    }
+    
+    /// Start observing dependencies using @Observable pattern
+    private func startObservingDependencies() {
+        observationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let isStatsLoaded = livePlayersViewModel.statsLoaded
+                let playerStats = livePlayersViewModel.playerStats
+                
+                if isStatsLoaded && !statsAvailable {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        statsAvailable = true
+                    }
+                }
+                
+                if !playerStats.isEmpty && !statsAvailable {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        statsAvailable = true
+                    }
+                }
+                
+                try? await Task.sleep(nanoseconds: 500_000_000) // Check twice per second
+            }
+        }
+    }
     
     // MARK: - Computed Properties
     
@@ -84,9 +119,6 @@ class FantasyPlayerViewModel: ObservableObject {
         if isPlayerLive(player) {
             startLiveAnimations()
         }
-        
-        // Observe stats loading
-        observeStatsUpdates()
     }
     
     /// Gets positional ranking display string
@@ -228,28 +260,6 @@ class FantasyPlayerViewModel: ObservableObject {
         withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
             glowIntensity = 0.8
         }
-    }
-    
-    private func observeStatsUpdates() {
-        livePlayersViewModel.$statsLoaded
-            .sink { [weak self] isLoaded in
-                if isLoaded {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self?.statsAvailable = true
-                    }
-                }
-            }
-            .store(in: &cancellables)
-        
-        livePlayersViewModel.$playerStats
-            .sink { [weak self] playerStats in
-                if !playerStats.isEmpty && self?.statsAvailable == false {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        self?.statsAvailable = true
-                    }
-                }
-            }
-            .store(in: &cancellables)
     }
     
     // MARK: - Stat Formatting Methods

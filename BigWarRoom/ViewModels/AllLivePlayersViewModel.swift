@@ -7,102 +7,115 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 @MainActor
-final class AllLivePlayersViewModel: ObservableObject {
-    // MARK: - Shared Instance
-    static let shared = AllLivePlayersViewModel()
+@Observable
+final class AllLivePlayersViewModel {
+    // MARK: - Shared Instance (DEPRECATED - for bridge compatibility only)
+    @MainActor
+    static let shared: AllLivePlayersViewModel = {
+        return AllLivePlayersViewModel(matchupsHubViewModel: MatchupsHubViewModel.shared)
+    }()
     
-    // MARK: - Published Properties (Core State Only)
-    @Published var allPlayers: [LivePlayerEntry] = []
-    @Published var filteredPlayers: [LivePlayerEntry] = []
-    @Published var selectedPosition: PlayerPosition = .all
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var dataState: DataLoadingState = .initial
+    // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
+    var allPlayers: [LivePlayerEntry] = []
+    var filteredPlayers: [LivePlayerEntry] = []
+    var selectedPosition: PlayerPosition = .all
+    var isLoading = false
+    var errorMessage: String?
+    var dataState: DataLoadingState = .initial
     
     // MARK: - UI State
-    @Published var sortHighToLow = true
-    @Published var sortingMethod: SortingMethod = .position
-    @Published var showActiveOnly: Bool = false
-    @Published var shouldResetAnimations = false
-    @Published var sortChangeID = UUID()
-    @Published var lastUpdateTime = Date()
-    @Published var searchText: String = ""
-    @Published var isSearching: Bool = false
-    @Published var showRosteredOnly: Bool = false // Changed to checkbox approach
-    @Published var allNFLPlayers: [SleeperPlayer] = [] // For All Players search
+    var sortHighToLow = true
+    var sortingMethod: SortingMethod = .position
+    var showActiveOnly: Bool = false
+    var shouldResetAnimations = false
+    var sortChangeID = UUID()
+    var lastUpdateTime = Date()
+    var searchText: String = ""
+    var isSearching: Bool = false
+    var showRosteredOnly: Bool = false // Changed to checkbox approach
+    var allNFLPlayers: [SleeperPlayer] = [] // For All Players search
     
     // MARK: - Computed Statistics
-    @Published var topScore: Double = 0.0
-    @Published var medianScore: Double = 0.0
-    @Published var scoreRange: Double = 0.0
-    @Published var useAdaptiveScaling: Bool = false
-    @Published var positionTopScore: Double = 0.0
+    var topScore: Double = 0.0
+    var medianScore: Double = 0.0
+    var scoreRange: Double = 0.0
+    var useAdaptiveScaling: Bool = false
+    var positionTopScore: Double = 0.0
     
     // MARK: - Player Stats
-    @Published var playerStats: [String: [String: Double]] = [:]
-    @Published var statsLoaded: Bool = false
+    var playerStats: [String: [String: Double]] = [:]
+    var statsLoaded: Bool = false
     
-    // MARK: - Dependencies
-    let matchupsHubViewModel = MatchupsHubViewModel.shared
+    // 🔥 PHASE 2.5: Accept dependencies instead of hardcoded .shared
+    let matchupsHubViewModel: MatchupsHubViewModel
     
     // MARK: - Internal State (not published)
-    internal var weekSubscription: AnyCancellable?
-    internal var matchupsSubscription: AnyCancellable?
     internal var debounceTask: Task<Void, Never>?
     internal var isBatchingUpdates = false
     
     // 🔥 FIXED: Track last processed update time to prevent duplicate processing
     internal var lastProcessedMatchupUpdate = Date.distantPast
     
-    // MARK: - Private Init
-    private init() {
-        subscribeToWeekChanges()
-        subscribeToMatchupsUpdates()
+    // 🔥 PHASE 3: Replace Combine subscriptions with observation task
+    private var observationTask: Task<Void, Never>?
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    @MainActor
+    init(matchupsHubViewModel: MatchupsHubViewModel) {
+        self.matchupsHubViewModel = matchupsHubViewModel
+        setupObservation()
+    }
+    
+    // MARK: - Bridge compatibility initializer (DEPRECATED)
+    @MainActor
+    private static func createSharedInstance() -> AllLivePlayersViewModel {
+        return AllLivePlayersViewModel(matchupsHubViewModel: MatchupsHubViewModel.shared)
     }
     
     // MARK: - Cleanup
+    @MainActor
     deinit {
         debounceTask?.cancel()
-        weekSubscription?.cancel()
-        matchupsSubscription?.cancel()
+        observationTask?.cancel()
     }
     
-    // 🔥 FIXED: Subscribe to MatchupsHubViewModel updates with duplicate prevention
-    private func subscribeToMatchupsUpdates() {
-        print("🔥 SUBSCRIPTION SETUP: Setting up matchups subscription")
-        matchupsSubscription = matchupsHubViewModel.$lastUpdateTime
-            .removeDuplicates()
-            .debounce(for: .milliseconds(750), scheduler: DispatchQueue.main) 
-            .sink { [weak self] updateTime in
-                guard let self = self else { 
-                    print("🔥 SUBSCRIPTION ERROR: Self is nil")
-                    return 
+    // 🔥 PHASE 3: Replace Combine subscription with @Observable observation
+    private func setupObservation() {
+        print("🔥 OBSERVATION SETUP: Setting up @Observable-based observation")
+        
+        observationTask = Task { @MainActor in
+            // Observe changes to MatchupsHubViewModel
+            var lastObservedUpdate = Date.distantPast
+            
+            while !Task.isCancelled {
+                // Check if MatchupsHubViewModel's lastUpdateTime changed
+                let currentUpdateTime = matchupsHubViewModel.lastUpdateTime
+                
+                if currentUpdateTime > lastObservedUpdate && currentUpdateTime > lastProcessedMatchupUpdate {
+                    print("🔥 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
+                    
+                    // Only process if we have initial data
+                    guard !allPlayers.isEmpty else {
+                        print("🔥 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
+                        lastObservedUpdate = currentUpdateTime
+                        try? await Task.sleep(for: .seconds(1))
+                        continue
+                    }
+                    
+                    print("🔥 OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
+                    lastProcessedMatchupUpdate = currentUpdateTime
+                    lastObservedUpdate = currentUpdateTime
+                    
+                    await performLiveUpdate()
                 }
                 
-                print("🔥 SUBSCRIPTION TRIGGERED: MatchupsHub lastUpdateTime = \(updateTime)")
-                
-                // 🔥 CRITICAL FIX: Prevent duplicate processing of same update
-                guard updateTime > self.lastProcessedMatchupUpdate else {
-                    print("🔥 SUBSCRIPTION BLOCKED: Duplicate update from \(updateTime), last processed: \(self.lastProcessedMatchupUpdate)")
-                    return
-                }
-                
-                // Only process if we have initial data
-                guard !self.allPlayers.isEmpty else { 
-                    print("🔥 SUBSCRIPTION BLOCKED: No initial data yet (allPlayers.count = \(self.allPlayers.count))")
-                    return 
-                }
-                
-                print("🔥 SUBSCRIPTION PROCESSING: Starting live update for \(updateTime)")
-                self.lastProcessedMatchupUpdate = updateTime
-                
-                Task { @MainActor in
-                    await self.performLiveUpdate()
-                }
+                // Small delay to prevent excessive polling
+                try? await Task.sleep(for: .milliseconds(500))
             }
+        }
     }
 }
 

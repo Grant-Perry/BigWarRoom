@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DraftStatusInfo: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         HStack(spacing: 8) {

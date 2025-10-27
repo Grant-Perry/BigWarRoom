@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TurnIndicatorView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         Group {

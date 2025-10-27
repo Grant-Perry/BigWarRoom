@@ -116,7 +116,10 @@ extension MatchupsHubView {
     }
 
     func buildWeekPickerSheet() -> some View {
-        WeekPickerView(isPresented: $showingWeekPicker)
+        WeekPickerView(
+            weekManager: weekManager,
+            isPresented: $showingWeekPicker
+        )
     }
     
     func buildEmptyStateView() -> some View {

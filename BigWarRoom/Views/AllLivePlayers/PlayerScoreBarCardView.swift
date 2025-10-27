@@ -12,13 +12,13 @@ struct PlayerScoreBarCardView: View {
     let animateIn: Bool
     let onTap: (() -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     
-    // 🔥 NEW: Get stats from parent view model
-    @ObservedObject var viewModel: AllLivePlayersViewModel
+    // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels
+    @Bindable var viewModel: AllLivePlayersViewModel
     
     @State private var scoreBarWidth: Double = 0.0
     @State private var cardOffset: Double = 50.0
     @State private var cardOpacity: Double = 0.0
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared
     
     private let maxScoreBarWidth: Double = 120.0 // Maximum width in points
     private let cardHeight: Double = 110.0 // Increased card height to accommodate stats at bottom (was 95.0)

@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sheet for filtering and sorting all live players data
 struct AllLivePlayersFiltersSheet: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ManualPositionPicker: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

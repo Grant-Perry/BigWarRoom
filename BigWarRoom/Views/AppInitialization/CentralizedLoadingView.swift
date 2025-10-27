@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct CentralizedLoadingView: View {
-    @ObservedObject var centralizedAppLoader: CentralizedAppLoader
-    @StateObject private var sharedStats = SharedStatsService.shared  // 🔥 NEW: Monitor stats loading
+    @State var centralizedAppLoader: CentralizedAppLoader
+    @State private var sharedStats = SharedStatsService.shared  // 🔥 PHASE 2.5: Use @State for @Observable
     
     @State private var animationOffset: CGFloat = 0
     @State private var pulseAnimation: Bool = false

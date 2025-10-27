@@ -7,29 +7,30 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// ViewModel for team-filtered matchups from Schedule tap
 @MainActor
-final class TeamFilteredMatchupsViewModel: ObservableObject {
+@Observable
+final class TeamFilteredMatchupsViewModel {
     
-    // MARK: - Published Properties
-    @Published var filteredMatchups: [UnifiedMatchup] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+    // MARK: - Observable Properties
+    var filteredMatchups: [UnifiedMatchup] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
     
     /// The ScheduleGame object is the source of truth
-    @Published var gameData: ScheduleGame?
+    var gameData: ScheduleGame?
     
     /// Explicit ready state - true when both matchups and team codes are available
-    @Published var isReadyToFilter: Bool = false
+    var isReadyToFilter: Bool = false
 
     private var lastFilteredAwayTeam: String = ""
     private var lastFilteredHomeTeam: String = ""
     
     // MARK: - Dependencies
     private let matchupsHubViewModel: MatchupsHubViewModel
-    private var cancellables = Set<AnyCancellable>()
+    private var observationTask: Task<Void, Never>?
     
     // MARK: - Computed Properties
     
@@ -64,7 +65,13 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
     
     init(matchupsHubViewModel: MatchupsHubViewModel) {
         self.matchupsHubViewModel = matchupsHubViewModel
-        setupCombineChaining()
+        setupObservation()
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
     }
     
     // MARK: - Public Methods
@@ -89,8 +96,7 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
 
         logDebug("Set loading state - isLoading: \(isLoading)", category: "TeamFilter")
 
-        // IMPORTANT: Don't call performFiltering() here - let the Combine pipeline handle it
-        // This prevents the double-call race condition
+        // The observation task will handle filtering when conditions are met
     }
     
     /// Refresh the filtered data
@@ -101,60 +107,58 @@ final class TeamFilteredMatchupsViewModel: ObservableObject {
         // Refresh the main hub data first
         await matchupsHubViewModel.manualRefresh()
         
-        // No need to set isLoading to false here, the Combine pipeline will
-        // handle it once the matchupsHubViewModel.myMatchups publisher emits
-        // a new value and performFiltering() is called.
+        // The observation task will handle re-filtering when matchups update
     }
     
     // MARK: - Private Methods
     
-    /// Setup Combine pipeline to watch matchups readiness
-    private func setupCombineChaining() {
-        // Create a publisher that emits when matchups are available
-        let readyStatePublisher = matchupsHubViewModel.$myMatchups
-            .map { !$0.isEmpty }
-            .map { hasMatchups in
-                logDebug("Matchups loaded: \(hasMatchups), Ready: \(hasMatchups)", category: "TeamFilter")
-                return hasMatchups
-            }
-            .removeDuplicates()
-        
-        // Update isReadyToFilter state
-        readyStatePublisher
-            .assign(to: &$isReadyToFilter)
-        
-        // Trigger filtering whenever the selected game changes AND the data is ready
-        // Add a small delay to ensure gameData is fully set before filtering
-        Publishers.CombineLatest(
-            readyStatePublisher,
-            $gameData
-        )
-        .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
-        .sink { [weak self] isReady, game in
-            guard let self = self, isReady, let game = game else { 
-                logDebug("Filter skipped - Ready: \(isReady), Game: \(game?.id ?? "nil")", category: "TeamFilter")
-                return 
-            }
+    /// Setup @Observable observation to watch for changes
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            var lastObservedMatchupsReady = false
+            var lastObservedGameData: ScheduleGame? = nil
+            var lastObservedMatchupsCount = 0
             
-            logDebug("Executing filter: Game data ready: \(game.id)", category: "TeamFilter")
-            self.performFiltering()
-            self.isLoading = false
-            logDebug("Filter complete: Cleared loading states", category: "TeamFilter")
+            while !Task.isCancelled {
+                let hasMatchups = !matchupsHubViewModel.myMatchups.isEmpty
+                let currentGameData = gameData
+                let currentMatchupsCount = matchupsHubViewModel.myMatchups.count
+                
+                // Update ready state
+                if hasMatchups != isReadyToFilter {
+                    isReadyToFilter = hasMatchups
+                    logDebug("Matchups loaded: \(hasMatchups), Ready: \(hasMatchups)", category: "TeamFilter")
+                }
+                
+                // Check if conditions changed for filtering
+                let readyChanged = hasMatchups != lastObservedMatchupsReady
+                let gameChanged = (currentGameData?.id != lastObservedGameData?.id)
+                let matchupsCountChanged = currentMatchupsCount != lastObservedMatchupsCount
+                
+                if (readyChanged || gameChanged) && hasMatchups && currentGameData != nil {
+                    logDebug("Executing filter: Game data ready: \(currentGameData?.id ?? "nil")", category: "TeamFilter")
+                    
+                    // Small delay to ensure state is settled
+                    try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                    
+                    performFiltering()
+                    isLoading = false
+                    logDebug("Filter complete: Cleared loading states", category: "TeamFilter")
+                }
+                
+                // Also refilter if matchups data changed (for refreshes)
+                if matchupsCountChanged && hasMatchups && currentGameData != nil && isReadyToFilter {
+                    logDebug("Matchups updated: Refiltering...", category: "TeamFilter")
+                    performFiltering()
+                }
+                
+                lastObservedMatchupsReady = hasMatchups
+                lastObservedGameData = currentGameData
+                lastObservedMatchupsCount = currentMatchupsCount
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
         }
-        .store(in: &cancellables)
-        
-        // Also watch for changes in the actual matchups data (for refreshes)
-        matchupsHubViewModel.$myMatchups
-            .filter { [weak self] _ in
-                // Only refilter if we have a game selected and are ready
-                guard let self = self else { return false }
-                return self.gameData != nil && self.isReadyToFilter
-            }
-            .sink { [weak self] _ in
-                logDebug("Matchups updated: Refiltering...", category: "TeamFilter")
-                self?.performFiltering()
-            }
-            .store(in: &cancellables)
     }
     
     /// Perform the actual filtering logic

@@ -14,9 +14,9 @@ struct PlayerScoreBarCardContentView: View {
     let formattedPlayerName: String
     let playerScoreColor: Color
     
-    @ObservedObject var viewModel: AllLivePlayersViewModel
-    @StateObject private var watchService = PlayerWatchService.shared
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared // 🔥 NEW: For injury data
+    @Bindable var viewModel: AllLivePlayersViewModel
+    @State private var watchService = PlayerWatchService.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared // 🔥 PHASE 2.5: Use @State for @Observable
     
     @State private var showingScoreBreakdown = false
     

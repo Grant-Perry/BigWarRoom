@@ -7,38 +7,76 @@
 // MARK: -> NFL Game Matchup View Model
 
 import SwiftUI
-import Combine
+import Observation
 
-class NFLGameMatchupViewModel: ObservableObject {
-    @Published var gameInfo: NFLGameInfo?
-    @Published var isLoading = false
-    private var cancellables = Set<AnyCancellable>()
+@MainActor
+@Observable
+final class NFLGameMatchupViewModel {
+    var gameInfo: NFLGameInfo?
+    var isLoading = false
+    
     private let gameDataService = NFLGameDataService.shared
+    private var observationTask: Task<Void, Never>?
+
+    init() {
+        setupObservation()
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
+    }
+    
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let currentGameData = gameDataService.gameData
+                let currentIsLoading = gameDataService.isLoading
+                
+                if currentIsLoading != isLoading {
+                    isLoading = currentIsLoading
+                }
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+        }
+    }
 
     func configure(for team: String, week: Int, year: Int = 2024) {
-        gameDataService.$gameData
-            .map { [weak self] gameData in
-                let normalizedTeam = self?.normalizeTeamAbbreviation(team.uppercased()) ?? team.uppercased()
-                let gameInfo = gameData[normalizedTeam]
-                return gameInfo
-            }
-            .removeDuplicates { oldInfo, newInfo in
-                guard let oldInfo, let newInfo else { return oldInfo == nil && newInfo == nil }
-                return oldInfo.matchupString == newInfo.matchupString &&
-                    oldInfo.formattedGameTime == newInfo.formattedGameTime &&
-                    oldInfo.scoreString == newInfo.scoreString &&
-                    oldInfo.isLive == newInfo.isLive
-            }
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.gameInfo, on: self)
-            .store(in: &cancellables)
-        gameDataService.$isLoading
-            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.isLoading, on: self)
-            .store(in: &cancellables)
+        let normalizedTeam = normalizeTeamAbbreviation(team.uppercased())
+        gameInfo = gameDataService.gameData[normalizedTeam]
+        
         if gameDataService.gameData.isEmpty {
             gameDataService.fetchGameData(forWeek: week, year: year)
+        }
+        
+        // Update observation to track this specific team's game info
+        observationTask?.cancel()
+        observationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let currentGameData = gameDataService.gameData
+                let currentIsLoading = gameDataService.isLoading
+                let newGameInfo = currentGameData[normalizedTeam]
+                
+                if currentIsLoading != isLoading {
+                    isLoading = currentIsLoading
+                }
+                
+                // Only update if game info actually changed
+                if let oldInfo = gameInfo, let newInfo = newGameInfo {
+                    if oldInfo.matchupString != newInfo.matchupString ||
+                       oldInfo.formattedGameTime != newInfo.formattedGameTime ||
+                       oldInfo.scoreString != newInfo.scoreString ||
+                       oldInfo.isLive != newInfo.isLive {
+                        gameInfo = newInfo
+                    }
+                } else if gameInfo != newGameInfo {
+                    gameInfo = newGameInfo
+                }
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
         }
     }
 

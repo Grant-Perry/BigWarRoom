@@ -6,27 +6,50 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
 /// Manages Sleeper user credentials and settings
-final class SleeperCredentialsManager: ObservableObject {
-    static let shared = SleeperCredentialsManager()
+@Observable
+@MainActor
+final class SleeperCredentialsManager {
     
-    // MARK: - Published Properties
-    @Published var hasValidCredentials: Bool = false
-    @Published var currentUsername: String = ""
-    @Published var currentUserID: String = ""
-    @Published var selectedSeason: String = "2025"
-    @Published var cachedLeagues: [String] = [] // Optional: Cache discovered league IDs
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: SleeperCredentialsManager?
     
-    // MARK: - UserDefaults Keys
-    private let usernameKey = "SLEEPER_USERNAME"
-    private let userIDKey = "SLEEPER_USER_ID"
-    private let seasonKey = "SLEEPER_SEASON"
-    private let cachedLeaguesKey = "SLEEPER_CACHED_LEAGUES"
-    private let leagueCacheTimestampKey = "SLEEPER_LEAGUE_CACHE_TIMESTAMP"
+    static var shared: SleeperCredentialsManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default SleeperAPIClient
+        let instance = SleeperCredentialsManager(apiClient: SleeperAPIClient())
+        _shared = instance
+        return instance
+    }
     
-    private init() {
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: SleeperCredentialsManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties
+    var hasValidCredentials: Bool = false
+    var currentUsername: String = ""
+    var currentUserID: String = ""
+    var selectedSeason: String = "2025"
+    var cachedLeagues: [String] = [] // Optional: Cache discovered league IDs
+    
+    // MARK: - UserDefaults Keys - Use @ObservationIgnored for constants
+    @ObservationIgnored private let usernameKey = "SLEEPER_USERNAME"
+    @ObservationIgnored private let userIDKey = "SLEEPER_USER_ID"
+    @ObservationIgnored private let seasonKey = "SLEEPER_SEASON"
+    @ObservationIgnored private let cachedLeaguesKey = "SLEEPER_CACHED_LEAGUES"
+    @ObservationIgnored private let leagueCacheTimestampKey = "SLEEPER_LEAGUE_CACHE_TIMESTAMP"
+    
+    // Dependencies - inject instead of using .shared
+    private let apiClient: SleeperAPIClient
+    
+    init(apiClient: SleeperAPIClient) {
+        self.apiClient = apiClient
         loadCredentials()
     }
     
@@ -38,7 +61,7 @@ final class SleeperCredentialsManager: ObservableObject {
         UserDefaults.standard.set(userID, forKey: userIDKey)
         UserDefaults.standard.set(season, forKey: seasonKey)
         
-        // Update published properties
+        // Update properties - @Observable will automatically notify observers
         self.currentUsername = username
         self.currentUserID = userID
         self.selectedSeason = season
@@ -93,7 +116,7 @@ final class SleeperCredentialsManager: ObservableObject {
     func saveCredentialsWithResolution(usernameOrID: String, season: String = "2025") async -> Bool {
         do {
             // Try to fetch user info to resolve username → userID
-            let user = try await SleeperAPIClient.shared.fetchUser(username: usernameOrID)
+            let user = try await apiClient.fetchUser(username: usernameOrID)
             
             // Determine what the user entered
             let enteredUsername = user.displayName?.lowercased() == usernameOrID.lowercased() || user.username?.lowercased() == usernameOrID.lowercased()
@@ -161,7 +184,7 @@ final class SleeperCredentialsManager: ObservableObject {
         
         do {
             // Try to fetch user info to validate
-            let user = try await SleeperAPIClient.shared.fetchUser(username: identifier)
+            let user = try await apiClient.fetchUser(username: identifier)
             // x// x Print("✅ Sleeper credentials validation successful: \(user.displayName ?? identifier)")
             
             // Update user ID if we only had username
@@ -184,13 +207,12 @@ final class SleeperCredentialsManager: ObservableObject {
     }
     
     /// Refresh the league cache in background
-    @MainActor
     func refreshLeagueCache() async {
         guard let identifier = getUserIdentifier() else { return }
         
         do {
-            let user = try await SleeperAPIClient.shared.fetchUser(username: identifier)
-            let leagues = try await SleeperAPIClient.shared.fetchLeagues(userID: user.userID, season: selectedSeason)
+            let user = try await apiClient.fetchUser(username: identifier)
+            let leagues = try await apiClient.fetchLeagues(userID: user.userID, season: selectedSeason)
             let leagueIDs = leagues.map { $0.leagueID }
             
             cacheDiscoveredLeagues(leagueIDs)

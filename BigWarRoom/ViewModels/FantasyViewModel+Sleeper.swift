@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Combine
 
 // MARK: -> Sleeper Fantasy Data Extension
 extension FantasyViewModel {
@@ -174,10 +173,6 @@ extension FantasyViewModel {
                 
                 detectedAsChoppedLeague = true
                 hasActiveRosters = true
-                
-                await MainActor.run {
-                    self.objectWillChange.send()
-                }
                 
                 Task {
                     await validateChoppedLeagueDetection(leagueID: leagueID, week: week)

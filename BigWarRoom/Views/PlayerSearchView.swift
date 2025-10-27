@@ -15,9 +15,9 @@ struct PlayerSearchView: View {
     
     // MARK: - State Properties
     @State private var searchText = ""
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-    @StateObject private var matchupsViewModel = MatchupsHubViewModel.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared
+    // 🔥 PHASE 3: Use @State for @Observable ViewModel
+    @State private var matchupsViewModel = MatchupsHubViewModel.shared
     @State private var selectedScope: SearchScope = .all
     @Environment(\.presentationMode) var presentationMode
     

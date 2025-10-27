@@ -2,7 +2,7 @@ import SwiftUI
 
 struct SuggestionContextMenu: View {
     let suggestion: Suggestion
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     let onShowStats: (Player) -> Void
     
     var body: some View {

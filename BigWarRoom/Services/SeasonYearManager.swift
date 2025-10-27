@@ -7,36 +7,52 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
 /// **SeasonYearManager**
 /// 
 /// The ultimate year manager - controls current season year for the entire app
 /// 
 /// **Key Features:**
-/// - Singleton pattern for app-wide access
-/// - Defaults to current NFL season year (2024)
+/// - @Observable pattern for app-wide access
+/// - Defaults to current NFL season year (2025)
 /// - When changed, propagates to ALL subscribers
 /// - Integrates with WeekPickerView for unified season/week control
+@Observable
 @MainActor
-final class SeasonYearManager: ObservableObject {
+final class SeasonYearManager {
     
-    // MARK: - Singleton
-    static let shared = SeasonYearManager()
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: SeasonYearManager?
     
-    // MARK: - Published Properties
+    static var shared: SeasonYearManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = SeasonYearManager()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: SeasonYearManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties
     /// The selected year that drives the ENTIRE app
     /// When user changes this, it changes everywhere
-    @Published var selectedYear: String
+    var selectedYear: String
     
     /// Track when the year was last changed (for debugging/logging)
-    @Published var lastChanged: Date = Date()
+    var lastChanged: Date = Date()
     
-    /// Available years for picker
-    let availableYears = ["2024", "2025", "2026"]
+    /// Available years for picker - Use @ObservationIgnored for constants
+    @ObservationIgnored let availableYears = ["2024", "2025", "2026"]
     
     // MARK: - Initialization
-    private init() {
+    init() {
         // 🔥 FIXED: Default to current NFL season (2025)
         // Check if user has a saved preference, otherwise use 2025
         let savedYear = AppConstants.ESPNLeagueYear
@@ -60,9 +76,6 @@ final class SeasonYearManager: ObservableObject {
         
         // Update AppConstants ESPNLeagueYear for backward compatibility
         AppConstants.ESPNLeagueYear = year
-        
-        // Force objectWillChange notification to ensure all subscribers update
-        objectWillChange.send()
     }
     
     /// Get the current year as Int for API calls

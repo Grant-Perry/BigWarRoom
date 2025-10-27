@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CompactSuggestionCard: View {
     let suggestion: Suggestion
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     let onShowStats: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     
     var body: some View {

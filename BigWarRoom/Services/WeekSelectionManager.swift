@@ -7,40 +7,61 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
 /// **WeekSelectionManager**
 /// 
 /// The ultimate week manager - Mission Control's week picker controls the entire app
 /// 
 /// **Key Features:**
-/// - Singleton pattern for app-wide access
+/// - @Observable pattern for app-wide access
 /// - Always initializes to current NFL week (waits for real API data)
 /// - When changed, propagates to ALL subscribers
 /// - Mission Control becomes the master controller
+@Observable
 @MainActor
-final class WeekSelectionManager: ObservableObject {
+final class WeekSelectionManager {
     
-    // MARK: - Singleton
-    static let shared = WeekSelectionManager()
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: WeekSelectionManager?
     
-    // MARK: - Published Properties
+    static var shared: WeekSelectionManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default NFLWeekService
+        let nflWeekService = NFLWeekService(apiClient: SleeperAPIClient())
+        let instance = WeekSelectionManager(nflWeekService: nflWeekService)
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: WeekSelectionManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties
     /// The selected week that drives the ENTIRE app
     /// When Mission Control changes this, it changes everywhere
-    @Published var selectedWeek: Int
+    var selectedWeek: Int
     
     /// Track when the week was last changed (for debugging/logging)
-    @Published var lastChanged: Date = Date()
+    var lastChanged: Date = Date()
     
     /// Whether we're still waiting for the real NFL week to be fetched
-    @Published var isWaitingForRealWeek: Bool = true
+    var isWaitingForRealWeek: Bool = true
     
-    // MARK: - Dependencies
-    private let nflWeekService = NFLWeekService.shared
-    private var cancellables = Set<AnyCancellable>()
+    // MARK: - Dependencies - inject instead of using singletons
+    private let nflWeekService: NFLWeekService
+    
+    // Use @ObservationIgnored for internal subscription management
+    @ObservationIgnored private var weekUpdateTask: Task<Void, Never>?
     
     // MARK: - Initialization
-    private init() {
+    init(nflWeekService: NFLWeekService) {
+        self.nflWeekService = nflWeekService
+        
         // Start with current NFL week (even if it's the default 1)
         self.selectedWeek = nflWeekService.currentWeek
         
@@ -58,6 +79,10 @@ final class WeekSelectionManager: ObservableObject {
 //        print("🗓️ WeekSelectionManager: Initialized to Week \(selectedWeek)")
     }
     
+    deinit {
+        weekUpdateTask?.cancel()
+    }
+    
     // MARK: - Public Interface
     
     /// Change the selected week (typically called by Mission Control)
@@ -71,8 +96,8 @@ final class WeekSelectionManager: ObservableObject {
         lastChanged = Date()
         isWaitingForRealWeek = false // User has made an explicit selection
         
-        // Force objectWillChange notification to ensure all subscribers update
-        objectWillChange.send()
+        // Post notification for backward compatibility
+        NotificationCenter.default.post(name: .weekSelectionChanged, object: nil)
     }
     
     /// Reset to current NFL week (useful for "Current Week" button)
@@ -96,47 +121,47 @@ final class WeekSelectionManager: ObservableObject {
     
     /// Subscribe to NFL week service for season transitions and initial real week
     private func setupNFLWeekSubscription() {
-        nflWeekService.$currentWeek
-            .removeDuplicates()
-            .sink { [weak self] newNFLWeek in
-                guard let self = self else { return }
+        weekUpdateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { break }
                 
-//                print("🗓️ WeekSelectionManager: NFL week updated to \(newNFLWeek)")
+                let newNFLWeek = self.nflWeekService.currentWeek
                 
-                // If we're still waiting for the real week (first load), update to it
+                // Check if NFL week has changed
                 if self.isWaitingForRealWeek && newNFLWeek != 1 {
 //                    print("🗓️ WeekSelectionManager: First real NFL week received, updating from \(self.selectedWeek) to \(newNFLWeek)")
-                    self.selectedWeek = newNFLWeek
-                    self.isWaitingForRealWeek = false
-                    self.lastChanged = Date()
-                    return
+                    await MainActor.run {
+                        self.selectedWeek = newNFLWeek
+                        self.isWaitingForRealWeek = false
+                        self.lastChanged = Date()
+                    }
                 }
                 
                 // If user was viewing current week and NFL advances, update selection
-                // This handles week transitions automatically
-                if self.selectedWeek == newNFLWeek - 1 && !self.isWaitingForRealWeek {
+                else if self.selectedWeek == newNFLWeek - 1 && !self.isWaitingForRealWeek {
 //                    print("🗓️ WeekSelectionManager: Auto-advancing to new current week \(newNFLWeek)")
-                    self.selectedWeek = newNFLWeek
-                    self.lastChanged = Date()
+                    await MainActor.run {
+                        self.selectedWeek = newNFLWeek
+                        self.lastChanged = Date()
+                    }
                 }
-            }
-            .store(in: &cancellables)
-            
-        // Also watch for when NFL service finishes loading
-        nflWeekService.$lastUpdated
-            .compactMap { $0 }
-            .sink { [weak self] _ in
-                guard let self = self else { return }
                 
-                // If we're still waiting and the real week is different, update
-                if self.isWaitingForRealWeek && self.selectedWeek != self.nflWeekService.currentWeek {
+                // Check if NFL service has loaded for the first time
+                if self.isWaitingForRealWeek && 
+                   self.nflWeekService.lastUpdated != nil && 
+                   self.selectedWeek != self.nflWeekService.currentWeek {
 //                    print("🗓️ WeekSelectionManager: NFL service loaded, updating week to \(self.nflWeekService.currentWeek)")
-                    self.selectedWeek = self.nflWeekService.currentWeek
-                    self.isWaitingForRealWeek = false
-                    self.lastChanged = Date()
+                    await MainActor.run {
+                        self.selectedWeek = self.nflWeekService.currentWeek
+                        self.isWaitingForRealWeek = false
+                        self.lastChanged = Date()
+                    }
                 }
+                
+                // Wait before next check
+                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 seconds
             }
-            .store(in: &cancellables)
+        }
     }
 }
 

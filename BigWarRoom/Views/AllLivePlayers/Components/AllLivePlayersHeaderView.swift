@@ -6,11 +6,10 @@
 //
 
 import SwiftUI
-import Combine
 
 /// Complete header section with manager info, controls, and stats
 struct AllLivePlayersHeaderView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var sortHighToLow: Bool
     @Binding var showingWeekPicker: Bool
     let onAnimationReset: () -> Void
@@ -18,6 +17,10 @@ struct AllLivePlayersHeaderView: View {
     // New bindings for filters and watched players
     @Binding var showingFilters: Bool
     @Binding var showingWatchedPlayers: Bool
+    
+    // 🔥 PHASE 2.5: Accept dependencies instead of using .shared
+    private let watchService: PlayerWatchService
+    private let weekManager: WeekSelectionManager
     
     // 🔥 NEW: Focus state for search TextField
     @FocusState private var isSearchFocused: Bool
@@ -30,10 +33,27 @@ struct AllLivePlayersHeaderView: View {
     // 🔥 FIX: Maintain stable manager info during refreshes
     @State private var stableManager: ManagerInfo?
     
-    // 🔥 NEW: Week picker state - now passed as binding
-    @StateObject private var weekManager = WeekSelectionManager.shared
-    @StateObject private var watchService = PlayerWatchService.shared
-    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(
+        allLivePlayersViewModel: AllLivePlayersViewModel,
+        sortHighToLow: Binding<Bool>,
+        showingWeekPicker: Binding<Bool>,
+        onAnimationReset: @escaping () -> Void,
+        showingFilters: Binding<Bool>,
+        showingWatchedPlayers: Binding<Bool>,
+        watchService: PlayerWatchService,
+        weekManager: WeekSelectionManager
+    ) {
+        self.allLivePlayersViewModel = allLivePlayersViewModel
+        self._sortHighToLow = sortHighToLow
+        self._showingWeekPicker = showingWeekPicker
+        self.onAnimationReset = onAnimationReset
+        self._showingFilters = showingFilters
+        self._showingWatchedPlayers = showingWatchedPlayers
+        self.watchService = watchService
+        self.weekManager = weekManager
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             // #GoodNav: Header with WEEK + icons (like Mission Control/Intelligence)
@@ -57,6 +77,11 @@ struct AllLivePlayersHeaderView: View {
             // 🔥 FIX: Sync initial state between View and ViewModel
             sortHighToLow = allLivePlayersViewModel.sortHighToLow
             startGlobalRefreshCycle()
+            
+            // 🔥 FIX: Set initial stable manager when view appears
+            if let newManager = allLivePlayersViewModel.firstAvailableManager {
+                stableManager = newManager
+            }
         }
         .onDisappear {
             stopGlobalRefreshCycle()
@@ -65,9 +90,9 @@ struct AllLivePlayersHeaderView: View {
             // 🔥 FIX: Keep View state in sync when ViewModel changes
             sortHighToLow = newValue
         }
-        .onReceive(allLivePlayersViewModel.objectWillChange) { _ in
-            // 🔥 FIX: Update stable manager when new data is available
-            if let newManager = allLivePlayersViewModel.firstAvailableManager {
+        .onChange(of: allLivePlayersViewModel.firstAvailableManager) { _, newManager in
+            // 🔥 FIX: Update stable manager when new data is available using @Observable onChange
+            if let newManager = newManager {
                 stableManager = newManager
             }
         }

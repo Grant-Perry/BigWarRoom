@@ -12,8 +12,8 @@ struct ScheduleGameCard: View {
     let game: ScheduleGame
     let action: () -> Void
     
-    @StateObject private var teamAssets = TeamAssetManager.shared
-    @StateObject private var standingsService = NFLStandingsService.shared
+    @State private var teamAssets = TeamAssetManager.shared
+    @State private var standingsService = NFLStandingsService.shared
     
     var body: some View {
         HStack(spacing: 0) {
@@ -206,7 +206,7 @@ struct TeamLogoView: View {
     let teamCode: String
     let size: CGFloat
     
-    @StateObject private var teamAssets = TeamAssetManager.shared
+    @State private var teamAssets = TeamAssetManager.shared
     
     var body: some View {
         Group {

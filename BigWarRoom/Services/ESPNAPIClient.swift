@@ -9,14 +9,38 @@
 import Foundation
 
 final class ESPNAPIClient: DraftAPIClient {
-    static let shared = ESPNAPIClient()
+    
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: ESPNAPIClient?
+    
+    static var shared: ESPNAPIClient {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default credentials
+        let credentialsManager = ESPNCredentialsManager()
+        let instance = ESPNAPIClient(credentialsManager: credentialsManager)
+        credentialsManager.setAPIClient(instance) // Complete the circular dependency
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: ESPNAPIClient) {
+        _shared = instance
+    }
     
     // Updated to use working API subdomain from SleepThis
     private let baseURL = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons"
     private let session = URLSession.shared
-    private let credentialsManager = ESPNCredentialsManager.shared
     
-    private init() {}
+    // 🔥 PHASE 2: Inject credentials manager instead of using .shared
+    private let credentialsManager: ESPNCredentialsManager
+    
+    // 🔥 PHASE 2: Make initializer public and require dependency injection
+    init(credentialsManager: ESPNCredentialsManager) {
+        self.credentialsManager = credentialsManager
+    }
     
     // MARK: -> Authentication Headers
     private func authHeaders() -> [String: String] {
@@ -641,37 +665,37 @@ enum ESPNAPIError: Error, LocalizedError {
 }
 
 // MARK: -> Draft Helper Functions
+
+/// Calculate round number from pick number
+private func calculateRound(pickNumber: Int, teamCount: Int) -> Int {
+    return ((pickNumber - 1) / teamCount) + 1
+}
+
+/// Calculate draft slot from pick number  
+private func calculateDraftSlot(pickNumber: Int, teamCount: Int) -> Int {
+    let round = calculateRound(pickNumber: pickNumber, teamCount: teamCount)
     
-    /// Calculate round number from pick number
-    private func calculateRound(pickNumber: Int, teamCount: Int) -> Int {
-        return ((pickNumber - 1) / teamCount) + 1
+    if round % 2 == 1 {
+        // Odd rounds: normal order (1, 2, 3, ..., teamCount)
+        return ((pickNumber - 1) % teamCount) + 1
+    } else {
+        // Even rounds: snake/reverse order (teamCount, ..., 3, 2, 1)  
+        return teamCount - ((pickNumber - 1) % teamCount)
     }
-    
-    /// Calculate draft slot from pick number  
-    private func calculateDraftSlot(pickNumber: Int, teamCount: Int) -> Int {
-        let round = calculateRound(pickNumber: pickNumber, teamCount: teamCount)
-        
-        if round % 2 == 1 {
-            // Odd rounds: normal order (1, 2, 3, ..., teamCount)
-            return ((pickNumber - 1) % teamCount) + 1
-        } else {
-            // Even rounds: snake/reverse order (teamCount, ..., 3, 2, 1)  
-            return teamCount - ((pickNumber - 1) % teamCount)
-        }
+}
+
+/// Calculate the correct pick number for a snake draft
+/// - Parameters:
+///   - draftPosition: Team's draft position (1-10 for a 10-team league)
+///   - round: Round number (1, 2, 3, etc.)
+///   - teamCount: Total number of teams
+/// - Returns: Overall pick number
+private func calculateSnakeDraftPickNumber(draftPosition: Int, round: Int, teamCount: Int) -> Int {
+    if round % 2 == 1 {
+        // Odd rounds: normal order (1, 2, 3, ..., teamCount)
+        return (round - 1) * teamCount + draftPosition
+    } else {
+        // Even rounds: snake/reverse order (teamCount, ..., 3, 2, 1)
+        return (round - 1) * teamCount + (teamCount - draftPosition + 1)
     }
-    
-    /// Calculate the correct pick number for a snake draft
-    /// - Parameters:
-    ///   - draftPosition: Team's draft position (1-10 for a 10-team league)
-    ///   - round: Round number (1, 2, 3, etc.)
-    ///   - teamCount: Total number of teams
-    /// - Returns: Overall pick number
-    private func calculateSnakeDraftPickNumber(draftPosition: Int, round: Int, teamCount: Int) -> Int {
-        if round % 2 == 1 {
-            // Odd rounds: normal order (1, 2, 3, ..., teamCount)
-            return (round - 1) * teamCount + draftPosition
-        } else {
-            // Even rounds: snake/reverse order (teamCount, ..., 3, 2, 1)
-            return (round - 1) * teamCount + (teamCount - draftPosition + 1)
-        }
-    }
+}

@@ -8,16 +8,39 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class TeamAssetManager: ObservableObject {
-    static let shared = TeamAssetManager()
+final class TeamAssetManager {
     
-    @Published private var logoCache: [String: UIImage] = [:]
-    private let fileManager = FileManager.default
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: TeamAssetManager?
     
-    private init() {
+    static var shared: TeamAssetManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = TeamAssetManager()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: TeamAssetManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    private var logoCache: [String: UIImage] = [:]
+    
+    @ObservationIgnored private let fileManager = FileManager.default
+    
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Make init public for dependency injection
+    init() {
         preloadCommonLogos()
     }
     
@@ -170,7 +193,7 @@ final class TeamAssetManager: ObservableObject {
                 if let image = UIImage(data: data) {
                     await MainActor.run {
                         logoCache[teamCode.uppercased()] = image
-                        objectWillChange.send()
+                        // 🔥 @Observable: No need for objectWillChange.send() - automatic change detection
                     }
                     // x// x Print("📥 Downloaded logo for \(teamCode)")
                     return

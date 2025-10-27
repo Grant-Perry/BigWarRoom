@@ -11,7 +11,7 @@ struct PlayerScoreBarCardTeamLogoView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
     // 🔥 NEW: State for accessing player directory for injury data
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared
     
     var body: some View {
         ZStack {

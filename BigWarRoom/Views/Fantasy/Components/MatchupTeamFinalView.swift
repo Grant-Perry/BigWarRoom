@@ -19,9 +19,9 @@ struct MatchupTeamFinalView: View {
     let player: FantasyPlayer
     let scaleEffect: CGFloat
     
-    @StateObject private var gameViewModel = NFLGameMatchupViewModel()
+    @State private var gameViewModel = NFLGameMatchupViewModel()
     @State private var currentWeek: Int = NFLWeekService.shared.currentWeek
-    @StateObject private var nflWeekService = NFLWeekService.shared
+    @State private var nflWeekService = NFLWeekService.shared
     
     /// Initialize with default scale
     init(player: FantasyPlayer) {
@@ -52,7 +52,7 @@ struct MatchupTeamFinalView: View {
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             gameViewModel.refresh(week: currentWeek)
         }
-        .onReceive(nflWeekService.$currentWeek) { newWeek in
+        .onChange(of: nflWeekService.currentWeek) { _, newWeek in
             if currentWeek != newWeek {
                 currentWeek = newWeek
                 setupGameData()

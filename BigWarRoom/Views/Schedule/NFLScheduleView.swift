@@ -9,10 +9,10 @@
 import SwiftUI
 
 struct NFLScheduleView: View {
-    @StateObject private var viewModel = NFLScheduleViewModel()
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-    @StateObject private var matchupsHubViewModel = MatchupsHubViewModel.shared
-    @StateObject private var weekManager = WeekSelectionManager.shared // Use shared week manager
+    @State private var viewModel = NFLScheduleViewModel()
+    // 🔥 PHASE 3: Use @State for @Observable ViewModel
+    @State private var matchupsHubViewModel = MatchupsHubViewModel.shared
+    @State private var weekManager = WeekSelectionManager.shared // Use shared week manager
     @State private var showingWeekPicker = false
     
     // 🔥 NEW: Sheet state for team filtered matchups
@@ -92,7 +92,7 @@ struct NFLScheduleView: View {
         // BEFORE: .sheet(isPresented: $showingTeamMatchups) { TeamFilteredMatchupsView(...) }
         // AFTER: NavigationLinks in game cards handle navigation
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(isPresented: $showingWeekPicker)
+            WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)
         }
         // Sync with shared week manager
         .onChange(of: weekManager.selectedWeek) { _, newWeek in

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct QuickConnectSectionDisconnectView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         Button("Disconnect All Services") {

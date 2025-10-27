@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct TopSuggestionsSection: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedTab: Int
     
     var body: some View {

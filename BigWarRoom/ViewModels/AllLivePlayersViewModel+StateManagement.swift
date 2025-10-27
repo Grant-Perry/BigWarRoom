@@ -55,11 +55,12 @@ extension AllLivePlayersViewModel {
         showActiveOnly = false
         selectedPosition = .all
 
-        // Force re-apply filtering
+        // Apply the restored filters
         applyPositionFilter()
 
-        // Trigger UI update
-        objectWillChange.send()
+        // 🔥 PHASE 3: @Observable handles change notifications automatically
+        // No need for objectWillChange.send() anymore
+        print("🔥 @OBSERVABLE: State recovery triggered - UI will update automatically")
     }
     
     // MARK: - State Validation
@@ -120,8 +121,9 @@ extension AllLivePlayersViewModel {
         // Perform all updates in one batch
         updates()
 
-        // Single UI update notification
-        objectWillChange.send()
+        // 🔥 PHASE 3: @Observable handles change notifications automatically
+        // No need for objectWillChange.send() anymore
+        print("🔥 @OBSERVABLE: Batch update completed - UI will update automatically")
 
         isBatchingUpdates = false
     }

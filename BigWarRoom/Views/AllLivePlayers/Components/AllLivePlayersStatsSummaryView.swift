@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Stats summary display with player count, top score, and position filter
 struct AllLivePlayersStatsSummaryView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     let onPositionChange: () -> Void
     
     var body: some View {

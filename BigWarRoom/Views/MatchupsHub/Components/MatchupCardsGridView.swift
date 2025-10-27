@@ -138,7 +138,7 @@ struct ExpandedCardOverlayView: View {
 
 /// Friendly message when user has services connected but no matchups
 struct NoMatchupsThisWeekView: View {
-    @StateObject private var weekManager = WeekSelectionManager.shared
+    @State private var weekManager = WeekSelectionManager.shared
     
     var body: some View {
         VStack(spacing: 20) {

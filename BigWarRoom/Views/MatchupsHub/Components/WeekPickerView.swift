@@ -22,8 +22,11 @@ import SwiftUI
 /// - **USES WeekSelectionManager AS SSOT**
 struct WeekPickerView: View {
     @Binding var isPresented: Bool
-    @StateObject private var weekManager = WeekSelectionManager.shared
-    @StateObject private var yearManager = SeasonYearManager.shared
+    
+    // 🔥 PHASE 2.5: Accept dependencies instead of using .shared
+    private let weekManager: WeekSelectionManager
+    private let yearManager: SeasonYearManager
+    
     @State private var animateIn = false
     
     /// NFL season has 18 weeks (17 regular + playoffs)
@@ -32,6 +35,16 @@ struct WeekPickerView: View {
     /// NFL 2024 season start date (adjust as needed)
     private let season2024Start = Calendar.current.date(from: DateComponents(year: 2024, month: 9, day: 5))!
     
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(
+        weekManager: WeekSelectionManager,
+        isPresented: Binding<Bool>
+    ) {
+        self.weekManager = weekManager
+        self.yearManager = SeasonYearManager.shared // TODO: Convert this too
+        self._isPresented = isPresented
+    }
+
     var body: some View {
         ZStack {
             // Background blur
@@ -468,6 +481,7 @@ struct WeekPickerView: View {
         Color.black.ignoresSafeArea()
         
         WeekPickerView(
+            weekManager: WeekSelectionManager(nflWeekService: NFLWeekService(apiClient: SleeperAPIClient())),
             isPresented: .constant(true)
         )
     }

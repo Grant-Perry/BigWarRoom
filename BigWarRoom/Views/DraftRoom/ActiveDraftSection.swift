@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ActiveDraftSection: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         VStack(spacing: 12) {

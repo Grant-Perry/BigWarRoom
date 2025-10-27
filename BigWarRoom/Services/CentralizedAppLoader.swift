@@ -7,17 +7,40 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class CentralizedAppLoader: ObservableObject {
-    static let shared = CentralizedAppLoader()
+final class CentralizedAppLoader {
     
-    @Published var isLoading = true
-    @Published var loadingProgress: Double = 0.0
-    @Published var currentLoadingMessage = "Initializing BigWarRoom..."
-    @Published var hasCompletedInitialization = false
-    @Published var canShowPartialData = false  // 🔥 NEW: Allow showing partial data
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: CentralizedAppLoader?
+    
+    static var shared: CentralizedAppLoader {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = CentralizedAppLoader()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: CentralizedAppLoader) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var isLoading = true
+    var loadingProgress: Double = 0.0
+    var currentLoadingMessage = "Initializing BigWarRoom..."
+    var hasCompletedInitialization = false
+    var canShowPartialData = false  // 🔥 NEW: Allow showing partial data
+    
+    // MARK: - Dependencies
+    private let matchupsHubViewModel: MatchupsHubViewModel
+    private let allLivePlayersViewModel: AllLivePlayersViewModel
     
     private var loadingMessages = [
         "Loading your fantasy data...",
@@ -26,7 +49,21 @@ final class CentralizedAppLoader: ObservableObject {
         "Finalizing setup..."
     ]
     
-    private init() {}
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Default initializer for bridge pattern
+    convenience init() {
+        self.init(
+            matchupsHubViewModel: MatchupsHubViewModel.shared,
+            allLivePlayersViewModel: AllLivePlayersViewModel.shared
+        )
+    }
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(matchupsHubViewModel: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+        self.matchupsHubViewModel = matchupsHubViewModel
+        self.allLivePlayersViewModel = allLivePlayersViewModel
+    }
     
     /// 🔥 NEW: Progressive initialization - show data as it becomes available
     func initializeAppProgressively() async {
@@ -77,7 +114,7 @@ final class CentralizedAppLoader: ObservableObject {
     /// Load matchups in background without blocking UI
     private func loadMatchupsInBackground() async {
 //        print("🚀 CentralizedAppLoader: Loading matchups in background...")
-        await MatchupsHubViewModel.shared.loadAllMatchups()
+        await matchupsHubViewModel.loadAllMatchups()
 //        print("✅ CentralizedAppLoader: Background matchup loading completed")
     }
     
@@ -85,24 +122,24 @@ final class CentralizedAppLoader: ObservableObject {
     private func loadPlayerDataInBackground() async {
 //        print("🚀 CentralizedAppLoader: Loading player data in background...")
         
-        if !AllLivePlayersViewModel.shared.statsLoaded {
-            await AllLivePlayersViewModel.shared.loadPlayerStats()
+        if !allLivePlayersViewModel.statsLoaded {
+            await allLivePlayersViewModel.loadPlayerStats()
         }
         
         // Process players if we have matchups
-        if !MatchupsHubViewModel.shared.myMatchups.isEmpty {
-            let playerEntries = AllLivePlayersViewModel.shared.extractAllPlayers()
-            await AllLivePlayersViewModel.shared.buildPlayerData(from: playerEntries)
+        if !matchupsHubViewModel.myMatchups.isEmpty {
+            let playerEntries = allLivePlayersViewModel.extractAllPlayers()
+            await allLivePlayersViewModel.buildPlayerData(from: playerEntries)
             
             // Update state
-            if AllLivePlayersViewModel.shared.allPlayers.isEmpty {
-                AllLivePlayersViewModel.shared.dataState = .empty
+            if allLivePlayersViewModel.allPlayers.isEmpty {
+                allLivePlayersViewModel.dataState = .empty
             } else {
-                AllLivePlayersViewModel.shared.dataState = .loaded
-                AllLivePlayersViewModel.shared.applyPositionFilter()
+                allLivePlayersViewModel.dataState = .loaded
+                allLivePlayersViewModel.applyPositionFilter()
             }
             
-            AllLivePlayersViewModel.shared.lastUpdateTime = Date()
+            allLivePlayersViewModel.lastUpdateTime = Date()
         }
         
 //        print("✅ CentralizedAppLoader: Player data processing completed")

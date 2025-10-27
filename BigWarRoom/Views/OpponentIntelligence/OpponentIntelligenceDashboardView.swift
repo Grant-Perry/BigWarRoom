@@ -11,8 +11,8 @@ import SwiftUI
 /// 
 /// Strategic opponent analysis across all leagues
 struct OpponentIntelligenceDashboardView: View {
-    @StateObject private var viewModel = OpponentIntelligenceViewModel()
-    @StateObject private var watchService = PlayerWatchService.shared
+    @State private var viewModel = OpponentIntelligenceViewModel()
+    @State private var watchService = PlayerWatchService.shared
     @State private var showingFilters = false
     @State private var selectedIntelligence: OpponentIntelligence?
     @State private var showingWeekPicker = false
@@ -115,7 +115,10 @@ struct OpponentIntelligenceDashboardView: View {
             OpponentFiltersSheet(viewModel: viewModel)
         }
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(isPresented: $showingWeekPicker)
+            WeekPickerView(
+                weekManager: WeekSelectionManager.shared,
+                isPresented: $showingWeekPicker
+            )
         }
         .sheet(isPresented: $showingWatchedPlayers) {
             WatchedPlayersSheet(watchService: watchService)

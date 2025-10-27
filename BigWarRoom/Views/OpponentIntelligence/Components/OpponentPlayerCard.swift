@@ -14,8 +14,8 @@ import SwiftUI
 /// **After:** Use UnifiedPlayerCardBackground + existing components
 struct OpponentPlayerCard: View {
     let player: OpponentPlayer
-    @StateObject private var watchService = PlayerWatchService.shared
-    @StateObject private var fantasyPlayerViewModel = FantasyPlayerViewModel()
+    @State private var watchService = PlayerWatchService.shared
+    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel()
     
     var body: some View {
         HStack(spacing: 12) {

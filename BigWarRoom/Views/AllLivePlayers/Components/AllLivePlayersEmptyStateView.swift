@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Shows appropriate empty state based on current filter conditions
 struct AllLivePlayersEmptyStateView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     let onAnimationReset: () -> Void
     
     var body: some View {
@@ -146,9 +146,4 @@ struct AllLivePlayersEmptyStateView: View {
             .buttonStyle(.plain)
         }
     }
-}
-
-#Preview {
-    let viewModel = AllLivePlayersViewModel.shared
-    return AllLivePlayersEmptyStateView(allLivePlayersViewModel: viewModel, onAnimationReset: {})
 }

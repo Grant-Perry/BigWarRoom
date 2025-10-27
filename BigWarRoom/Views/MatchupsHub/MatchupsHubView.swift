@@ -9,23 +9,19 @@ import SwiftUI
 
 /// Main matchups hub view - focuses on core structure and state management
 struct MatchupsHubView: View {
-    // MARK: - ViewModels
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency across all views
-    @StateObject internal var matchupsHubViewModel = MatchupsHubViewModel.shared
     
-    // MARK: - Week Selection (SSOT)
-    @StateObject internal var weekManager = WeekSelectionManager.shared
+    // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels that need two-way binding
+    @Bindable internal var matchupsHubViewModel: MatchupsHubViewModel
     
-    // 🔥 NEW: Service Credential Managers for Connection Status
-    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
-    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
+    // Dependencies injected via initializer (proper @Observable pattern)
+    let weekManager: WeekSelectionManager
+    let espnCredentials: ESPNCredentialsManager
+    let sleeperCredentials: SleeperCredentialsManager
     
     // MARK: - Navigation State
-    // 🏈 NAVIGATION FREEDOM: Remove showingMatchupDetail - using NavigationLinks instead
-    // @State internal var showingMatchupDetail: UnifiedMatchup?
     @State internal var showingSettings = false
     @State internal var showingWeekPicker = false
-    @State internal var showingWatchedPlayers = false // NEW: Add watched players sheet state
+    @State internal var showingWatchedPlayers = false
     
     // MARK: - UI State
     @State internal var refreshing = false
@@ -33,7 +29,7 @@ struct MatchupsHubView: View {
     
     // MARK: - Battles Section State
     @State internal var battlesMinimized = false
-    @State internal var poweredByExpanded = false // Changed from true to false - hide the branding banner
+    @State internal var poweredByExpanded = false
     
     // MARK: - Sorting States
     @State internal var sortByWinning = false
@@ -46,6 +42,27 @@ struct MatchupsHubView: View {
     @State internal var countdownTimer: Timer?
     @State internal var refreshTimer: Timer?
     @State internal var justMeModeTimer: Timer?
+    
+    // MARK: - Initializers
+    
+    // MARK: - Dependency injection initializer (PREFERRED)
+    init(weekManager: WeekSelectionManager, 
+         espnCredentials: ESPNCredentialsManager,
+         sleeperCredentials: SleeperCredentialsManager,
+         matchupsHubViewModel: MatchupsHubViewModel) {
+        self.weekManager = weekManager
+        self.espnCredentials = espnCredentials
+        self.sleeperCredentials = sleeperCredentials
+        self.matchupsHubViewModel = matchupsHubViewModel
+    }
+    
+    // MARK: - Default initializer (DEPRECATED - for backward compatibility)
+    init() {
+        self.weekManager = WeekSelectionManager.shared
+        self.espnCredentials = ESPNCredentialsManager()
+        self.sleeperCredentials = SleeperCredentialsManager.shared
+        self.matchupsHubViewModel = MatchupsHubViewModel.shared
+    }
     
     // MARK: - Computed Properties for State Access
     private var microMode: Bool {
@@ -60,9 +77,6 @@ struct MatchupsHubView: View {
 
     // MARK: - Body
     var body: some View {
-        // 🏈 NAVIGATION FREEDOM: Remove NavigationView - parent TabView provides it
-        // BEFORE: NavigationView { ... }
-        // AFTER: Direct content - NavigationView provided by parent TabView
         ZStack {
             buildBackgroundView()
 
@@ -100,6 +114,7 @@ struct MatchupsHubView: View {
             buildWeekPickerSheet()
         }
         .sheet(isPresented: $showingWatchedPlayers) {
+            // 🔥 TODO: Convert PlayerWatchService to @Observable and inject
             WatchedPlayersSheet(watchService: PlayerWatchService.shared)
         }
         .onChange(of: weekManager.selectedWeek) { oldValue, newValue in

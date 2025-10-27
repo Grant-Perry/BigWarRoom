@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 /// Model for displaying manager information in All Live Players view
-struct ManagerInfo {
+struct ManagerInfo: Equatable {
     let name: String
     let score: Double
     let avatarURL: URL?

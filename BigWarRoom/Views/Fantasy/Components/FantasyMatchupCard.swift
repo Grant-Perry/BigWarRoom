@@ -10,7 +10,7 @@ import SwiftUI
 /// Fantasy Matchup Card component
 struct FantasyMatchupCard: View {
     let matchup: FantasyMatchup
-    @ObservedObject var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 NEW: Access to FantasyViewModel
+    @State var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 PHASE 3: Use @State for @Observable
     
     var body: some View {
         VStack(spacing: 0) {

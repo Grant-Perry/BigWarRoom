@@ -8,11 +8,11 @@
 import SwiftUI
 
 struct DraftRoomView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedTab: Int
     @State private var selectedYear: String = AppConstants.ESPNLeagueYear
-    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
-    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
+    @State private var espnCredentials = ESPNCredentialsManager.shared
+    @State private var sleeperCredentials = SleeperCredentialsManager.shared
 
     var body: some View {
         GeometryReader { geometry in
@@ -155,8 +155,8 @@ struct ServiceSetupNotices: View {
     @Binding var selectedTab: Int
     let showESPN: Bool
     let showSleeper: Bool
-    @StateObject private var espnCredentials = ESPNCredentialsManager.shared
-    @StateObject private var sleeperCredentials = SleeperCredentialsManager.shared
+    @State private var espnCredentials = ESPNCredentialsManager.shared
+    @State private var sleeperCredentials = SleeperCredentialsManager.shared
     
     var body: some View {
         VStack(spacing: 12) {
@@ -173,7 +173,7 @@ struct ServiceSetupNotices: View {
 
 struct ESPNSetupNoticeCard: View {
     @Binding var selectedTab: Int
-    @StateObject private var credentialsManager = ESPNCredentialsManager.shared
+    @State private var credentialsManager = ESPNCredentialsManager.shared
     
     var body: some View {
         VStack(spacing: 12) {
@@ -226,7 +226,7 @@ struct ESPNSetupNoticeCard: View {
 
 struct SleeperSetupNoticeCard: View {
     @Binding var selectedTab: Int
-    @StateObject private var credentialsManager = SleeperCredentialsManager.shared
+    @State private var credentialsManager = SleeperCredentialsManager.shared
     
     var body: some View {
         VStack(spacing: 12) {

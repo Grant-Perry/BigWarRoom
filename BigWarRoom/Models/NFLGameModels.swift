@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftUI
+import Observation
 import Combine
 
 // MARK: -> ESPN NFL Scoreboard API Response Models
@@ -52,7 +53,7 @@ struct NFLGameStatusType: Codable {
 }
 
 // MARK: -> Processed Game Info
-struct NFLGameInfo {
+struct NFLGameInfo: Equatable {
     let homeTeam: String
     let awayTeam: String
     let homeScore: Int
@@ -229,23 +230,45 @@ struct NFLGameInfo {
 }
 
 // MARK: -> NFL Game Data Service
-class NFLGameDataService: ObservableObject {
-    static let shared = NFLGameDataService()
-    @Published var gameData: [String: NFLGameInfo] = [:] // Team -> GameInfo mapping
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+@Observable
+@MainActor
+final class NFLGameDataService {
+    
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: NFLGameDataService?
+    
+    static var shared: NFLGameDataService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = NFLGameDataService()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: NFLGameDataService) {
+        _shared = instance
+    }
+    
+    var gameData: [String: NFLGameInfo] = [:] // Team -> GameInfo mapping
+    var isLoading = false
+    var errorMessage: String?
 
-    private var cancellable: AnyCancellable?
-    private var cache: NFLScoreboardResponse?
-    private var cacheTimestamp: Date?
-    private let cacheExpiration: TimeInterval = 300 // 5 minutes
+    // Use @ObservationIgnored for internal properties that shouldn't trigger UI updates
+    @ObservationIgnored private var cancellable: AnyCancellable?
+    @ObservationIgnored private var cache: NFLScoreboardResponse?
+    @ObservationIgnored private var cacheTimestamp: Date?
+    @ObservationIgnored private let cacheExpiration: TimeInterval = 300 // 5 minutes
     
     // Request deduplication to prevent API spam
-    private var pendingRequests: Set<String> = []
-    private var lastRequestTimestamp: Date?
-    private let minimumRequestInterval: TimeInterval = 2.0 // Minimum 2 seconds between requests
+    @ObservationIgnored private var pendingRequests: Set<String> = []
+    @ObservationIgnored private var lastRequestTimestamp: Date?
+    @ObservationIgnored private let minimumRequestInterval: TimeInterval = 2.0 // Minimum 2 seconds between requests
     
-    private init() {}
+    // 🔥 PHASE 2 CORRECTED: Remove .shared singleton, use proper dependency injection
+    init() {}
     
     /// Fetch real NFL game data from ESPN API with deduplication and throttling
     func fetchGameData(forWeek week: Int, year: Int? = nil, forceRefresh: Bool = false) {
@@ -275,9 +298,7 @@ class NFLGameDataService: ObservableObject {
         print("🔥 NFL FETCH: Fetching fresh data for week \(week), year \(currentYear)")
         
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(currentYear)") else {
-            DispatchQueue.main.async {
-                self.errorMessage = "Invalid API URL"
-            }
+            errorMessage = "Invalid API URL"
             return
         }
         
@@ -374,9 +395,8 @@ class NFLGameDataService: ObservableObject {
             newGameData[homeTeam] = gameInfo
             newGameData[awayTeam] = gameInfo
         }
-        DispatchQueue.main.async { [weak self] in
-            self?.gameData = newGameData
-        }
+        
+        gameData = newGameData
     }
 
     /// Get game info with enhanced error handling
@@ -390,9 +410,7 @@ class NFLGameDataService: ObservableObject {
             // Only fetch if we haven't recently requested
             if lastRequestTimestamp == nil || 
                Date().timeIntervalSince(lastRequestTimestamp!) > minimumRequestInterval {
-                DispatchQueue.main.async { [weak self] in
-                    self?.fetchGameData(forWeek: currentWeek)
-                }
+                fetchGameData(forWeek: currentWeek)
             }
         }
         

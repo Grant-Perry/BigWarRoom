@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sorting method and direction controls
 struct PlayerSortControlsView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var sortHighToLow: Bool
     let onSortChange: () -> Void
     

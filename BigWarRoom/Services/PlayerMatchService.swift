@@ -6,40 +6,72 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
 /// **PlayerMatchService**
 /// 
 /// High-performance player matching with indexing and caching to eliminate O(n) scans
+@Observable
 @MainActor
-final class PlayerMatchService: ObservableObject {
-    static let shared = PlayerMatchService()
+final class PlayerMatchService {
+    
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: PlayerMatchService?
+    
+    static var shared: PlayerMatchService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default dependencies
+        let playerDirectory = PlayerDirectoryStore(apiClient: SleeperAPIClient())
+        let instance = PlayerMatchService(playerDirectory: playerDirectory)
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: PlayerMatchService) {
+        _shared = instance
+    }
     
     // MARK: - Properties
     
-    private var playerDirectory: PlayerDirectoryStore { PlayerDirectoryStore.shared }
+    // Dependencies - inject instead of using singletons
+    private let playerDirectory: PlayerDirectoryStore
     
-    // Performance indexes
-    private var lastNameIndex: [String: [SleeperPlayer]] = [:]
-    private var teamPositionIndex: [String: [SleeperPlayer]] = [:]  // "TEAM_POSITION" -> [players]
-    private var shortNameIndex: [String: [SleeperPlayer]] = [:]
+    // Performance indexes - Use @ObservationIgnored for internal caches
+    @ObservationIgnored private var lastNameIndex: [String: [SleeperPlayer]] = [:]
+    @ObservationIgnored private var teamPositionIndex: [String: [SleeperPlayer]] = [:]  // "TEAM_POSITION" -> [players]
+    @ObservationIgnored private var shortNameIndex: [String: [SleeperPlayer]] = [:]
     
     // Match result cache
-    private var matchCache: [String: SleeperPlayer?] = [:]
+    @ObservationIgnored private var matchCache: [String: SleeperPlayer?] = [:]
     
     // Cache invalidation
-    private var lastIndexUpdate: Date?
-    private var cancellables = Set<AnyCancellable>()
+    @ObservationIgnored private var lastIndexUpdate: Date?
+    @ObservationIgnored private var playerUpdateTask: Task<Void, Never>?
     
     // MARK: - Initialization
     
-    private init() {
-        // Listen for player directory updates
-        playerDirectory.$players
-            .sink { [weak self] _ in
-                self?.invalidateIndexes()
+    init(playerDirectory: PlayerDirectoryStore) {
+        self.playerDirectory = playerDirectory
+        
+        // Listen for player directory updates with Task instead of Combine
+        playerUpdateTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { break }
+                
+                // Check if player directory has been updated
+                await self.invalidateIndexes()
+                
+                // Wait before next check
+                try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
             }
-            .store(in: &cancellables)
+        }
+    }
+    
+    deinit {
+        playerUpdateTask?.cancel()
     }
     
     // MARK: - Public Interface

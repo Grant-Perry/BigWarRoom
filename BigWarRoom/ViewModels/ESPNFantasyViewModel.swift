@@ -6,18 +6,18 @@
 //
 
 import SwiftUI
-import Combine
 
 @MainActor
-final class ESPNFantasyViewModel: ObservableObject {
+@Observable
+final class ESPNFantasyViewModel {
     
-    // MARK: - Published Properties
-    @Published var espnFantasyModel: ESPNFantasyLeagueModel?
-    @Published var selectedLeagueID: String = ""
-    @Published var selectedYear: String = String(Calendar.current.component(.year, from: Date())) // FIXED: Use current year dynamically
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String? = nil
-    @Published var availableLeagues: [ESPNLeagueResponse] = []
+    // MARK: - Observable Properties
+    var espnFantasyModel: ESPNFantasyLeagueModel?
+    var selectedLeagueID: String = ""
+    var selectedYear: String = String(Calendar.current.component(.year, from: Date())) // FIXED: Use current year dynamically
+    var isLoading: Bool = false
+    var errorMessage: String? = nil
+    var availableLeagues: [ESPNLeagueResponse] = []
     
     // MARK: -> Week Management (SSOT)
     /// The week selection manager - SINGLE SOURCE OF TRUTH for all week data
@@ -30,7 +30,7 @@ final class ESPNFantasyViewModel: ObservableObject {
     
     // MARK: - Dependencies
     private let nflWeekService = NFLWeekService.shared
-    private var cancellables = Set<AnyCancellable>()
+    private var observationTask: Task<Void, Never>?
     
     // MARK: - Initialization
     init() {
@@ -39,35 +39,34 @@ final class ESPNFantasyViewModel: ObservableObject {
             selectedLeagueID = firstLeagueID
         }
         
-        subscribeToWeekManager()
-        subscribeToNFLWeekService()
+        startObservingDependencies()
         fetchESPNManagerLeagues()
     }
     
-    /// Subscribe to WeekSelectionManager for centralized week management
-    private func subscribeToWeekManager() {
-        weekManager.$selectedWeek
-            .removeDuplicates()
-            .sink { [weak self] newWeek in
-                guard let self = self else { return }
-                
-                print("📺 ESPNFantasyViewModel: Week changed to \(newWeek), refreshing data...")
-                self.fetchFantasyData(forWeek: newWeek)
-            }
-            .store(in: &cancellables)
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
     }
     
-    /// Subscribe to NFL Week Service updates (for year changes)
-    private func subscribeToNFLWeekService() {
-        // Update selectedYear when NFL week service updates  
-        nflWeekService.$currentYear
-            .sink { [weak self] newYear in
-                if self?.selectedYear != newYear {
-                    // x// x Print("🏈 ESPN: NFL Week Service updated year to \(newYear)")
-                    self?.selectedYear = newYear
+    /// Start observing dependencies using @Observable pattern
+    private func startObservingDependencies() {
+        observationTask = Task { @MainActor in
+            while !Task.isCancelled {
+                let currentWeek = weekManager.selectedWeek
+                let currentYear = nflWeekService.currentYear
+                
+                // Update selectedYear if needed
+                if selectedYear != currentYear {
+                    selectedYear = currentYear
                 }
+                
+                // Auto-refresh when week changes
+                fetchFantasyData(forWeek: currentWeek)
+                
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // Check every second
             }
-            .store(in: &cancellables)
+        }
     }
     
     // MARK: - Public Methods
@@ -100,26 +99,22 @@ final class ESPNFantasyViewModel: ObservableObject {
         let espnToken = selectedYear == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
         
-        // x// x Print("🏈 ESPN API Request: \(url)")
-        // x// x Print("🔑 Using ESPN year: \(selectedYear)")
-        
-        URLSession.shared.dataTaskPublisher(for: request)
-            .map(\.data)
-            .decode(type: ESPNFantasyLeagueModel.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { [weak self] completion in
-                self?.isLoading = false
-                switch completion {
-                case .failure(let error):
-                    self?.errorMessage = "Error fetching ESPN data: \(error.localizedDescription)"
-                    // x// x Print("❌ ESPN API Error: \(error)")
-                case .finished:
-                    break
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(for: request)
+                let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
+                
+                await MainActor.run {
+                    espnFantasyModel = model
+                    isLoading = false
                 }
-            }, receiveValue: { [weak self] model in
-                self?.espnFantasyModel = model
-            })
-            .store(in: &cancellables)
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Error fetching ESPN data: \(error.localizedDescription)"
+                    isLoading = false
+                }
+            }
+        }
     }
     
     /// Get team by ID
@@ -154,7 +149,7 @@ final class ESPNFantasyViewModel: ObservableObject {
     /// Update selected week - NOW USES WeekSelectionManager
     func selectWeek(_ week: Int) {
         weekManager.selectWeek(week)
-        // No need to manually refresh - the subscription will handle it
+        // No need to manually refresh - the observation will handle it
     }
     
     /// Update selected year and refetch data
@@ -174,7 +169,6 @@ final class ESPNFantasyViewModel: ObservableObject {
     /// Fetch ESPN leagues for the manager
     private func fetchESPNManagerLeagues() {
         guard let url = URL(string: "https://fan.api.espn.com/apis/v2/fans/\(AppConstants.GpESPNID)?configuration=SITE_DEFAULT&displayEvents=true&displayNow=true&displayRecs=true&displayHiddenPrefs=true&featureFlags=expandAthlete&featureFlags=isolateEvents&featureFlags=challengeEntries&platform=web&recLimit=5&coreData=logos&showAirings=buy%2Clive%2Creplay&authorizedNetworks=espn3&entitlements=ESPN_PLUS&zipcode=23607") else {
-            // x// x Print("❌ Invalid ESPN manager leagues URL")
             return
         }
         
@@ -183,19 +177,18 @@ final class ESPNFantasyViewModel: ObservableObject {
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(AppConstants.ESPN_S2)", forHTTPHeaderField: "Cookie")
         
-        URLSession.shared.dataTaskPublisher(for: request)
-            .map(\.data)
-            .receive(on: DispatchQueue.main)
-            .sink(receiveCompletion: { completion in
-                if case .failure(let error) = completion {
-                    // x// x Print("❌ Error fetching ESPN manager leagues: \(error)")
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(for: request)
+                let leagues = parseESPNLeagues(from: data)
+                
+                await MainActor.run {
+                    availableLeagues = leagues
                 }
-            }, receiveValue: { [weak self] data in
-                let leagues = self?.parseESPNLeagues(from: data) ?? []
-                self?.availableLeagues = leagues
-                // x// x Print("✅ Fetched \(leagues.count) ESPN leagues")
-            })
-            .store(in: &cancellables)
+            } catch {
+                // Silent error handling
+            }
+        }
     }
     
     /// Parse ESPN leagues from response data (from SleepThis)
@@ -222,7 +215,6 @@ final class ESPNFantasyViewModel: ObservableObject {
                                         teamName: teamName
                                     )
                                     leagues.append(league)
-                                    // x// x Print("📺 Found ESPN league: \(teamName) (ID: \(groupId))")
                                 }
                             }
                         }
@@ -230,7 +222,7 @@ final class ESPNFantasyViewModel: ObservableObject {
                 }
             }
         } catch {
-            // x// x Print("❌ Error parsing ESPN leagues: \(error)")
+            // Silent error handling
         }
         
         return leagues

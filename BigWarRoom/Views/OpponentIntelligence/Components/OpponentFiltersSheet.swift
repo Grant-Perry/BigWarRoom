@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sheet for filtering and sorting opponent intelligence data
 struct OpponentFiltersSheet: View {
-    @ObservedObject var viewModel: OpponentIntelligenceViewModel
+    @Bindable var viewModel: OpponentIntelligenceViewModel
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

@@ -7,40 +7,52 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 /// Coordinator ViewModel for FantasyMatchupListView
 /// Handles smart mode detection, draft position management, and league setup
 @MainActor
-final class FantasyMatchupListViewModel: ObservableObject {
+@Observable
+final class FantasyMatchupListViewModel {
     
     // MARK: - Dependencies
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-    private let matchupsHubViewModel = MatchupsHubViewModel.shared
+    // 🔥 PHASE 2.5: Accept dependencies via dependency injection
+    private let matchupsHubViewModel: MatchupsHubViewModel
     private let weekManager: WeekSelectionManager
     private let fantasyViewModel: FantasyViewModel
     private var draftRoomViewModel: DraftRoomViewModel?
     
-    // MARK: - Published States
-    @Published var showLeaguePicker = false
-    @Published var availableLeagues: [UnifiedMatchup] = []
-    @Published var showDraftPositionPicker = false
-    @Published var selectedLeagueForPosition: UnifiedLeagueManager.LeagueWrapper?
-    @Published var selectedDraftPosition = 1
-    @Published var forceChoppedMode = false // DEBUG: Force chopped mode
+    // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
+    var showLeaguePicker = false
+    var availableLeagues: [UnifiedMatchup] = []
+    var showDraftPositionPicker = false
+    var selectedLeagueForPosition: UnifiedLeagueManager.LeagueWrapper?
+    var selectedDraftPosition = 1
+    var forceChoppedMode = false // DEBUG: Force chopped mode
     
     // MARK: - Race Condition Prevention
-    @Published var isDetectingSmartMode = false
-    @Published var isSettingUpLeague = false
-    @Published var hasInitializedSmartMode = false
+    var isDetectingSmartMode = false
+    var isSettingUpLeague = false
+    var hasInitializedSmartMode = false
     
+    // 🔥 PHASE 2.5: Dependency injection initializer
     init(
-        weekManager: WeekSelectionManager = WeekSelectionManager.shared,
-        fantasyViewModel: FantasyViewModel = FantasyViewModel.shared
+        matchupsHubViewModel: MatchupsHubViewModel,
+        weekManager: WeekSelectionManager,
+        fantasyViewModel: FantasyViewModel
     ) {
+        self.matchupsHubViewModel = matchupsHubViewModel
         self.weekManager = weekManager
         self.fantasyViewModel = fantasyViewModel
-        // 🔥 REMOVED: No longer creating our own instance - using shared
+    }
+    
+    // 🔥 PHASE 2.5: Bridge compatibility initializer (DEPRECATED)
+    convenience init() {
+        self.init(
+            matchupsHubViewModel: MatchupsHubViewModel.shared,
+            weekManager: WeekSelectionManager.shared,
+            fantasyViewModel: FantasyViewModel.shared
+        )
     }
     
     // MARK: - Setup

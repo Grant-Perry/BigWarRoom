@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct AIPickSuggestionsView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         NavigationStack {

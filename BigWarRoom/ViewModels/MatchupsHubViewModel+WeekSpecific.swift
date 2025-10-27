@@ -27,8 +27,8 @@ extension MatchupsHubViewModel {
             // Step 1: Load all available leagues
             await updateLoadingState("Loading available leagues...")
             
-            // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
-            let sleeperUserID = SleeperCredentialsManager.shared.getUserIdentifier()
+            // 🔥 PHASE 2: Use injected credentials instead of .shared
+            let sleeperUserID = sleeperCredentials.getUserIdentifier()
             
             await unifiedLeagueManager.fetchAllLeagues(
                 sleeperUserID: sleeperUserID,
@@ -181,7 +181,8 @@ extension MatchupsHubViewModel {
                     choppedSummary: choppedSummary,
                     lastUpdated: Date(),
                     myTeamRanking: myTeamRanking,
-                    myIdentifiedTeamID: myTeamID
+                    myIdentifiedTeamID: myTeamID,
+                    authenticatedUsername: sleeperCredentials.currentUsername
                 )
                 
                 await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
@@ -215,7 +216,8 @@ extension MatchupsHubViewModel {
                 choppedSummary: nil,
                 lastUpdated: Date(),
                 myTeamRanking: nil,
-                myIdentifiedTeamID: myTeamID
+                myIdentifiedTeamID: myTeamID,
+                authenticatedUsername: sleeperCredentials.currentUsername
             )
             
             await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)

@@ -7,31 +7,47 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class ScoringSettingsManager: ObservableObject {
+final class ScoringSettingsManager {
     
-    // MARK: - Singleton
-    static let shared = ScoringSettingsManager()
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: ScoringSettingsManager?
     
-    // MARK: - Published Properties
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
+    static var shared: ScoringSettingsManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = ScoringSettingsManager()
+        _shared = instance
+        return instance
+    }
     
-    // MARK: - Private Properties
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: ScoringSettingsManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties
+    var isLoading: Bool = false
+    var errorMessage: String?
+    
+    // MARK: - Private Properties - Use @ObservationIgnored for internal caches
     /// Current scoring settings: [leagueID: [sleeperStatKey: points]]
-    private var espnScoringSettings: [String: [String: Double]] = [:]
-    private var sleeperScoringSettings: [String: [String: Double]] = [:]
+    @ObservationIgnored private var espnScoringSettings: [String: [String: Double]] = [:]
+    @ObservationIgnored private var sleeperScoringSettings: [String: [String: Double]] = [:]
     
     /// 🔥 NEW: Validated scoring settings using differential analysis
-    private var validatedESPNScoringSettings: [String: [String: Double]] = [:]
+    @ObservationIgnored private var validatedESPNScoringSettings: [String: [String: Double]] = [:]
     
     /// Debug info for each league's scoring basis
-    private var leagueScoringBasis: [String: String] = [:]
+    @ObservationIgnored private var leagueScoringBasis: [String: String] = [:]
     
     // MARK: - Initialization
-    private init() {}
+    init() {}
     
     // MARK: - 🔥 NEW: Fantasy Football Scoring Baselines
     
@@ -708,30 +724,13 @@ final class ScoringSettingsManager: ObservableObject {
     
     /// Calculate points for a specific stat using proper fantasy football math
     private func calculateStatPoints(statKey: String, statValue: Double, pointsPerStat: Double) -> Double {
-        // 🔥 GUMBY'S CRITICAL FIX: YARDAGE MATH WAS SYSTEMATICALLY WRONG!
-        // OLD BROKEN: floor(statValue / increment) - this undercounted every player
-        // NEW CORRECT: Pure fractional multiplication - exact points like ESPN/Sleeper actually do
-        
         if isYardStat(statKey) {
             // 🔥 NEW CORRECT MATH: Direct fractional multiplication  
-            // Example: 211 pass yards × 0.04 = 8.44 points (not 8.0 points)
             return statValue * pointsPerStat
         }
         
         // Event-based stats (TDs, INTs, etc.) use direct multiplication
         return statValue * pointsPerStat
-        
-        // 🔥 OLD BROKEN MATH (REMOVED):
-        // This was systematically undercounting every player with yards
-        /* REMOVED - WRONG MATH:
-        if isYardStat(statKey) {
-            if pointsPerStat > 0 {
-                let increment = 1.0 / pointsPerStat  // 25 yards per point
-                let points = floor(statValue / increment) * 1.0  // 🚨 WRONG: floor() loses 0.44 points on 211 yards
-                return points
-            }
-        }
-        */
     }
     
     /// Check if a stat is yard-based and needs increment calculation

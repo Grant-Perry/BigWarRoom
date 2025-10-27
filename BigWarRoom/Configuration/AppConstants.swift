@@ -61,14 +61,16 @@ struct AppConstants {
     }
 
     // MARK: -> Current Season Year (SSOT)
-    /// Get the current season year from SeasonYearManager SSOT
+    /// Get the current season year - now requires dependency injection instead of singleton
+    /// NOTE: This will need to be updated in Phase 3 when we wire up dependency injection
+    /// For now, keeping ESPNLeagueYear as the source of truth
     static var currentSeasonYear: String {
-        return SeasonYearManager.shared.selectedYear
+        return ESPNLeagueYear
     }
     
     /// Get the current season year as Int for API calls
     static var currentSeasonYearInt: Int {
-        return SeasonYearManager.shared.selectedYearInt
+        return Int(ESPNLeagueYear) ?? 2025
     }
     
     // MARK: -> ESPN Token Management (Updated to use SSOT)

@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import Combine
 
 // MARK: -> Refresh & Data Management Extension
 extension FantasyViewModel {
@@ -98,10 +97,6 @@ extension FantasyViewModel {
             if matchups.isEmpty && league.source == .sleeper {
                 detectedAsChoppedLeague = true
                 hasActiveRosters = true
-                
-                await MainActor.run {
-                    self.objectWillChange.send()
-                }
             } else if matchups.isEmpty && league.source == .espn {
                 // Don't immediately mark as chopped, ESPN leagues shouldn't be chopped
                 errorMessage = "No matchups found for week \(selectedWeek). Check if this week has started."

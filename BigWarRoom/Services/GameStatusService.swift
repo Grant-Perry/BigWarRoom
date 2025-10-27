@@ -6,12 +6,38 @@
 //
 
 import Foundation
+import Observation
 
 /// Service to provide real NFL game status data for fantasy players
+@Observable
+@MainActor
 final class GameStatusService {
-    static let shared = GameStatusService()
     
-    private init() {}
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: GameStatusService?
+    
+    static var shared: GameStatusService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default dependencies
+        let nflGameService = NFLGameDataService.shared
+        let instance = GameStatusService(nflGameDataService: nflGameService)
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: GameStatusService) {
+        _shared = instance
+    }
+    
+    // Dependencies - inject instead of using singletons
+    private let nflGameDataService: NFLGameDataService
+    
+    init(nflGameDataService: NFLGameDataService) {
+        self.nflGameDataService = nflGameDataService
+    }
     
     /// Get real game status for a player based on their NFL team
     /// This replaces all the createMockGameStatus() bullshit with actual data
@@ -22,7 +48,7 @@ final class GameStatusService {
         }
         
         // Use NFLGameDataService to get real game info
-        guard let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) else {
+        guard let gameInfo = nflGameDataService.getGameInfo(for: team) else {
 //            print("⚠️ GAME STATUS: No game info found for team \(team)")
             return nil
         }

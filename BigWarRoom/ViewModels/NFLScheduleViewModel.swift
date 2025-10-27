@@ -8,47 +8,69 @@
 
 import SwiftUI
 import Foundation
-import Combine
+import Observation
 
 @MainActor
-final class NFLScheduleViewModel: ObservableObject {
-    @Published var games: [ScheduleGame] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-    @Published var selectedWeek: Int
-    @Published var selectedGame: ScheduleGame?
-    @Published var showingGameDetail = false
-    @Published var selectedGameId: String? // For NavigationLink selection
+@Observable
+final class NFLScheduleViewModel {
+    var games: [ScheduleGame] = []
+    var isLoading = false
+    var errorMessage: String?
+    var selectedWeek: Int
+    var selectedGame: ScheduleGame?
+    var showingGameDetail = false
+    var selectedGameId: String? // For NavigationLink selection
     
-    private var cancellables = Set<AnyCancellable>()
     private let gameDataService = NFLGameDataService.shared
     private let weekService = NFLWeekService.shared
+    private var observationTask: Task<Void, Never>?
     
     init() {
         self.selectedWeek = weekService.currentWeek
-        
-        // Subscribe to game data updates
-        gameDataService.$gameData
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] gameData in
-                self?.processGameData(gameData)
-            }
-            .store(in: &cancellables)
-        
-        // Subscribe to loading state
-        gameDataService.$isLoading
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.isLoading, on: self)
-            .store(in: &cancellables)
-        
-        // Subscribe to error messages
-        gameDataService.$errorMessage
-            .receive(on: DispatchQueue.main)
-            .assign(to: \.errorMessage, on: self)
-            .store(in: &cancellables)
+        setupObservation()
         
         // Initial data load
         refreshSchedule()
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
+    }
+    
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            var lastObservedGameData: [String: NFLGameInfo] = [:]
+            var lastObservedIsLoading = false
+            var lastObservedErrorMessage: String? = nil
+            
+            while !Task.isCancelled {
+                let currentGameData = gameDataService.gameData
+                let currentIsLoading = gameDataService.isLoading
+                let currentErrorMessage = gameDataService.errorMessage
+                
+                // Check for game data changes
+                if currentGameData != lastObservedGameData {
+                    processGameData(currentGameData)
+                    lastObservedGameData = currentGameData
+                }
+                
+                // Check for loading state changes
+                if currentIsLoading != lastObservedIsLoading {
+                    isLoading = currentIsLoading
+                    lastObservedIsLoading = currentIsLoading
+                }
+                
+                // Check for error message changes
+                if currentErrorMessage != lastObservedErrorMessage {
+                    errorMessage = currentErrorMessage
+                    lastObservedErrorMessage = currentErrorMessage
+                }
+                
+                try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            }
+        }
     }
     
     /// Refresh schedule data for current week
@@ -88,9 +110,6 @@ final class NFLScheduleViewModel: ObservableObject {
             )
             
             processedGames.append(scheduleGame)
-            
-            // DEBUG: Print game info to see what we're getting
-//            print("🏈 Schedule Game: \(gameInfo.awayTeam) @ \(gameInfo.homeTeam) - Status: \(gameInfo.gameStatus) - Scores: \(gameInfo.awayScore)-\(gameInfo.homeScore)")
         }
         
         // STABLE SORT: Keep existing games in their current positions when possible
@@ -121,17 +140,13 @@ final class NFLScheduleViewModel: ObservableObject {
         let existingGameIds = Set(games.map { $0.id })
         
         if newGameIds != existingGameIds || games.isEmpty {
-//            print("🏈 Game order changed - updating games array")
             games = sortedGames
         } else {
-//            print("🏈 Game data updated but order preserved")
             // Update game data but preserve order
             games = games.compactMap { existingGame in
                 processedGames.first { $0.id == existingGame.id }
             }
         }
-        
-//        print("🏈 Total games processed: \(games.count)")
     }
     
     /// Show game detail with fantasy players
@@ -160,9 +175,6 @@ struct ScheduleGame: Identifiable, Hashable {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE" // Full day name
         let dayName = formatter.string(from: date)
-        
-        // DEBUG: Print the day name to see what we're getting
-//        print("🏈 Game day for \(awayTeam)@\(homeTeam): \(dayName)")
         
         return dayName
     }

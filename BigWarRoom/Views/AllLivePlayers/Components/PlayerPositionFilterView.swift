@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Position filter dropdown menu component
 struct PlayerPositionFilterView: View {
-    @ObservedObject var allLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     let onPositionChange: () -> Void
     
     var body: some View {

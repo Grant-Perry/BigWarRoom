@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DraftSelectionSection: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedTab: Int
     @State private var showAllLeagues = false
     

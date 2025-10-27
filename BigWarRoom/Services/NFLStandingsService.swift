@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 // MARK: -> ESPN NFL Team Record API Response Models
 struct NFLTeamRecordResponse: Codable {
@@ -63,20 +63,39 @@ struct NFLTeamRecord {
 }
 
 // MARK: -> NFL Standings Service
+@Observable
 @MainActor
-final class NFLStandingsService: ObservableObject {
-    static let shared = NFLStandingsService()
+final class NFLStandingsService {
     
-    @Published var teamRecords: [String: NFLTeamRecord] = [:]
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: NFLStandingsService?
     
-    private var cancellables = Set<AnyCancellable>()
-    private var cacheTimestamp: Date?
-    private let cacheExpiration: TimeInterval = 3600 // 1 hour - standings don't change as often
+    static var shared: NFLStandingsService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = NFLStandingsService()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: NFLStandingsService) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var teamRecords: [String: NFLTeamRecord] = [:]
+    var isLoading = false
+    var errorMessage: String?
+    
+    @ObservationIgnored private var fetchTask: Task<Void, Never>?
+    @ObservationIgnored private var cacheTimestamp: Date?
+    @ObservationIgnored private let cacheExpiration: TimeInterval = 3600 // 1 hour - standings don't change as often
     
     // Team ID mapping for ESPN API
-    private let teamIdMap: [String: String] = [
+    @ObservationIgnored private let teamIdMap: [String: String] = [
         "ARI": "22", "ATL": "1", "BAL": "33", "BUF": "2", "CAR": "29", "CHI": "3",
         "CIN": "4", "CLE": "5", "DAL": "6", "DEN": "7", "DET": "8", "GB": "9",
         "HOU": "34", "IND": "11", "JAX": "30", "KC": "12", "LV": "13", "LAC": "24",
@@ -85,7 +104,10 @@ final class NFLStandingsService: ObservableObject {
         "TEN": "10", "WSH": "28", "WAS": "28" // Handle both Washington codes
     ]
     
-    private init() {
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Make init public for dependency injection
+    init() {
         // Auto-fetch on init
         fetchStandings()
     }
@@ -101,53 +123,64 @@ final class NFLStandingsService: ObservableObject {
             return
         }
         
-        isLoading = true
-        errorMessage = nil
+        // Cancel any existing fetch task
+        fetchTask?.cancel()
         
-        print("🏈 Fetching NFL team records from ESPN API...")
-        
-        // Fetch records for all teams simultaneously
-        let publishers = teamIdMap.compactMap { (teamCode, teamId) -> AnyPublisher<(String, NFLTeamRecord?), Never>? in
-            guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?enable=record") else {
-                return nil
+        fetchTask = Task { [weak self] in
+            guard let self = self else { return }
+            
+            await MainActor.run {
+                self.isLoading = true
+                self.errorMessage = nil
             }
             
-            return URLSession.shared.dataTaskPublisher(for: url)
-                .map { $0.data }
-                .decode(type: NFLTeamRecordResponse.self, decoder: JSONDecoder())
-                .map { response -> (String, NFLTeamRecord?) in
-                    let record = self.processTeamRecord(response, teamCode: teamCode)
-                    return (teamCode, record)
+            print("🏈 Fetching NFL team records from ESPN API...")
+            
+            // Fetch records for all teams simultaneously using async/await
+            await withTaskGroup(of: (String, NFLTeamRecord?).self) { group in
+                for (teamCode, teamId) in teamIdMap {
+                    group.addTask {
+                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId)
+                    }
                 }
-                .catch { error -> AnyPublisher<(String, NFLTeamRecord?), Never> in
-                    print("🏈 Error fetching record for \(teamCode): \(error)")
-                    return Just((teamCode, nil)).eraseToAnyPublisher()
-                }
-                .eraseToAnyPublisher()
-        }
-        
-        Publishers.MergeMany(publishers)
-            .collect()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] teamRecordsArray in
-                self?.isLoading = false
                 
                 var newTeamRecords: [String: NFLTeamRecord] = [:]
-                for (teamCode, record) in teamRecordsArray {
+                
+                for await (teamCode, record) in group {
                     if let record = record {
                         newTeamRecords[teamCode] = record
                     }
                 }
                 
-                self?.teamRecords = newTeamRecords
-                self?.cacheTimestamp = Date()
-                
-                print("🏈 Successfully fetched \(newTeamRecords.count) team records")
-                for record in newTeamRecords.values.sorted(by: { $0.teamCode < $1.teamCode }) {
-                    print("🏈 \(record.teamCode): \(record.displayRecord)")
+                await MainActor.run {
+                    self.isLoading = false
+                    self.teamRecords = newTeamRecords
+                    self.cacheTimestamp = Date()
+                    
+                    print("🏈 Successfully fetched \(newTeamRecords.count) team records")
+                    for record in newTeamRecords.values.sorted(by: { $0.teamCode < $1.teamCode }) {
+                        print("🏈 \(record.teamCode): \(record.displayRecord)")
+                    }
                 }
             }
-            .store(in: &cancellables)
+        }
+    }
+    
+    /// Fetch single team record
+    private func fetchSingleTeamRecord(teamCode: String, teamId: String) async -> (String, NFLTeamRecord?) {
+        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?enable=record") else {
+            return (teamCode, nil)
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(NFLTeamRecordResponse.self, from: data)
+            let record = processTeamRecord(response, teamCode: teamCode)
+            return (teamCode, record)
+        } catch {
+            print("🏈 Error fetching record for \(teamCode): \(error)")
+            return (teamCode, nil)
+        }
     }
     
     /// Process ESPN team record API response
@@ -212,5 +245,11 @@ final class NFLStandingsService: ObservableObject {
     /// Force refresh standings
     func refreshStandings() {
         fetchStandings(forceRefresh: true)
+    }
+    
+    // MARK: - Cleanup
+    
+    deinit {
+        fetchTask?.cancel()
     }
 }

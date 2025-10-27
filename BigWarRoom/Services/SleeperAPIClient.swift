@@ -24,12 +24,29 @@ protocol DraftAPIClient {
 }
 
 final class SleeperAPIClient: DraftAPIClient {
-    static let shared = SleeperAPIClient()
+    
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: SleeperAPIClient?
+    
+    static var shared: SleeperAPIClient {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = SleeperAPIClient()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: SleeperAPIClient) {
+        _shared = instance
+    }
     
     private let baseURL = "https://api.sleeper.app/v1"
     private let session = URLSession.shared
     
-    private init() {}
+    init() {}
     
     // MARK: -> User
 

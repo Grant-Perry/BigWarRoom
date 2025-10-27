@@ -19,8 +19,8 @@ struct FantasyPlayerCard: View {
     let teamIndex: Int?
     let isBench: Bool
     
-    @StateObject private var viewModel = FantasyPlayerViewModel()
-    @StateObject private var watchService = PlayerWatchService.shared
+    @State private var viewModel = FantasyPlayerViewModel()
+    @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
     @State private var showingPlayerDetail = false

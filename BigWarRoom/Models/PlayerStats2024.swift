@@ -210,14 +210,36 @@ struct PlayerStats2024: Codable, Identifiable {
 }
 
 // MARK: -> Stats Store
+@Observable
 @MainActor
-final class PlayerStatsStore: ObservableObject {
-    static let shared = PlayerStatsStore()
+final class PlayerStatsStore {
     
-    private var stats: [String: PlayerStats2024] = [:]
-    private var isLoading = false
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: PlayerStatsStore?
     
-    private init() {
+    static var shared: PlayerStatsStore {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = PlayerStatsStore()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: PlayerStatsStore) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    @ObservationIgnored private var stats: [String: PlayerStats2024] = [:]
+    @ObservationIgnored private var isLoading = false
+    
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Make init public for dependency injection
+    init() {
         Task {
             await loadRealStats()
         }

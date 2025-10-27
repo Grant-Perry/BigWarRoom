@@ -19,7 +19,7 @@ struct FantasyMatchupDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     // Shared instance to ensure stats are loaded early
-    @ObservedObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
 
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position

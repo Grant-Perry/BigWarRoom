@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import Observation
 
 #if os(iOS)
 import AudioToolbox
@@ -45,7 +45,8 @@ enum PositionFilter: CaseIterable, Identifiable {
 }
 
 @MainActor
-final class DraftRoomViewModel: ObservableObject {
+@Observable
+final class DraftRoomViewModel {
     
     // MARK: - Coordinators
     
@@ -72,38 +73,38 @@ final class DraftRoomViewModel: ObservableObject {
     var selectedPositionFilter: PositionFilter { suggestionsCoordinator.selectedPositionFilter }
     var selectedSortMethod: SortMethod { suggestionsCoordinator.selectedSortMethod }
     
-    // MARK: - Published UI State (owned by ViewModel)
+    // MARK: - 🔥 PHASE 3: @Observable UI State (no @Published needed)
     
-    @Published var picksFeed: String = ""
-    @Published var myPickInput: String = ""
+    var picksFeed: String = ""
+    var myPickInput: String = ""
     
-    @Published var selectedDraft: SleeperLeague?
-    @Published var selectedLeagueWrapper: UnifiedLeagueManager.LeagueWrapper?
+    var selectedDraft: SleeperLeague?
+    var selectedLeagueWrapper: UnifiedLeagueManager.LeagueWrapper?
     
-    @Published var pollingCountdown: Double = 0.0
-    @Published var maxPollingInterval: Double = 15.0
+    var pollingCountdown: Double = 0.0
+    var maxPollingInterval: Double = 15.0
     
     // MARK: - Pick Notifications
     
-    @Published var showingPickAlert = false
-    @Published var showingConfirmationAlert = false
-    @Published var pickAlertMessage = ""
-    @Published var confirmationAlertMessage = ""
-    @Published var isMyTurn = false
+    var showingPickAlert = false
+    var showingConfirmationAlert = false
+    var pickAlertMessage = ""
+    var confirmationAlertMessage = ""
+    var isMyTurn = false
     
     // MARK: - Manual Draft Position Selection
     
-    @Published var isConnectedToManualDraft = false
-    @Published var manualDraftNeedsPosition = false
-    @Published var selectedManualPosition: Int = 1
-    @Published var manualDraftInfo: SleeperDraft?
-    @Published var showManualDraftEntry = false
+    var isConnectedToManualDraft = false
+    var manualDraftNeedsPosition = false
+    var selectedManualPosition: Int = 1
+    var manualDraftInfo: SleeperDraft?
+    var showManualDraftEntry = false
     
     // MARK: - ESPN Draft Pick Selection
     
-    @Published var showingESPNPickPrompt = false
-    @Published var pendingESPNLeagueWrapper: UnifiedLeagueManager.LeagueWrapper?
-    @Published var selectedESPNDraftPosition: Int = 1
+    var showingESPNPickPrompt = false
+    var pendingESPNLeagueWrapper: UnifiedLeagueManager.LeagueWrapper?
+    var selectedESPNDraftPosition: Int = 1
     
     // MARK: - Services
     
@@ -121,9 +122,8 @@ final class DraftRoomViewModel: ObservableObject {
     internal var lastPickCount = 0
     internal var lastMyPickCount = 0
     
-    // MARK: - Combine
-    
-    internal var cancellables = Set<AnyCancellable>()
+    // 🔥 PHASE 3: Replace Combine with observation task
+    private var observationTask: Task<Void, Never>?
     
     // MARK: - User cache for ownerID -> SleeperUser lookups
     internal var userCache: [String: SleeperUser] = [:]
@@ -183,8 +183,27 @@ final class DraftRoomViewModel: ObservableObject {
         rosterCoordinator: DraftRosterCoordinator? = nil,
         suggestionsCoordinator: DraftSuggestionsCoordinator? = nil
     ) {
-        // Use provided coordinators or create defaults
-        self.connectionCoordinator = connectionCoordinator ?? DefaultDraftConnectionCoordinator()
+        // 🔥 FIX: Create coordinators with proper dependencies instead of using empty constructors
+        if let connectionCoordinator = connectionCoordinator {
+            self.connectionCoordinator = connectionCoordinator
+        } else {
+            // Create default connection coordinator with required dependencies
+            let sleeperClient = SleeperAPIClient.shared
+            let espnClient = ESPNAPIClient.shared
+            let espnCredentials = ESPNCredentialsManager()
+            let leagueManager = UnifiedLeagueManager(
+                sleeperClient: sleeperClient,
+                espnClient: espnClient,
+                espnCredentials: espnCredentials
+            )
+            self.connectionCoordinator = DefaultDraftConnectionCoordinator(
+                sleeperClient: sleeperClient,
+                espnClient: espnClient,
+                leagueManager: leagueManager,
+                espnCredentials: espnCredentials
+            )
+        }
+        
         self.rosterCoordinator = rosterCoordinator ?? DefaultDraftRosterCoordinator()
         self.suggestionsCoordinator = suggestionsCoordinator ?? DefaultDraftSuggestionsCoordinator()
         
@@ -193,7 +212,7 @@ final class DraftRoomViewModel: ObservableObject {
         (self.rosterCoordinator as? DefaultDraftRosterCoordinator)?.delegate = self
         (self.suggestionsCoordinator as? DefaultDraftSuggestionsCoordinator)?.delegate = self
         
-        bindToPollingService()
+        setupObservation() // 🔥 PHASE 3: Replace Combine binding with observation
         
         // 🔥 PERFORMANCE FIX: Don't block init() with heavy operations!
         // Let the loading screen handle data loading asynchronously
@@ -212,47 +231,65 @@ final class DraftRoomViewModel: ObservableObject {
         await suggestionsCoordinator.refreshSuggestions()
     }
     
-    // MARK: - Polling Service Binding
+    // MARK: - 🔥 PHASE 3: Replace Combine Polling Service Binding with @Observable Observation
     
-    private func bindToPollingService() {
-        polling.$allPicks
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] picks in
-                guard let self else { return }
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            var lastObservedPickCount = 0
+            var lastObservedCountdown = 0.0
+            var lastObservedInterval = 0.0
+            
+            while !Task.isCancelled {
+                // Observe polling service changes
+                let currentPickCount = polling.allPicks.count
+                let currentCountdown = polling.pollingCountdown
+                let currentInterval = polling.currentPollingInterval
                 
-                // Update roster coordinator with latest picks
-                let enhancedPicks = self.rosterCoordinator.buildEnhancedPicks(from: picks, draftRosters: self.draftRosters)
-                
-                // Manually update the published properties since we can't directly bind
-                Task { @MainActor in
+                // Check for pick changes
+                if currentPickCount != lastObservedPickCount {
+                    // Update roster coordinator with latest picks
+                    let enhancedPicks = rosterCoordinator.buildEnhancedPicks(
+                        from: polling.allPicks, 
+                        draftRosters: draftRosters
+                    )
+                    
                     // Update roster coordinator's published properties
-                    if let defaultRosterCoordinator = self.rosterCoordinator as? DefaultDraftRosterCoordinator {
-                        defaultRosterCoordinator.recentLivePicks = Array(self.polling.recentPicks)
+                    if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                        defaultRosterCoordinator.recentLivePicks = Array(polling.recentPicks)
                         defaultRosterCoordinator.allDraftPicks = enhancedPicks
                     }
                     
                     // Check for turn changes and new picks
-                    await self.checkForTurnChange()
-                    await self.checkForMyNewPicks(picks)
-                    await self.rosterCoordinator.updateMyRosterFromPicks(picks)
-                    await self.suggestionsCoordinator.refreshSuggestions()
+                    await checkForTurnChange()
+                    await checkForMyNewPicks(polling.allPicks)
+                    await rosterCoordinator.updateMyRosterFromPicks(polling.allPicks)
+                    await suggestionsCoordinator.refreshSuggestions()
+                    
+                    lastObservedPickCount = currentPickCount
                 }
+                
+                // Check for countdown changes
+                if currentCountdown != lastObservedCountdown {
+                    pollingCountdown = currentCountdown
+                    lastObservedCountdown = currentCountdown
+                }
+                
+                // Check for interval changes
+                if currentInterval != lastObservedInterval {
+                    maxPollingInterval = currentInterval
+                    lastObservedInterval = currentInterval
+                }
+                
+                // Small delay to prevent excessive polling
+                try? await Task.sleep(for: .milliseconds(500))
             }
-            .store(in: &cancellables)
-        
-        polling.$pollingCountdown
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] value in
-                self?.pollingCountdown = value
-            }
-            .store(in: &cancellables)
-        
-        polling.$currentPollingInterval
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] interval in
-                self?.maxPollingInterval = interval
-            }
-            .store(in: &cancellables)
+        }
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
     }
     
     // MARK: - Public Methods (Delegate to Coordinators)
@@ -340,8 +377,7 @@ extension DraftRoomViewModel: DraftConnectionCoordinatorDelegate {
         // Update our currentUserID to match
         currentUserID = coordinator.currentUserID
         
-        // Trigger UI update
-        objectWillChange.send()
+        // 🔥 PHASE 3: No need for objectWillChange.send() with @Observable - automatic change detection
     }
     
     func connectionCoordinator(_ coordinator: DraftConnectionCoordinator, didFailWithError error: Error) {
@@ -350,13 +386,13 @@ extension DraftRoomViewModel: DraftConnectionCoordinatorDelegate {
     
     func connectionCoordinator(_ coordinator: DraftConnectionCoordinator, didRefreshLeagues leagues: [UnifiedLeagueManager.LeagueWrapper]) {
         AppLogger.info("DraftRoomViewModel: Refreshed \(leagues.count) leagues", category: "DraftRoom")
-        objectWillChange.send()
+        // 🔥 PHASE 3: No need for objectWillChange.send() with @Observable
     }
     
     func connectionCoordinatorDidDisconnect(_ coordinator: DraftConnectionCoordinator) {
         AppLogger.info("DraftRoomViewModel: Disconnected from services", category: "DraftRoom")
         currentUserID = nil
-        objectWillChange.send()
+        // 🔥 PHASE 3: No need for objectWillChange.send() with @Observable
     }
 }
 
@@ -369,7 +405,7 @@ extension DraftRoomViewModel: DraftRosterCoordinatorDelegate {
         Task {
             await suggestionsCoordinator.refreshSuggestions()
         }
-        objectWillChange.send()
+        // 🔥 PHASE 3: No need for objectWillChange.send() with @Observable
     }
     
     func rosterCoordinatorTeamCount(_ coordinator: DraftRosterCoordinator) -> Int {

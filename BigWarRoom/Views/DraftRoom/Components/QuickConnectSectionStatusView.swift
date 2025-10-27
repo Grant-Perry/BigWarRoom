@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct QuickConnectSectionStatusView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         HStack(spacing: 20) {

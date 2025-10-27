@@ -7,31 +7,55 @@
 // MARK: -> Draft Polling Service
 
 import Foundation
-import Combine
+import Observation
 import UIKit
 
+@Observable
 @MainActor
-final class DraftPollingService: ObservableObject {
-    static let shared = DraftPollingService()
+final class DraftPollingService {
     
-    @Published private(set) var currentDraft: SleeperDraft?
-    @Published private(set) var allPicks: [SleeperPick] = [] // Changed from recentPicks to allPicks
-    @Published private(set) var recentPicks: [SleeperPick] = [] // Keep recent picks for other uses
-    @Published private(set) var isPolling = false
-    @Published private(set) var lastUpdate: Date?
-    @Published private(set) var error: Error?
-    @Published private(set) var pollingCountdown: Double = 0.0
-    @Published private(set) var currentPollingInterval: Double = 3.0
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: DraftPollingService?
     
-    private let playerDirectory = PlayerDirectoryStore.shared
+    static var shared: DraftPollingService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = DraftPollingService()
+        _shared = instance
+        return instance
+    }
     
-    private var pollingTask: Task<Void, Never>?
-    private var countdownTask: Task<Void, Never>?
-    private var pollInterval: TimeInterval = 3.0 // 3 seconds during active drafts
-    private var lastPollTime: Date = Date()
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: DraftPollingService) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    private(set) var currentDraft: SleeperDraft?
+    private(set) var allPicks: [SleeperPick] = [] // Changed from recentPicks to allPicks
+    private(set) var recentPicks: [SleeperPick] = [] // Keep recent picks for other uses
+    private(set) var isPolling = false
+    private(set) var lastUpdate: Date?
+    private(set) var error: Error?
+    private(set) var pollingCountdown: Double = 0.0
+    private(set) var currentPollingInterval: Double = 3.0
+    
+    @ObservationIgnored private let playerDirectory = PlayerDirectoryStore.shared
+    
+    @ObservationIgnored private var pollingTask: Task<Void, Never>?
+    @ObservationIgnored private var countdownTask: Task<Void, Never>?
+    @ObservationIgnored private var pollInterval: TimeInterval = 3.0 // 3 seconds during active drafts
+    @ObservationIgnored private var lastPollTime: Date = Date()
     
     // API client - can be Sleeper or ESPN
-    private var currentApiClient: DraftAPIClient? = nil
+    @ObservationIgnored private var currentApiClient: DraftAPIClient? = nil
+    
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Make init public for dependency injection
+    init() {}
     
     // MARK: -> Draft Polling
     
@@ -261,8 +285,6 @@ final class DraftPollingService: ObservableObject {
             }
         }
     }
-    
-    private init() {}
 }
 
 // MARK: -> Draft State Helpers

@@ -22,7 +22,7 @@ struct EnhancedNFLTeamRosterView: View {
     
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: NFLTeamRosterViewModel
-    @StateObject private var nflGameService = NFLGameDataService.shared
+    @State private var nflGameService = NFLGameDataService.shared
     
     // UI State
     @State private var sortingMethod: MatchupSortingMethod = .position

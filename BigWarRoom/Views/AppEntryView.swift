@@ -14,10 +14,15 @@ struct AppEntryView: View {
     var body: some View {
         Group {
             if showingLoading {
-                LoadingScreen { needsOnboarding in
-                    shouldShowOnboarding = needsOnboarding
-                    showingLoading = false
-                }
+                LoadingScreen(
+                    onComplete: { needsOnboarding in
+                        shouldShowOnboarding = needsOnboarding
+                        showingLoading = false
+                    },
+                    espnCredentials: ESPNCredentialsManager.shared,
+                    sleeperCredentials: SleeperCredentialsManager.shared,
+                    matchupsHub: MatchupsHubViewModel.shared
+                )
             } else {
                 // Only show main app AFTER loading completes
                 BigWarRoomWithConditionalStart(shouldShowOnboarding: shouldShowOnboarding)
@@ -38,8 +43,8 @@ struct BigWarRoomWithConditionalStart: View {
 
 // 🔥 SIMPLIFIED: Remove all the tab disabling bullshit - data is already loaded
 struct BigWarRoomModified: View {
-    @StateObject private var viewModel = DraftRoomViewModel()
-    @StateObject private var matchupsHub = MatchupsHubViewModel.shared
+    @State private var viewModel = DraftRoomViewModel()
+    @State private var matchupsHub = MatchupsHubViewModel.shared
     @State private var selectedTab: Int
     
     init(startOnSettings: Bool) {
@@ -76,12 +81,24 @@ struct BigWarRoomModified: View {
                 .tag(2)
                 
                 // All Live Players Tab
-                AllLivePlayersView()
-                    .tabItem {
-                        Image(systemName: "chart.bar.fill")
-                        Text("Live Players")
+                Group {
+                    if let allLivePlayersVM = AllLivePlayersViewModel.shared as AllLivePlayersViewModel?,
+                       let watchService = PlayerWatchService.shared as PlayerWatchService?,
+                       let weekManager = WeekSelectionManager.shared as WeekSelectionManager? {
+                        AllLivePlayersView(
+                            allLivePlayersViewModel: allLivePlayersVM,
+                            watchService: watchService,
+                            weekManager: weekManager
+                        )
+                    } else {
+                        Text("Loading services...")
                     }
-                    .tag(3)
+                }
+                .tabItem {
+                    Image(systemName: "chart.bar.fill")
+                    Text("Live Players")
+                }
+                .tag(3)
                 
                 // MORE TAB
                 MoreTabView(viewModel: viewModel)

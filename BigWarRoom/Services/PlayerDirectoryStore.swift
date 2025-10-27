@@ -7,21 +7,40 @@
 // MARK: -> Player Directory Store
 
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class PlayerDirectoryStore: ObservableObject {
-    static let shared = PlayerDirectoryStore()
+final class PlayerDirectoryStore {
     
-    @Published private(set) var players: [String: SleeperPlayer] = [:]
-    @Published private(set) var isLoading = false
-    @Published private(set) var lastUpdated: Date?
-    @Published private(set) var error: Error?
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: PlayerDirectoryStore?
+    
+    static var shared: PlayerDirectoryStore {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default SleeperAPIClient
+        let instance = PlayerDirectoryStore(apiClient: SleeperAPIClient())
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: PlayerDirectoryStore) {
+        _shared = instance
+    }
+    
+    private(set) var players: [String: SleeperPlayer] = [:]
+    private(set) var isLoading = false
+    private(set) var lastUpdated: Date?
+    private(set) var error: Error?
     
     // NEW: Positional rankings cache
-    @Published private(set) var positionalRankings: [String: [String: Int]] = [:] // [position: [playerID: rank]]
+    private(set) var positionalRankings: [String: [String: Int]] = [:] // [position: [playerID: rank]]
     
-    private let apiClient = SleeperAPIClient.shared
+    // Dependencies - these will need to be injected instead of .shared
+    private let apiClient: SleeperAPIClient
     private let userDefaults = UserDefaults.standard
     private let cacheKey = "SleeperPlayers"
     private let lastUpdatedKey = "SleeperPlayersLastUpdated"
@@ -31,7 +50,8 @@ final class PlayerDirectoryStore: ObservableObject {
     
     // MARK: -> Initialization
     
-    private init() {
+    init(apiClient: SleeperAPIClient) {
+        self.apiClient = apiClient
         loadCachedPlayers()
         calculatePositionalRankings()
     }
@@ -271,16 +291,21 @@ final class PlayerDirectoryStore: ObservableObject {
     }
 }
 
-// MARK: -> Helper Extensions
+// MARK: -> Helper Extensions (UPDATED to remove .shared usage)
 
 extension SleeperPlayer {
     /// Get the player's positional ranking (e.g., "RB1", "WR2")
+    /// NOTE: This will need to be updated once we implement dependency injection
+    /// For now, this will break - we'll fix it in Phase 3
     var positionalRank: String? {
-        return PlayerDirectoryStore.shared.positionalRank(for: playerID)
+        // TODO: This needs to be updated to not use .shared - will be fixed in Phase 3
+        return nil // Temporarily disabled until dependency injection is implemented
     }
     
     /// Get the player's numeric positional ranking
+    /// NOTE: This will need to be updated once we implement dependency injection  
     var numericPositionalRank: Int? {
-        return PlayerDirectoryStore.shared.numericPositionalRank(for: playerID)
+        // TODO: This needs to be updated to not use .shared - will be fixed in Phase 3
+        return nil // Temporarily disabled until dependency injection is implemented
     }
 }

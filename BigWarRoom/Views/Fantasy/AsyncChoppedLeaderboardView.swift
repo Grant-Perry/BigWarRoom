@@ -11,8 +11,8 @@ import SwiftUI
 struct AsyncChoppedLeaderboardView: View {
     let leagueWrapper: UnifiedLeagueManager.LeagueWrapper
     let week: Int
-    @ObservedObject var fantasyViewModel: FantasyViewModel
-    @StateObject private var weekManager = WeekSelectionManager.shared
+    @Bindable var fantasyViewModel: FantasyViewModel
+    @State private var weekManager = WeekSelectionManager.shared
     
     var body: some View {
         Group {
@@ -57,7 +57,7 @@ struct AsyncChoppedLeaderboardView: View {
         .task {
             await loadInitialChoppedData()
         }
-        .onReceive(weekManager.$selectedWeek) { newWeek in
+        .onChange(of: weekManager.selectedWeek) { _, newWeek in
             // Reload data when week changes from WeekSelectionManager
             if newWeek != week {
                 Task {

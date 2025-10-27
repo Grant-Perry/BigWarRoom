@@ -9,8 +9,8 @@ import SwiftUI
 
 struct TeamRostersView: View {
     @StateObject private var viewModel = TeamRostersViewModel()
-    @StateObject private var nflGameService = NFLGameDataService.shared
-    @StateObject private var weekManager = WeekSelectionManager.shared
+    @State private var nflGameService = NFLGameDataService.shared
+    @State private var weekManager = WeekSelectionManager.shared
     @State private var selectedTeam: String = "SF"
     @State private var hoveredTeam: String? = nil
     @State private var showingWeekPicker = false
@@ -51,7 +51,10 @@ struct TeamRostersView: View {
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showingWeekPicker) {
-                WeekPickerView(isPresented: $showingWeekPicker)
+                WeekPickerView(
+                    weekManager: weekManager,
+                    isPresented: $showingWeekPicker
+                )
             }
             // 🔥 ADD: Proper hierarchical navigation destination for team rosters
             .navigationDestination(for: String.self) { teamCode in
@@ -439,8 +442,8 @@ struct MiniScheduleCard: View {
     let isByeWeek: Bool
     let onTeamTap: (String) -> Void
     
-    @StateObject private var teamAssets = TeamAssetManager.shared
-    @StateObject private var standingsService = NFLStandingsService.shared
+    @State private var teamAssets = TeamAssetManager.shared
+    @State private var standingsService = NFLStandingsService.shared
     
     var body: some View {
         if isByeWeek {

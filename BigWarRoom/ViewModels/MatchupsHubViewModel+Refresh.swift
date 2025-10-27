@@ -47,6 +47,7 @@ extension MatchupsHubViewModel {
         print("🔥 REFRESH: Cleared cached providers for fresh scores")
         
         // Get the currently selected week from WeekSelectionManager
+        // 🔥 TODO: We'll need to inject WeekSelectionManager too
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
         // Limit concurrent refreshes
@@ -112,7 +113,8 @@ extension MatchupsHubViewModel {
                         choppedSummary: choppedSummary,
                         lastUpdated: Date(),
                         myTeamRanking: myTeamRanking,
-                        myIdentifiedTeamID: myTeamID
+                        myIdentifiedTeamID: myTeamID,
+                        authenticatedUsername: sleeperCredentials.currentUsername
                     )
                 }
             }
@@ -134,7 +136,8 @@ extension MatchupsHubViewModel {
                             choppedSummary: nil,
                             lastUpdated: Date(),
                             myTeamRanking: nil,
-                            myIdentifiedTeamID: myTeamID
+                            myIdentifiedTeamID: myTeamID,
+                            authenticatedUsername: sleeperCredentials.currentUsername
                         )
                     }
                 }
@@ -188,6 +191,7 @@ extension MatchupsHubViewModel {
     /// Background refresh that doesn't disrupt the UI
     /// 🔥 FIXED: Preserves UI state during refresh
     private func refreshMatchupsInBackground() async {
+        // 🔥 TODO: We'll need to inject WeekSelectionManager too
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
         // 🔥 PRESERVE UI state before refresh
@@ -210,8 +214,8 @@ extension MatchupsHubViewModel {
             NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear, forceRefresh: true)
             
             // Step 1: Refresh available leagues quietly
-            // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
-            let sleeperUserID = SleeperCredentialsManager.shared.getUserIdentifier()
+            // 🔥 PHASE 2: Use injected credentials instead of .shared
+            let sleeperUserID = sleeperCredentials.getUserIdentifier()
             
             await unifiedLeagueManager.fetchAllLeagues(
                 sleeperUserID: sleeperUserID,
@@ -323,7 +327,8 @@ extension MatchupsHubViewModel {
                     choppedSummary: choppedSummary,
                     lastUpdated: Date(),
                     myTeamRanking: myTeamRanking,
-                    myIdentifiedTeamID: myTeamID
+                    myIdentifiedTeamID: myTeamID,
+                    authenticatedUsername: sleeperCredentials.currentUsername
                 )
                 
                 return unifiedMatchup
@@ -347,7 +352,8 @@ extension MatchupsHubViewModel {
                 choppedSummary: nil,
                 lastUpdated: Date(),
                 myTeamRanking: nil,
-                myIdentifiedTeamID: myTeamID
+                myIdentifiedTeamID: myTeamID,
+                authenticatedUsername: sleeperCredentials.currentUsername
             )
             
             return unifiedMatchup

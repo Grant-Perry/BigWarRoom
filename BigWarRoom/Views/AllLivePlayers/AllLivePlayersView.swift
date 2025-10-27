@@ -8,9 +8,10 @@
 import SwiftUI
 
 struct AllLivePlayersView: View {
-    // 🔥 FIXED: Use shared instance instead of creating new one
-    @ObservedObject private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
-    @StateObject private var watchService = PlayerWatchService.shared
+    // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels that need two-way binding
+    @Bindable private var allLivePlayersViewModel: AllLivePlayersViewModel
+    private let watchService: PlayerWatchService
+    private let weekManager: WeekSelectionManager
     
     // 🔥 UI STATE ONLY - No business logic
     @State private var animatedPlayers: [String] = []
@@ -28,6 +29,17 @@ struct AllLivePlayersView: View {
     // 🔥 PROPER: Clean state management without band-aids
     @State private var hasPerformedInitialLoad = false
     
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(
+        allLivePlayersViewModel: AllLivePlayersViewModel,
+        watchService: PlayerWatchService,
+        weekManager: WeekSelectionManager
+    ) {
+        self.allLivePlayersViewModel = allLivePlayersViewModel
+        self.watchService = watchService
+        self.weekManager = weekManager
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -39,14 +51,16 @@ struct AllLivePlayersView: View {
                     .ignoresSafeArea(.all)
                 
                 VStack(spacing: 0) {
-                    // 🔥 FIXED: Header with NO top padding
+                    // 🔥 PHASE 2.5: Pass dependencies to header
                     AllLivePlayersHeaderView(
                         allLivePlayersViewModel: allLivePlayersViewModel,
                         sortHighToLow: $sortHighToLow,
                         showingWeekPicker: $showingWeekPicker,
                         onAnimationReset: resetAnimations,
                         showingFilters: $showingFilters,
-                        showingWatchedPlayers: $showingWatchedPlayers
+                        showingWatchedPlayers: $showingWatchedPlayers,
+                        watchService: watchService,
+                        weekManager: weekManager
                     )
                     
                     // 🔥 PROPER: Content based on clean state machine
@@ -90,7 +104,7 @@ struct AllLivePlayersView: View {
             cancelTasks()
         }
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(isPresented: $showingWeekPicker)
+            WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)
         }
         .sheet(isPresented: $showingFilters) {
             AllLivePlayersFiltersSheet(allLivePlayersViewModel: allLivePlayersViewModel)

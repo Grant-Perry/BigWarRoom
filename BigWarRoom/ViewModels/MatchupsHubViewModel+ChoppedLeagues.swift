@@ -32,7 +32,8 @@ extension MatchupsHubViewModel {
                     choppedSummary: choppedSummary,
                     lastUpdated: Date(),
                     myTeamRanking: myTeamRanking,
-                    myIdentifiedTeamID: myTeamID
+                    myIdentifiedTeamID: myTeamID,
+                    authenticatedUsername: sleeperCredentials.currentUsername
                 )
                 
                 await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)

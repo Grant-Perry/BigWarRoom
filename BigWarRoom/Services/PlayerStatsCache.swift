@@ -17,8 +17,9 @@ class PlayerStatsCache {
     
     private var weeklyStats: [Int: [String: [String: Double]]] = [:]
     
-    private init() {}
-    
+    // 🔥 PHASE 2.5: Make init public for dependency injection
+    init() {}
+
     /// Update cached stats for a specific week
     func updateWeeklyStats(_ stats: [String: [String: Double]], for week: Int) {
         weeklyStats[week] = stats

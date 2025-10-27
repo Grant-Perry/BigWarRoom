@@ -7,57 +7,96 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// **PlayerWatchService**
 /// 
 /// Manages watched players, notifications, and real-time score tracking
+@Observable
 @MainActor
-final class PlayerWatchService: ObservableObject {
-    static let shared = PlayerWatchService()
+final class PlayerWatchService {
     
-    // MARK: - Published Properties
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: PlayerWatchService?
     
-    @Published var watchedPlayers: [WatchedPlayer] = []
-    @Published var recentNotifications: [WatchNotification] = []
-    @Published var settings = WatchSettings()
-    @Published var isManuallyOrdered = false // Track if user has manually reordered
-    @Published var sortHighToLow = true // Track sort direction for threat mode
-    @Published var sortMethod: WatchSortMethod = .delta // Sort method with Delta as default
+    static var shared: PlayerWatchService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = PlayerWatchService()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: PlayerWatchService) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    
+    var watchedPlayers: [WatchedPlayer] = []
+    var recentNotifications: [WatchNotification] = []
+    var settings = WatchSettings()
+    var isManuallyOrdered = false // Track if user has manually reordered
+    var sortHighToLow = true // Track sort direction for threat mode
+    var sortMethod: WatchSortMethod = .delta // Sort method with Delta as default
     
     // MARK: - Private Properties
     
-    private let userDefaults = UserDefaults.standard
-    private let maxWatchedPlayers = 25 // Increased from 10 to 25
-    private var notificationHistory: [String: Date] = [:] // Prevent spam
-    private let notificationCooldown: TimeInterval = 300 // 5 minutes between same-type notifications
-    private var weekSubscription: AnyCancellable?
+    @ObservationIgnored private let userDefaults = UserDefaults.standard
+    @ObservationIgnored private let maxWatchedPlayers = 25 // Increased from 10 to 25
+    @ObservationIgnored private var notificationHistory: [String: Date] = [:] // Prevent spam
+    @ObservationIgnored private let notificationCooldown: TimeInterval = 300 // 5 minutes between same-type notifications
+    @ObservationIgnored private var weekObservationTask: Task<Void, Never>?
     
     // Keys for UserDefaults persistence
-    private let watchedPlayersKey = "BigWarRoom_WatchedPlayers"
-    private let watchSettingsKey = "BigWarRoom_WatchSettings"
-    private let manualOrderKey = "BigWarRoom_WatchedPlayers_ManualOrder"
-    private let sortDirectionKey = "BigWarRoom_WatchedPlayers_SortDirection"
-    private let sortMethodKey = "BigWarRoom_WatchedPlayers_SortMethod" // Persist sort method
+    @ObservationIgnored private let watchedPlayersKey = "BigWarRoom_WatchedPlayers"
+    @ObservationIgnored private let watchSettingsKey = "BigWarRoom_WatchSettings"
+    @ObservationIgnored private let manualOrderKey = "BigWarRoom_WatchedPlayers_ManualOrder"
+    @ObservationIgnored private let sortDirectionKey = "BigWarRoom_WatchedPlayers_SortDirection"
+    @ObservationIgnored private let sortMethodKey = "BigWarRoom_WatchedPlayers_SortMethod" // Persist sort method
+    
+    // MARK: - Dependencies
+    private let weekManager: WeekSelectionManager
     
     // MARK: - Initialization
     
-    private init() {
+    // 🔥 PHASE 2.5: Default initializer for bridge pattern
+    convenience init() {
+        self.init(weekManager: WeekSelectionManager.shared)
+    }
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(weekManager: WeekSelectionManager) {
+        self.weekManager = weekManager
         loadWatchedPlayers()
         loadSettings()
-        setupWeekChangeSubscription()
+        setupWeekChangeObservation()
     }
     
     // MARK: - Week Change Handling
     
-    private func setupWeekChangeSubscription() {
-        weekSubscription = WeekSelectionManager.shared.$selectedWeek
-            .removeDuplicates()
-            .sink { [weak self] newWeek in
-                Task { @MainActor in
-                    await self?.handleWeekChange(newWeek)
+    private func setupWeekChangeObservation() {
+        weekObservationTask = Task { [weak self] in
+            var lastObservedWeek = await self?.weekManager.selectedWeek
+            
+            while !Task.isCancelled {
+                guard let self = self else { break }
+                
+                let currentWeek = await self.weekManager.selectedWeek
+                
+                if let lastWeek = lastObservedWeek, currentWeek != lastWeek {
+                    await self.handleWeekChange(currentWeek)
                 }
+                
+                lastObservedWeek = currentWeek
+                
+                // Check every 2 seconds
+                try? await Task.sleep(for: .seconds(2))
             }
+        }
     }
     
     private func handleWeekChange(_ newWeek: Int) async {
@@ -491,7 +530,7 @@ final class PlayerWatchService: ObservableObject {
     // MARK: - Cleanup
     
     deinit {
-        weekSubscription?.cancel()
+        weekObservationTask?.cancel()
     }
 
     // MARK: - Statistics

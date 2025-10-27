@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct RosterView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Environment(\.dismiss) private var dismiss
     @StateObject private var rosterViewModel: RosterViewModel
     

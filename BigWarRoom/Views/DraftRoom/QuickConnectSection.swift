@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct QuickConnectSection: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedYear: String
     @Binding var selectedTab: Int // Add this for navigation
     @State private var customSleeperInput: String = ""

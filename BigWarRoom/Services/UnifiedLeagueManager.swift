@@ -8,24 +8,44 @@
 
 import Foundation
 import Combine
+import Observation
 
+@Observable
 @MainActor
-final class UnifiedLeagueManager: ObservableObject {
-    @Published var allLeagues: [LeagueWrapper] = []
-    @Published var isLoadingSleeperLeagues = false
-    @Published var isLoadingESPNLeagues = false
+final class UnifiedLeagueManager {
+    var allLeagues: [LeagueWrapper] = []
+    var isLoadingSleeperLeagues = false
+    var isLoadingESPNLeagues = false
     
-    private let sleeperClient = SleeperAPIClient.shared
-    private let espnClient = ESPNAPIClient.shared
-    private let espnCredentials = ESPNCredentialsManager.shared
+    // 🔥 PHASE 2 CORRECTED: Inject dependencies instead of using .shared
+    private let sleeperClient: SleeperAPIClient
+    private let espnClient: ESPNAPIClient
+    private let espnCredentials: ESPNCredentialsManager
+    
+    // Dependencies injected via initializer (proper @Observable pattern)
+    init(sleeperClient: SleeperAPIClient, 
+         espnClient: ESPNAPIClient,
+         espnCredentials: ESPNCredentialsManager) {
+        self.sleeperClient = sleeperClient
+        self.espnClient = espnClient
+        self.espnCredentials = espnCredentials
+    }
     
     // MARK: -> League Wrapper
-    struct LeagueWrapper: Identifiable {
+    struct LeagueWrapper: Identifiable, Equatable {
         let id: String
         let league: SleeperLeague
         let source: LeagueSource
         let client: DraftAPIClient
         
+        // MARK: - Equatable Implementation
+        static func == (lhs: LeagueWrapper, rhs: LeagueWrapper) -> Bool {
+            return lhs.id == rhs.id &&
+                   lhs.league.id == rhs.league.id &&
+                   lhs.source == rhs.source
+            // Note: We don't compare clients since they're protocol types
+        }
+
         enum LeagueSource: String, CaseIterable {
             case sleeper = "Sleeper"
             case espn = "ESPN"

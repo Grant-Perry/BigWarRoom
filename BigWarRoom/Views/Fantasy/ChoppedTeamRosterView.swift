@@ -28,8 +28,8 @@ struct ChoppedTeamRosterView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel: ChoppedTeamRosterViewModel
     
-    // NFL Game Data Integration
-    @StateObject private var nflGameService = NFLGameDataService.shared
+    // NFL Game Data Integration - 🔥 PHASE 2.5: Use @State for @Observable
+    @State private var nflGameService = NFLGameDataService.shared
     
     // UI State
     @State private var showStartingLineup = true
@@ -117,11 +117,3 @@ struct ChoppedTeamRosterView: View {
         showStats = true
     }
 }
-
-#Preview {
-    // Cannot preview without proper models setup
-    Text("ChoppedTeamRosterView Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}
- 

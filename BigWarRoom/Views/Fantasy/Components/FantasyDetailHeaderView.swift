@@ -30,7 +30,7 @@ struct FantasyDetailHeaderView: View {
     
     // 👁️ NEW: Watched Players Sheet state
     @State private var showingWatchedPlayers = false
-    @ObservedObject private var watchService = PlayerWatchService.shared
+    @State private var watchService = PlayerWatchService.shared
     
     /// Dynamic sort direction text based on current method and direction
     private var sortDirectionText: String {

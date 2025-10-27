@@ -6,25 +6,47 @@
 //
 
 import Foundation
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class NFLWeekService: ObservableObject {
+final class NFLWeekService {
     
-    static let shared = NFLWeekService()
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: NFLWeekService?
     
-    // MARK: -> Published Properties (Available to all ViewModels)
-    @Published var currentWeek: Int
-    @Published var currentYear: String = "2024"
-    @Published var seasonType: String = "regular" // "pre", "regular", "post"
-    @Published var isLoading: Bool = false
-    @Published var lastUpdated: Date?
+    static var shared: NFLWeekService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance with default SleeperAPIClient
+        let instance = NFLWeekService(apiClient: SleeperAPIClient())
+        _shared = instance
+        return instance
+    }
     
-    // MARK: -> Private Properties
-    private var cancellables = Set<AnyCancellable>()
-    private let updateInterval: TimeInterval = 300 // 5 minutes
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: NFLWeekService) {
+        _shared = instance
+    }
     
-    private init() {
+    // MARK: -> Observable Properties (Available to all ViewModels)
+    var currentWeek: Int
+    var currentYear: String = "2024"
+    var seasonType: String = "regular" // "pre", "regular", "post"
+    var isLoading: Bool = false
+    var lastUpdated: Date?
+    
+    // MARK: -> Private Properties - Use @ObservationIgnored for internal state
+    @ObservationIgnored private let updateInterval: TimeInterval = 300 // 5 minutes
+    @ObservationIgnored private var updateTimer: Timer?
+    
+    // Dependencies - inject instead of using .shared
+    private let apiClient: SleeperAPIClient
+    
+    init(apiClient: SleeperAPIClient) {
+        self.apiClient = apiClient
+        
         // Start with reasonable defaults - calculate approximate current week
         currentYear = String(Calendar.current.component(.year, from: Date()))
         currentWeek = Self.calculateApproximateCurrentWeek()
@@ -83,9 +105,9 @@ final class NFLWeekService: ObservableObject {
         isLoading = true
         
         do {
-            let nflState = try await SleeperAPIClient.shared.fetchNFLState()
+            let nflState = try await apiClient.fetchNFLState()
             
-            // Update published properties
+            // Update properties - @Observable will automatically notify observers
             currentWeek = nflState.displayWeek
             currentYear = nflState.leagueSeason
             seasonType = nflState.seasonType
@@ -100,13 +122,15 @@ final class NFLWeekService: ObservableObject {
     
     /// Setup periodic updates every 5 minutes
     private func setupPeriodicUpdates() {
-        Timer.publish(every: updateInterval, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                Task { [weak self] in
-                    await self?.fetchCurrentNFLWeek()
-                }
+        updateTimer?.invalidate()
+        updateTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
+            Task { [weak self] in
+                await self?.fetchCurrentNFLWeek()
             }
-            .store(in: &cancellables)
+        }
+    }
+    
+    deinit {
+        updateTimer?.invalidate()
     }
 }

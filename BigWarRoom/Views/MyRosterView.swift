@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct MyRosterView: View {
-    @ObservedObject var draftRoomViewModel: DraftRoomViewModel
+    @Bindable var draftRoomViewModel: DraftRoomViewModel
     @StateObject private var myRosterViewModel: MyRosterViewModel
     
     init(draftRoomViewModel: DraftRoomViewModel) {

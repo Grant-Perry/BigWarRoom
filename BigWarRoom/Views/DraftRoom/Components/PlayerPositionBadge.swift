@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlayerPositionBadge: View {
     let suggestion: Suggestion
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         Group {

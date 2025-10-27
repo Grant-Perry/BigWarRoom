@@ -6,28 +6,56 @@
 //
 
 import Foundation
-import Combine
+import Observation
 import Security
 
 /// Manages ESPN authentication credentials with secure Keychain storage
-final class ESPNCredentialsManager: ObservableObject {
-    static let shared = ESPNCredentialsManager()
+@Observable
+@MainActor
+final class ESPNCredentialsManager {
     
-    // MARK: - Published Properties
-    @Published var hasValidCredentials: Bool = false
-    @Published var currentSWID: String = ""
-    @Published var leagueIDs: [String] = []
-    @Published var leagueTeamIDs: [String: String] = [:] // NEW: LeagueID -> TeamID mapping
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: ESPNCredentialsManager?
     
-    // MARK: - Keychain Keys
-    private let swidKey = "ESPN_SWID"
-    private let espnS2Key = "ESPN_S2"
-    private let leagueIDsKey = "ESPN_LEAGUE_IDS"
-    private let leagueTeamIDsKey = "ESPN_LEAGUE_TEAM_IDS" // NEW: Store team IDs per league
-    private let keychainService = "BigWarRoom_ESPN"
+    static var shared: ESPNCredentialsManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = ESPNCredentialsManager()
+        _shared = instance
+        return instance
+    }
     
-    private init() {
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: ESPNCredentialsManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties
+    var hasValidCredentials: Bool = false
+    var currentSWID: String = ""
+    var leagueIDs: [String] = []
+    var leagueTeamIDs: [String: String] = [:] // LeagueID -> TeamID mapping
+    
+    // MARK: - Keychain Keys - Use @ObservationIgnored for constants
+    @ObservationIgnored private let swidKey = "ESPN_SWID"
+    @ObservationIgnored private let espnS2Key = "ESPN_S2"
+    @ObservationIgnored private let leagueIDsKey = "ESPN_LEAGUE_IDS"
+    @ObservationIgnored private let leagueTeamIDsKey = "ESPN_LEAGUE_TEAM_IDS"
+    @ObservationIgnored private let keychainService = "BigWarRoom_ESPN"
+    
+    // Dependencies - inject instead of using .shared
+    private var apiClient: ESPNAPIClient?
+    
+    // 🔥 PHASE 2: Fix circular dependency - allow initialization without API client
+    init() {
         loadCredentials()
+    }
+    
+    // 🔥 PHASE 2: Set API client after initialization to break circular dependency
+    func setAPIClient(_ apiClient: ESPNAPIClient) {
+        self.apiClient = apiClient
     }
     
     // MARK: - Public Methods
@@ -42,7 +70,7 @@ final class ESPNCredentialsManager: ObservableObject {
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
         UserDefaults.standard.set(leagueTeamIDs, forKey: leagueTeamIDsKey)
         
-        // Update published properties
+        // Update properties - @Observable will automatically notify observers
         self.currentSWID = swid
         self.leagueIDs = leagueIDs
         self.leagueTeamIDs = leagueTeamIDs
@@ -100,13 +128,13 @@ final class ESPNCredentialsManager: ObservableObject {
     
     /// Resolve and store team IDs for all configured leagues
     func resolveAllTeamIDs() async {
-        guard hasValidCredentials else { return }
+        guard hasValidCredentials, let apiClient = apiClient else { return }
         
         print("🔍 ESPN: Resolving team IDs for \(leagueIDs.count) leagues...")
         
         for leagueID in leagueIDs {
             do {
-                if let teamID = try await ESPNAPIClient.shared.getCurrentUserMemberID(leagueID: leagueID) {
+                if let teamID = try await apiClient.getCurrentUserMemberID(leagueID: leagueID) {
                     setTeamID(teamID, for: leagueID)
                     print("✅ ESPN: Found team ID '\(teamID)' for league '\(leagueID)'")
                 } else {
@@ -137,13 +165,15 @@ final class ESPNCredentialsManager: ObservableObject {
     
     /// Validate credentials by attempting a test API call
     func validateCredentials() async -> Bool {
-        guard hasValidCredentials, let firstLeagueID = leagueIDs.first else {
+        guard hasValidCredentials, 
+              let firstLeagueID = leagueIDs.first,
+              let apiClient = apiClient else {
             return false
         }
         
         do {
-            // Use the updated API client to test credentials
-            let league = try await ESPNAPIClient.shared.fetchLeague(leagueID: firstLeagueID)
+            // Use the injected API client to test credentials
+            let league = try await apiClient.fetchLeague(leagueID: firstLeagueID)
             // x// x Print("✅ ESPN credentials validation successful: \(league.name)")
             return true
         } catch {

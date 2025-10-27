@@ -17,8 +17,8 @@ struct TeamFilteredMatchupsView: View {
     let rootDismiss: (() -> Void)? // 🔥 NEW: Optional closure to dismiss entire sheet stack
     
     // MARK: - ViewModels
-    @StateObject private var viewModel: TeamFilteredMatchupsViewModel
-    @StateObject private var standingsService = NFLStandingsService.shared
+    @State private var viewModel: TeamFilteredMatchupsViewModel
+    @State private var standingsService = NFLStandingsService.shared
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - UI State (reusing Mission Control patterns)
@@ -38,7 +38,7 @@ struct TeamFilteredMatchupsView: View {
         self.homeTeam = homeTeam
         self.gameData = gameData // 🔥 NEW: Store actual game data
         self.rootDismiss = rootDismiss // 🔥 NEW: Store root dismiss closure
-        self._viewModel = StateObject(wrappedValue: TeamFilteredMatchupsViewModel(matchupsHubViewModel: matchupsHubViewModel))
+        self._viewModel = State(wrappedValue: TeamFilteredMatchupsViewModel(matchupsHubViewModel: matchupsHubViewModel))
     }
     
     // MARK: - Body

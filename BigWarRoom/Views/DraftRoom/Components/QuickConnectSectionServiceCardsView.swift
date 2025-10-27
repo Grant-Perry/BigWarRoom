@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct QuickConnectSectionServiceCardsView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedTab: Int
     @Binding var selectedYear: String
     @Binding var customSleeperInput: String

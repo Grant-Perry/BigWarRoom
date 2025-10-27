@@ -11,6 +11,7 @@ struct AppSettingsView: View {
     @StateObject private var viewModel = SettingsViewModel()
     @State private var showingConnectionSuccess = false
     @State private var connectionSuccessMessage = ""
+    @State private var nflWeekService = NFLWeekService.shared
     
     var body: some View {
         NavigationView {
@@ -490,7 +491,7 @@ struct AppSettingsView: View {
 // MARK: -> NFL Week Settings View
 
 struct NFLWeekSettingsView: View {
-    @ObservedObject private var nflWeekService = NFLWeekService.shared
+    @State private var nflWeekService = NFLWeekService.shared
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {

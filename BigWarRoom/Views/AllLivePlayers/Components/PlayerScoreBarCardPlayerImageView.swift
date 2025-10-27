@@ -12,7 +12,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
     
     // 🔥 NEW: State for player detail sheet
     @State private var showingPlayerDetail = false
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared
     
     var body: some View {
         ZStack {

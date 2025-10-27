@@ -12,7 +12,7 @@ import SwiftUI
 struct CompactTeamRosterPlayerCard: View {
     let pick: EnhancedPick
     let onPlayerTap: (SleeperPlayer) -> Void
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     
     var body: some View {
         VStack(spacing: 8) {

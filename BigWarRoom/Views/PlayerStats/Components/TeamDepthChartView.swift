@@ -13,7 +13,7 @@ struct TeamDepthChartView: View {
     let team: NFLTeam?
     let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Callback for player selection
     
-    @StateObject private var teamAssets = TeamAssetManager.shared
+    @State private var teamAssets = TeamAssetManager.shared
     @State private var isExpanded: Bool = true // 🏈 UX: Changed to true for initial expanded state
     
     // 🏈 PLAYER NAVIGATION: Remove sheet states, use callback instead

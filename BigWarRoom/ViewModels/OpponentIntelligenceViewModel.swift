@@ -7,45 +7,46 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// **OpponentIntelligenceViewModel**
 /// 
 /// Manages opponent intelligence data and provides UI-ready analysis
 @MainActor
-final class OpponentIntelligenceViewModel: ObservableObject {
+@Observable
+final class OpponentIntelligenceViewModel {
     
-    // MARK: - Published Properties
+    // MARK: - Observable Properties
     
-    @Published var opponentIntelligence: [OpponentIntelligence] = []
-    @Published var allOpponentPlayers: [OpponentPlayer] = []
-    @Published var conflictPlayers: [ConflictPlayer] = []
-    @Published var strategicRecommendations: [StrategicRecommendation] = []
-    @Published var isLoading = false
-    @Published var isInjuryDataLoading = false // NEW: Specific injury loading state
-    @Published var lastUpdateTime = Date()
-    @Published var errorMessage: String?
+    var opponentIntelligence: [OpponentIntelligence] = []
+    var allOpponentPlayers: [OpponentPlayer] = []
+    var conflictPlayers: [ConflictPlayer] = []
+    var strategicRecommendations: [StrategicRecommendation] = []
+    var isLoading = false
+    var isInjuryDataLoading = false // NEW: Specific injury loading state
+    var lastUpdateTime = Date()
+    var errorMessage: String?
     
     // MARK: - Filter & Sort Properties
     
-    @Published var selectedThreatLevel: ThreatLevel? = nil
-    @Published var selectedPosition: String = "All"
-    @Published var sortBy: SortMethod = .threatLevel
-    @Published var showConflictsOnly = false
+    var selectedThreatLevel: ThreatLevel? = nil
+    var selectedPosition: String = "All"
+    var sortBy: SortMethod = .threatLevel
+    var showConflictsOnly = false
     
     // MARK: - Analytics Properties
     
-    @Published var totalOpponentsTracked: Int = 0
-    @Published var criticalThreatCount: Int = 0
-    @Published var totalConflictCount: Int = 0
-    @Published var overallThreatAssessment: ThreatLevel = .low
+    var totalOpponentsTracked: Int = 0
+    var criticalThreatCount: Int = 0
+    var totalConflictCount: Int = 0
+    var overallThreatAssessment: ThreatLevel = .low
     
     // MARK: - Dependencies
     
     private let intelligenceService = OpponentIntelligenceService.shared
     // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
     private let matchupsHubViewModel = MatchupsHubViewModel.shared
-    private var cancellables = Set<AnyCancellable>()
+    private var observationTask: Task<Void, Never>?
     
     // MARK: - Game Alerts Integration 🚨
     let gameAlertsManager = GameAlertsManager.shared
@@ -127,19 +128,37 @@ final class OpponentIntelligenceViewModel: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        // Subscribe to MatchupsHubViewModel for real-time updates
-        matchupsHubViewModel.$myMatchups
-            .sink { [weak self] _ in
-                Task { @MainActor in
-                    await self?.refreshIntelligence()
-                }
-            }
-            .store(in: &cancellables)
+        setupObservation()
         
         // NEW: Subscribe to injury loading state changes
         intelligenceService.onInjuryLoadingStateChanged = { [weak self] isLoading in
             Task { @MainActor in
                 self?.isInjuryDataLoading = isLoading
+            }
+        }
+    }
+    
+    deinit {
+        Task { @MainActor in
+            observationTask?.cancel()
+        }
+    }
+    
+    /// Setup @Observable observation to watch for matchups changes
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            var lastObservedMatchupsCount = 0
+            
+            while !Task.isCancelled {
+                let currentMatchupsCount = matchupsHubViewModel.myMatchups.count
+                
+                if currentMatchupsCount != lastObservedMatchupsCount {
+                    print("🔄 OpponentIntelligenceViewModel: Matchups changed from \(lastObservedMatchupsCount) to \(currentMatchupsCount)")
+                    await refreshIntelligence()
+                    lastObservedMatchupsCount = currentMatchupsCount
+                }
+                
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // Check every second
             }
         }
     }

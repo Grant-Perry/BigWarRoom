@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AppInitializationLoadingView: View {
-    @ObservedObject var initManager: AppInitializationManager
+    @State var initManager: AppInitializationManager
     
     var body: some View {
         ZStack {

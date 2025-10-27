@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Scrollable list of players with staggered animations and NavigationLink (NO MORE SHEETS!)
 struct AllLivePlayersListView: View {
-    @ObservedObject var allLLivePlayersViewModel: AllLivePlayersViewModel
+    @Bindable var allLLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var animatedPlayers: [String]
     let onPlayerTap: (UnifiedMatchup) -> Void // 🔥 DEPRECATED: Will be removed
     

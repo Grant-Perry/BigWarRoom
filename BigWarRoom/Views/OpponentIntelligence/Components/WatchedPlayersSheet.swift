@@ -9,7 +9,7 @@ import SwiftUI
 
 /// Sheet for displaying and managing watched players
 struct WatchedPlayersSheet: View {
-    @ObservedObject var watchService: PlayerWatchService
+    @Bindable var watchService: PlayerWatchService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.editMode) private var editMode
     
@@ -239,9 +239,9 @@ struct WatchedPlayersSheet: View {
 struct WatchedPlayerCard: View {
     let watchedPlayer: WatchedPlayer
     
-    @ObservedObject private var watchService = PlayerWatchService.shared
-    @StateObject private var fantasyPlayerViewModel = FantasyPlayerViewModel()
-    @StateObject private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var watchService = PlayerWatchService.shared
+    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel()
+    @State private var playerDirectory = PlayerDirectoryStore.shared
     
     // 🔥 NEW: State for player stats sheet
     @State private var showingPlayerStats = false
@@ -323,7 +323,7 @@ struct WatchedPlayerCard: View {
                         Text(team)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.gray)
-                            .shadow(color: .black.opacity(0.8), radius: 2, x: 1, y: 1)
+                            .shadow(color: .black.opacity(0.8), radius: 1, x: 1, y: 1)
                     }
                 }
                 

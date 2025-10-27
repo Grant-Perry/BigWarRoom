@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PlayerImageForSuggestion: View {
     let player: Player
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     let size: CGFloat = 40
     
     var body: some View {

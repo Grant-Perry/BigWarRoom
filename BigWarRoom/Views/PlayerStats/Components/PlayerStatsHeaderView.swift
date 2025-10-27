@@ -12,10 +12,10 @@ struct PlayerStatsHeaderView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
     
-    @StateObject private var teamAssets = TeamAssetManager.shared
-    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    @State private var teamAssets = TeamAssetManager.shared
+    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
     @StateObject private var playerNewsViewModel = PlayerNewsViewModel()
-    @ObservedObject private var watchService = PlayerWatchService.shared
+    @State private var watchService = PlayerWatchService.shared
     
     // 🗞️ NEWS: Player news sheet state
     @State private var showingPlayerNews = false

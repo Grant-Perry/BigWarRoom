@@ -10,8 +10,8 @@ import SwiftUI
 struct DepthChartPlayerRowInfoSectionView: View {
     let depthPlayer: DepthChartPlayer
     
-    // 🔥 NEW: Access to live player stats for PPR points
-    @StateObject private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    // 🔥 PHASE 3: Use @State for @Observable ViewModel
+    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

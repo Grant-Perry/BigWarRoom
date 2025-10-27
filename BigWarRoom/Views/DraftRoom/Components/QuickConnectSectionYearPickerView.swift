@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct QuickConnectSectionYearPickerView: View {
-    @ObservedObject var viewModel: DraftRoomViewModel
+    @Bindable var viewModel: DraftRoomViewModel
     @Binding var selectedYear: String
     @Binding var customSleeperInput: String
     

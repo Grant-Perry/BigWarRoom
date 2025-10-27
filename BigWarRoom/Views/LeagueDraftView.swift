@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct LeagueDraftView: View {
-    @ObservedObject var draftRoomViewModel: DraftRoomViewModel
+    @Bindable var draftRoomViewModel: DraftRoomViewModel
     @StateObject private var leagueDraftViewModel: LeagueDraftViewModel
     
     init(viewModel: DraftRoomViewModel) {

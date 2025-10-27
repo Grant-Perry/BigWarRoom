@@ -7,15 +7,34 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
 /// Service responsible for managing refresh timers and countdown functionality
+@Observable
 @MainActor
-final class RefreshTimerService: ObservableObject {
+final class RefreshTimerService {
     
-    // MARK: - Published Properties
-    @Published var refreshCountdown: Double = 0
-    @Published var isTimerActive: Bool = false
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: RefreshTimerService?
+    
+    static var shared: RefreshTimerService {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = RefreshTimerService()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: RefreshTimerService) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var refreshCountdown: Double = 0
+    var isTimerActive: Bool = false
     
     // MARK: - Private Properties
     private var refreshTimer: Timer?
@@ -24,16 +43,24 @@ final class RefreshTimerService: ObservableObject {
     private var onRefreshCallback: (() async -> Void)?
     
     // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Default initializer for bridge pattern
+    convenience init() {
+        self.init(refreshInterval: Double(AppConstants.MatchupRefresh))
+    }
+    
     init(refreshInterval: TimeInterval = Double(AppConstants.MatchupRefresh)) {
         self.refreshInterval = refreshInterval
         self.refreshCountdown = refreshInterval
     }
     
     deinit {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        countdownTimer?.invalidate()
-        countdownTimer = nil
+        Task { @MainActor in
+            refreshTimer?.invalidate()
+            refreshTimer = nil
+            countdownTimer?.invalidate()
+            countdownTimer = nil
+        }
     }
     
     // MARK: - Public Interface

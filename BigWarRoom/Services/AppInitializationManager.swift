@@ -7,25 +7,57 @@
 
 import Foundation
 import SwiftUI
-import Combine
+import Observation
 
+@Observable
 @MainActor
-final class AppInitializationManager: ObservableObject {
-    static let shared = AppInitializationManager()
+final class AppInitializationManager {
     
-    // MARK: - Published Properties
-    @Published var isInitialized = false
-    @Published var isLoading = false // 🔥 FIX: Start with false, not true
-    @Published var currentLoadingStage: LoadingStage = .starting
-    @Published var loadingProgress: Double = 0.0
-    @Published var errorMessage: String?
-    @Published var canShowPartialData = false // Progressive loading support
+    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    private static var _shared: AppInitializationManager?
+    
+    static var shared: AppInitializationManager {
+        if let existing = _shared {
+            return existing
+        }
+        // Create temporary shared instance
+        let instance = AppInitializationManager()
+        _shared = instance
+        return instance
+    }
+    
+    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    static func setSharedInstance(_ instance: AppInitializationManager) {
+        _shared = instance
+    }
+    
+    // MARK: - Observable Properties (No @Published needed with @Observable)
+    var isInitialized = false
+    var isLoading = false // 🔥 FIX: Start with false, not true
+    var currentLoadingStage: LoadingStage = .starting
+    var loadingProgress: Double = 0.0
+    var errorMessage: String?
+    var canShowPartialData = false // Progressive loading support
     
     // MARK: - Dependencies
-    private let matchupsHubViewModel = MatchupsHubViewModel.shared
-    private let allLivePlayersViewModel = AllLivePlayersViewModel.shared
+    private let matchupsHubViewModel: MatchupsHubViewModel
+    private let allLivePlayersViewModel: AllLivePlayersViewModel
     
-    private init() {}
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 2.5: Default initializer for bridge pattern
+    convenience init() {
+        self.init(
+            matchupsHubViewModel: MatchupsHubViewModel.shared,
+            allLivePlayersViewModel: AllLivePlayersViewModel.shared
+        )
+    }
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer
+    init(matchupsHubViewModel: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+        self.matchupsHubViewModel = matchupsHubViewModel
+        self.allLivePlayersViewModel = allLivePlayersViewModel
+    }
     
     // MARK: - Loading Stages
     enum LoadingStage {

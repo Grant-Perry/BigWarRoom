@@ -22,7 +22,7 @@ struct MatchupsStatsOverviewView: View {
     let onRefreshTapped: () -> Void
     let watchedPlayersCount: Int
     
-    @StateObject private var watchService = PlayerWatchService.shared
+    @State private var watchService = PlayerWatchService.shared
     
     var body: some View {
         HStack {

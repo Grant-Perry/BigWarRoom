@@ -7,29 +7,30 @@
 // MARK: -> Fantasy ViewModel Core
 
 import Foundation
-import Combine
 import SwiftUI
+import Observation
 
 @MainActor
-final class FantasyViewModel: ObservableObject {
+@Observable
+final class FantasyViewModel {
     // MARK: -> Singleton
     static let shared = FantasyViewModel()
     
-    // MARK: -> Published Properties
-    @Published var matchups: [FantasyMatchup] = []
-    @Published var byeWeekTeams: [FantasyTeam] = []
-    @Published var selectedLeague: UnifiedLeagueManager.LeagueWrapper?
-    @Published var selectedYear: String = AppConstants.currentSeasonYear
-    @Published var autoRefresh: Bool = true
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-    @Published var showWeekSelector: Bool = false
-    @Published var choppedWeekSummary: ChoppedWeekSummary?
-    @Published var currentChoppedSummary: ChoppedWeekSummary?
-    @Published var isLoadingChoppedData: Bool = false
-    @Published var hasActiveRosters: Bool = false
-    @Published var detectedAsChoppedLeague: Bool = false
-    @Published var nflGameService = NFLGameDataService.shared
+    // MARK: -> 🔥 PHASE 3: @Observable State Properties (no @Published needed)
+    var matchups: [FantasyMatchup] = []
+    var byeWeekTeams: [FantasyTeam] = []
+    var selectedLeague: UnifiedLeagueManager.LeagueWrapper?
+    var selectedYear: String = AppConstants.currentSeasonYear
+    var autoRefresh: Bool = true
+    var isLoading: Bool = false
+    var errorMessage: String?
+    var showWeekSelector: Bool = false
+    var choppedWeekSummary: ChoppedWeekSummary?
+    var currentChoppedSummary: ChoppedWeekSummary?
+    var isLoadingChoppedData: Bool = false
+    var hasActiveRosters: Bool = false
+    var detectedAsChoppedLeague: Bool = false
+    var nflGameService = NFLGameDataService.shared
     
     // MARK: -> Instance tracking for debugging
     private let instanceID = UUID().uuidString.prefix(8)
@@ -65,29 +66,40 @@ final class FantasyViewModel: ObservableObject {
     }
     
     // MARK: -> ESPN Data Storage
-    @Published var espnTeamRecords: [Int: TeamRecord] = [:]
-    @Published var espnTeamNames: [Int: String] = [:]
-    @Published var currentESPNLeague: ESPNLeague? = nil // For ESPN member name resolution
+    var espnTeamRecords: [Int: TeamRecord] = [:]
+    var espnTeamNames: [Int: String] = [:]
+    var currentESPNLeague: ESPNLeague? = nil // For ESPN member name resolution
     
     // MARK: -> Sleeper Data Storage
-    @Published var sleeperLeagueSettings: [String: Any]? = nil
-    @Published var playerStats: [String: [String: Double]] = [:]
-    @Published var rosterIDToManagerID: [Int: String] = [:]
-    @Published var userIDs: [String: String] = [:]
-    @Published var userAvatars: [String: URL] = [:]
-    @Published var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record lookup
+    var sleeperLeagueSettings: [String: Any]? = nil
+    var playerStats: [String: [String: Double]] = [:]
+    var rosterIDToManagerID: [Int: String] = [:]
+    var userIDs: [String: String] = [:]
+    var userAvatars: [String: URL] = [:]
+    var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record lookup
     
     // MARK: -> Picker Options
     let availableWeeks = Array(1...18)
     let availableYears = AppConstants.availableYears
     
     // MARK: -> Dependencies
-    private let unifiedLeagueManager = UnifiedLeagueManager()
+    private let unifiedLeagueManager: UnifiedLeagueManager = {
+        let sleeperClient = SleeperAPIClient()
+        let espnCreds = ESPNCredentialsManager()
+        let espnClient = ESPNAPIClient(credentialsManager: espnCreds)
+        return UnifiedLeagueManager(
+            sleeperClient: sleeperClient,
+            espnClient: espnClient,
+            espnCredentials: espnCreds
+        )
+    }()
     private let sleeperCredentials = SleeperCredentialsManager.shared // 🔥 NEW: Add Sleeper credentials manager
     let playerDirectoryStore = PlayerDirectoryStore.shared
     var sharedDraftRoomViewModel: DraftRoomViewModel?
     var refreshTimer: Timer?
-    var cancellables = Set<AnyCancellable>()
+    
+    // 🔥 PHASE 3: Replace Combine with observation task
+    private var observationTask: Task<Void, Never>?
     
     // MARK: -> Refresh control to prevent cascading
     private var isRefreshing = false
@@ -100,8 +112,7 @@ final class FantasyViewModel: ObservableObject {
         }
         
         setupAutoRefresh()
-        subscribeToWeekManager() // NEW: Subscribe to centralized week management
-        subscribeToNFLWeekService()
+        setupObservation() // 🔥 PHASE 3: Replace Combine subscriptions with observation
         setupInitialNFLGameData()
     }
     
@@ -109,54 +120,59 @@ final class FantasyViewModel: ObservableObject {
         Task { @MainActor in
             FantasyViewModel.instanceCount -= 1
             // print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
+            refreshTimer?.invalidate()
+            observationTask?.cancel()
         }
-        refreshTimer?.invalidate()
     }
     
-    /// Subscribe to WeekSelectionManager for centralized week management
-    private func subscribeToWeekManager() {
-        weekManager.$selectedWeek
-            .removeDuplicates()
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main) // Increased debounce
-            .sink { [weak self] newWeek in
-                guard let self = self else { return }
-                
-                // Prevent cascading refreshes
-                guard !self.isRefreshing else {
-                    // print("📊 FantasyViewModel \(self.instanceID): Skipping refresh - already refreshing")
-                    return
-                }
-                
-                // print("📊 FantasyViewModel \(self.instanceID): Week changed to \(newWeek), refreshing data...")
-                
-                self.isRefreshing = true
-                
-                // Update NFL game data for the new week (non-blocking)
-                self.refreshNFLGameData()
-                
-                // Refresh matchups for the new week (only if we have a selected league)
-                if self.selectedLeague != nil {
-                    Task { @MainActor in
-                        await self.fetchMatchups()
-                        self.isRefreshing = false
+    /// 🔥 PHASE 3: Replace Combine subscriptions with @Observable observation
+    private func setupObservation() {
+        observationTask = Task { @MainActor in
+            var lastObservedWeek = weekManager.selectedWeek
+            var lastObservedYear = nflWeekService.currentYear
+            
+            while !Task.isCancelled {
+                // Check if WeekSelectionManager's selectedWeek changed
+                let currentWeek = weekManager.selectedWeek
+                if currentWeek != lastObservedWeek {
+                    print("📊 FantasyViewModel \(instanceID): Week changed to \(currentWeek), refreshing data...")
+                    
+                    // Prevent cascading refreshes
+                    guard !isRefreshing else {
+                        print("📊 FantasyViewModel \(instanceID): Skipping refresh - already refreshing")
+                        lastObservedWeek = currentWeek
+                        try? await Task.sleep(for: .seconds(1))
+                        continue
                     }
-                } else {
-                    self.isRefreshing = false
+                    
+                    isRefreshing = true
+                    
+                    // Update NFL game data for the new week (non-blocking)
+                    refreshNFLGameData()
+                    
+                    // Refresh matchups for the new week (only if we have a selected league)
+                    if selectedLeague != nil {
+                        await fetchMatchups()
+                    }
+                    
+                    isRefreshing = false
+                    lastObservedWeek = currentWeek
                 }
-            }
-            .store(in: &cancellables)
-    }
-    
-    /// Subscribe to NFL Week Service updates
-    private func subscribeToNFLWeekService() {
-        nflWeekService.$currentYear
-            .sink { [weak self] newYear in
-                if self?.selectedYear != newYear {
-                    self?.selectedYear = newYear
-                    self?.refreshNFLGameData()
+                
+                // Check if NFLWeekService's currentYear changed
+                let currentYear = nflWeekService.currentYear
+                if currentYear != lastObservedYear {
+                    if selectedYear != currentYear {
+                        selectedYear = currentYear
+                        refreshNFLGameData()
+                    }
+                    lastObservedYear = currentYear
                 }
+                
+                // Small delay to prevent excessive polling
+                try? await Task.sleep(for: .milliseconds(500))
             }
-            .store(in: &cancellables)
+        }
     }
     
     /// Setup initial NFL game data
@@ -301,7 +317,7 @@ final class FantasyViewModel: ObservableObject {
     /// Select a specific week - NOW USES WeekSelectionManager
     func selectWeek(_ week: Int) {
         weekManager.selectWeek(week)
-        // No need to manually refresh - the subscription will handle it
+        // No need to manually refresh - the observation will handle it
     }
     
     // MARK: -> Load Leagues

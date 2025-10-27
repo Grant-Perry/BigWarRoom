@@ -56,6 +56,9 @@ extension AllLivePlayersViewModel {
             let playerEntries = extractAllPlayers()
             await buildPlayerData(from: playerEntries)
             
+            // 🔥 NEW: Update PlayerWatchService with initial data
+            await notifyPlayerWatchService(with: playerEntries)
+            
             // Update state
             lastLoadTime = Date()
             dataState = allPlayers.isEmpty ? .empty : .loaded
@@ -175,6 +178,9 @@ extension AllLivePlayersViewModel {
             print("🔥 FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
         }
         
+        // 🔥 NEW: Update PlayerWatchService with fresh data
+        await notifyPlayerWatchService(with: freshPlayerEntries)
+        
         // 🔥 CRITICAL: Update timestamp to trigger view updates
         let oldTime = lastUpdateTime
         lastUpdateTime = Date()
@@ -185,46 +191,50 @@ extension AllLivePlayersViewModel {
         let elapsed = Date().timeIntervalSince(startTime)
         print("✅ LIVE UPDATE: Completed in \(String(format: "%.2f", elapsed))s")
         
-        // 🔥 FORCE UI UPDATE: Manually trigger objectWillChange as backup
-        objectWillChange.send()
-        print("🔥 SENT OBJECT WILL CHANGE")
+        // 🔥 PHASE 3: @Observable handles change notifications automatically
+        // No need for objectWillChange.send() anymore
+        print("🔥 @OBSERVABLE: Property changes will automatically trigger UI updates")
     }
     
     // MARK: - Week Changes Subscription
     internal func subscribeToWeekChanges() {
-        weekSubscription = WeekSelectionManager.shared.$selectedWeek
-            .removeDuplicates()
-            .debounce(for: .milliseconds(500), scheduler: DispatchQueue.main)
-            .sink { [weak self] newWeek in
-                self?.debounceTask?.cancel()
-                self?.debounceTask = Task { @MainActor in
-                    // PRESERVE SEARCH STATE: Don't clear search data during week changes
-                    let wasSearching = self?.isSearching ?? false
-                    let searchText = self?.searchText ?? ""
-                    let showRosteredOnly = self?.showRosteredOnly ?? false
-                    let preservedNFLPlayers = self?.allNFLPlayers ?? []
+        // 🔥 PHASE 2.5: @Observable doesn't have Combine publishers
+        // We'll use NotificationCenter instead for now
+        NotificationCenter.default.addObserver(
+            forName: .weekSelectionChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            let newWeek = WeekSelectionManager.shared.selectedWeek
+            self?.debounceTask?.cancel()
+            self?.debounceTask = Task { @MainActor in
+                // PRESERVE SEARCH STATE: Don't clear search data during week changes
+                let wasSearching = self?.isSearching ?? false
+                let searchText = self?.searchText ?? ""
+                let showRosteredOnly = self?.showRosteredOnly ?? false
+                let preservedNFLPlayers = self?.allNFLPlayers ?? []
+                
+                // Reset stats for new week
+                self?.statsLoaded = false
+                self?.playerStats = [:]
+                
+                // Reload stats for new week if we have players
+                if !(self?.allPlayers.isEmpty ?? true) {
+                    await self?.loadPlayerStats()
+                }
+                
+                // RESTORE SEARCH STATE: Put search state back after week change
+                if wasSearching {
+                    self?.isSearching = wasSearching
+                    self?.searchText = searchText
+                    self?.showRosteredOnly = showRosteredOnly
+                    self?.allNFLPlayers = preservedNFLPlayers
                     
-                    // Reset stats for new week
-                    self?.statsLoaded = false
-                    self?.playerStats = [:]
-                    
-                    // Reload stats for new week if we have players
-                    if !(self?.allPlayers.isEmpty ?? true) {
-                        await self?.loadPlayerStats()
-                    }
-                    
-                    // RESTORE SEARCH STATE: Put search state back after week change
-                    if wasSearching {
-                        self?.isSearching = wasSearching
-                        self?.searchText = searchText
-                        self?.showRosteredOnly = showRosteredOnly
-                        self?.allNFLPlayers = preservedNFLPlayers
-                        
-                        // Reapply search filters for new week
-                        self?.applyPositionFilter()
-                    }
+                    // Reapply search filters for new week
+                    self?.applyPositionFilter()
                 }
             }
+        }
     }
 
     // MARK: - Force Methods (For Compatibility)
@@ -253,5 +263,47 @@ extension AllLivePlayersViewModel {
         }
         
         return allPlayerEntries
+    }
+    
+    // MARK: - PlayerWatchService Integration
+    
+    /// Notify PlayerWatchService of updated player data
+    private func notifyPlayerWatchService(with playerEntries: [LivePlayerEntry]) async {
+        print("🔥 WATCH SERVICE UPDATE: Converting \(playerEntries.count) players for PlayerWatchService")
+        
+        // Convert LivePlayerEntry to OpponentPlayer format
+        let opponentPlayers = playerEntries.map { entry in
+            OpponentPlayer(
+                id: UUID().uuidString,
+                player: entry.player,
+                isStarter: entry.isStarter,
+                currentScore: entry.currentScore,
+                projectedScore: entry.projectedScore,
+                threatLevel: convertThreatLevel(entry.performanceTier),
+                matchupAdvantage: .neutral,
+                percentageOfOpponentTotal: entry.percentageOfTop * 100.0
+            )
+        }
+        
+        // Update PlayerWatchService on main actor
+        await MainActor.run {
+            PlayerWatchService.shared.updateWatchedPlayerScores(opponentPlayers)
+        }
+        
+        print("🔥 WATCH SERVICE UPDATE: Updated PlayerWatchService with \(opponentPlayers.count) players")
+    }
+    
+    /// Convert performance tier to player threat level
+    private func convertThreatLevel(_ tier: PerformanceTier) -> PlayerThreatLevel {
+        switch tier {
+        case .elite:
+            return .explosive
+        case .good:
+            return .dangerous
+        case .average:
+            return .moderate
+        case .struggling:
+            return .minimal
+        }
     }
 }
