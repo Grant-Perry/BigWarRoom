@@ -90,13 +90,48 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Score Calculation
     private func getCalculatedPlayerScore(for player: FantasyPlayer, in matchup: UnifiedMatchup) -> Double {
-        // 🔥 CRITICAL FIX: Use the same logic as FantasyViewModel.getCorrectedPlayerScore()
+        // 🔥 CRITICAL FIX: Use SharedStatsService directly for live stats instead of cached providers
         let currentWeek = WeekSelectionManager.shared.selectedWeek
         let currentYear = AppConstants.currentSeasonYear
         
         print("🔥 SCORE CALC: \(player.fullName) - Week: \(currentWeek), Year: \(currentYear)")
         
-        // Get cached provider from MatchupsHubViewModel (same as FantasyViewModel)
+        // 🔥 NEW APPROACH: Get fresh stats directly from SharedStatsService
+        if let sleeperID = player.sleeperID {
+            // Get cached stats from SharedStatsService (which loads from live API)
+            if let playerStats = SharedStatsService.shared.getCachedPlayerStats(
+                playerID: sleeperID, 
+                week: currentWeek, 
+                year: currentYear
+            ) {
+                print("🔥 SCORE CALC: Found fresh stats from SharedStatsService for \(player.fullName)")
+                
+                // Calculate fantasy points using proper scoring settings
+                let calculatedScore = calculateFantasyPoints(from: playerStats, for: matchup)
+                print("🔥 SCORE CALC: \(player.fullName) calculated score: \(calculatedScore) pts")
+                return calculatedScore
+                
+            } else {
+                print("🔥 SCORE CALC: No stats found in SharedStatsService for \(player.fullName) (ID: \(sleeperID))")
+                
+                // Try to trigger a fresh stats load if needed
+                if !SharedStatsService.shared.hasCache(week: currentWeek, year: currentYear) {
+                    print("🔥 SCORE CALC: SharedStatsService has no cache for week \(currentWeek) - triggering load")
+                    Task {
+                        do {
+                            let _ = try await SharedStatsService.shared.loadWeekStats(week: currentWeek, year: currentYear)
+                            print("🔥 SCORE CALC: Successfully loaded fresh stats for week \(currentWeek)")
+                        } catch {
+                            print("🔥 SCORE CALC ERROR: Failed to load fresh stats: \(error)")
+                        }
+                    }
+                }
+            }
+        } else {
+            print("🔥 SCORE CALC: No sleeperID for \(player.fullName)")
+        }
+        
+        // 🔥 FALLBACK 1: Try the old cached provider method for ESPN leagues
         if let cachedProvider = matchupsHubViewModel.getCachedProvider(
             for: matchup.league, 
             week: currentWeek, 
@@ -107,14 +142,11 @@ extension AllLivePlayersViewModel {
             // For ESPN leagues, get fresh score from the cached matchup data
             if matchup.league.source == .espn {
                 print("🔥 SCORE CALC: ESPN league - checking myTeam roster")
-                // Check if there's a fresh score from the current matchups
                 if let myTeam = matchup.myTeam,
                    let freshPlayer = myTeam.roster.first(where: { $0.id == player.id }) {
                     let freshScore = freshPlayer.currentPoints ?? 0.0
                     print("🔥 SCORE CALC: \(player.fullName) ESPN fresh score: \(freshScore) pts")
                     return freshScore
-                } else {
-                    print("🔥 SCORE CALC: \(player.fullName) NOT found in myTeam roster")
                 }
             }
             
@@ -123,17 +155,86 @@ extension AllLivePlayersViewModel {
                 let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
                 print("🔥 SCORE CALC: \(player.fullName) Sleeper provider score: \(calculatedScore) pts")
                 return calculatedScore
-            } else if matchup.league.source == .sleeper {
-                print("🔥 SCORE CALC: Sleeper provider has no player scores")
             }
-        } else {
-            print("🔥 SCORE CALC: NO cached provider found for \(matchup.league.source.rawValue)")
         }
         
-        // Final fallback to cached score
+        // 🔥 FALLBACK 2: Use the player's cached score
         let fallbackScore = player.currentPoints ?? 0.0
         print("🔥 SCORE CALC: \(player.fullName) using fallback score: \(fallbackScore) pts")
         return fallbackScore
+    }
+    
+    // 🔥 NEW: Calculate fantasy points from raw stats using league scoring settings
+    private func calculateFantasyPoints(from stats: [String: Double], for matchup: UnifiedMatchup) -> Double {
+        // Get scoring settings based on league type
+        let scoringSettings = getScoringSettings(for: matchup)
+        
+        var totalPoints = 0.0
+        
+        // Apply scoring rules to stats
+        for (statKey, statValue) in stats {
+            if let pointsPerStat = scoringSettings[statKey] {
+                let points = statValue * pointsPerStat
+                totalPoints += points
+            }
+        }
+        
+        return totalPoints
+    }
+    
+    // 🔥 NEW: Get scoring settings for a league
+    private func getScoringSettings(for matchup: UnifiedMatchup) -> [String: Double] {
+        // For now, use standard PPR scoring
+        // TODO: Get league-specific scoring settings from the league configuration
+        return getStandardPPRScoring()
+    }
+    
+    // 🔥 NEW: Standard PPR scoring settings
+    private func getStandardPPRScoring() -> [String: Double] {
+        return [
+            // Passing
+            "pass_yd": 0.04,      // 1 point per 25 passing yards
+            "pass_td": 4.0,       // 4 points per passing TD
+            "pass_int": -1.0,     // -1 point per interception
+            "pass_2pt": 2.0,      // 2 points per 2-point conversion
+            
+            // Rushing
+            "rush_yd": 0.1,       // 1 point per 10 rushing yards
+            "rush_td": 6.0,       // 6 points per rushing TD
+            "rush_2pt": 2.0,      // 2 points per 2-point conversion
+            
+            // Receiving
+            "rec": 1.0,           // 1 point per reception (PPR)
+            "rec_yd": 0.1,        // 1 point per 10 receiving yards
+            "rec_td": 6.0,        // 6 points per receiving TD
+            "rec_2pt": 2.0,       // 2 points per 2-point conversion
+            
+            // Kicking
+            "fgm": 3.0,           // 3 points per field goal made
+            "fgm_0_19": 3.0,      // 3 points for 0-19 yard FG
+            "fgm_20_29": 3.0,     // 3 points for 20-29 yard FG
+            "fgm_30_39": 3.0,     // 3 points for 30-39 yard FG
+            "fgm_40_49": 4.0,     // 4 points for 40-49 yard FG
+            "fgm_50p": 5.0,       // 5 points for 50+ yard FG
+            "xpm": 1.0,           // 1 point per extra point made
+            
+            // Defense/Special Teams
+            "def_td": 6.0,        // 6 points per defensive TD
+            "def_int": 2.0,       // 2 points per interception
+            "def_fr": 2.0,        // 2 points per fumble recovery
+            "def_sack": 1.0,      // 1 point per sack
+            "def_safe": 2.0,      // 2 points per safety
+            "def_pa": 0.0,        // Points allowed (varies by league)
+            "def_yds_allowed": 0.0, // Yards allowed (varies by league)
+            
+            // Fumbles (negative points)
+            "fum_lost": -1.0,     // -1 point per fumble lost
+            
+            // Common alternative stat names
+            "pts_ppr": 1.0,       // Direct PPR points (if provided)
+            "pts_std": 1.0,       // Direct standard points (if provided)
+            "pts_half_ppr": 1.0   // Direct half-PPR points (if provided)
+        ]
     }
     
     // MARK: - Build Player Data with Statistics

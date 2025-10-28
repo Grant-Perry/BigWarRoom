@@ -84,27 +84,17 @@ extension AllLivePlayersViewModel {
 
         let currentYear = AppConstants.currentSeasonYear
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
-        let urlString = "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(selectedWeek)"
         
-        print("🔄 STATS DEBUG: Loading player stats from \(urlString)")
-
-        guard let url = URL(string: urlString) else {
-            print("🔄 STATS DEBUG: Invalid URL, marking stats as loaded")
-            await MainActor.run { self.statsLoaded = true }
-            return
-        }
+        print("🔄 STATS DEBUG: Loading player stats for week \(selectedWeek), year \(currentYear)")
 
         do {
-            let request = URLRequest(url: url, timeoutInterval: 10.0)
-            let (data, _) = try await URLSession.shared.data(for: request)
-            guard !Task.isCancelled else { return }
-
-            let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
+            // 🔥 CRITICAL FIX: Use SharedStatsService instead of making redundant API calls
+            let freshStats = try await SharedStatsService.shared.loadWeekStats(week: selectedWeek, year: currentYear)
             
-            print("🔄 STATS DEBUG: Successfully loaded stats for \(statsData.keys.count) players")
+            print("🔄 STATS DEBUG: Successfully loaded stats from SharedStatsService for \(freshStats.keys.count) players")
             
             // Log a few sample player scores for debugging
-            let sampleStats = Array(statsData.prefix(3))
+            let sampleStats = Array(freshStats.prefix(3))
             for (playerId, stats) in sampleStats {
                 let fantasyPoints = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
                 print("🔄 STATS DEBUG: Sample - Player \(playerId): \(fantasyPoints) pts")
@@ -112,15 +102,13 @@ extension AllLivePlayersViewModel {
 
             await MainActor.run {
                 guard !Task.isCancelled else { return }
-                self.playerStats = statsData
+                self.playerStats = freshStats
                 self.statsLoaded = true
-                print("🔄 STATS DEBUG: Updated playerStats on main thread")
-                
-                // 🔥 CRITICAL FIX: Don't trigger objectWillChange here
-                // Let the natural property change handle it to avoid duplicate updates
+                print("🔄 STATS DEBUG: Updated playerStats on main thread with fresh data from SharedStatsService")
             }
+            
         } catch {
-            print("🔄 STATS DEBUG: Failed to load stats: \(error)")
+            print("🔄 STATS DEBUG: Failed to load stats from SharedStatsService: \(error)")
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.statsLoaded = true

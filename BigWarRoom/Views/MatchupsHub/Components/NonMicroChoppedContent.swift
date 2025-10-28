@@ -29,30 +29,64 @@ struct NonMicroChoppedContent: View {
                 }
             }
             
-            // My status
+            // My status with prominent delta and "yet to play"
             if let ranking = matchup.myTeamRanking {
-                HStack {
-                    // Rank
-                    VStack(spacing: 2) {
-                        Text("#\(ranking.rank)")
-                            .font(.system(size: 16, weight: .black))
-                            .foregroundColor(ranking.eliminationStatus.color)
+                VStack(spacing: 6) {
+                    // Top row: Rank, Score, and "to play"
+                    HStack {
+                        // Rank
+                        VStack(spacing: 2) {
+                            Text("#\(ranking.rank)")
+                                .font(.system(size: 16, weight: .black))
+                                .foregroundColor(ranking.eliminationStatus.color)
+                            
+                            Text(ranking.eliminationStatus.emoji)
+                                .font(.system(size: 12))
+                        }
                         
-                        Text(ranking.eliminationStatus.emoji)
-                            .font(.system(size: 12))
+                        Spacer()
+                        
+                        // "to play" count (like regular matchup cards)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(ranking.weeklyPointsString)
+                                .font(.system(size: 18, weight: .black, design: .rounded))
+                                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                            
+                            // Add "to play" count
+                            HStack(spacing: 4) {
+                                Text("to play:")
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundColor(.gray)
+                                
+                                Text("\(myTeamPlayersYetToPlay)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(myTeamPlayersYetToPlay > 0 ? .gpYellow : .gray)
+                            }
+                        }
                     }
                     
-                    Spacer()
-                    
-                    // Score
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(ranking.weeklyPointsString)
-                            .font(.system(size: 16, weight: .black, design: .rounded))
-                            .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                    // Center: Prominent Delta Display
+                    HStack {
+                        Spacer()
                         
-                        Text(ranking.safetyMarginDisplay)
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(ranking.pointsFromSafety >= 0 ? .green : .red)
+                        VStack(spacing: 1) {
+                            Text(ranking.safetyMarginDisplay)
+                                .font(.system(size: 14, weight: .black, design: .rounded))
+                                .foregroundColor(.white)
+                                .shadow(color: .black, radius: 2, x: 1, y: 1)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black.opacity(0.3))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(ranking.pointsFromSafety >= 0 ? Color.gpGreen : Color.gpRedPink, lineWidth: 1.5)
+                                )
+                        )
+                        
+                        Spacer()
                     }
                 }
                 .padding(.horizontal, 8)
@@ -63,5 +97,16 @@ struct NonMicroChoppedContent: View {
                 )
             }
         }
+    }
+    
+    // MARK: - Computed Properties
+    
+    /// Calculate "yet to play" count for my team in chopped league
+    private var myTeamPlayersYetToPlay: Int {
+        guard let ranking = matchup.myTeamRanking else { return 0 }
+        
+        // Use the FantasyTeam's playersYetToPlay method with week context
+        let currentWeek = WeekSelectionManager.shared.selectedWeek
+        return ranking.team.playersYetToPlay(forWeek: currentWeek)
     }
 }

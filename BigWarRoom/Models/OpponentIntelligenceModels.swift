@@ -13,7 +13,7 @@ import SwiftUI
 /// Complete opponent analysis for a single league matchup
 struct OpponentIntelligence: Identifiable {
     let id: String
-    let opponentTeam: FantasyTeam
+    let opponentTeam: FantasyTeam? // 🔥 CHANGED: Made optional for chopped leagues
     let myTeam: FantasyTeam
     let leagueName: String
     let leagueSource: LeagueSource
@@ -25,11 +25,11 @@ struct OpponentIntelligence: Identifiable {
     
     /// Computed properties for quick analysis
     var totalOpponentScore: Double {
-        opponentTeam.currentScore ?? 0.0
+        opponentTeam?.currentScore ?? 0.0
     }
     
     var projectedOpponentScore: Double {
-        opponentTeam.projectedScore ?? 0.0
+        opponentTeam?.projectedScore ?? 0.0
     }
     
     var scoreDifferential: Double {

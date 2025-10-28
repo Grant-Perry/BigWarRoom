@@ -49,6 +49,13 @@ final class OpponentIntelligenceService {
             }
         }
         
+        // 🔥 NEW: Also analyze Chopped league scenarios for critical threats
+        for matchup in matchups {
+            if let choppedAnalysis = analyzeChoppedLeagueThreats(matchup) {
+                intelligence.append(choppedAnalysis)
+            }
+        }
+        
         // Detect cross-league conflicts
         let allConflicts = detectCrossLeagueConflicts(from: intelligence, matchups: matchups)
         
@@ -112,15 +119,28 @@ final class OpponentIntelligenceService {
         // Critical threat recommendations
         let criticalThreats = intelligence.filter { $0.threatLevel == .critical }
         for threat in criticalThreats {
+            // Skip chopped league threats (they don't have opponent teams)
+            guard let opponentTeam = threat.opponentTeam else { continue }
+            
             // Get week context for accurate "yet to play" calculation
             let currentWeek = threat.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
             
             // Calculate yet-to-play counts for both teams
             let myYetToPlay = threat.myTeam.playersYetToPlay(forWeek: currentWeek)
-            let theirYetToPlay = threat.opponentTeam.playersYetToPlay(forWeek: currentWeek)
+            let theirYetToPlay = opponentTeam.playersYetToPlay(forWeek: currentWeek)
             
-            // Enhanced description with yet-to-play information
-            let baseDescription = "You're losing to \(threat.opponentTeam.ownerName) by \(abs(threat.scoreDifferential).formatted(.number.precision(.fractionLength(1)))) points in \(threat.leagueName)"
+            // 🔥 FIXED: Check if winning or losing and format message accordingly
+            let scoreDiff = abs(threat.scoreDifferential)
+            let baseDescription: String
+            
+            if threat.isLosingTo {
+                // Actually losing - show as threat
+                baseDescription = "You're losing to \(opponentTeam.ownerName) by \(scoreDiff.formatted(.number.precision(.fractionLength(1)))) points in \(threat.leagueName)"
+            } else {
+                // Actually winning - this shouldn't be a "critical threat" but handle gracefully
+                baseDescription = "You're winning against \(opponentTeam.ownerName) by \(scoreDiff.formatted(.number.precision(.fractionLength(1)))) points in \(threat.leagueName), but they have explosive players"
+            }
+            
             let yetToPlayInfo = "You have \(myYetToPlay) to play, they have \(theirYetToPlay) to play"
             
             recommendations.append(StrategicRecommendation(
@@ -129,9 +149,17 @@ final class OpponentIntelligenceService {
                 description: "\(baseDescription). \(yetToPlayInfo)",
                 priority: .critical,
                 actionable: true,
-                opponentTeam: threat.opponentTeam
+                opponentTeam: opponentTeam
             ))
         }
+        
+        // 🔥 NEW: Check for "Yet to Play" disadvantage scenarios (even when currently winning)
+        let yetToPlayThreats = generateYetToPlayThreats(from: intelligence)
+        recommendations.append(contentsOf: yetToPlayThreats)
+        
+        // 🔥 NEW: Check for negative delta threats in chopped leagues
+        let negativeDeltaThreats = generateNegativeDeltaThreats(from: intelligence)
+        recommendations.append(contentsOf: negativeDeltaThreats)
         
         // Conflict warnings - Enhanced with league context instead of useless BENCH advice
         let majorConflicts = intelligence.flatMap { $0.conflictPlayers.filter { $0.severity == .extreme || $0.severity == .high } }
@@ -152,15 +180,19 @@ final class OpponentIntelligenceService {
         }
         
         // Opportunity alerts
-        let strugglingOpponents = intelligence.filter { $0.totalOpponentScore < 80 && $0.isLosingTo }
+        let strugglingOpponents = intelligence.filter { 
+            $0.totalOpponentScore < 80 && $0.isLosingTo && $0.opponentTeam != nil 
+        }
         for opportunity in strugglingOpponents {
+            guard let opponentTeam = opportunity.opponentTeam else { continue }
+            
             recommendations.append(StrategicRecommendation(
                 type: .opportunityAlert,
                 title: "🎯 Opportunity Window",
-                description: "\(opportunity.opponentTeam.ownerName) is struggling (\(opportunity.totalOpponentScore.formatted(.number.precision(.fractionLength(1)))) pts) - maintain aggressive lineup in \(opportunity.leagueName)",
+                description: "\(opponentTeam.ownerName) is struggling (\(opportunity.totalOpponentScore.formatted(.number.precision(.fractionLength(1)))) pts) - maintain aggressive lineup in \(opportunity.leagueName)",
                 priority: .medium,
                 actionable: false,
-                opponentTeam: opportunity.opponentTeam
+                opponentTeam: opponentTeam
             ))
         }
         
@@ -420,6 +452,149 @@ final class OpponentIntelligenceService {
         return cachedIntelligence
     }
     
+    // 🔥 NEW: Analyze Chopped league threats (negative deltas)
+    private func analyzeChoppedLeagueThreats(_ matchup: UnifiedMatchup) -> OpponentIntelligence? {
+        // Only process Chopped leagues
+        guard matchup.isChoppedLeague,
+              let myTeam = matchup.myTeam,
+              let myRanking = matchup.myTeamRanking else {
+            return nil
+        }
+        
+        // Check if I have a negative delta (behind the cutoff)
+        guard myRanking.pointsFromSafety < 0 else {
+            return nil
+        }
+        
+        // Create a "virtual opponent" for the chopped league threat
+        // This allows us to display it in the Intelligence system
+        let virtualOpponentTeam = FantasyTeam(
+            id: "chopped_threat_\(matchup.id)",
+            name: "ELIMINATION CUTOFF",
+            ownerName: "Chopped League System",
+            record: nil,
+            avatar: nil,
+            currentScore: myTeam.currentScore! + abs(myRanking.pointsFromSafety), // The cutoff score
+            projectedScore: nil,
+            roster: [],
+            rosterID: nil
+        )
+        
+        // Calculate threat level based on how far behind cutoff
+        let deltaDistance = abs(myRanking.pointsFromSafety)
+        let threatLevel: ThreatLevel
+        if deltaDistance >= 15.0 {
+            threatLevel = .critical
+        } else if deltaDistance >= 8.0 {
+            threatLevel = .high
+        } else if deltaDistance >= 3.0 {
+            threatLevel = .medium
+        } else {
+            threatLevel = .low
+        }
+        
+        let strategicNotes = [
+            "🚨 You are \(deltaDistance.formatted(.number.precision(.fractionLength(1)))) points behind the elimination cutoff",
+            "💀 Rank: \(myRanking.rankDisplay) out of \(matchup.choppedSummary?.totalSurvivors ?? 0) survivors",
+            "⚡ Elimination Status: \(myRanking.eliminationStatus.displayName.uppercased())"
+        ]
+        
+        return OpponentIntelligence(
+            id: "chopped_\(matchup.id)",
+            opponentTeam: nil, // 🔥 CHANGED: No opponent in chopped leagues
+            myTeam: myTeam,
+            leagueName: matchup.league.league.name,
+            leagueSource: matchup.league.source,
+            matchup: matchup,
+            players: [], // No individual players to analyze for chopped leagues
+            conflictPlayers: [],
+            threatLevel: threatLevel,
+            strategicNotes: strategicNotes
+        )
+    }
+    
+    // 🔥 NEW: Generate "Yet to Play" disadvantage threats
+    private func generateYetToPlayThreats(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
+        var threats: [StrategicRecommendation] = []
+        
+        for intel in intelligence {
+            // Only check regular head-to-head matchups (not chopped leagues)
+            guard !intel.matchup.isChoppedLeague,
+                  let opponentTeam = intel.opponentTeam else {
+                continue
+            }
+            
+            let currentWeek = intel.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
+            let myYetToPlay = intel.myTeam.playersYetToPlay(forWeek: currentWeek)
+            let theirYetToPlay = opponentTeam.playersYetToPlay(forWeek: currentWeek)
+            let yetToPlayDifference = theirYetToPlay - myYetToPlay
+            
+            // Current score differential
+            let scoreDiff = intel.scoreDifferential
+            
+            // Check for "Yet to Play" disadvantage scenarios
+            let shouldCreateThreat: Bool
+            let threatDescription: String
+            
+            if scoreDiff > 0 && yetToPlayDifference >= 3 {
+                // I'm winning but they have significantly more players to play
+                shouldCreateThreat = true
+                threatDescription = "You're winning by \(scoreDiff.formatted(.number.precision(.fractionLength(1)))) points, but \(opponentTeam.ownerName) has \(yetToPlayDifference) more players to play in \(intel.leagueName). You have \(myYetToPlay), they have \(theirYetToPlay)"
+            } else if scoreDiff > 0 && scoreDiff <= 20 && yetToPlayDifference >= 2 && theirYetToPlay >= 4 {
+                // Close game where they have meaningful player advantage
+                shouldCreateThreat = true
+                threatDescription = "Close game vs \(opponentTeam.ownerName) in \(intel.leagueName)! You're up by \(scoreDiff.formatted(.number.precision(.fractionLength(1)))), but they have \(yetToPlayDifference) more players left. You: \(myYetToPlay), them: \(theirYetToPlay)"
+            } else {
+                shouldCreateThreat = false
+                threatDescription = ""
+            }
+            
+            if shouldCreateThreat {
+                threats.append(StrategicRecommendation(
+                    type: .threatAssessment,
+                    title: "Critical Threat Alert",
+                    description: threatDescription,
+                    priority: .critical,
+                    actionable: true,
+                    opponentTeam: opponentTeam
+                ))
+            }
+        }
+        
+        return threats
+    }
+    
+    // 🔥 NEW: Generate negative delta threats for chopped leagues
+    private func generateNegativeDeltaThreats(from intelligence: [OpponentIntelligence]) -> [StrategicRecommendation] {
+        var threats: [StrategicRecommendation] = []
+        
+        for intel in intelligence {
+            // Only process chopped leagues with negative deltas
+            guard intel.matchup.isChoppedLeague,
+                  let myRanking = intel.matchup.myTeamRanking,
+                  myRanking.pointsFromSafety < 0 else {
+                continue
+            }
+            
+            let deltaDistance = abs(myRanking.pointsFromSafety)
+            let currentWeek = intel.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
+            let myYetToPlay = intel.myTeam.playersYetToPlay(forWeek: currentWeek)
+            
+            let threatDescription = "You're \(deltaDistance.formatted(.number.precision(.fractionLength(1)))) points behind the cutoff in \(intel.leagueName). Rank: \(myRanking.rankDisplay). You have \(myYetToPlay) players left to play"
+            
+            threats.append(StrategicRecommendation(
+                type: .threatAssessment,
+                title: "Critical Threat Alert",
+                description: threatDescription,
+                priority: .critical,
+                actionable: true,
+                opponentTeam: nil // No opponent in chopped leagues
+            ))
+        }
+        
+        return threats
+    }
+    
     private func analyzeOpponentInMatchup(_ matchup: UnifiedMatchup) -> OpponentIntelligence? {
         // Skip chopped leagues for now - they don't have direct opponents
         guard !matchup.isChoppedLeague,
@@ -587,7 +762,7 @@ final class OpponentIntelligenceService {
         
         // Get all opponent players across all leagues
         let opponentPlayers = intelligence.flatMap { intel in
-            intel.players.map { ($0, intel.leagueName, intel.opponentTeam.ownerName) }
+            intel.players.map { ($0, intel.leagueName, intel.opponentTeam?.ownerName ?? "Unknown") }
         }
         
         // Detect conflicts by player ID

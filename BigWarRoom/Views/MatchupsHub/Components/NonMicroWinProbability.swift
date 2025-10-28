@@ -61,7 +61,18 @@ struct NonMicroWinProbability: View {
                 if let delta = scoreDelta {
                     Text(formatScoreDelta(delta))
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                        .foregroundColor(.white)
+                        .shadow(color: .black, radius: 2, x: 1, y: 1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black.opacity(0.3))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(isWinning ? Color.gpGreen : Color.gpRedPink, lineWidth: 1.5)
+                                )
+                        )
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }

@@ -558,8 +558,8 @@ struct OpponentIntelligenceDashboardView: View {
            let opponentTeam = recommendation.opponentTeam {
             
             // Find the intelligence matching this opponent
-            if let intelligence = viewModel.filteredIntelligence.first(where: { 
-                $0.opponentTeam.ownerName == opponentTeam.ownerName 
+            if let intelligence = viewModel.filteredIntelligence.first(where: { intel in
+                intel.opponentTeam?.ownerName == opponentTeam.ownerName 
             }) {
                 selectedMatchup = intelligence.matchup
             }

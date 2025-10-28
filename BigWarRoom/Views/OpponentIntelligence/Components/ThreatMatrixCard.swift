@@ -100,63 +100,79 @@ struct ThreatMatrixCard: View {
 				  }
 			   }
 
-				  // Opponent name
-			   Text(intelligence.opponentTeam.ownerName)
-				  .font(.system(size: 16, weight: .semibold))
-				  .foregroundColor(.white)
-				  .lineLimit(1)
+				  // Opponent name - Handle chopped leagues
+           if let opponentTeam = intelligence.opponentTeam {
+               Text(opponentTeam.ownerName)
+                   .font(.system(size: 16, weight: .semibold))
+                   .foregroundColor(.white)
+                   .lineLimit(1)
+           } else {
+               Text("ELIMINATION THREAT")
+                   .font(.system(size: 16, weight: .semibold))
+                   .foregroundColor(.red)
+                   .lineLimit(1)
+           }
 
-				  // Score comparison
-			   HStack {
-					 // Determine team colors dynamically based on remaining players
-				  let myTeamColor: Color = intelligence.myTeam.playersYetToPlay > intelligence.opponentTeam.playersYetToPlay ? .gpGreen : .gpRedPink
-				  let oppTeamColor: Color = intelligence.opponentTeam.playersYetToPlay > intelligence.myTeam.playersYetToPlay ? .gpGreen : .gpRedPink
+				  // Score comparison - Handle chopped leagues
+           HStack {
+               if let opponentTeam = intelligence.opponentTeam {
+                   // Regular matchup display
+                   let myTeamColor: Color = intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) > opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) ? .gpGreen : .gpRedPink
+                   let oppTeamColor: Color = opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) > intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) ? .gpGreen : .gpRedPink
+                   
+                   // My team info
+                   VStack(alignment: .leading, spacing: 3) {
+                       Text("You: \(intelligence.myTeam.currentScore?.formatted(.number.precision(.fractionLength(1))) ?? "0.0")")
+                           .font(.system(size: 13, weight: .semibold, design: .rounded))
+                           .foregroundColor(intelligence.isLosingTo ? .red : .gpGreen)
 
-					 // My team info
-				  VStack(alignment: .leading, spacing: 3) {
-					 Text("You: \(intelligence.myTeam.currentScore?.formatted(.number.precision(.fractionLength(1))) ?? "0.0")")
-						.font(.system(size: 13, weight: .semibold, design: .rounded))
-						.foregroundColor(intelligence.isLosingTo ? .red : .gpGreen)
+                       Text("to play: \(intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
+                           .font(.system(size: 10, weight: .regular))
+                           .foregroundColor(myTeamColor)
+                   }
 
-					 Text("to play: \(intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
-						.font(.system(size: 10, weight: .regular))
-						.foregroundStyle(
-						   LinearGradient(
-							  colors: [myTeamColor.opacity(1.0), myTeamColor.opacity(0.95)],
-							  startPoint: .leading,
-							  endPoint: .trailing
-						   )
-						)
-				  }
+                   Spacer()
 
-				  Spacer()
+                   // Opponent info
+                   VStack(alignment: .trailing, spacing: 3) {
+                       Text("Them: \(intelligence.totalOpponentScore.formatted(.number.precision(.fractionLength(1))))")
+                           .font(.system(size: 13, weight: .semibold, design: .rounded))
+                           .foregroundColor(intelligence.isLosingTo ? .gpGreen : .red)
 
-					 // Opponent info
-				  VStack(alignment: .trailing, spacing: 3) {
-					 Text("Them: \(intelligence.totalOpponentScore.formatted(.number.precision(.fractionLength(1))))")
-						.font(.system(size: 13, weight: .semibold, design: .rounded))
-						.foregroundColor(intelligence.isLosingTo ? .gpGreen : .red)
+                       Text("to play: \(opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
+                           .font(.system(size: 10, weight: .regular))
+                           .foregroundColor(oppTeamColor)
+                   }
 
-					 Text("to play: \(intelligence.opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
-						.font(.system(size: 10, weight: .regular))
-						.foregroundStyle(
-						   LinearGradient(
-							  colors: [oppTeamColor.opacity(1.0), oppTeamColor.opacity(0.95)],
-							  startPoint: .trailing,
-							  endPoint: .leading
-						   )
-						)
-				  }
+                   Spacer()
 
-				  Spacer()
-
-					 // Score differential
-				  let diff = intelligence.scoreDifferential
-				  Text(diff >= 0 ? "+\(diff.formatted(.number.precision(.fractionLength(1))))" : "\(diff.formatted(.number.precision(.fractionLength(1))))")
-					 .font(.system(size: 13, weight: .bold, design: .rounded))
-					 .foregroundColor(diff >= 0 ? .gpGreen : .red)
-			   }
-			}
+                   // Score differential
+                   let diff = intelligence.scoreDifferential
+                   Text(diff >= 0 ? "+\(diff.formatted(.number.precision(.fractionLength(1))))" : "\(diff.formatted(.number.precision(.fractionLength(1))))")
+                       .font(.system(size: 13, weight: .bold, design: .rounded))
+                       .foregroundColor(diff >= 0 ? .gpGreen : .red)
+               } else {
+                   // Chopped league display
+                   VStack(alignment: .leading, spacing: 3) {
+                       Text("Your Score: \(intelligence.myTeam.currentScore?.formatted(.number.precision(.fractionLength(1))) ?? "0.0")")
+                           .font(.system(size: 13, weight: .semibold, design: .rounded))
+                           .foregroundColor(.white)
+                       
+                       if let ranking = intelligence.matchup.myTeamRanking {
+                           Text("Rank: \(ranking.rankDisplay)")
+                               .font(.system(size: 10, weight: .regular))
+                               .foregroundColor(ranking.eliminationStatus.color)
+                           
+                           Text("From Safety: \(ranking.safetyMarginDisplay)")
+                               .font(.system(size: 10, weight: .regular))
+                               .foregroundColor(ranking.pointsFromSafety >= 0 ? .gpGreen : .red)
+                       }
+                   }
+                   
+                   Spacer()
+               }
+           }
+		}
 
 			   // Top threat player
 			if let topThreat = intelligence.topThreatPlayer {

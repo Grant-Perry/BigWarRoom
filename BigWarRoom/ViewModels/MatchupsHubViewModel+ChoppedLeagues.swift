@@ -342,10 +342,25 @@ extension MatchupsHubViewModel {
                 status = .safe
             }
             
-            // Calculate safety margin from elimination cutoff
-            let eliminationCutoffTeams = sortedTeams.suffix(eliminationCount)
-            let cutoffScore = eliminationCutoffTeams.first?.currentScore ?? 0.0
-            let safetyMargin = teamScore - cutoffScore
+            // 🔥 HYBRID LOGIC: Strategic delta based on your situation
+            let safetyMargin: Double
+            
+            if isInEliminationZone {
+                // IN ELIMINATION ZONE: Show distance to next person above (negative = need to catch up)
+                if index > 0 {
+                    let nextPersonAbove = sortedTeams[index - 1]
+                    let nextPersonScore = nextPersonAbove.currentScore ?? 0.0
+                    safetyMargin = teamScore - nextPersonScore // Negative = points needed to catch them
+                } else {
+                    // Shouldn't happen (elimination zone but first place), but fallback
+                    safetyMargin = 0.0
+                }
+            } else {
+                // SAFE ZONE: Show distance from elimination cutoff line (positive = your buffer)
+                let eliminationCutoffTeams = sortedTeams.suffix(eliminationCount)
+                let cutoffScore = eliminationCutoffTeams.first?.currentScore ?? 0.0
+                safetyMargin = teamScore - cutoffScore // Positive = buffer above elimination
+            }
             
             return FantasyTeamRanking(
                 id: team.id,

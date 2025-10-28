@@ -572,7 +572,7 @@ extension PlayerWatchService {
             if intel.players.contains(where: { $0.player.id == player.player.id }) {
                 return OpponentReference(
                     id: intel.id,
-                    opponentName: intel.opponentTeam.ownerName,
+                    opponentName: intel.opponentTeam?.ownerName ?? "Unknown",
                     leagueName: intel.leagueName,
                     leagueSource: intel.leagueSource.rawValue
                 )
