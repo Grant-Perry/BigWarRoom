@@ -21,6 +21,19 @@ struct ComparisonPlayer: Identifiable {
     let matchupInfo: MatchupInfo?
     let injuryStatus: InjuryStatus
     
+    // NEW: Enhanced Metrics
+    let qbQualityTier: String?  // "Elite", "Solid", "Adequate", "Weak" (for WR/TE/RB only)
+    let qbTeamStats: (passTDs: Int?, passYards: Int?)?
+    let tdScoringTier: String  // "High TD Potential", "Moderate", "Low TD Potential"
+    let avgTDsPerGame: Double?
+    let injurySeverity: String  // "Healthy", "Minor Risk", "Moderate Risk", "High Risk"
+    let depthChartTier: String  // "Starter", "Backup", "Deep Bench"
+    let depthChartPosition: Int?
+    let efficiencyTrend: String  // "Improving ↗️", "Declining ↘️", "Stable →"
+    let catchRatePercentage: Double?  // For receivers
+    let yardsPerCarry: Double?  // For RBs
+    let usagePercentage: Double?  // Target share for receivers
+    
     var fullName: String { sleeperPlayer.fullName }
     var position: String { sleeperPlayer.position ?? "UNK" }
     var team: String? { sleeperPlayer.team }

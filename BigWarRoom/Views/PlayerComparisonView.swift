@@ -367,6 +367,9 @@ struct PlayerComparisonView: View {
     
     private func comparisonResultsSection(recommendation: ComparisonRecommendation) -> some View {
         VStack(spacing: 20) {
+            // Key Factors Analysis
+            KeyFactorsView(player1: recommendation.winner, player2: recommendation.loser)
+            
             // Recommendation Header
             recommendationHeader(recommendation: recommendation)
             
@@ -430,20 +433,35 @@ struct PlayerComparisonView: View {
         VStack(spacing: 12) {
             // Player Image - Clickable to view stats
             NavigationLink(destination: PlayerStatsCardView(player: player.sleeperPlayer, team: nil)) {
-                AsyncImage(url: player.sleeperPlayer.headshotURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Circle()
-                        .fill(Color.gray.opacity(0.3))
+                ZStack {
+                    AsyncImage(url: player.sleeperPlayer.headshotURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Circle()
+                            .fill(Color.gray.opacity(0.3))
+                    }
+                    .frame(width: 80, height: 80)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(isWinner ? Color.green : Color.red, lineWidth: 3)
+                    )
+                    
+                    // Injury Status Badge
+                    if let injuryStatus = player.sleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                                    .scaleEffect(0.9)
+                                    .offset(x: -6, y: -6)
+                            }
+                        }
+                    }
                 }
-                .frame(width: 80, height: 80)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(isWinner ? Color.green : Color.red, lineWidth: 3)
-                )
             }
             
             // Player Name
@@ -561,6 +579,221 @@ struct PlayerComparisonView: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.red.opacity(0.2))
         )
+    }
+}
+
+// MARK: - Key Factors View Component
+
+struct KeyFactorsView: View {
+    let player1: ComparisonPlayer
+    let player2: ComparisonPlayer
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("📊 Key Factors")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+            
+            VStack(spacing: 12) {
+                // Depth Chart Comparison
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Depth")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            if player1.depthChartTier == "Starter" {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            } else if player1.depthChartTier == "Backup" {
+                                Image(systemName: "circle.fill")
+                                    .foregroundColor(.yellow)
+                            } else {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                            Text(player1.depthChartTier)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Depth")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            Text(player2.depthChartTier)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                            if player2.depthChartTier == "Starter" {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            } else if player2.depthChartTier == "Backup" {
+                                Image(systemName: "circle.fill")
+                                    .foregroundColor(.yellow)
+                            } else {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                
+                // TD Potential
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TD Potential")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            let emoji1 = player1.tdScoringTier == "High TD Potential" ? "🔥" : "⚡"
+                            Text(emoji1)
+                            Text(player1.tdScoringTier)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("TD Potential")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            Text(player2.tdScoringTier)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.white)
+                            let emoji2 = player2.tdScoringTier == "High TD Potential" ? "🔥" : "⚡"
+                            Text(emoji2)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                
+                // Health Status
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Health")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            let healthEmoji1 = getHealthEmoji(player1.injurySeverity)
+                            Text(healthEmoji1)
+                            Text(player1.injurySeverity)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(getHealthColor(player1.injurySeverity))
+                        }
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Health")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        HStack(spacing: 4) {
+                            Text(player2.injurySeverity)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(getHealthColor(player2.injurySeverity))
+                            let healthEmoji2 = getHealthEmoji(player2.injurySeverity)
+                            Text(healthEmoji2)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                
+                // Trend
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Trend")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(player1.efficiencyTrend)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Trend")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                        Text(player2.efficiencyTrend)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                
+                // QB Quality (for WR/TE/RB)
+                if ["WR", "TE", "RB"].contains(player1.position.uppercased()) {
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("QB Quality")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                            HStack(spacing: 4) {
+                                let qbEmoji1 = getQBEmoji(player1.qbQualityTier)
+                                Text(qbEmoji1)
+                                Text(player1.qbQualityTier ?? "Unknown")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 4) {
+                            Text("QB Quality")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.white.opacity(0.7))
+                            HStack(spacing: 4) {
+                                Text(player2.qbQualityTier ?? "Unknown")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                let qbEmoji2 = getQBEmoji(player2.qbQualityTier)
+                                Text(qbEmoji2)
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                }
+            }
+        }
+        .padding(16)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)))
+    }
+    
+    private func getHealthEmoji(_ severity: String) -> String {
+        switch severity {
+        case "Healthy": return "✅"
+        case "Minor Risk": return "⚠️"
+        case "Moderate Risk": return "🔴"
+        case "High Risk": return "❌"
+        default: return "❓"
+        }
+    }
+    
+    private func getHealthColor(_ severity: String) -> Color {
+        switch severity {
+        case "Healthy": return .green
+        case "Minor Risk": return .yellow
+        case "Moderate Risk": return .orange
+        case "High Risk": return .red
+        default: return .white
+        }
+    }
+    
+    private func getQBEmoji(_ tier: String?) -> String {
+        guard let tier = tier else { return "❓" }
+        switch tier {
+        case "Elite": return "⭐"
+        case "Solid": return "👍"
+        case "Adequate": return "👌"
+        case "Weak": return "📉"
+        default: return "❓"
+        }
     }
 }
 
