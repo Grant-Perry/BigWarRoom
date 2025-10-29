@@ -68,6 +68,12 @@ struct AllLivePlayersView: View {
                 }
             }
         }
+//        .siriAnimate(
+//            isActive: allLivePlayersViewModel.isUpdating, // 🔥 Only active during 15-second updates
+//            intensity: 0.4, // 🔥 Good balance of movement and visibility
+//            speed: 0.8,
+//            baseColors: [.gpBlue, .gpGreen, .purple]
+//        )
         .navigationTitle("All Rostered Players")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -102,6 +108,13 @@ struct AllLivePlayersView: View {
         }
         .onDisappear {
             cancelTasks()
+        }
+        .onChange(of: weekManager.selectedWeek) { _, _ in
+            hasPerformedInitialLoad = false
+            print("🔥 WEEK CHANGED: Resetting initial load flag")
+            Task {
+                await allLivePlayersViewModel.loadAllPlayers()
+            }
         }
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)

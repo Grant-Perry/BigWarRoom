@@ -122,5 +122,11 @@ struct MatchupsHubView: View {
                 onWeekSelected(newValue)
             }
         }
+//        .siriAnimate(
+//            isActive: matchupsHubViewModel.isUpdating, // 🔥 Only active during 15-second updates  
+//            intensity: 0.4,
+//            speed: 0.8,
+//            baseColors: [.gpBlue, .gpGreen, .purple]
+//        )
     }
 }

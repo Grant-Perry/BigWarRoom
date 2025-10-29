@@ -23,6 +23,7 @@ final class AllLivePlayersViewModel {
     var filteredPlayers: [LivePlayerEntry] = []
     var selectedPosition: PlayerPosition = .all
     var isLoading = false
+    var isUpdating = false // 🔥 NEW: Track live update state for animation
     var errorMessage: String?
     var dataState: DataLoadingState = .initial
     

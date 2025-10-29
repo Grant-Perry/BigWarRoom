@@ -129,6 +129,9 @@ extension AllLivePlayersViewModel {
             return 
         }
         
+        // 🔥 NEW: Set updating flag for animation
+        isUpdating = true
+        
         print("🔥 LIVE UPDATE START: Beginning live update process...")
         let startTime = Date()
         
@@ -140,6 +143,7 @@ extension AllLivePlayersViewModel {
         let freshPlayerEntries = extractAllPlayers()
         guard !freshPlayerEntries.isEmpty else {
             print("🔥 LIVE UPDATE ERROR: No fresh player entries found")
+            isUpdating = false // 🔥 Clear updating flag on error
             return
         }
         
@@ -178,6 +182,9 @@ extension AllLivePlayersViewModel {
         
         let elapsed = Date().timeIntervalSince(startTime)
         print("✅ LIVE UPDATE: Completed in \(String(format: "%.2f", elapsed))s")
+        
+        // 🔥 NEW: Clear updating flag when complete
+        isUpdating = false
         
         // 🔥 PHASE 3: @Observable handles change notifications automatically
         // No need for objectWillChange.send() anymore

@@ -30,15 +30,25 @@ extension MatchupsHubViewModel {
     /// 🔥 FIXED: Uses selected week instead of current week
     private func refreshMatchups() async {
         guard !myMatchups.isEmpty && !isLoading else {
-            await performLoadAllMatchups()
+            // 🔥 CRITICAL FIX: Load for selected week, not current week!
+            let selectedWeek = WeekSelectionManager.shared.selectedWeek
+            if selectedWeek != WeekSelectionManager.shared.currentNFLWeek {
+                await performLoadMatchupsForWeek(selectedWeek)
+            } else {
+                await performLoadAllMatchups()
+            }
             return
         }
+        
+        // 🔥 NEW: Set updating flag for Siri animation  
+        isUpdating = true
         
         // 🔥 LIGHT THROTTLING: Prevent rapid duplicate calls (3 seconds minimum)
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 3.0 else {
             print("🔥 REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
@@ -73,6 +83,8 @@ extension MatchupsHubViewModel {
         
         await MainActor.run {
             self.lastUpdateTime = Date()
+            // 🔥 NEW: Clear updating flag when refresh complete
+            self.isUpdating = false
         }
     }
     
@@ -157,11 +169,15 @@ extension MatchupsHubViewModel {
             return 
         }
         
+        // 🔥 NEW: Set updating flag for Siri animation
+        isUpdating = true
+        
         // 🔥 LIGHT THROTTLING: Prevent excessive manual refreshes (2 seconds minimum)
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 2.0 else {
             print("🔥 MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
+            isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
@@ -186,6 +202,9 @@ extension MatchupsHubViewModel {
             expandedCardId = preservedExpandedCardId
             justMeModeBannerVisible = wasBannerVisible // NEW: Restore banner state
         }
+        
+        // 🔥 NEW: Clear updating flag when complete
+        isUpdating = false
     }
     
     /// Background refresh that doesn't disrupt the UI

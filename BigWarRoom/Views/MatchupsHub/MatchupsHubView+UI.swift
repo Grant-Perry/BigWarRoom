@@ -43,10 +43,8 @@ extension MatchupsHubView {
             winningCount: winningCount,
             losingCount: losingCount,
             lastUpdateTime: matchupsHubViewModel.lastUpdateTime,
-            autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
             onWeekPickerTapped: showWeekPicker,
-            onAutoRefreshToggle: toggleAutoRefresh,
             // #GoodNav: Intelligence-style actions
             onFiltersToggle: {
                 // TODO: Add filters functionality for Mission Control
@@ -71,7 +69,6 @@ extension MatchupsHubView {
             microMode: matchupsHubViewModel.microModeEnabled,
             justMeModeBannerVisible: matchupsHubViewModel.justMeModeBannerVisible,
             refreshCountdown: refreshCountdown,
-            autoRefreshEnabled: matchupsHubViewModel.autoRefreshEnabled,
             sortedMatchups: sortedMatchups,
             expandedCardId: matchupsHubViewModel.expandedCardId,
             onPoweredByToggle: {
@@ -82,7 +79,6 @@ extension MatchupsHubView {
             onSortToggle: toggleSortOrder,
             onDualViewToggle: toggleDualViewMode,
             onMicroModeToggle: toggleMicroMode,
-            onAutoRefreshToggle: toggleAutoRefresh,
             onRefreshTapped: {
                 Task {
                     await handlePullToRefresh()

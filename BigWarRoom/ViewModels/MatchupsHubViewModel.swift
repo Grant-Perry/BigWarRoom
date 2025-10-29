@@ -37,6 +37,7 @@ final class MatchupsHubViewModel {
     // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
     var myMatchups: [UnifiedMatchup] = []
     var isLoading = false
+    var isUpdating = false // 🔥 NEW: Track live update state for Siri animation
     var lastUpdateTime = Date()
     var autoRefreshEnabled = true
 

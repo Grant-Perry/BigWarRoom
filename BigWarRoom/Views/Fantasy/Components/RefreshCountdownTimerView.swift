@@ -11,7 +11,6 @@ import SwiftUI
 struct RefreshCountdownTimerView: View {
     @State private var timeRemaining: TimeInterval = TimeInterval(AppConstants.MatchupRefresh)
     @State private var timer: Timer?
-    @State private var glowIntensity: Double = 0.3
     
     // MARK: - Computed Properties
     
@@ -20,72 +19,87 @@ struct RefreshCountdownTimerView: View {
         let progress = timeRemaining / TimeInterval(AppConstants.MatchupRefresh)
         
         if progress > 0.66 {
-            return .green
+            return .gpGreen
         } else if progress > 0.33 {
             return .orange
         } else {
-            return .red
+            return .gpRedPink
         }
     }
     
     /// Progress value for the circular progress indicator
-    private var progress: Double {
-        return timeRemaining / TimeInterval(AppConstants.MatchupRefresh)
-    }
-    
-    /// Dynamic glow opacity that intensifies as time runs out
-    private var dynamicGlowOpacity: Double {
-        let baseIntensity = glowIntensity
-        let urgencyMultiplier = 1.0 + (1.0 - progress) * 2.0 // 1x to 3x intensity
-        return baseIntensity * urgencyMultiplier
+    private var timerProgress: Double {
+        let progress = timeRemaining / TimeInterval(AppConstants.MatchupRefresh)
+        return progress // Full progress (1.0 = full circle, 0.0 = empty)
     }
     
     // MARK: - Body
     
     var body: some View {
+        // 🔥 EXACT SAME TIMER as Live Players
         ZStack {
-            // Subtle glow background layers
-            ForEach(0..<2) { index in
+            // 🔥 External glow layers (multiple for depth)
+            ForEach(0..<3) { index in
                 Circle()
-                    .fill(timerColor.opacity(0.1))
-                    .frame(width: 42 + CGFloat(index * 6), height: 42 + CGFloat(index * 6))
-                    .blur(radius: CGFloat(2 + index * 2))
-                    .opacity(0.3 * (1.0 - Double(index) * 0.3))
-                    .animation(.easeInOut(duration: 0.5), value: timerColor)
+                    .fill(timerColor.opacity(0.15 - Double(index) * 0.05))
+                    .frame(width: 45 + CGFloat(index * 8), height: 45 + CGFloat(index * 8))
+                    .blur(radius: CGFloat(4 + index * 3))
+                    .animation(.easeInOut(duration: 0.8), value: timerColor)
+                    .scaleEffect(timeRemaining < 3 ? 1.1 : 1.0)
+                    .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: timeRemaining < 3)
             }
             
-            // Background circle
-            Circle()
-                .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
-                .frame(width: 38, height: 38)
-            
-            // Center fill that matches the rotating circle color
-            Circle()
-                .fill(timerColor.opacity(0.2))
-                .frame(width: 33, height: 33)
-                .animation(.easeInOut(duration: 0.3), value: timerColor)
-            
-            // Progress circle with color animation
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    AngularGradient(
-                        colors: [timerColor, timerColor.opacity(0.6)],
-                        center: .center,
-                        startAngle: .degrees(-90),
-                        endAngle: .degrees(270)
-                    ),
-                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                )
-                .frame(width: 38, height: 38)
-                .rotationEffect(.degrees(-90))
-                .animation(.easeInOut(duration: 0.5), value: progress)
-            
-            // Time remaining text
-            Text(String(format: "%.0f", timeRemaining))
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(timerColor)
-                .animation(.easeInOut(duration: 0.3), value: timerColor)
+            ZStack {
+                // Background circle
+                Circle()
+                    .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
+                    .frame(width: 32, height: 32)
+                
+                // 🔥 Circular sweep progress
+                Circle()
+                    .trim(from: 0, to: timerProgress)
+                    .stroke(
+                        AngularGradient(
+                            colors: [timerColor, timerColor.opacity(0.6), timerColor],
+                            center: .center,
+                            startAngle: .degrees(-90),
+                            endAngle: .degrees(270)
+                        ),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                    )
+                    .frame(width: 32, height: 32)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.5), value: timerProgress)
+                
+                // Center fill
+                Circle()
+                    .fill(timerColor.opacity(0.15))
+                    .frame(width: 27, height: 27)
+                    .animation(.easeInOut(duration: 0.3), value: timerColor)
+                
+                // 🔥 Timer text with swipe animation
+                ZStack {
+                    Text("\(Int(timeRemaining))")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: timerColor.opacity(0.8), radius: 2, x: 0, y: 1)
+                        .scaleEffect(timeRemaining < 3 ? 1.1 : 1.0)
+                        .id("mission-timer-\(Int(timeRemaining))") // 🔥 Unique ID for transition
+                        .transition(
+                            .asymmetric(
+                                insertion: AnyTransition.move(edge: .leading)
+                                    .combined(with: .scale(scale: 0.8))
+                                    .combined(with: .opacity),
+                                removal: AnyTransition.move(edge: .trailing)
+                                    .combined(with: .scale(scale: 1.2))
+                                    .combined(with: .opacity)
+                            )
+                        )
+                }
+                .frame(width: 14, height: 14) // Fixed frame to prevent layout shifts
+                .clipped()
+                .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: Int(timeRemaining))
+            }
         }
         .onAppear {
             startTimer()

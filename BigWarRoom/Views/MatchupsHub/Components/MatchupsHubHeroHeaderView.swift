@@ -15,10 +15,8 @@ struct MatchupsHubHeroHeaderView: View {
     let winningCount: Int
     let losingCount: Int
     let lastUpdateTime: Date?
-    let autoRefreshEnabled: Bool
     let timeAgoString: String?
     let onWeekPickerTapped: () -> Void
-    let onAutoRefreshToggle: () -> Void
     
     // #GoodNav: Intelligence-style actions
     let onFiltersToggle: () -> Void

@@ -133,6 +133,24 @@ struct AllLivePlayersHeaderView: View {
             
             Spacer()
             
+            // 🔥 NEW: Total points display 
+            Text("Total: \(totalPointsFormatted)")
+                .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                .foregroundColor(.gpGreen)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.gpGreen.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gpGreen.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .animation(.easeInOut(duration: 0.3), value: totalPoints)
+            
+            Spacer()
+            
             // Icons (right side)
             HStack(spacing: 12) {
                 // Filters button
@@ -303,15 +321,71 @@ struct AllLivePlayersHeaderView: View {
                     Spacer()
                 }
                 
-                // Timer dial (existing refresh countdown)
-                Circle()
-                    .stroke(timerColor, lineWidth: 2)
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Text("\(Int(refreshCountdown))")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.white)
-                    )
+                // Timer dial with sweep animation, number swipe, and external glow
+                ZStack {
+                    // 🔥 External glow layers (multiple for depth)
+                    ForEach(0..<3) { index in
+                        Circle()
+                            .fill(timerColor.opacity(0.15 - Double(index) * 0.05))
+                            .frame(width: 45 + CGFloat(index * 8), height: 45 + CGFloat(index * 8))
+                            .blur(radius: CGFloat(4 + index * 3))
+                            .animation(.easeInOut(duration: 0.8), value: timerColor)
+                            .scaleEffect(refreshCountdown < 3 ? 1.1 : 1.0)
+                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: refreshCountdown < 3)
+                    }
+                    
+                    ZStack {
+                        // Background circle
+                        Circle()
+                            .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
+                            .frame(width: 32, height: 32)
+                        
+                        // 🔥 Circular sweep progress
+                        Circle()
+                            .trim(from: 0, to: timerProgress)
+                            .stroke(
+                                AngularGradient(
+                                    colors: [timerColor, timerColor.opacity(0.6), timerColor],
+                                    center: .center,
+                                    startAngle: .degrees(-90),
+                                    endAngle: .degrees(270)
+                                ),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                            )
+                            .frame(width: 32, height: 32)
+                            .rotationEffect(.degrees(-90))
+                            .animation(.easeInOut(duration: 0.5), value: timerProgress)
+                        
+                        // Center fill
+                        Circle()
+                            .fill(timerColor.opacity(0.15))
+                            .frame(width: 27, height: 27)
+                            .animation(.easeInOut(duration: 0.3), value: timerColor)
+                        
+                        // 🔥 Timer text with swipe animation
+                        ZStack {
+                            Text("\(Int(refreshCountdown))")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .shadow(color: timerColor.opacity(0.8), radius: 2, x: 0, y: 1)
+                                .scaleEffect(refreshCountdown < 3 ? 1.1 : 1.0)
+                                .id("live-timer-\(Int(refreshCountdown))") // 🔥 Unique ID for transition
+                                .transition(
+                                    .asymmetric(
+                                        insertion: AnyTransition.move(edge: .leading)
+                                            .combined(with: .scale(scale: 0.8))
+                                            .combined(with: .opacity),
+                                        removal: AnyTransition.move(edge: .trailing)
+                                            .combined(with: .scale(scale: 1.2))
+                                            .combined(with: .opacity)
+                                    )
+                                )
+                        }
+                        .frame(width: 14, height: 14) // Fixed frame to prevent layout shifts
+                        .clipped()
+                        .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: Int(refreshCountdown))
+                    }
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 16)
@@ -446,6 +520,27 @@ struct AllLivePlayersHeaderView: View {
     
     // MARK: - Helper Methods
     
+    // 🔥 NEW: Total points calculation - GUARANTEED LIVE
+    private var totalPoints: Double {
+        // 🔥 Force recalculation on every live update by depending on lastUpdateTime
+        let _ = allLivePlayersViewModel.lastUpdateTime
+        
+        return allLivePlayersViewModel.filteredPlayers.reduce(0) { total, player in
+            total + player.currentScore
+        }
+    }
+    
+    private var totalPointsFormatted: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        formatter.groupingSeparator = ","
+        formatter.decimalSeparator = "."
+        
+        return formatter.string(from: NSNumber(value: totalPoints)) ?? "0.00"
+    }
+    
     private var timerColor: Color {
         let progress = refreshCountdown / Double(AppConstants.MatchupRefresh)
         
@@ -456,6 +551,12 @@ struct AllLivePlayersHeaderView: View {
         } else {
             return .gpRedPink
         }
+    }
+    
+    // 🔥 NEW: Timer progress for scaling effect
+    private var timerProgress: Double {
+        let progress = refreshCountdown / Double(AppConstants.MatchupRefresh)
+        return 0.3 + (progress * 0.7) // Scale from 30% to 100%
     }
     
     private func getOverallPerformanceEmoji() -> String {
@@ -517,19 +618,18 @@ struct AllLivePlayersHeaderView: View {
             stableManager = manager
         }
         
-        // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
-        // Individual views should not create their own refresh timers to prevent conflicts
-        // Only MatchupsHubViewModel.shared should control the global refresh cycle
+        // 🔥 ENABLED: Restore AllLivePlayersView auto-refresh timer to fix live updates
+        // This timer was previously disabled causing the missing automatic refresh issue
         
         // Start the actual refresh timer (every 15 seconds)
-        // refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
-        //     Task { @MainActor in
-        //         if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
-        //             // Background refresh without UI disruption
-        //             await performBackgroundRefresh()
-        //         }
-        //     }
-        // }
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
+            Task { @MainActor in
+                if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
+                    // Background refresh without UI disruption
+                    await performBackgroundRefresh()
+                }
+            }
+        }
         
         // Keep the visual countdown timer only (every 1 second)
         startCountdownTimer()

@@ -143,18 +143,6 @@ extension MatchupsHubView {
     }
     
     // MARK: - Toggle Actions
-    func toggleAutoRefresh() {
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
-        
-        matchupsHubViewModel.toggleAutoRefresh()
-        
-        if matchupsHubViewModel.autoRefreshEnabled {
-            startPeriodicRefresh()
-        } else {
-            stopPeriodicRefresh()
-        }
-    }
     
     func toggleMicroMode() {
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)

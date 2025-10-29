@@ -15,14 +15,12 @@ struct MatchupsHubMatchupsSectionView: View {
     let microMode: Bool
     let justMeModeBannerVisible: Bool
     let refreshCountdown: Double
-    let autoRefreshEnabled: Bool
     let sortedMatchups: [UnifiedMatchup]
     let expandedCardId: String?
     let onPoweredByToggle: () -> Void
     let onSortToggle: () -> Void
     let onDualViewToggle: () -> Void
     let onMicroModeToggle: () -> Void
-    let onAutoRefreshToggle: () -> Void
     let onRefreshTapped: () -> Void
     // 🏈 NAVIGATION FREEDOM: Remove onShowDetail callback - using NavigationLinks instead
     // let onShowDetail: (UnifiedMatchup) -> Void
@@ -38,13 +36,11 @@ struct MatchupsHubMatchupsSectionView: View {
                 dualViewMode: dualViewMode,
                 microMode: microMode,
                 refreshCountdown: refreshCountdown,
-                autoRefreshEnabled: autoRefreshEnabled,
                 onPoweredByToggle: onPoweredByToggle,
                 onSortToggle: onSortToggle,
                 onDualViewToggle: onDualViewToggle,
                 onMicroModeToggle: onMicroModeToggle,
-                onRefreshTapped: onRefreshTapped,
-                onAutoRefreshToggle: onAutoRefreshToggle
+                onRefreshTapped: onRefreshTapped
             )
             
             // Powered by branding (keep existing functionality)

@@ -52,6 +52,9 @@ final class WeekSelectionManager {
     /// Whether we're still waiting for the real NFL week to be fetched
     var isWaitingForRealWeek: Bool = true
     
+    /// 🔥 CRITICAL: Track if user manually selected a week (prevents auto-advance)
+    @ObservationIgnored private var userDidManuallySelectWeek: Bool = false
+    
     // MARK: - Dependencies - inject instead of using singletons
     private let nflWeekService: NFLWeekService
     
@@ -95,6 +98,7 @@ final class WeekSelectionManager {
         selectedWeek = week
         lastChanged = Date()
         isWaitingForRealWeek = false // User has made an explicit selection
+        userDidManuallySelectWeek = true // 🔥 CRITICAL: Mark that user selected this week
         
         // Post notification for backward compatibility
         NotificationCenter.default.post(name: .weekSelectionChanged, object: nil)
@@ -138,7 +142,8 @@ final class WeekSelectionManager {
                 }
                 
                 // If user was viewing current week and NFL advances, update selection
-                else if self.selectedWeek == newNFLWeek - 1 && !self.isWaitingForRealWeek {
+                // 🔥 CRITICAL FIX: DON'T auto-advance if user manually selected a different week!
+                else if self.selectedWeek == newNFLWeek - 1 && !self.isWaitingForRealWeek && !self.userDidManuallySelectWeek {
 //                    print("🗓️ WeekSelectionManager: Auto-advancing to new current week \(newNFLWeek)")
                     await MainActor.run {
                         self.selectedWeek = newNFLWeek
