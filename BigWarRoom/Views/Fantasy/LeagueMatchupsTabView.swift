@@ -285,6 +285,7 @@ struct LeagueMatchupsTabView: View {
         HStack {
             // FIXED: Always show exit button on left
             Button(action: {
+                // 🔥 NAVIGATION FIX: Use dismiss() to go back to Mission Control
                 dismiss()
             }) {
                 HStack(spacing: 4) {

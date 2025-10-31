@@ -199,47 +199,7 @@ struct PlayerComparisonView: View {
                                         searchText.wrappedValue = ""
                                         showSearch.wrappedValue = false
                                     }) {
-                                        HStack(spacing: 12) {
-                                            AsyncImage(url: p.headshotURL) { image in
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                Circle()
-                                                    .fill(Color.gray.opacity(0.3))
-                                            }
-                                            .frame(width: 40, height: 40)
-                                            .clipShape(Circle())
-                                            
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(p.fullName)
-                                                    .font(.system(size: 14, weight: .semibold))
-                                                    .foregroundColor(.white)
-                                                    .lineLimit(1)
-                                                
-                                                HStack(spacing: 6) {
-                                                    if let position = p.position {
-                                                        Text(position)
-                                                            .font(.system(size: 12))
-                                                            .foregroundColor(.white.opacity(0.7))
-                                                    }
-                                                    if let team = p.team {
-                                                        Text("•")
-                                                            .foregroundColor(.white.opacity(0.5))
-                                                        Text(team)
-                                                            .font(.system(size: 12))
-                                                            .foregroundColor(.white.opacity(0.7))
-                                                    }
-                                                }
-                                            }
-                                            
-                                            Spacer()
-                                        }
-                                        .padding(10)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(Color.white.opacity(0.08))
-                                        )
+                                        searchResultCard(player: p)
                                     }
                                 }
                             }
@@ -339,6 +299,69 @@ struct PlayerComparisonView: View {
         )
     }
     
+    private func searchResultCard(player: SleeperPlayer) -> some View {
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                // Player image with team background (LEFT side)
+                ZStack(alignment: .leading) {
+                    // Team logo background
+                    if let team = player.team {
+                        let normalizedTeamCode = TeamCodeNormalizer.normalize(team) ?? team
+                        if let nflTeam = NFLTeam.team(for: normalizedTeamCode) {
+                            TeamAssetManager.shared.logoOrFallback(for: nflTeam.id)
+                                .frame(width: 70, height: 70)
+                                .opacity(0.2)
+                        }
+                    }
+                    
+                    // Player image
+                    AsyncImage(url: player.headshotURL) { image in
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } placeholder: {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
+                    }
+                    .frame(width: 50, height: 65)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .offset(x: -15)
+                }
+                .frame(width: 70, height: 70)
+                
+                // Player info on RIGHT
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(player.fullName)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                    
+                    HStack(spacing: 6) {
+                        if let position = player.position {
+                            Text(position)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                        if let team = player.team {
+                            Text("•")
+                                .foregroundColor(.white.opacity(0.5))
+                            Text(team)
+                                .font(.system(size: 12))
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.08))
+        )
+    }
+    
     // MARK: - Compare Button
     
     private var compareButton: some View {
@@ -367,9 +390,6 @@ struct PlayerComparisonView: View {
     
     private func comparisonResultsSection(recommendation: ComparisonRecommendation) -> some View {
         VStack(spacing: 20) {
-            // Key Factors Analysis
-            KeyFactorsView(player1: recommendation.winner, player2: recommendation.loser)
-            
             // Recommendation Header
             recommendationHeader(recommendation: recommendation)
             
@@ -388,6 +408,12 @@ struct PlayerComparisonView: View {
                 )
             }
             .padding(.horizontal, 4)
+            
+            // Percentage Thermometer - shows weighted score distribution
+            percentageThermometer(recommendation: recommendation)
+            
+            // Key Factors Analysis
+            KeyFactorsView(player1: recommendation.winner, player2: recommendation.loser)
             
             // Reasoning
             reasoningSection(reasoning: recommendation.reasoning)
@@ -509,10 +535,71 @@ struct PlayerComparisonView: View {
         )
     }
     
+    private func percentageThermometer(recommendation: ComparisonRecommendation) -> some View {
+        let totalScore = recommendation.winnerScore + recommendation.loserScore
+        let winnerPercentage = totalScore > 0 ? (recommendation.winnerScore / totalScore) * 100 : 0
+        let loserPercentage = 100 - winnerPercentage
+        
+        return VStack(alignment: .center, spacing: 8) {
+            // Labels
+            HStack(spacing: 16) {
+                Text(recommendation.winner.fullName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Text(recommendation.loser.fullName)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+            }
+            
+            // Thermometer Bar
+            HStack(spacing: 0) {
+                // Winner side (green)
+                Rectangle()
+                    .fill(Color.green.opacity(0.6))
+                    .frame(maxWidth: .infinity)
+                
+                // Loser side (red)
+                Rectangle()
+                    .fill(Color.red.opacity(0.4))
+                    .frame(maxWidth: .infinity)
+            }
+            .frame(height: 12)
+            .cornerRadius(6)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+            
+            // Percentage Labels
+            HStack(spacing: 16) {
+                Text(String(format: "%.0f%%", winnerPercentage))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.green)
+                
+                Spacer()
+                
+                Text(String(format: "%.0f%%", loserPercentage))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.red)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.3))
+        )
+    }
+    
     private func reasoningSection(reasoning: [String]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Why")
-                .font(.system(size: 18, weight: .semibold))
+            Text("Why?")
+                .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
             
             ForEach(Array(reasoning.enumerated()), id: \.offset) { _, reason in
@@ -530,7 +617,11 @@ struct PlayerComparisonView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 8)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.6))
+        )
     }
     
     private func confidenceBadge(confidence: ComparisonRecommendation.ConfidenceLevel) -> some View {
@@ -640,7 +731,7 @@ struct KeyFactorsView: View {
                     }
                 }
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.3)))
                 
                 // TD Potential
                 HStack(spacing: 16) {
@@ -671,7 +762,7 @@ struct KeyFactorsView: View {
                     }
                 }
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.3)))
                 
                 // Health Status
                 HStack(spacing: 16) {
@@ -702,7 +793,7 @@ struct KeyFactorsView: View {
                     }
                 }
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.3)))
                 
                 // Trend
                 HStack(spacing: 16) {
@@ -725,7 +816,7 @@ struct KeyFactorsView: View {
                     }
                 }
                 .padding(12)
-                .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.3)))
                 
                 // QB Quality (for WR/TE/RB)
                 if ["WR", "TE", "RB"].contains(player1.position.uppercased()) {
@@ -757,12 +848,15 @@ struct KeyFactorsView: View {
                         }
                     }
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.white.opacity(0.05)))
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.black.opacity(0.3)))
                 }
             }
         }
         .padding(16)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.white.opacity(0.08)))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.6))
+        )
     }
     
     private func getHealthEmoji(_ severity: String) -> String {
@@ -771,6 +865,7 @@ struct KeyFactorsView: View {
         case "Minor Risk": return "⚠️"
         case "Moderate Risk": return "🔴"
         case "High Risk": return "❌"
+        case "Low Risk": return "✅"
         default: return "❓"
         }
     }
@@ -781,6 +876,7 @@ struct KeyFactorsView: View {
         case "Minor Risk": return .yellow
         case "Moderate Risk": return .orange
         case "High Risk": return .red
+        case "Low Risk": return .green
         default: return .white
         }
     }
@@ -790,6 +886,7 @@ struct KeyFactorsView: View {
         switch tier {
         case "Elite": return "⭐"
         case "Solid": return "👍"
+        case "Good": return "✅"
         case "Adequate": return "👌"
         case "Weak": return "📉"
         default: return "❓"

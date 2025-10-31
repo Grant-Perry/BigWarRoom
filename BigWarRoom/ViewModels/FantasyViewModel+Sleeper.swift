@@ -79,6 +79,24 @@ extension FantasyViewModel {
             let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
             DebugLogger.api("Decoded \(rosters.count) Sleeper rosters")
             
+            // 🔥 DIAGNOSTIC: Log record data from Sleeper API response
+            DebugLogger.fantasy("🔍 SLEEPER API RESPONSE - Record Diagnosis:")
+            DebugLogger.fantasy("   Total rosters: \(rosters.count)")
+            for (index, roster) in rosters.prefix(5).enumerated() {
+                let winsDisplay = roster.wins.map(String.init) ?? "nil"
+                let lossesDisplay = roster.losses.map(String.init) ?? "nil"
+                let tieValue = roster.ties ?? 0
+                
+                DebugLogger.fantasy("   Roster \(index): ID=\(roster.rosterID), Owner=\(roster.ownerID ?? "nil")")
+                DebugLogger.fantasy("      Root level - wins:\(winsDisplay), losses:\(lossesDisplay), ties:\(tieValue)")
+                
+                if let settings = roster.settings {
+                    let settingsWins = settings.wins ?? -1
+                    let settingsLosses = settings.losses ?? -1
+                    DebugLogger.fantasy("      Settings level - wins:\(settingsWins), losses:\(settingsLosses)")
+                }
+            }
+            
             // 🔥 NEW: Store rosters in main FantasyViewModel for record lookup
             sleeperRosters = rosters
             

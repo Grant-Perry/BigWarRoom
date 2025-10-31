@@ -147,13 +147,32 @@ struct FantasyDetailHeaderView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record - only show if not empty
-                let homeRecord = fantasyViewModel?.getManagerRecord(managerID: matchup.homeTeam.id) ?? ""
-                if !homeRecord.isEmpty {
-                    Text(homeRecord)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
-                }
+                // Record - always show with label
+                // 🔥 DRY FIX: Use record directly from matchup team, fallback to getManagerRecord, then espnTeamRecords
+                let homeRecordText: String = {
+                    let managerID = matchup.homeTeam.id
+                    
+                    // First try: Direct access from matchup team (most reliable)
+                    if let record = matchup.homeTeam.record {
+                        return record.displayString
+                    }
+                    
+                    // Second try: Direct lookup in espnTeamRecords if managerID is a number (faster than getManagerRecord)
+                    if let teamId = Int(managerID),
+                       let record = fantasyViewModel?.espnTeamRecords[teamId] {
+                        return record.displayString
+                    }
+                    
+                    // Third try: Use FantasyViewModel's getManagerRecord (handles sync cases)
+                    if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
+                        return record
+                    }
+                    
+                    return "N/A"
+                }()
+                Text("Record: \(homeRecordText)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
                 
                 // SCORE and YET TO PLAY stack
                 VStack(spacing: 1) {
@@ -233,13 +252,32 @@ struct FantasyDetailHeaderView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record - only show if not empty
-                let awayRecord = fantasyViewModel?.getManagerRecord(managerID: matchup.awayTeam.id) ?? ""
-                if !awayRecord.isEmpty {
-                    Text(awayRecord)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.gray)
-                }
+                // Record - always show with label
+                // 🔥 DRY FIX: Use record directly from matchup team, fallback to getManagerRecord, then espnTeamRecords
+                let awayRecordText: String = {
+                    let managerID = matchup.awayTeam.id
+                    
+                    // First try: Direct access from matchup team (most reliable)
+                    if let record = matchup.awayTeam.record {
+                        return record.displayString
+                    }
+                    
+                    // Second try: Direct lookup in espnTeamRecords if managerID is a number (faster than getManagerRecord)
+                    if let teamId = Int(managerID),
+                       let record = fantasyViewModel?.espnTeamRecords[teamId] {
+                        return record.displayString
+                    }
+                    
+                    // Third try: Use FantasyViewModel's getManagerRecord (handles sync cases)
+                    if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
+                        return record
+                    }
+                    
+                    return "N/A"
+                }()
+                Text("Record: \(awayRecordText)")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.gray)
                 
                 // SCORE and YET TO PLAY stack
                 VStack(spacing: 1) {

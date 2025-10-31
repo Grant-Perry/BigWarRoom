@@ -93,21 +93,21 @@ struct NonMicroTeamSection: View {
                 .lineLimit(1)
                 .frame(maxWidth: dualViewMode ? 60 : 50)
             
+            // Manager record (only show if available)
+            if let record = team.record {
+                Text(record.displayString)
+                    .font(.system(size: dualViewMode ? 9 : 8, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            
             // Score
             Text(team.currentScoreString)
                 .font(.system(size: dualViewMode ? 16 : 13, weight: .black, design: .rounded))
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
             
-            // 🔥 NEW: Record (only show in Dual view AND only if not empty - Sleeper only)
-            if dualViewMode {
-                let teamRecord = fantasyViewModel.getManagerRecord(managerID: team.id)
-                if !teamRecord.isEmpty {
-                    Text(teamRecord)
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-            }
+            // 🔥 OLD: Record (only show in Dual view AND only if not empty - Sleeper only)
+            // REMOVED - now always showing above
         }
         .frame(maxWidth: .infinity)
     }

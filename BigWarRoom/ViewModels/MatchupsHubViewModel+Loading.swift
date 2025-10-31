@@ -15,12 +15,14 @@ extension MatchupsHubViewModel {
     /// Main loading function - Load all matchups across all connected leagues
     internal func performLoadAllMatchups() async {
         guard !isLoading else { 
-            // print("🔥 LOADING: Already loading, ignoring duplicate request")
+            print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups called - ALREADY LOADING, ignoring")
             return 
         }
         
+        print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups STARTING")
+        
         let loadingSessionId = UUID().uuidString.prefix(8)
-        // print("🔥 LOADING SESSION \(loadingSessionId): Starting new loading session")
+        print("🔥 LOADING SESSION \(loadingSessionId): Starting new loading session")
         
         await MainActor.run {
             isLoading = true
@@ -33,10 +35,13 @@ extension MatchupsHubViewModel {
         
         do {
             // Step 0: Fetch NFL game data for live detection - 5% progress
+            // print("  → Step 0: Fetching NFL game data...")
             await updateProgress(0.05, message: "Loading NFL data...", sessionId: String(loadingSessionId))
             await fetchNFLGameData()
+            print("  ✅ Step 0: NFL data loaded")
             
             // Step 1: Load all available leagues - 10% progress
+            // print("  → Step 1: Loading available leagues...")
             await updateProgress(0.10, message: "Loading available leagues...", sessionId: String(loadingSessionId))
             
             // 🔥 PHASE 2: Use injected credentials instead of .shared
@@ -49,26 +54,32 @@ extension MatchupsHubViewModel {
             
             let availableLeagues = unifiedLeagueManager.allLeagues
             totalLeagueCount = availableLeagues.count
+            print("  ✅ Step 1: Found \(availableLeagues.count) leagues")
             
             guard !availableLeagues.isEmpty else {
                 await MainActor.run {
                     errorMessage = "No leagues found. Connect your leagues first!"
                     isLoading = false
                 }
+                print("  ❌ No leagues found")
                 return
             }
             
             // Step 2: Load matchups for each league in parallel
+            // print("  → Step 2: Loading matchups from all leagues...")
             await loadMatchupsFromAllLeagues(availableLeagues, sessionId: String(loadingSessionId))
+            print("  ✅ Step 2: Matchups loaded")
             
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to load leagues: \(error.localizedDescription)"
                 isLoading = false
             }
+            print("  ❌ Error: \(error)")
         }
         
-        // print("🔥 LOADING SESSION \(loadingSessionId): Completed loading session")
+        print("🔥 LOADING SESSION \(loadingSessionId): Completed - myMatchups.count=\(myMatchups.count)")
+        print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups COMPLETE")
     }
     
     /// 🔥 NEW: Bulletproof progress update that forces UI refresh
@@ -207,6 +218,7 @@ extension MatchupsHubViewModel {
         
         do {
             // print("🔥 SINGLE LEAGUE: Creating provider for \(league.league.name)")
+            print("🔥🔥🔥 MATCHUPS HUB: loadSingleLeague called for \(league.league.name)")
             
             // 🔥 NEW APPROACH: Create isolated provider for this league
             let provider = LeagueMatchupProvider(
@@ -218,36 +230,45 @@ extension MatchupsHubViewModel {
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.3)
             
             // print("🔥 SINGLE LEAGUE: Identifying team ID for \(league.league.name)")
+            print("  → Identifying team ID for \(league.league.name)...")
             
             // Step 1: Identify user's team ID
             guard let myTeamID = await provider.identifyMyTeamID() else {
                 // print("🔥 SINGLE LEAGUE: Failed to identify team ID for \(league.league.name)")
+                print("  ❌ Failed to identify team ID")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil
             }
             
             // print("🔥 SINGLE LEAGUE: Found team ID '\(myTeamID)' for \(league.league.name)")
+            print("  ✅ Found team ID: \(myTeamID)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.6)
             
             // Step 2: Fetch matchups using isolated provider
             // print("🔥 SINGLE LEAGUE: Fetching matchups for \(league.league.name)")
+            print("  → Fetching matchups via provider.fetchMatchups()...")
             let matchups = try await provider.fetchMatchups()
+            print("  ✅ Fetched \(matchups.count) matchups")
             // print("🔥 SINGLE LEAGUE: Fetched \(matchups.count) matchups for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
             
             // 🔥 NEW: Cache the fully-loaded provider for later use
             await MainActor.run {
-                self.cacheProvider(provider, for: league, week: currentWeek, year: currentYear)
+                // 🔥 DISABLED: Provider caching causes stale records to persist across weeks
+                // self.cacheProvider(provider, for: league, week: currentWeek, year: currentYear)
+                // Each time we load, we need FRESH providers with current week data
             }
             
             // Step 3: Check for Chopped league
             if league.source == .sleeper && matchups.isEmpty {
                 // print("🔥 SINGLE LEAGUE: Detected Chopped league: \(league.league.name)")
+                // print("  🍲 Detected Chopped league")
                 return await handleChoppedLeague(league: league, myTeamID: myTeamID)
             }
             
             // Step 4: Handle regular leagues
             // print("🔥 SINGLE LEAGUE: Processing regular league: \(league.league.name)")
+            // print("  → Processing regular league...")
             return await handleRegularLeague(league: league, matchups: matchups, myTeamID: myTeamID, provider: provider)
             
         } catch {

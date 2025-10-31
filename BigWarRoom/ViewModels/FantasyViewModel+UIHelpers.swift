@@ -87,11 +87,6 @@ extension FantasyViewModel {
     
     /// Get manager record for display with REAL league data 
     func getManagerRecord(managerID: String) -> String {
-        // 🔥 NEW: For Sleeper leagues, don't show any records for ESPN teams
-        if let selectedLeague = selectedLeague, selectedLeague.source == .espn {
-            return ""  // Don't show any record for ESPN leagues
-        }
-        
         // First, try to find the team in current matchups to get their record
         for matchup in matchups {
             let homeTeam = matchup.homeTeam
@@ -109,17 +104,24 @@ extension FantasyViewModel {
                 // Use the team's record if available
                 if let record = team.record {
                     let recordString = record.displayString
-                    
-                    // Calculate league rank based on wins/losses
-                    let leagueRank = calculateLeagueRank(for: team)
-                    let rankSuffix = getRankSuffix(leagueRank)
-                    
-                    return "\(recordString) • Rank: \(leagueRank)\(rankSuffix)"
+                    DebugLogger.fantasy("📊 RECORD FOUND: \(team.ownerName) -> \(recordString)")
+                    return recordString
+                } else {
+                    DebugLogger.fantasy("📊 NO RECORD: \(team.ownerName) (team.record is nil)")
                 }
             }
         }
         
-        // For Sleeper leagues, return empty string instead of fake data
+        // 🔥 DRY FIX: Fallback to espnTeamRecords if team.record is nil
+        // This handles cases where records were calculated but not yet set on the FantasyTeam
+        if let teamId = Int(managerID),
+           let record = espnTeamRecords[teamId] {
+            let recordString = record.displayString
+            DebugLogger.fantasy("📊 RECORD FOUND (fallback): Team \(teamId) -> \(recordString)")
+            return recordString
+        }
+        
+        // Return empty string if no record found
         return ""
     }
     

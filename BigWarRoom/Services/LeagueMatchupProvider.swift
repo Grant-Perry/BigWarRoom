@@ -162,6 +162,7 @@ final class LeagueMatchupProvider {
     
     /// Fetch all matchup data for this league
     func fetchMatchups() async throws -> [FantasyMatchup] {
+        print("🎯 LeagueMatchupProvider.fetchMatchups() called for \(league.league.leagueID), league.source=\(league.source)")
         // Clear previous state
         matchups = []
         byeWeekTeams = []
@@ -169,11 +170,14 @@ final class LeagueMatchupProvider {
         detectedAsChoppedLeague = false
         
         if league.source == .espn {
+            print("  → Fetching ESPN data")
             await fetchESPNData()
         } else {
+            print("  → Fetching Sleeper data")
             await fetchSleeperData()
         }
         
+        print("  ← Returning \(matchups.count) matchups")
         return matchups
     }
     
@@ -185,14 +189,105 @@ final class LeagueMatchupProvider {
     /// Get Chopped league summary (if applicable)
     func getChoppedSummary() async -> ChoppedWeekSummary? {
         guard isChoppedLeague() else { return nil }
-        
+
         if choppedSummary == nil {
             choppedSummary = await createChoppedSummary()
         }
-        
+
         return choppedSummary
     }
-    
+
+    /// Calculate team records from matchup history when standings don't provide them
+    private func calculateRecordsFromMatchupHistory(leagueID: String) async {
+        print("📊 calculateRecordsFromMatchupHistory: Starting calculation for league \(leagueID)")
+
+        // Get all past weeks (1-8 since we're in week 9)
+        let pastWeeks = 1..<week
+        var teamRecords: [Int: TeamRecord] = [:]
+
+        for pastWeek in pastWeeks {
+            do {
+                print("  📊 Calculating records for week \(pastWeek)...")
+
+                // Fetch matchup data for this past week
+                guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(pastWeek)") else {
+                    print("  ❌ Failed to create URL for week \(pastWeek)")
+                    continue
+                }
+
+                var request = URLRequest(url: url)
+                request.addValue("application/json", forHTTPHeaderField: "Accept")
+
+                let espnToken = year == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
+                request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
+
+                let (data, _) = try await URLSession.shared.data(for: request)
+                let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
+
+                // Process each matchup to determine winner/loser
+                for scheduleEntry in model.schedule {
+                    guard let awayTeam = scheduleEntry.away else {
+                        continue // Skip bye weeks where away team doesn't exist
+                    }
+                    let homeTeam = scheduleEntry.home
+
+                    // Calculate scores for this specific week
+                    let awayScore = calculateTeamScoreForWeek(team: awayTeam, week: pastWeek)
+                    let homeScore = calculateTeamScoreForWeek(team: homeTeam, week: pastWeek)
+
+                    // Initialize records if not exists
+                    if teamRecords[awayTeam.teamId] == nil {
+                        teamRecords[awayTeam.teamId] = TeamRecord(wins: 0, losses: 0, ties: 0)
+                    }
+                    if teamRecords[homeTeam.teamId] == nil {
+                        teamRecords[homeTeam.teamId] = TeamRecord(wins: 0, losses: 0, ties: 0)
+                    }
+
+                    // Determine winner
+                    if awayScore > homeScore {
+                        // Away team wins
+                        let currentAway = teamRecords[awayTeam.teamId]!
+                        let currentHome = teamRecords[homeTeam.teamId]!
+                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins + 1, losses: currentAway.losses, ties: currentAway.ties)
+                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins, losses: currentHome.losses + 1, ties: currentHome.ties)
+                    } else if homeScore > awayScore {
+                        // Home team wins
+                        let currentAway = teamRecords[awayTeam.teamId]!
+                        let currentHome = teamRecords[homeTeam.teamId]!
+                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins + 1, losses: currentHome.losses, ties: currentHome.ties)
+                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins, losses: currentAway.losses + 1, ties: currentAway.ties)
+                    } else {
+                        // Tie
+                        let currentAway = teamRecords[awayTeam.teamId]!
+                        let currentHome = teamRecords[homeTeam.teamId]!
+                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins, losses: currentAway.losses, ties: (currentAway.ties ?? 0) + 1)
+                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins, losses: currentHome.losses, ties: (currentHome.ties ?? 0) + 1)
+                    }
+                }
+
+            } catch {
+                continue
+            }
+        }
+
+        // Store calculated records
+        espnTeamRecords = teamRecords
+    }
+
+    /// Calculate a team's score for a specific week from their roster
+    private func calculateTeamScoreForWeek(team: ESPNTeamMatchupModel, week: Int) -> Double {
+        guard let roster = team.roster else { return 0.0 }
+
+        // Active slots for standard fantasy football
+        let activeSlotsOrder: [Int] = [0, 2, 3, 4, 5, 6, 23, 16, 17] // QB, RB, RB, WR, WR, TE, FLEX, D/ST, K
+
+        return roster.entries
+            .filter { activeSlotsOrder.contains($0.lineupSlotId) }
+            .reduce(0.0) { sum, entry in
+                sum + entry.getScore(for: week)
+            }
+    }
+
     /// Find user's matchup by team ID
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
         for (index, matchup) in matchups.enumerated() {
@@ -216,11 +311,42 @@ final class LeagueMatchupProvider {
         // First fetch league data for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            // 🔥 NEW: Sync ESPN league data to main FantasyViewModel for score breakdowns
             await syncESPNDataToMainViewModel()
         } catch {
             currentESPNLeague = nil
         }
+
+        // 🔥 NEW: Fetch ESPN standings to get team records BEFORE processing matchups
+        do {
+            let standingsData = try await ESPNAPIClient.shared.fetchESPNStandings(leagueID: league.league.leagueID)
+
+            // Extract and store team records from standings
+            espnTeamRecords.removeAll() // Clear any existing records
+            for team in standingsData.teams ?? [] {
+                if let espnRecord = team.record, let record = espnRecord.overall {
+                    espnTeamRecords[team.id] = TeamRecord(
+                        wins: record.wins,
+                        losses: record.losses,
+                        ties: record.ties
+                    )
+                }
+            }
+
+            // If no records found in standings, calculate from matchup history
+            if espnTeamRecords.isEmpty {
+                await calculateRecordsFromMatchupHistory(leagueID: league.league.leagueID)
+            }
+            
+            // 🔥 DRY FIX: Sync calculated records to FantasyViewModel after calculation completes
+            await syncESPNRecordsToViewModel()
+
+        } catch {
+            // Continue without standings data - records will be nil but won't crash
+        }
+
+        // NOTE: ESPN's standings endpoint does NOT support historical weeks
+        // It always returns current standings regardless of parameters
+        // Since Sleeper records work correctly, we only use Sleeper for team records
         
         // Now fetch matchup data
         var request = URLRequest(url: url)
@@ -232,25 +358,18 @@ final class LeagueMatchupProvider {
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
-            
             await processESPNData(model)
-            
         } catch {
-            // Silent fail
+            // Silent fail - matchup data couldn't be loaded
         }
     }
     
     private func processESPNData(_ espnModel: ESPNFantasyLeagueModel) async {
+        print("🔥 processESPNData called for \(espnModel.teams.count) teams")
+        
         // Store team records and names
         for team in espnModel.teams {
             espnTeamNames[team.id] = team.name
-            if let record = team.record?.overall {
-                espnTeamRecords[team.id] = TeamRecord(
-                    wins: record.wins,
-                    losses: record.losses,
-                    ties: record.ties
-                )
-            }
         }
         
         var processedMatchups: [FantasyMatchup] = []
@@ -259,7 +378,7 @@ final class LeagueMatchupProvider {
         let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
         
         for scheduleEntry in weekSchedule {
-            // Handle bye weeks
+            
             guard let awayTeamEntry = scheduleEntry.away else {
                 if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
                     let homeScore = homeTeam.activeRosterScore(for: week)
@@ -332,7 +451,7 @@ final class LeagueMatchupProvider {
         }
         
         let record: TeamRecord?
-        if let espnRecord = espnTeam.record?.overall {
+        if let espnRecord = espnTeamRecords[espnTeam.id] {
             record = TeamRecord(
                 wins: espnRecord.wins,
                 losses: espnRecord.losses,
@@ -421,19 +540,42 @@ final class LeagueMatchupProvider {
             // 🔥 NEW: Store rosters for record lookup
             sleeperRosters = rosters
             
+            // DISABLED VERBOSE LOGGING - uncomment if needed for debugging Sleeper records
+            /*
+            print("🔍 SLEEPER API RESPONSE - Record Diagnosis:")
+            print("   Total rosters: \(rosters.count)")
+            for (index, roster) in rosters.prefix(5).enumerated() {
+                let winsDisplay = roster.wins.map(String.init) ?? "nil"
+                let lossesDisplay = roster.losses.map(String.init) ?? "nil"
+                let tieValue = roster.ties ?? 0
+                
+                print("   Roster \(index): ID=\(roster.rosterID), Owner=\(roster.ownerID ?? "nil")")
+                print("      Root level - wins:\(winsDisplay), losses:\(lossesDisplay), ties:\(tieValue)")
+                
+                if let settings = roster.settings {
+                    let settingsWins = settings.wins ?? -1
+                    let settingsLosses = settings.losses ?? -1
+                    print("      Settings level - wins:\(settingsWins), losses:\(settingsLosses)")
+                }
+            }
+            */
+            
             var newRosterMapping: [Int: String] = [:]
+            
             for roster in rosters {
                 if let ownerID = roster.ownerID {
                     newRosterMapping[roster.rosterID] = ownerID
                 }
             }
+            
             rosterIDToManagerID = newRosterMapping
+            print("Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
             
             // Fetch users
             await fetchSleeperUsers()
             
         } catch {
-            // Silent fail
+            print("Failed to fetch Sleeper rosters: \(error)")
         }
     }
     
@@ -550,6 +692,9 @@ final class LeagueMatchupProvider {
         }
         
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
+        
+        // 🔥 DRY FIX: Final sync of records after matchups are created to ensure they're available
+        await syncESPNRecordsToViewModel()
     }
     
     private func createSleeperFantasyTeam(
@@ -591,14 +736,36 @@ final class LeagueMatchupProvider {
         
         // 🔥 NEW: Get roster record data
         let rosterRecord: TeamRecord? = {
-            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }),
-               let wins = roster.wins,
-               let losses = roster.losses {
-                return TeamRecord(
-                    wins: wins,
-                    losses: losses,
-                    ties: roster.ties ?? 0
-                )
+            
+            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }) {
+                DebugLogger.fantasy("🔍 Creating team for roster \(matchupResponse.rosterID):")
+                DebugLogger.fantasy("   Root level: wins=\(roster.wins ?? 0), losses=\(roster.losses ?? 0)")
+                
+                // Try root level first
+                if let wins = roster.wins, let losses = roster.losses {
+                    DebugLogger.fantasy("✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (root level)")
+                    return TeamRecord(
+                        wins: wins,
+                        losses: losses,
+                        ties: roster.ties ?? 0
+                    )
+                }
+                
+                // Fallback to settings object
+                if let settings = roster.settings,
+                   let wins = settings.wins,
+                   let losses = settings.losses {
+                    DebugLogger.fantasy("✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (settings)")
+                    return TeamRecord(
+                        wins: wins,
+                        losses: losses,
+                        ties: settings.ties ?? 0
+                    )
+                }
+                
+                DebugLogger.fantasy("❌ NO record data for roster \(matchupResponse.rosterID) - wins/losses not in root or settings")
+            } else {
+                DebugLogger.fantasy("❌ Roster not found for rosterID \(matchupResponse.rosterID) (sleeperRosters.count=\(sleeperRosters.count))")
             }
             return nil
         }()
@@ -720,6 +887,22 @@ final class LeagueMatchupProvider {
         
         await MainActor.run {
             FantasyViewModel.shared.currentESPNLeague = espnLeague
+        }
+        
+        // 🔥 DRY FIX: Sync records after league data is set
+        await syncESPNRecordsToViewModel()
+    }
+    
+    /// 🔥 DRY FIX: Centralized function to sync ESPN team records to FantasyViewModel
+    private func syncESPNRecordsToViewModel() async {
+        await MainActor.run {
+            // Sync all calculated records to FantasyViewModel for use in getManagerRecord
+            for (teamId, record) in espnTeamRecords {
+                FantasyViewModel.shared.espnTeamRecords[teamId] = record
+            }
+            if !espnTeamRecords.isEmpty {
+                print("📊 Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
+            }
         }
     }
     

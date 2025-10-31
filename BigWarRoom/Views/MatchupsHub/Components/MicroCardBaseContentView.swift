@@ -54,7 +54,8 @@ struct MicroCardBaseContentView: View {
                     managerName: managerName,
                     score: score,
                     scoreColor: scoreColor,
-                    percentage: percentage
+                    percentage: percentage,
+                    record: matchup.myTeam?.record?.displayString
                 )
             }
         }

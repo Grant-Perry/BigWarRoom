@@ -41,9 +41,7 @@ class PlayerComparisonViewModel {
     
     func selectPlayer1(_ player: SleeperPlayer) {
         player1 = player
-        player2 = nil // Reset player 2 when player 1 changes
         comparisonPlayer1 = nil
-        comparisonPlayer2 = nil
         recommendation = nil
     }
     
@@ -77,11 +75,14 @@ class PlayerComparisonViewModel {
     // MARK: - Comparison Processing
     
     func performComparison() async {
+        print("🏈 performComparison called: player1=\(player1?.fullName ?? "nil"), player2=\(player2?.fullName ?? "nil")")
         guard let p1 = player1, let p2 = player2 else {
             errorMessage = "Please select both players to compare"
+            print("🏈 performComparison: Missing player - returning")
             return
         }
         
+        print("🏈 performComparison: Starting async preparation for \(p1.fullName) vs \(p2.fullName)")
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -91,17 +92,20 @@ class PlayerComparisonViewModel {
             async let prep1 = prepareComparisonPlayer(p1)
             async let prep2 = prepareComparisonPlayer(p2)
             
+            print("🏈 performComparison: Awaiting player preparation...")
             let (comp1, comp2) = try await (prep1, prep2)
+            print("🏈 performComparison: Player preparation complete")
             
             comparisonPlayer1 = comp1
             comparisonPlayer2 = comp2
             
             // Generate recommendation
             recommendation = generateRecommendation(player1: comp1, player2: comp2)
+            print("🏈 performComparison: Recommendation generated")
             
         } catch {
             errorMessage = "Failed to prepare comparison: \(error.localizedDescription)"
-            print("❌ PlayerComparison: Error - \(error)")
+            print("🏈 performComparison: Error - \(error)")
         }
     }
     
@@ -121,13 +125,14 @@ class PlayerComparisonViewModel {
         let injuryStatus = InjuryStatus(from: player)
         
         // NEW: Get QB quality tier (for receivers and RBs)
-        let (qbTier, qbStats) = getQBQualityTier(for: player)
+        let (qbTier, qbStats, qbName) = getQBQualityTier(for: player)
+        print("🏈 DEBUG: \(player.fullName) position=\(player.position ?? "nil"), qbTier=\(qbTier ?? "nil")")
         
         // NEW: Calculate TD scoring tier
         let tdTier = getTDScoringTier(for: player)
         
         // NEW: Get average TDs per game
-        let avgTDsPerGame = getAverageTDsPerGame(for: player)
+        let avgTDsPerGame = getAverageTDsPerGame(for: player, projectedPoints: projectedPoints, recentStats: recentForm?.lastThreeGames)
         
         // NEW: Determine injury severity
         let injurySeverity = getInjurySeverity(from: player, injuryStatus: injuryStatus)
@@ -152,6 +157,8 @@ class PlayerComparisonViewModel {
             injuryStatus: injuryStatus,
             qbQualityTier: qbTier,
             qbTeamStats: qbStats,
+            qbPasserRating: qbStats?.passerRating,
+            qbName: qbName,
             tdScoringTier: tdTier,
             avgTDsPerGame: avgTDsPerGame,
             injurySeverity: injurySeverity,
@@ -287,8 +294,8 @@ class PlayerComparisonViewModel {
         
         // ====== SCORING BREAKDOWN (out of 100) ======
         
-        // Factor 1: Projected Points (30% weight - 30 pts)
-        let projWeight = 0.30
+        // Factor 1: Projected Points (40% weight - 40 pts) - INCREASED from 30%
+        let projWeight = 0.40
         let proj1 = (player1.projectedPoints ?? 0) * projWeight
         let proj2 = (player2.projectedPoints ?? 0) * projWeight
         player1Score += proj1
@@ -302,8 +309,8 @@ class PlayerComparisonViewModel {
             }
         }
         
-        // Factor 2: Recent Form (20% weight - 20 pts)
-        let formWeight = 0.20
+        // Factor 2: Recent Form (25% weight - 25 pts) - INCREASED from 20%
+        let formWeight = 0.25
         if let form1 = player1.recentForm {
             let formScore = form1.averagePoints * formWeight
             player1Score += formScore
@@ -330,8 +337,8 @@ class PlayerComparisonViewModel {
             }
         }
         
-        // Factor 3: TD Scoring Potential (15% weight - 15 pts)
-        let tdWeight = 0.15
+        // Factor 3: TD Scoring Potential (12% weight - 12 pts) - DECREASED from 15%
+        let tdWeight = 0.12
         let td1Score = scoreTDTier(player1.tdScoringTier) * tdWeight
         let td2Score = scoreTDTier(player2.tdScoringTier) * tdWeight
         player1Score += td1Score
@@ -343,8 +350,8 @@ class PlayerComparisonViewModel {
             reasons.append("\(td1emoji) \(player1.fullName): \(player1.tdScoringTier) | \(td2emoji) \(player2.fullName): \(player2.tdScoringTier)")
         }
         
-        // Factor 4: Depth Chart Position (10% weight - 10 pts)
-        let depthWeight = 0.10
+        // Factor 4: Depth Chart Position (5% weight - 5 pts) - DECREASED from 10%
+        let depthWeight = 0.05
         let depth1Score = scoreDepthTier(player1.depthChartTier) * depthWeight
         let depth2Score = scoreDepthTier(player2.depthChartTier) * depthWeight
         player1Score += depth1Score
@@ -354,19 +361,13 @@ class PlayerComparisonViewModel {
             reasons.append("📋 Depth: \(player1.fullName) (\(player1.depthChartTier)) vs \(player2.fullName) (\(player2.depthChartTier))")
         }
         
-        // Factor 5: QB Quality (if WR/TE/RB) (10% weight - 10 pts)
+        // Factor 5: QB Quality (for WR/TE/RB only - 10% weight)
         let qbWeight = 0.10
         if ["WR", "TE", "RB"].contains(player1.position.uppercased()) {
             let qb1Score = scoreQBTier(player1.qbQualityTier) * qbWeight
             let qb2Score = scoreQBTier(player2.qbQualityTier) * qbWeight
             player1Score += qb1Score
             player2Score += qb2Score
-            
-            if player1.qbQualityTier != player2.qbQualityTier {
-                let qb1 = player1.qbQualityTier ?? "Unknown"
-                let qb2 = player2.qbQualityTier ?? "Unknown"
-                reasons.append("🏈 QB: \(player1.fullName)'s QB is \(qb1) vs \(player2.fullName)'s QB is \(qb2)")
-            }
         }
         
         // Factor 6: Injury Status (15% weight - 15 pts)
@@ -381,6 +382,18 @@ class PlayerComparisonViewModel {
         }
         if player2.injurySeverity != "Healthy" {
             reasons.append("⚠️ \(player2.fullName): \(player2.injurySeverity)")
+        }
+        
+        // Add QB information for non-QB players
+        if !player1.position.uppercased().contains("QB") {
+            let qb1Name = player1.qbName ?? "Unknown QB"
+            let qb1Tier = player1.qbQualityTier ?? "Unknown"
+            reasons.append("🏈 \(player1.fullName) QB: \(qb1Name) (\(qb1Tier))")
+        }
+        if !player2.position.uppercased().contains("QB") {
+            let qb2Name = player2.qbName ?? "Unknown QB"
+            let qb2Tier = player2.qbQualityTier ?? "Unknown"
+            reasons.append("🏈 \(player2.fullName) QB: \(qb2Name) (\(qb2Tier))")
         }
         
         // Clamp scores to 0-100
@@ -424,6 +437,8 @@ class PlayerComparisonViewModel {
             winnerGrade: winnerGrade,
             loserGrade: loserGrade,
             scoreDifference: projectedDiff,
+            winnerScore: player1Score >= player2Score ? player1Score : player2Score,
+            loserScore: player1Score >= player2Score ? player2Score : player1Score,
             reasoning: reasons,
             confidence: confidence
         )
@@ -453,7 +468,7 @@ class PlayerComparisonViewModel {
         switch tier {
         case "Elite": return 10.0
         case "Solid": return 8.0
-        case "Adequate": return 5.0
+        case "Good": return 5.0
         case "Weak": return 2.0
         default: return 5.0
         }
@@ -493,40 +508,117 @@ class PlayerComparisonViewModel {
     
     // MARK: - NEW: Enhanced Metrics Helpers
     
-    private func getQBQualityTier(for player: SleeperPlayer) -> (tier: String?, stats: (passTDs: Int?, passYards: Int?)?) {
-        guard let position = player.position?.uppercased(), ["WR", "TE", "RB"].contains(position) else {
-            return (nil, nil)
+    private func getQBQualityTier(for player: SleeperPlayer) -> (tier: String?, stats: (passTDs: Int?, passYards: Int?, passerRating: Double?)?, qbName: String?) {
+        print("🏈 getQBQualityTier called for: \(player.fullName), position: \(player.position ?? "nil")")
+        guard let position = player.position?.uppercased() else {
+            print("🏈 No position found")
+            return (nil, nil, nil)
         }
         
+        print("🏈 Position is: \(position)")
+        print("🏈 Is QB?: \(position == "QB")")
+        print("🏈 Is WR/TE/RB?: \(["WR", "TE", "RB"].contains(position))")
+        
+        // If this IS a QB, try to calculate their own passer rating
+        if position == "QB" {
+            // Try to get stats from store first
+            if let stats = PlayerStatsStore.shared.stats(for: player.playerID) {
+                print("🏈 Found season stats for QB \(player.fullName) from PlayerStatsStore")
+                let passTDs = stats.passTDs ?? 0
+                let passYards = stats.passYards ?? 0
+                let passAttempts = stats.passAttempts ?? 1
+                let passCompletions = stats.passCompletions ?? 0
+                let interceptions = stats.interceptions ?? 0
+                
+                let passerRating = calculatePasserRating(
+                    completions: passCompletions,
+                    attempts: passAttempts,
+                    yards: passYards,
+                    touchdowns: passTDs,
+                    interceptions: interceptions
+                )
+                
+                print("🏈 QB Rating for \(player.fullName): \(passerRating)")
+                
+                let tier: String
+                switch passerRating {
+                case 120...: tier = "Elite"
+                case 105..<120: tier = "Solid"
+                case 85..<105: tier = "Good"
+                default: tier = "Weak"
+                }
+                
+                return (tier, (passTDs: passTDs, passYards: passYards, passerRating: passerRating), player.fullName)
+            } else {
+                // Use tier map for QB without stats
+                print("🏈 No season stats for QB \(player.fullName), using tier map")
+            }
+        }
+        
+        // For non-QBs, get their team's QB
+        guard ["WR", "TE", "RB"].contains(position) else {
+            return (nil, nil, nil)
+        }
+        
+        print("🏈 Getting QB for non-QB player: \(player.fullName), team: \(player.team ?? "nil")")
         // Get QB for this player's team
-        guard let team = player.team else { return (nil, nil) }
+        guard let team = player.team else { return ("Good", nil, nil) }
         let roster = NFLTeamRosterService.shared.getTeamRoster(for: team)
-        guard let qb = roster.quarterbacks.first else { return (nil, nil) }
-        
-        // Get QB season stats
-        guard let qbStats = PlayerStatsStore.shared.stats(for: qb.playerID) else {
-            return (nil, nil)
+        guard let qb = roster.quarterbacks.first else { 
+            print("🏈 No QB found in roster for team: \(team)")
+            return ("Good", nil, nil) 
         }
         
-        let passTDs = qbStats.passTDs ?? 0
-        let passYards = qbStats.passYards ?? 0
+        print("🏈 Found QB: \(qb.fullName) for team \(team)")
         
-        // Tier based on pass TDs
-        let tier: String
-        switch passTDs {
-        case 30...: tier = "Elite"
-        case 25..<30: tier = "Solid"
-        case 20..<25: tier = "Adequate"
-        default: tier = "Weak"
-        }
+        // Use tier map of known QBs to provide reasonable estimates
+        let knownQBTiers: [String: String] = [
+            // Elite QBs (30+ TDs, 120+ rating)
+            "Josh Allen": "Elite", "Patrick Mahomes": "Elite", "Jared Goff": "Elite",
+            "Lamar Jackson": "Elite", "Dak Prescott": "Elite", "Joe Burrow": "Elite",
+
+            // Solid QBs (25-29 TDs, 105-119 rating)
+            "Brock Purdy": "Solid", "Justin Herbert": "Solid", "Michael Penix": "Good",
+             "Baker Mayfield": "Solid", "Daniel Jones": "Solid", "Drake Maye": "Solid",
+
+            // Good QBs (20-24 TDs, 85-104 rating)
+            "Will Levis": "Good", "Bryce Young": "Good", "Tua Tagovailoa": "Good",
+            "Aaron Rodgers": "Solid", "Sam Darnold": "Good", "Anthony Richardson": "Good", "Kirk Cousins": "Bad"]
+
+        let tier = knownQBTiers[qb.fullName] ?? "Good"
+        print("🏈 QB \(qb.fullName) assigned tier: \(tier)")
         
-        return (tier, (passTDs: passTDs, passYards: passYards))
+        // For non-QBs, return the tier and the QB's name
+        return (tier, nil, qb.fullName)
+    }
+    
+    private func calculatePasserRating(completions: Int, attempts: Int, yards: Int, touchdowns: Int, interceptions: Int) -> Double {
+        guard attempts > 0 else { return 0.0 }
+        
+        let a = attempts
+        let c = Double(completions)
+        let y = Double(yards)
+        let t = Double(touchdowns)
+        let i = Double(interceptions)
+        let att = Double(a)
+        
+        // NFL Passer Rating Formula:
+        // ((C/A) * 100 - 30) * 0.05 + ((Y/A) - 3) * 0.25 + (T/A) * 20 + 2.375 - (I/A) * 25
+        
+        let comp = max(0, min(2.375, ((c / att) * 100 - 30) * 0.05))
+        let yard = max(0, min(2.375, ((y / att) - 3) * 0.25))
+        let td = max(0, min(2.375, (t / att) * 20))
+        let inter = max(0, min(2.375, (i / att) * 25))
+        
+        let rating = ((comp + yard + td + 2.375 - inter) / 6.0) * 100.0
+        return min(158.3, max(0, rating)) // Cap at 158.3 (perfect rating)
     }
     
     private func getTDScoringTier(for player: SleeperPlayer) -> String {
-        guard let position = player.position?.uppercased() else { return "Unknown" }
+        guard let position = player.position?.uppercased() else { return "Moderate" }
         guard let stats = PlayerStatsStore.shared.stats(for: player.playerID) else {
-            return "Unknown"
+            // Return default tier based on position instead of "Unknown"
+            return "Moderate"
         }
         
         switch position {
@@ -554,14 +646,15 @@ class PlayerComparisonViewModel {
             default: return "Low TD Potential"
             }
         default:
-            return "Unknown"
+            return "Moderate"
         }
     }
     
-    private func getAverageTDsPerGame(for player: SleeperPlayer) -> Double? {
+    private func getAverageTDsPerGame(for player: SleeperPlayer, projectedPoints: Double?, recentStats: [Double]?) -> Double? {
         guard let stats = PlayerStatsStore.shared.stats(for: player.playerID),
               let gamesPlayed = stats.gamesPlayed, gamesPlayed > 0 else {
-            return nil
+            // Fallback: Get actual TDs from last 3 weeks if available
+            return getActualTDsFromRecentWeeks(for: player)
         }
         
         guard let position = player.position?.uppercased() else { return nil }
@@ -582,10 +675,53 @@ class PlayerComparisonViewModel {
         return Double(tds) / Double(gamesPlayed)
     }
     
+    private func getActualTDsFromRecentWeeks(for player: SleeperPlayer) -> Double? {
+        // Extract TD data from the last 3 weeks if available
+        var totalTDs = 0
+        var gamesWithData = 0
+        let position = player.position?.uppercased() ?? "UNK"
+        
+        // Load stats for last 3 weeks
+        for weekOffset in 1...3 {
+            let week = max(1, currentWeek - weekOffset)
+            
+            // Try cache first
+            if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: player.playerID, week: week) {
+                // Extract TDs based on position
+                let weekTDs: Int
+                switch position {
+                case "RB":
+                    let rushTDs = Int(cachedStats["rush_td"] ?? 0)
+                    let recTDs = Int(cachedStats["rec_td"] ?? 0)
+                    weekTDs = rushTDs + recTDs
+                case "WR", "TE":
+                    weekTDs = Int(cachedStats["rec_td"] ?? 0)
+                case "QB":
+                    weekTDs = Int(cachedStats["pass_td"] ?? 0)
+                default:
+                    weekTDs = 0
+                }
+                
+                if weekTDs >= 0 {
+                    totalTDs += weekTDs
+                    gamesWithData += 1
+                }
+            }
+        }
+        
+        guard gamesWithData > 0 else { return nil }
+        return Double(totalTDs) / Double(gamesWithData)
+    }
+    
     private func getInjurySeverity(from player: SleeperPlayer, injuryStatus: InjuryStatus) -> String {
         guard !injuryStatus.isHealthy else { return "Healthy" }
         
         let status = (player.injuryStatus ?? "").lowercased()
+        
+        // If no injury status at all, return Low Risk
+        if status.isEmpty {
+            return "Low Risk"
+        }
         
         if status.contains("out") {
             return "High Risk"
@@ -597,7 +733,7 @@ class PlayerComparisonViewModel {
             return "Minor Risk"
         }
         
-        return "Moderate Risk"
+        return "Low Risk"
     }
     
     private func getDepthChartTier(for player: SleeperPlayer) -> String {

@@ -97,7 +97,8 @@ struct MatchupsHubView: View {
         .navigationTitle("")
         .navigationBarHidden(true)
         .onAppear {
-            loadInitialData()
+            // 🔥 NAVIGATION FIX: Only load if we don't have data - prevents loading screen on navigation return
+            loadInitialData() // This function now checks if data exists before loading
             startPeriodicRefresh()
         }
         .onDisappear {

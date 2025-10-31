@@ -15,7 +15,7 @@ struct MoreTabView: View {
         MenuItem(
             icon: "arrow.left.arrow.right.circle.fill",
             iconColor: .purple,
-            title: "Start/Sit Compare",
+            title: "Start/Sit AssistantA",
             subtitle: "Compare players and get recommendations",
             destination: .playerComparison
         ),

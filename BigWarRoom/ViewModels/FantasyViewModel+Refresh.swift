@@ -61,6 +61,7 @@ extension FantasyViewModel {
             )
             
             if let cachedProvider = cachedProvider {
+                DebugLogger.fantasy("📦 Using CACHED provider for league \(league.league.leagueID)")
                 
                 // Get matchups from cached provider
                 let providerMatchups = try await cachedProvider.fetchMatchups()
@@ -82,15 +83,19 @@ extension FantasyViewModel {
                 
             } else {
                 // Fallback: Use original API calls if no cached provider available
+                DebugLogger.fantasy("📦 NO CACHED PROVIDER - Using FALLBACK fetch for league \(league.league.leagueID), source=\(league.source)")
                 
                 if league.source == .espn {
+                    DebugLogger.fantasy("  📡 FALLBACK: Fetching ESPN data via fetchESPNFantasyData")
                     await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
                 } else {
+                    DebugLogger.fantasy("  📡 FALLBACK: Fetching Sleeper data via fetchSleeperLeagueUsersAndRosters")
                     await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
                     await fetchSleeperWeeklyStats()
                     await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
                     await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
                 }
+                DebugLogger.fantasy("  ✅ FALLBACK fetch complete, matchups.count=\(matchups.count)")
             }
             
             // FIX: Better handling when matchups are empty

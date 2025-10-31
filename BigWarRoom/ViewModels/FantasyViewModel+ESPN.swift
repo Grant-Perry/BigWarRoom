@@ -35,7 +35,33 @@ extension FantasyViewModel {
             print("⚠️ ESPN: Failed to get league data, using fallback names - \(error)")
             currentESPNLeague = nil
         }
-        
+
+        // 🔥 NEW: Fetch ESPN standings to get team records BEFORE processing matchups
+        do {
+            let standingsData = try await ESPNAPIClient.shared.fetchESPNStandings(leagueID: leagueID)
+            print("✅ ESPN: Got standings data for team records")
+
+            // Extract and store team records from standings
+            espnTeamRecords.removeAll() // Clear any existing records
+            for team in standingsData.teams ?? [] {
+                if let record = team.record?.overall {
+                    espnTeamRecords[team.id] = TeamRecord(
+                        wins: record.wins,
+                        losses: record.losses,
+                        ties: record.ties
+                    )
+                    print("📊 ESPN Standings Record: Team \(team.id) '\(team.displayName)': \(record.wins)-\(record.losses)")
+                } else {
+                    print("⚠️ ESPN Standings: Team \(team.id) '\(team.displayName)': NO RECORD in standings")
+                }
+            }
+            print("📊 ESPN Standings Summary: \(espnTeamRecords.count) records stored from standings")
+
+        } catch {
+            print("❌ ESPN: Failed to get standings data - \(error)")
+            // Continue without standings data - records will be nil but won't crash
+        }
+
         var request = URLRequest(url: url)
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         
@@ -147,17 +173,16 @@ extension FantasyViewModel {
     
     /// Process ESPN Fantasy data exactly like the working test view
     func processESPNFantasyData(espnModel: ESPNFantasyLeagueModel, leagueID: String, week: Int) async {
-        // Store team records and names for later lookup
+        // Store team names for later lookup (records are now fetched from standings separately)
+        print("🔍 ESPN Matchup API RESPONSE - Processing \(espnModel.teams.count) teams")
+
         for team in espnModel.teams {
             espnTeamNames[team.id] = team.name
-            if let record = team.record?.overall {
-                espnTeamRecords[team.id] = TeamRecord(
-                    wins: record.wins,
-                    losses: record.losses,
-                    ties: record.ties
-                )
-            }
+            // Records are now fetched from standings endpoint, not matchup data
+            // The matchup endpoint (mMatchupScore&mLiveScoring&mRoster) does NOT include team records
         }
+
+        print("📊 ESPN Matchup Processing: Team names stored. Records fetched separately from standings endpoint.")
         
         var processedMatchups: [FantasyMatchup] = []
         var byeTeams: [FantasyTeam] = []
@@ -167,7 +192,6 @@ extension FantasyViewModel {
         for scheduleEntry in weekSchedule {
             // Handle bye weeks
             guard let awayTeamEntry = scheduleEntry.away else {
-                let homeTeamName = espnModel.teams.first { $0.id == scheduleEntry.home.teamId }?.name ?? "Unknown"
                 
                 // Convert this specific schedule entry back to JSON for inspection
                 if let jsonData = try? JSONEncoder().encode(scheduleEntry),
@@ -277,14 +301,13 @@ extension FantasyViewModel {
         }
         
         let record: TeamRecord?
-        if let espnRecord = espnTeam.record?.overall {
-            record = TeamRecord(
-                wins: espnRecord.wins,
-                losses: espnRecord.losses,
-                ties: espnRecord.ties
-            )
+        // 🔥 FIX: Use the espnTeamRecords dictionary that was populated from standings endpoint
+        if let storedRecord = espnTeamRecords[espnTeam.id] {
+            record = storedRecord
+            print("✅ Using standings record for ESPN team \(espnTeam.id): \(storedRecord.displayString)")
         } else {
             record = nil
+            print("❌ No standings record found for ESPN team \(espnTeam.id) - this should not happen")
         }
         
         // 🔥 FIX: Improved team name resolution with better fallbacks

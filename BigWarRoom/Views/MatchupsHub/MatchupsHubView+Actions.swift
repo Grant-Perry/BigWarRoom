@@ -12,6 +12,11 @@ extension MatchupsHubView {
     
     // MARK: - Data Loading Actions (Delegated to ViewModel)
     func loadInitialData() {
+        // 🔥 NAVIGATION FIX: Don't reload if we already have matchups - prevents loading screen on navigation return
+        guard matchupsHubViewModel.myMatchups.isEmpty else {
+            return // Already have data, don't reload
+        }
+        
         Task {
             if weekManager.selectedWeek != weekManager.currentNFLWeek {
                 await matchupsHubViewModel.loadMatchupsForWeek(weekManager.selectedWeek)
@@ -139,6 +144,9 @@ extension MatchupsHubView {
     func onWeekSelected(_ week: Int) {
         Task {
             await matchupsHubViewModel.loadMatchupsForWeek(week)
+            // Week change means we need to reload, so reset the flag to allow reload on next appear if needed
+            // Actually, don't reset here - hasLoadedInitialData should only prevent reload when navigating back
+            // Week changes are handled by onChange, which calls this directly
         }
     }
     

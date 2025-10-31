@@ -35,8 +35,7 @@ struct FantasyMatchupCard: View {
                 MatchupTeamSectionView(
                     team: matchup.awayTeam,
                     score: matchup.awayTeam.currentScoreString,
-                    isHome: false,
-                    fantasyViewModel: fantasyViewModel  // 🔥 NEW: Pass FantasyViewModel
+                    isHome: false
                 )
                 
                 // VS divider  
@@ -59,8 +58,7 @@ struct FantasyMatchupCard: View {
                 MatchupTeamSectionView(
                     team: matchup.homeTeam,
                     score: matchup.homeTeam.currentScoreString,
-                    isHome: true,
-                    fantasyViewModel: fantasyViewModel  // 🔥 NEW: Pass FantasyViewModel
+                    isHome: true
                 )
             }
             .padding(.horizontal, 16)
@@ -82,7 +80,6 @@ struct MatchupTeamSectionView: View {
     let team: FantasyTeam
     let score: String
     let isHome: Bool
-    let fantasyViewModel: FantasyViewModel  // 🔥 NEW: Access to FantasyViewModel
     
     var body: some View {
         VStack(spacing: 8) {
@@ -96,10 +93,9 @@ struct MatchupTeamSectionView: View {
                     .foregroundColor(.white)
                     .lineLimit(1)
                 
-                // 🔥 NEW: Only show record if not empty (Sleeper only)
-                let teamRecord = fantasyViewModel.getManagerRecord(managerID: team.id)
-                if !teamRecord.isEmpty {
-                    Text(teamRecord)
+                // 🔥 FIXED: Use team.record directly instead of calling getManagerRecord()
+                if let record = team.record {
+                    Text(record.displayString)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.gray)
                 }

@@ -133,11 +133,13 @@ final class MatchupsHubViewModel {
     
     /// Load all matchups across all connected leagues
     func loadAllMatchups() async {
+        print("🔥🔥🔥 PUBLIC API: MatchupsHubViewModel.loadAllMatchups() called from LoadingScreen")
         await performLoadAllMatchups()
     }
     
     /// Load matchups for a specific week
     func loadMatchupsForWeek(_ week: Int) async {
+        print("🔥🔥🔥 PUBLIC API: MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
         await performLoadMatchupsForWeek(week)
     }
     

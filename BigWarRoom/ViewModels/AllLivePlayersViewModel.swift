@@ -29,7 +29,7 @@ final class AllLivePlayersViewModel {
     
     // MARK: - UI State
     var sortHighToLow = true
-    var sortingMethod: SortingMethod = .position
+    var sortingMethod: SortingMethod = .score
     var showActiveOnly: Bool = false
     var shouldResetAnimations = false
     var sortChangeID = UUID()
@@ -63,11 +63,16 @@ final class AllLivePlayersViewModel {
     // 🔥 PHASE 3: Replace Combine subscriptions with observation task
     private var observationTask: Task<Void, Never>?
     
+    // 🔥 NEW: Auto-refresh timer for live player data (every 15 seconds during games)
+    internal var refreshTimer: Timer?
+    var autoRefreshEnabled = true
+    
     // 🔥 PHASE 2.5: Dependency injection initializer
     @MainActor
     init(matchupsHubViewModel: MatchupsHubViewModel) {
         self.matchupsHubViewModel = matchupsHubViewModel
         setupObservation()
+        setupAutoRefresh()
     }
     
     // MARK: - Bridge compatibility initializer (DEPRECATED)
@@ -81,11 +86,12 @@ final class AllLivePlayersViewModel {
     deinit {
         debounceTask?.cancel()
         observationTask?.cancel()
+        refreshTimer?.invalidate()
     }
     
     // 🔥 PHASE 3: Replace Combine subscription with @Observable observation
     private func setupObservation() {
-        print("🔥 OBSERVATION SETUP: Setting up @Observable-based observation")
+        // print("🔥 OBSERVATION SETUP: Setting up @Observable-based observation")
         
         observationTask = Task { @MainActor in
             // Observe changes to MatchupsHubViewModel
@@ -96,17 +102,17 @@ final class AllLivePlayersViewModel {
                 let currentUpdateTime = matchupsHubViewModel.lastUpdateTime
                 
                 if currentUpdateTime > lastObservedUpdate && currentUpdateTime > lastProcessedMatchupUpdate {
-                    print("🔥 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
+                    // print("🔥 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
                     
                     // Only process if we have initial data
                     guard !allPlayers.isEmpty else {
-                        print("🔥 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
+                        // print("🔥 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
                         lastObservedUpdate = currentUpdateTime
                         try? await Task.sleep(for: .seconds(1))
                         continue
                     }
                     
-                    print("🔥 OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
+                    // print("🔥 OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
                     lastProcessedMatchupUpdate = currentUpdateTime
                     lastObservedUpdate = currentUpdateTime
                     
@@ -117,6 +123,14 @@ final class AllLivePlayersViewModel {
                 try? await Task.sleep(for: .milliseconds(500))
             }
         }
+    }
+    
+    // 🔥 NEW: Setup auto-refresh timer
+    private func setupAutoRefresh() {
+        // 🔥 DISABLED: MatchupsHubViewModel already has a 15-second auto-refresh timer
+        // Having both timers causes a race condition where they block each other
+        // Instead, we observe MatchupsHub changes via setupObservation() which is already in place
+        // print("🔥 AUTO-REFRESH DISABLED: AllLivePlayersViewModel will observe MatchupsHub changes instead")
     }
 }
 
@@ -220,7 +234,22 @@ extension AllLivePlayersViewModel {
     
     /// Main entry point for refreshing data
     func refresh() async {
-        await performManualRefresh()
+        // 🔥 LIGHT THROTTLING: Prevent rapid duplicate calls (3 seconds minimum)
+        let now = Date()
+        let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
+        guard timeSinceLastUpdate >= 3.0 else {
+            print("🔥 AUTO-REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            return
+        }
+        
+        // Only refresh if we have data and are not already loading
+        guard !allPlayers.isEmpty && !isLoading else {
+            print("🔥 AUTO-REFRESH BLOCKED: No data yet or already loading")
+            return
+        }
+        
+        print("🔥 AUTO-REFRESH: Performing background live update")
+        await performLiveUpdate()
     }
     
     /// Main entry point for filter changes

@@ -23,7 +23,9 @@ struct ComparisonPlayer: Identifiable {
     
     // NEW: Enhanced Metrics
     let qbQualityTier: String?  // "Elite", "Solid", "Adequate", "Weak" (for WR/TE/RB only)
-    let qbTeamStats: (passTDs: Int?, passYards: Int?)?
+    let qbTeamStats: (passTDs: Int?, passYards: Int?, passerRating: Double?)?
+    let qbPasserRating: Double?  // Store the actual passer rating for display
+    let qbName: String?  // Store the QB's name for display in reasoning
     let tdScoringTier: String  // "High TD Potential", "Moderate", "Low TD Potential"
     let avgTDsPerGame: Double?
     let injurySeverity: String  // "Healthy", "Minor Risk", "Moderate Risk", "High Risk"
@@ -101,6 +103,8 @@ struct ComparisonRecommendation: Identifiable, Equatable {
     let winnerGrade: LetterGrade
     let loserGrade: LetterGrade
     let scoreDifference: Double // Projected point difference
+    let winnerScore: Double  // Actual weighted comparison score
+    let loserScore: Double   // Actual weighted comparison score
     let reasoning: [String] // List of reasons
     let confidence: ConfidenceLevel
     

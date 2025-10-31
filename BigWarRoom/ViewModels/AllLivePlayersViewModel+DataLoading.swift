@@ -133,16 +133,32 @@ extension AllLivePlayersViewModel {
         isUpdating = true
         
         print("🔥 LIVE UPDATE START: Beginning live update process...")
+        print("🔥 LIVE UPDATE: Selected week = \(WeekSelectionManager.shared.selectedWeek)")
         let startTime = Date()
         
-        // 🔥 CRITICAL FIX: Refresh matchups FIRST to get fresh scores
-        await matchupsHubViewModel.performManualRefresh()
-        print("🔥 LIVE UPDATE: Refreshed matchup data")
+        // 🔥 CRITICAL: Clear player stats cache to force fresh fetch
+        print("🔥 LIVE UPDATE: Clearing player stats cache for fresh data")
+        await PlayerStatsCache.shared.clearCache()
         
-        // 🔥 FIXED: Now extract from refreshed matchup data 
+        // 🔥 NOTE: DO NOT call performManualRefresh() here!
+        // This method is called BY the observation system AFTER MatchupsHub has already refreshed
+        // Calling refresh here would create a race condition
+        print("🔥 LIVE UPDATE: Extracting players from already-refreshed MatchupsHub data")
+        
+        // Debug: Show week info from first matchup
+        if let firstMatchup = matchupsHubViewModel.myMatchups.first {
+            if let fantasyMatchup = firstMatchup.fantasyMatchup {
+                print(
+                   "🔥 LIVE UPDATE: First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)"
+                )
+            }
+        }
+        
+        // 🔥 FIXED: Extract from already-refreshed matchup data 
         let freshPlayerEntries = extractAllPlayers()
         guard !freshPlayerEntries.isEmpty else {
-            print("🔥 LIVE UPDATE ERROR: No fresh player entries found")
+            print("🔥 LIVE UPDATE ERROR: No fresh player entries found after extraction")
+            print("🔥 LIVE UPDATE: matchupsHubViewModel.myMatchups.count = \(matchupsHubViewModel.myMatchups.count)")
             isUpdating = false // 🔥 Clear updating flag on error
             return
         }

@@ -564,7 +564,92 @@ final class ESPNAPIClient: DraftAPIClient {
         
         return try JSONDecoder().decode(ESPNLeague.self, from: data)
     }
-    
+
+    /// Fetch ESPN league standings data (contains team records)
+    func fetchESPNStandings(leagueID: String) async throws -> ESPNLeague {
+        // Try with the best token for this league first
+        let primaryToken = AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.currentSeasonYear)
+
+        do {
+            return try await fetchESPNStandingsWithToken(leagueID: leagueID, token: primaryToken)
+        } catch ESPNAPIError.authenticationFailed {
+            // Try with the alternate token
+            let alternateToken = leagueID == "1241361400" ?
+                AppConstants.getPrimaryESPNToken(for: AppConstants.currentSeasonYear) :
+                AppConstants.getAlternateESPNToken(for: AppConstants.currentSeasonYear)
+
+            return try await fetchESPNStandingsWithToken(leagueID: leagueID, token: alternateToken)
+        }
+    }
+
+    /// Fetch ESPN standings data with a specific token
+    private func fetchESPNStandingsWithToken(leagueID: String, token: String) async throws -> ESPNLeague {
+        // Try multiple view combinations to find team records
+        let viewCombinations = [
+            "?view=mStandings&view=mTeam",  // Both standings and team data
+            "?view=mTeam&view=mStandings",  // Reverse order
+            "?view=mTeam",                  // Just team data (might include records)
+            "?view=mStandings"              // Original standings view
+        ]
+
+        var lastError: Error?
+
+        for viewParams in viewCombinations {
+            let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)\(viewParams)"
+
+            guard let url = URL(string: urlString) else {
+                continue
+            }
+
+            var request = URLRequest(url: url)
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.setValue("SWID=\(AppConstants.SWID); espn_s2=\(token)", forHTTPHeaderField: "Cookie")
+
+            do {
+                let (data, response) = try await session.data(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw ESPNAPIError.invalidResponse
+                }
+
+                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                    throw ESPNAPIError.authenticationFailed
+                }
+
+                guard httpResponse.statusCode == 200 else {
+                    throw ESPNAPIError.invalidResponse
+                }
+
+                let league = try JSONDecoder().decode(ESPNLeague.self, from: data)
+
+                // Check if this view combination has records
+                let teamsWithRecords = league.teams?.filter { $0.record != nil } ?? []
+                print("📊 Standings fetch with \(viewParams): \(teamsWithRecords.count)/\(league.teams?.count ?? 0) teams have records")
+
+                // If we found records, return this data
+                if !teamsWithRecords.isEmpty {
+                    print("✅ Found records using view: \(viewParams)")
+                    return league
+                }
+
+                // If no records but successful response, try next combination
+                lastError = nil
+
+            } catch {
+                lastError = error
+                print("❌ Failed with view \(viewParams): \(error)")
+                continue
+            }
+        }
+
+        // If we get here, none of the view combinations worked
+        if let error = lastError {
+            throw error
+        } else {
+            throw ESPNAPIError.invalidResponse
+        }
+    }
+
     /// Get ESPN league scoring settings for score breakdown calculation
     func fetchESPNLeagueScoring(leagueID: String) async throws -> [String: Double] {
         let espnLeague = try await fetchESPNLeagueDataWithToken(leagueID: leagueID, token: AppConstants.getESPNTokenForLeague(leagueID, year: AppConstants.currentSeasonYear))
