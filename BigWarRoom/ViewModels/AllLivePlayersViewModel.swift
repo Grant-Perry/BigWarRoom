@@ -234,20 +234,7 @@ extension AllLivePlayersViewModel {
     
     /// Main entry point for refreshing data
     func refresh() async {
-        // 🔥 LIGHT THROTTLING: Prevent rapid duplicate calls (3 seconds minimum)
-        let now = Date()
-        let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
-        guard timeSinceLastUpdate >= 3.0 else {
-            debugPrint(mode: .liveUpdates, "🚫 AUTO-REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
-            return
-        }
-        
-        // Only refresh if we have data and are not already loading
-        guard !allPlayers.isEmpty && !isLoading else {
-            debugPrint(mode: .liveUpdates, "🚫 AUTO-REFRESH BLOCKED: No data yet or already loading")
-            return
-        }
-        
+        // 🔥 NO THROTTLING: Always fetch fresh data from APIs
         debugPrint(mode: .liveUpdates, "🔄 AUTO-REFRESH: Performing background live update")
         await performLiveUpdate()
     }

@@ -19,6 +19,7 @@ struct PlayerScoreBarCardContentView: View {
     @State private var playerDirectory = PlayerDirectoryStore.shared // 🔥 PHASE 2.5: Use @State for @Observable
     
     @State private var showingScoreBreakdown = false
+    @State private var isLoadingOverlayVisible = false
     
     var body: some View {
         ZStack(alignment: .leading) {
@@ -110,7 +111,9 @@ struct PlayerScoreBarCardContentView: View {
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             // 🔥 FIXED: Make score clickable with background like before
-                            Button(action: { showingScoreBreakdown = true }) {
+                            Button(action: {
+                                Task { await presentScoreBreakdown() }
+                            }) {
                                 HStack(spacing: 8) {
                                     Text(playerEntry.currentScoreString)
                                         .font(.callout)
@@ -211,8 +214,60 @@ struct PlayerScoreBarCardContentView: View {
         .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Restore clipping
         
+        // Inline loading overlay (not a sheet)
+        .overlay {
+            if isLoadingOverlayVisible {
+                ZStack {
+                    // MARK: Transparancy for point proof overlay
+                    Color.black.opacity(0.5).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(1.5)
+                        Text("Loading stats...")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+        }
+        
+        // Final sheet only for the breakdown once stats are ready
         .sheet(isPresented: $showingScoreBreakdown) {
-            ScoreBreakdownLoaderView(playerEntry: playerEntry)
+            let leagueContext = LeagueContext(
+                leagueID: playerEntry.matchup.league.league.leagueID,
+                source: playerEntry.matchup.league.source,
+                isChopped: playerEntry.matchup.isChoppedLeague
+            )
+            
+            let breakdown = ScoreBreakdownFactory.createBreakdown(
+                for: playerEntry.player,
+                week: WeekSelectionManager.shared.selectedWeek,
+                leagueContext: leagueContext
+            ).withLeagueName(playerEntry.leagueName)
+            
+            ScoreBreakdownView(breakdown: breakdown)
+                .presentationDetents([.height(500)])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(.clear)
+        }
+    }
+    
+    // MARK: - Loading + Sheet Orchestration
+    private func presentScoreBreakdown() async {
+        // Show inline overlay
+        await MainActor.run { isLoadingOverlayVisible = true }
+        
+        // Ensure stats are available on-demand
+        if !AllLivePlayersViewModel.shared.statsLoaded {
+            // IMPORTANT: Load using the singleton since ScoreBreakdown/StatsFacade reads from the shared store
+            await AllLivePlayersViewModel.shared.loadAllPlayers()
+        }
+        
+        // Hide overlay and present the breakdown sheet
+        await MainActor.run {
+            isLoadingOverlayVisible = false
+            showingScoreBreakdown = true
         }
     }
     
@@ -356,10 +411,14 @@ struct ScoreBreakdownLoaderView: View {
     @State private var isReady = false
     
     var body: some View {
-        Group {
+        ZStack {
             if isReady {
                 breakdownView
             } else {
+                // Simple transparent overlay with loading indicator
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                
                 VStack(spacing: 16) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -369,7 +428,6 @@ struct ScoreBreakdownLoaderView: View {
                         .font(.subheadline)
                         .foregroundColor(.white)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .task {
                     // Check if stats are already loaded
                     if viewModel.statsLoaded {
@@ -380,9 +438,6 @@ struct ScoreBreakdownLoaderView: View {
                         isReady = true
                     }
                 }
-                .presentationDetents([.large])
-                .presentationDragIndicator(.hidden)
-                .presentationBackground(Color.black.opacity(0.3))
             }
         }
     }

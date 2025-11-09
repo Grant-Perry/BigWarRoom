@@ -294,7 +294,8 @@ struct AllLivePlayersView: View {
     /// Perform pull-to-refresh - always allow manual refresh
     private func performRefresh() async {
         print("🔄 PULL-TO-REFRESH: User initiated manual refresh")
-        await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
+        // 🔥 FIX: Don't call loadAllMatchups() - it shows "Loading Leagues" overlay
+        // Just refresh the player data directly
         await allLivePlayersViewModel.loadAllPlayers()
     }
     

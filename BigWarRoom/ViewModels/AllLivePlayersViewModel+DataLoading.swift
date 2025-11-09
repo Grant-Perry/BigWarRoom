@@ -10,7 +10,7 @@ import Combine
 
 extension AllLivePlayersViewModel {
     // MARK: - Data Freshness Constants
-    private var dataFreshnessThreshold: TimeInterval { 15.0 } // 15 seconds for live sports
+    // 🔥 REMOVED CACHING: Always fetch fresh data, no threshold checks
     private var lastLoadTime: Date? {
         get { UserDefaults.standard.object(forKey: "AllLivePlayers_LastLoadTime") as? Date }
         set { 
@@ -25,16 +25,9 @@ extension AllLivePlayersViewModel {
     }
     
     // MARK: - Main Data Loading
+    // 🔥 NO CACHE: Always fetch fresh data from APIs
     internal func performDataLoad() async {
-        let needsDataFetch = allPlayers.isEmpty || 
-                           (lastLoadTime == nil) ||
-                           (Date().timeIntervalSince(lastLoadTime!) > dataFreshnessThreshold)
-        
-        if needsDataFetch {
-            await fetchFreshData()
-        } else {
-            await processExistingData()
-        }
+        await fetchFreshData()
     }
     
     // MARK: - Fresh Data Fetching (Shows Loading)
@@ -44,10 +37,8 @@ extension AllLivePlayersViewModel {
         errorMessage = nil
 
         do {
-            // Load stats if needed
-            if !statsLoaded {
-                await loadPlayerStats()
-            }
+            // 🔥 ALWAYS load fresh stats from API
+            await loadPlayerStats()
             
             // Load matchups
             await matchupsHubViewModel.loadAllMatchups()
@@ -72,20 +63,16 @@ extension AllLivePlayersViewModel {
     }
     
     // MARK: - Process Existing Data (No Loading State)
-    private func processExistingData() async {
-        // 🔥 FIX: Always ensure stats are loaded, even when processing cached data
-        if !statsLoaded {
-            await loadPlayerStats()
-        }
-        
-        applyPositionFilter() // Instant
-        dataState = allPlayers.isEmpty ? .empty : .loaded
-        isLoading = false
-    }
+    // 🔥 REMOVED: No longer using cached data - always fetch fresh
     
     // MARK: - Player Stats Loading
     internal func loadPlayerStats() async {
         guard !Task.isCancelled else { return }
+
+        // 🔥 ALWAYS reload stats - reset flag to force fresh fetch
+        await MainActor.run {
+            self.statsLoaded = false
+        }
 
         let currentYear = AppConstants.currentSeasonYear
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
@@ -129,10 +116,7 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
-        guard isDataLoaded else { 
-            debugPrint(mode: .liveUpdates, "LIVE UPDATE BLOCKED: Data not loaded yet")
-            return 
-        }
+        // 🔥 NO GUARDS: Always fetch fresh data from APIs
         
         // 🔥 NEW: Set updating flag for animation
         isUpdating = true
