@@ -370,18 +370,52 @@ class PlayerComparisonViewModel {
             player2Score += qb2Score
         }
         
-        // Factor 6: Injury Status (15% weight - 15 pts)
-        let injuryWeight = 0.15
+        // Factor 6: Injury Status (12% weight - 12 pts)
+        let injuryWeight = 0.12
         let injury1Penalty = getInjuryPenalty(player1.injurySeverity)
         let injury2Penalty = getInjuryPenalty(player2.injurySeverity)
-        player1Score -= injury1Penalty * injuryWeight * 15.0
-        player2Score -= injury2Penalty * injuryWeight * 15.0
+        player1Score -= injury1Penalty * injuryWeight * 12.0
+        player2Score -= injury2Penalty * injuryWeight * 12.0
         
         if player1.injurySeverity != "Healthy" {
             reasons.append("⚠️ \(player1.fullName): \(player1.injurySeverity)")
         }
         if player2.injurySeverity != "Healthy" {
             reasons.append("⚠️ \(player2.fullName): \(player2.injurySeverity)")
+        }
+        
+        // Factor 7: OPRK / Matchup Advantage (8% weight - 8 pts) 🔥 NEW!
+        let oprkWeight = 0.08
+        let oprk1Score = getOPRKScore(for: player1) * oprkWeight
+        let oprk2Score = getOPRKScore(for: player2) * oprkWeight
+        player1Score += oprk1Score
+        player2Score += oprk2Score
+        
+        // Add OPRK reasoning
+        if let team1 = player1.sleeperPlayer.team,
+           let matchup1 = player1.matchupInfo, let opp1 = matchup1.opponent {
+            let pos1 = player1.position
+            let advantage1 = OPRKService.shared.getMatchupAdvantage(forOpponent: opp1, position: pos1)
+            let oprk1 = OPRKService.shared.getOPRK(forTeam: opp1, position: pos1)
+            
+            if let rank = oprk1 {
+                let advantageEmoji = getOPRKEmoji(advantage1)
+                let advantageText = getOPRKText(advantage1)
+                reasons.append("\(advantageEmoji) \(player1.fullName) vs \(opp1): \(advantageText) (OPRK: \(rank))")
+            }
+        }
+        
+        if let team2 = player2.sleeperPlayer.team,
+           let matchup2 = player2.matchupInfo, let opp2 = matchup2.opponent {
+            let pos2 = player2.position
+            let advantage2 = OPRKService.shared.getMatchupAdvantage(forOpponent: opp2, position: pos2)
+            let oprk2 = OPRKService.shared.getOPRK(forTeam: opp2, position: pos2)
+            
+            if let rank = oprk2 {
+                let advantageEmoji = getOPRKEmoji(advantage2)
+                let advantageText = getOPRKText(advantage2)
+                reasons.append("\(advantageEmoji) \(player2.fullName) vs \(opp2): \(advantageText) (OPRK: \(rank))")
+            }
         }
         
         // Add QB information for non-QB players
@@ -777,6 +811,44 @@ class PlayerComparisonViewModel {
         // Simple estimation: targets / season targets for that team
         // This would need team context to be precise
         return nil  // TODO: implement when we have team target context
+    }
+    
+    // MARK: - OPRK Helpers
+    
+    private func getOPRKScore(for player: ComparisonPlayer) -> Double {
+        guard let team = player.sleeperPlayer.team,
+              let matchupInfo = player.matchupInfo,
+              let opponent = matchupInfo.opponent else {
+            return 5.0 // Neutral score
+        }
+        
+        let position = player.position
+        let advantage = OPRKService.shared.getMatchupAdvantage(forOpponent: opponent, position: position)
+        
+        switch advantage {
+        case .elite:      return 10.0  // Best matchup (weakest defense)
+        case .favorable:  return 7.5   // Good matchup
+        case .neutral:    return 5.0   // Average matchup
+        case .difficult:  return 2.5   // Tough matchup (strong defense)
+        }
+    }
+    
+    private func getOPRKEmoji(_ advantage: MatchupAdvantage) -> String {
+        switch advantage {
+        case .elite:      return "🟢"  // Green circle (best)
+        case .favorable:  return "🟡"  // Yellow circle (good)
+        case .neutral:    return "⚪"  // White circle (neutral)
+        case .difficult:  return "🔴"  // Red circle (tough)
+        }
+    }
+    
+    private func getOPRKText(_ advantage: MatchupAdvantage) -> String {
+        switch advantage {
+        case .elite:      return "Elite Matchup"
+        case .favorable:  return "Favorable"
+        case .neutral:    return "Neutral"
+        case .difficult:  return "Difficult"
+        }
     }
 }
 

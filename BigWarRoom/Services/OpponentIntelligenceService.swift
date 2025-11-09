@@ -717,9 +717,26 @@ final class OpponentIntelligenceService {
     }
     
     private func assessMatchupAdvantage(for player: FantasyPlayer) -> MatchupAdvantage {
-        // For now, return neutral - we can enhance this later with matchup data
-        // TODO: Integrate with NFL matchup difficulty, weather, etc.
-        return .neutral
+        // 1. Get player's NFL team
+        guard let playerTeam = player.team else {
+            return .neutral
+        }
+        
+        // 2. Get player's opponent this week from NFL game data
+        guard let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) else {
+            return .neutral
+        }
+        
+        // 3. Determine which team is the opponent
+        let opponentTeam = gameInfo.homeTeam == playerTeam.uppercased() ? gameInfo.awayTeam : gameInfo.homeTeam
+        
+        // 4. Get matchup advantage from OPRK service
+        let advantage = OPRKService.shared.getMatchupAdvantage(
+            forOpponent: opponentTeam,
+            position: player.position
+        )
+        
+        return advantage
     }
     
     private func generateStrategicNotes(for matchup: UnifiedMatchup, opponentPlayers: [OpponentPlayer]) -> [String] {

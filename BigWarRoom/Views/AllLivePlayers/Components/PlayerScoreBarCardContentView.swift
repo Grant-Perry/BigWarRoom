@@ -212,22 +212,7 @@ struct PlayerScoreBarCardContentView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Restore clipping
         
         .sheet(isPresented: $showingScoreBreakdown) {
-            let leagueContext = LeagueContext(
-                leagueID: playerEntry.matchup.league.league.leagueID,
-                source: playerEntry.matchup.league.source,
-                isChopped: playerEntry.matchup.isChoppedLeague
-            )
-            
-            let breakdown = ScoreBreakdownFactory.createBreakdown(
-                for: playerEntry.player,
-                week: WeekSelectionManager.shared.selectedWeek,
-                leagueContext: leagueContext
-            ).withLeagueName(playerEntry.leagueName)
-            
-            ScoreBreakdownView(breakdown: breakdown)
-                .presentationDetents([.height(500)])
-                .presentationDragIndicator(.hidden)
-                .presentationBackground(.clear)
+            ScoreBreakdownLoaderView(playerEntry: playerEntry)
         }
     }
     
@@ -358,6 +343,67 @@ struct PlayerScoreBarCardContentView: View {
         
         // WCAG luminance formula
         return 0.2126 * Double(adjustedRed) + 0.7152 * Double(adjustedGreen) + 0.0722 * Double(adjustedBlue)
+    }
+}
+
+// MARK: - Score Breakdown Loader
+
+/// On-demand stats loader - only loads stats when user clicks points box
+struct ScoreBreakdownLoaderView: View {
+    let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
+    
+    @State private var viewModel = AllLivePlayersViewModel.shared
+    @State private var isReady = false
+    
+    var body: some View {
+        Group {
+            if isReady {
+                breakdownView
+            } else {
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                    
+                    Text("Loading stats...")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .task {
+                    // Check if stats are already loaded
+                    if viewModel.statsLoaded {
+                        isReady = true
+                    } else {
+                        // Load stats on-demand
+                        await viewModel.loadAllPlayers()
+                        isReady = true
+                    }
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Color.black.opacity(0.3))
+            }
+        }
+    }
+    
+    private var breakdownView: some View {
+        let leagueContext = LeagueContext(
+            leagueID: playerEntry.matchup.league.league.leagueID,
+            source: playerEntry.matchup.league.source,
+            isChopped: playerEntry.matchup.isChoppedLeague
+        )
+        
+        let breakdown = ScoreBreakdownFactory.createBreakdown(
+            for: playerEntry.player,
+            week: WeekSelectionManager.shared.selectedWeek,
+            leagueContext: leagueContext
+        ).withLeagueName(playerEntry.leagueName)
+        
+        return ScoreBreakdownView(breakdown: breakdown)
+            .presentationDetents([.height(500)])
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(.clear)
     }
 }
 

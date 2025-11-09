@@ -81,9 +81,10 @@ struct AllLivePlayersEmptyStateView: View {
             
             // Reset Filters button
             Button(action: {
-                allLivePlayersViewModel.setShowActiveOnly(false)
-                allLivePlayersViewModel.setPositionFilter(.all)
                 onAnimationReset()
+                Task { @MainActor in
+                    await allLivePlayersViewModel.hardResetFilteringState()
+                }
             }) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise")
@@ -125,8 +126,10 @@ struct AllLivePlayersEmptyStateView: View {
             
             // Reset Filters button
             Button(action: {
-                allLivePlayersViewModel.setPositionFilter(.all)
                 onAnimationReset()
+                Task { @MainActor in
+                    await allLivePlayersViewModel.hardResetFilteringState()
+                }
             }) {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise")

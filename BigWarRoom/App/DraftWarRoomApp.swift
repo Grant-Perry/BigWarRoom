@@ -328,13 +328,13 @@ struct MainTabView: View {
                 }
                 .tag(0)
                 
-                // INTELLIGENCE TAB
+                // START/SIT TAB
                 NavigationStack {
-                    OpponentIntelligenceDashboardView()
+                    PlayerComparisonView()
                 }
                 .tabItem {
-                    Image(systemName: "eye.circle.fill")
-                    Text("Intelligence")
+                    Image(systemName: "arrow.left.arrow.right")
+                    Text("Start/Sit")
                 }
                 .tag(1)
                 

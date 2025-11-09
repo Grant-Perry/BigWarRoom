@@ -73,6 +73,11 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Process Existing Data (No Loading State)
     private func processExistingData() async {
+        // 🔥 FIX: Always ensure stats are loaded, even when processing cached data
+        if !statsLoaded {
+            await loadPlayerStats()
+        }
+        
         applyPositionFilter() // Instant
         dataState = allPlayers.isEmpty ? .empty : .loaded
         isLoading = false
@@ -125,50 +130,49 @@ extension AllLivePlayersViewModel {
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
         guard isDataLoaded else { 
-            print("🔥 LIVE UPDATE BLOCKED: Data not loaded yet")
+            debugPrint(mode: .liveUpdates, "LIVE UPDATE BLOCKED: Data not loaded yet")
             return 
         }
         
         // 🔥 NEW: Set updating flag for animation
         isUpdating = true
         
-        print("🔥 LIVE UPDATE START: Beginning live update process...")
-        print("🔥 LIVE UPDATE: Selected week = \(WeekSelectionManager.shared.selectedWeek)")
+        debugPrint(mode: .liveUpdates, "🔥 LIVE UPDATE START: Beginning live update process...")
+        debugPrint(mode: .liveUpdates, "Selected week = \(WeekSelectionManager.shared.selectedWeek)")
         let startTime = Date()
         
         // 🔥 CRITICAL: Clear player stats cache to force fresh fetch
-        print("🔥 LIVE UPDATE: Clearing player stats cache for fresh data")
+        debugPrint(mode: .liveUpdates, "Clearing player stats cache for fresh data")
         await PlayerStatsCache.shared.clearCache()
         
-        // 🔥 NOTE: DO NOT call performManualRefresh() here!
-        // This method is called BY the observation system AFTER MatchupsHub has already refreshed
-        // Calling refresh here would create a race condition
-        print("🔥 LIVE UPDATE: Extracting players from already-refreshed MatchupsHub data")
+        // 🔥 CRITICAL FIX: Actually refresh MatchupsHub data from APIs!
+        // The old comment was wrong - we MUST call refresh to get fresh scores from ESPN/Sleeper
+        debugPrint(mode: .liveUpdates, "🌐 Calling MatchupsHub to fetch fresh scores from APIs...")
+        await matchupsHubViewModel.refreshMatchups()
+        debugPrint(mode: .liveUpdates, "✅ API refresh complete - extracting updated player data")
         
         // Debug: Show week info from first matchup
         if let firstMatchup = matchupsHubViewModel.myMatchups.first {
             if let fantasyMatchup = firstMatchup.fantasyMatchup {
-                print(
-                   "🔥 LIVE UPDATE: First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)"
-                )
+                debugPrint(mode: .liveUpdates, "First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)")
             }
         }
         
-        // 🔥 FIXED: Extract from already-refreshed matchup data 
+        // Extract from freshly-refreshed matchup data with new API scores
         let freshPlayerEntries = extractAllPlayers()
         guard !freshPlayerEntries.isEmpty else {
-            print("🔥 LIVE UPDATE ERROR: No fresh player entries found after extraction")
-            print("🔥 LIVE UPDATE: matchupsHubViewModel.myMatchups.count = \(matchupsHubViewModel.myMatchups.count)")
+            debugPrint(mode: .liveUpdates, "❌ LIVE UPDATE ERROR: No fresh player entries found after extraction")
+            debugPrint(mode: .liveUpdates, "matchupsHubViewModel.myMatchups.count = \(matchupsHubViewModel.myMatchups.count)")
             isUpdating = false // 🔥 Clear updating flag on error
             return
         }
         
-        print("🔥 LIVE UPDATE DEBUG: Extracted \(freshPlayerEntries.count) players")
+        debugPrint(mode: .liveUpdates, "Extracted \(freshPlayerEntries.count) players")
         
         // Debug: Show sample scores before update
         let sampleBefore = Array(allPlayers.prefix(3))
         for player in sampleBefore {
-            print("🔥 BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
+            debugPrint(mode: .liveUpdates, limit: 3, "BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
         }
         
         // Update player data with fresh scores from matchups
@@ -177,13 +181,13 @@ extension AllLivePlayersViewModel {
         // Debug: Show sample scores after update
         let sampleAfter = Array(allPlayers.prefix(3))
         for player in sampleAfter {
-            print("🔥 AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
+            debugPrint(mode: .liveUpdates, limit: 3, "AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
         }
         
         // Debug: Show filtered players
         let filteredSample = Array(filteredPlayers.prefix(3))
         for player in filteredSample {
-            print("🔥 FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
+            debugPrint(mode: .liveUpdates, limit: 3, "FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
         }
         
         // 🔥 NEW: Update PlayerWatchService with fresh data
@@ -193,18 +197,36 @@ extension AllLivePlayersViewModel {
         let oldTime = lastUpdateTime
         lastUpdateTime = Date()
         
-        print("🔥 LIVE UPDATE COMPLETE: Updated lastUpdateTime from \(oldTime) to \(lastUpdateTime)")
-        print("🔥 LIVE UPDATE STATS: allPlayers.count = \(allPlayers.count), filteredPlayers.count = \(filteredPlayers.count)")
+        debugPrint(mode: .liveUpdates, "✅ LIVE UPDATE COMPLETE: Updated lastUpdateTime from \(oldTime) to \(lastUpdateTime)")
+        debugPrint(mode: .liveUpdates, "LIVE UPDATE STATS: allPlayers.count = \(allPlayers.count), filteredPlayers.count = \(filteredPlayers.count)")
         
         let elapsed = Date().timeIntervalSince(startTime)
-        print("✅ LIVE UPDATE: Completed in \(String(format: "%.2f", elapsed))s")
+        debugPrint(mode: .liveUpdates, "Completed in \(String(format: "%.2f", elapsed))s")
         
         // 🔥 NEW: Clear updating flag when complete
         isUpdating = false
         
         // 🔥 PHASE 3: @Observable handles change notifications automatically
         // No need for objectWillChange.send() anymore
-        print("🔥 @OBSERVABLE: Property changes will automatically trigger UI updates")
+        debugPrint(mode: .liveUpdates, limit: 1, "@Observable: Property changes will automatically trigger UI updates")
+    }
+
+    // MARK: - Snapshot Processing (no API calls)
+    /// Process the current snapshot from MatchupsHub without triggering any API refreshes.
+    /// Use this when another subsystem (MatchupsHub auto-refresh) is already refreshing scores.
+    internal func processCurrentSnapshot() async {
+        guard isDataLoaded else { return }
+        isUpdating = true
+
+        // Extract players from the existing, most recent MatchupsHub data
+        let entries = extractAllPlayers()
+        await updatePlayerDataSilently(from: entries)
+        await notifyPlayerWatchService(with: entries)
+
+        await MainActor.run {
+            lastUpdateTime = Date()
+            isUpdating = false
+        }
     }
     
     // MARK: - Week Changes Subscription
@@ -280,7 +302,7 @@ extension AllLivePlayersViewModel {
     
     /// Notify PlayerWatchService of updated player data
     private func notifyPlayerWatchService(with playerEntries: [LivePlayerEntry]) async {
-        print("🔥 WATCH SERVICE UPDATE: Converting \(playerEntries.count) players for PlayerWatchService")
+//        print("🔥 WATCH SERVICE UPDATE: Converting \(playerEntries.count) players for PlayerWatchService")
         
         // Convert LivePlayerEntry to OpponentPlayer format
         let opponentPlayers = playerEntries.map { entry in
@@ -301,7 +323,7 @@ extension AllLivePlayersViewModel {
             PlayerWatchService.shared.updateWatchedPlayerScores(opponentPlayers)
         }
         
-        print("🔥 WATCH SERVICE UPDATE: Updated PlayerWatchService with \(opponentPlayers.count) players")
+//        print("🔥 WATCH SERVICE UPDATE: Updated PlayerWatchService with \(opponentPlayers.count) players")
     }
     
     /// Convert performance tier to player threat level

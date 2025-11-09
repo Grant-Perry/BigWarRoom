@@ -144,13 +144,72 @@ final class ESPNAPIClient: DraftAPIClient {
                     throw ESPNAPIError.invalidResponse
                 }
             }
+            
+            // 🔍 DEBUG: Log top-level JSON keys to see if positionAgainstOpponent exists
+            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("🔍 ESPN API Response Top-Level Keys: \(jsonObject.keys.sorted())")
+                if let positionData = jsonObject["positionAgainstOpponent"] {
+                    print("✅ positionAgainstOpponent key EXISTS in response")
+                    print("🔍 positionAgainstOpponent type: \(type(of: positionData))")
+                    if let dict = positionData as? [String: Any] {
+                        print("🔍 positionAgainstOpponent keys: \(dict.keys.sorted())")
+                        if let innerRatings = dict["positionalRatings"] as? [String: Any] {
+                            print("🔍 positionalRatings has \(innerRatings.keys.count) position entries")
+                            print("🔍 Position IDs: \(Array(innerRatings.keys.sorted()))")
+                            // Check one position to see team structure
+                            if let firstKey = innerRatings.keys.first,
+                               let positionData = innerRatings[firstKey] as? [String: Any],
+                               let ratingsByOpp = positionData["ratingsByOpponent"] as? [String: Any],
+                               let firstTeamKey = ratingsByOpp.keys.first,
+                               let teamRating = ratingsByOpp[firstTeamKey] as? [String: Any] {
+                                print("🔍 Sample team rating keys: \(teamRating.keys.sorted())")
+                                print("🔍 Sample team rating values: \(teamRating)")
+                            }
+                        }
+                    }
+                } else {
+                    print("❌ positionAgainstOpponent key NOT FOUND in response")
+                }
+            }
     
-            let espnLeague = try JSONDecoder().decode(ESPNLeague.self, from: data)
+            let decoder = JSONDecoder()
             
-            // Register scoring settings with ScoringSettingsManager
-            ScoringSettingsManager.shared.registerESPNScoringSettings(from: espnLeague, leagueID: leagueID)
-            
-            return espnLeague.toSleeperLeague()
+            // Try to decode and catch any errors related to positionAgainstOpponent
+            do {
+                let espnLeague = try decoder.decode(ESPNLeague.self, from: data)
+                print("🔍 After decoding: positionAgainstOpponent is nil? \(espnLeague.positionAgainstOpponent == nil)")
+                
+                // If nil, try to decode just that field manually to see the error
+                if espnLeague.positionAgainstOpponent == nil {
+                    if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let posData = jsonObject["positionAgainstOpponent"] {
+                        print("⚠️ positionAgainstOpponent exists in JSON but failed to decode")
+                        print("⚠️ Attempting manual decode to see error...")
+                        
+                        let posDataJson = try JSONSerialization.data(withJSONObject: ["positionAgainstOpponent": posData])
+                        struct Wrapper: Codable {
+                            let positionAgainstOpponent: ESPNPositionalRatingsResponse?
+                        }
+                        do {
+                            let wrapper = try decoder.decode(Wrapper.self, from: posDataJson)
+                            print("✅ Manual decode successful: \(wrapper.positionAgainstOpponent != nil)")
+                        } catch {
+                            print("❌ Manual decode error: \(error)")
+                        }
+                    }
+                }
+                
+                // Register scoring settings with ScoringSettingsManager
+                ScoringSettingsManager.shared.registerESPNScoringSettings(from: espnLeague, leagueID: leagueID)
+                
+                // 🔥 NEW: Update OPRK data from ESPN positional ratings
+                OPRKService.shared.updateOPRKData(from: espnLeague)
+                
+                return espnLeague.toSleeperLeague()
+            } catch {
+                print("❌ ESPNLeague decode error: \(error)")
+                throw error
+            }
     
         } catch DecodingError.keyNotFound(let key, let context) {
             throw ESPNAPIError.decodingError(DecodingError.keyNotFound(key, context))
@@ -624,11 +683,11 @@ final class ESPNAPIClient: DraftAPIClient {
 
                 // Check if this view combination has records
                 let teamsWithRecords = league.teams?.filter { $0.record != nil } ?? []
-                print("📊 Standings fetch with \(viewParams): \(teamsWithRecords.count)/\(league.teams?.count ?? 0) teams have records")
+//                print("📊 Standings fetch with \(viewParams): \(teamsWithRecords.count)/\(league.teams?.count ?? 0) teams have records")
 
                 // If we found records, return this data
                 if !teamsWithRecords.isEmpty {
-                    print("✅ Found records using view: \(viewParams)")
+//                    print("✅ Found records using view: \(viewParams)")
                     return league
                 }
 
@@ -637,7 +696,7 @@ final class ESPNAPIClient: DraftAPIClient {
 
             } catch {
                 lastError = error
-                print("❌ Failed with view \(viewParams): \(error)")
+//                print("❌ Failed with view \(viewParams): \(error)")
                 continue
             }
         }
@@ -669,9 +728,9 @@ final class ESPNAPIClient: DraftAPIClient {
             // Convert ESPN stat ID to readable stat name
             if let statName = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                 scoringMap[statName] = points
-                print("📊 ESPN Scoring: \(statName) = \(points) points")
+//                print("📊 ESPN Scoring: \(statName) = \(points) points")
             } else {
-                print("⚠️ ESPN: Unknown stat ID \(statId) with \(points) points")
+//                print("⚠️ ESPN: Unknown stat ID \(statId) with \(points) points")
             }
         }
         

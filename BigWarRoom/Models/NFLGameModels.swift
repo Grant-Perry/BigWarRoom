@@ -128,7 +128,7 @@ struct NFLGameInfo: Equatable {
                     return "FINAL"
                 } else {
                     // 🔥 DEBUG: Log unexpected format for debugging
-                    print("🔥 NFL DEBUG: Unexpected gameTime format: '\(gameTime)' -> using LIVE")
+                    debugPrint(mode: .nflData, "Unexpected gameTime format: '\(gameTime)' -> using LIVE")
                     return "LIVE"
                 }
                 
@@ -154,11 +154,11 @@ struct NFLGameInfo: Equatable {
                 if !quarterDisplay.isEmpty {
                     if !timeDisplay.isEmpty {
                         let result = "\(quarterDisplay) \(timeDisplay)"
-                        print("🔥 NFL DEBUG: '\(gameTime)' -> '\(result)'")
+                        debugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)'")
                         return result
                     } else {
                         let result = quarterDisplay
-                        print("🔥 NFL DEBUG: '\(gameTime)' -> '\(result)' (no time)")
+                        debugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)' (no time)")
                         return result
                     }
                 }
@@ -290,12 +290,12 @@ final class NFLGameDataService {
            let cache = cache,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration {
-            print("🔥 NFL CACHE: Using cached data from \(timestamp)")
+            debugPrint(mode: .nflData, "Using cached data from \(timestamp)")
             processGameData(cache)
             return
         }
         
-        print("🔥 NFL FETCH: Fetching fresh data for week \(week), year \(currentYear)")
+        debugPrint(mode: .nflData, "Fetching fresh data for week \(week), year \(currentYear)")
         
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(currentYear)") else {
             errorMessage = "Invalid API URL"
@@ -320,7 +320,7 @@ final class NFLGameDataService {
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
-                        print("🔥 NFL ERROR: \(error.localizedDescription)")
+                        debugPrint(mode: .nflData, "NFL ERROR: \(error.localizedDescription)")
                         self?.errorMessage = "Failed to fetch NFL data: \(error.localizedDescription)"
                     }
                 },
@@ -328,7 +328,7 @@ final class NFLGameDataService {
                     // Remove from pending requests
                     self?.pendingRequests.remove(requestKey)
                     
-                    print("🔥 NFL SUCCESS: Received fresh data with \(response.events.count) games")
+                    debugPrint(mode: .nflData, "Received fresh data with \(response.events.count) games")
                     
                     self?.cache = response
                     self?.cacheTimestamp = Date()
@@ -358,13 +358,15 @@ final class NFLGameDataService {
             
             // 🔥 DEBUG: Log raw ESPN data for problematic games
             if homeTeam == "IND" || homeTeam == "TEN" || homeTeam == "DAL" || homeTeam == "DEN" {
-                print("🔥 ESPN RAW DATA for \(awayTeam) vs \(homeTeam):")
-                print("   - status.state: '\(gameStatus)'")
-                print("   - status.detail: '\(gameTime)'")
-                print("   - status.shortDetail: '\(status.shortDetail)'")
-                print("   - status.description: '\(status.description)'")
-                print("   - status.completed: \(isCompleted)")
-                print("   - homeScore: \(homeScore), awayScore: \(awayScore)")
+                debugPrint(mode: .nflData, limit: 2, """
+                ESPN RAW DATA for \(awayTeam) vs \(homeTeam):
+                   - status.state: '\(gameStatus)'
+                   - status.detail: '\(gameTime)'
+                   - status.shortDetail: '\(status.shortDetail)'
+                   - status.description: '\(status.description)'
+                   - status.completed: \(isCompleted)
+                   - homeScore: \(homeScore), awayScore: \(awayScore)
+                """)
             }
             
             var startDate: Date?

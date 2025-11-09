@@ -162,7 +162,7 @@ final class LeagueMatchupProvider {
     
     /// Fetch all matchup data for this league
     func fetchMatchups() async throws -> [FantasyMatchup] {
-        print("🎯 LeagueMatchupProvider.fetchMatchups() called for \(league.league.leagueID), league.source=\(league.source)")
+        debugPrint(mode: .leagueProvider, "fetchMatchups() called for \(league.league.leagueID), source=\(league.source)")
         // Clear previous state
         matchups = []
         byeWeekTeams = []
@@ -170,14 +170,14 @@ final class LeagueMatchupProvider {
         detectedAsChoppedLeague = false
         
         if league.source == .espn {
-            print("  → Fetching ESPN data")
+            debugPrint(mode: .leagueProvider, "Fetching ESPN data")
             await fetchESPNData()
         } else {
-            print("  → Fetching Sleeper data")
+            debugPrint(mode: .leagueProvider, "Fetching Sleeper data")
             await fetchSleeperData()
         }
         
-        print("  ← Returning \(matchups.count) matchups")
+        debugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
         return matchups
     }
     
@@ -199,7 +199,7 @@ final class LeagueMatchupProvider {
 
     /// Calculate team records from matchup history when standings don't provide them
     private func calculateRecordsFromMatchupHistory(leagueID: String) async {
-        print("📊 calculateRecordsFromMatchupHistory: Starting calculation for league \(leagueID)")
+        debugPrint(mode: .recordCalculation, "Starting calculation for league \(leagueID)")
 
         // Get all past weeks (1-8 since we're in week 9)
         let pastWeeks = 1..<week
@@ -207,11 +207,11 @@ final class LeagueMatchupProvider {
 
         for pastWeek in pastWeeks {
             do {
-                print("  📊 Calculating records for week \(pastWeek)...")
+                debugPrint(mode: .recordCalculation, limit: 5, "Calculating records for week \(pastWeek)...")
 
                 // Fetch matchup data for this past week
-                guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(pastWeek)") else {
-                    print("  ❌ Failed to create URL for week \(pastWeek)")
+                guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(pastWeek)") else {
+                    debugPrint(mode: .recordCalculation, "Failed to create URL for week \(pastWeek)")
                     continue
                 }
 
@@ -304,7 +304,7 @@ final class LeagueMatchupProvider {
     // MARK: -> ESPN Data Fetching
     
     private func fetchESPNData() async {
-        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(week)") else {
+        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
             return
         }
         
@@ -357,7 +357,23 @@ final class LeagueMatchupProvider {
         
         do {
             let (data, _) = try await URLSession.shared.data(for: request)
+            
+            // 🔍 DEBUG: Check if positionAgainstOpponent key exists in response
+            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("🔍 LeagueMatchupProvider ESPN API Keys: \(jsonObject.keys.sorted())")
+                if jsonObject["positionAgainstOpponent"] != nil {
+                    print("✅ positionAgainstOpponent EXISTS in LeagueMatchupProvider response")
+                } else {
+                    print("❌ positionAgainstOpponent NOT FOUND in LeagueMatchupProvider response")
+                }
+            }
+            
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
+            
+            // 🔥 NEW: Also try to decode full ESPNLeague for OPRK data
+            if let fullLeagueData = try? JSONDecoder().decode(ESPNLeague.self, from: data) {
+                OPRKService.shared.updateOPRKData(from: fullLeagueData)
+            }
             await processESPNData(model)
         } catch {
             // Silent fail - matchup data couldn't be loaded
@@ -365,7 +381,7 @@ final class LeagueMatchupProvider {
     }
     
     private func processESPNData(_ espnModel: ESPNFantasyLeagueModel) async {
-        print("🔥 processESPNData called for \(espnModel.teams.count) teams")
+        debugPrint(mode: .espnAPI, "processESPNData called for \(espnModel.teams.count) teams")
         
         // Store team records and names
         for team in espnModel.teams {
@@ -569,13 +585,13 @@ final class LeagueMatchupProvider {
             }
             
             rosterIDToManagerID = newRosterMapping
-            print("Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
+            debugPrint(mode: .dataSync, limit: 5, "Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
             
             // Fetch users
             await fetchSleeperUsers()
             
         } catch {
-            print("Failed to fetch Sleeper rosters: \(error)")
+            debugPrint(mode: .sleeperAPI, "Failed to fetch Sleeper rosters: \(error)")
         }
     }
     
@@ -901,7 +917,7 @@ final class LeagueMatchupProvider {
                 FantasyViewModel.shared.espnTeamRecords[teamId] = record
             }
             if !espnTeamRecords.isEmpty {
-                print("📊 Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
+                debugPrint(mode: .recordCalculation, "Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
             }
         }
     }

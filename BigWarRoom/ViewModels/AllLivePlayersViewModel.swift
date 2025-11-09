@@ -71,7 +71,7 @@ final class AllLivePlayersViewModel {
     @MainActor
     init(matchupsHubViewModel: MatchupsHubViewModel) {
         self.matchupsHubViewModel = matchupsHubViewModel
-        setupObservation()
+        // setupObservation()  // 🔥 DISABLED: Creates race condition with 15-second timer, causes throttle to block all API calls
         setupAutoRefresh()
     }
     
@@ -91,7 +91,7 @@ final class AllLivePlayersViewModel {
     
     // 🔥 PHASE 3: Replace Combine subscription with @Observable observation
     private func setupObservation() {
-        // print("🔥 OBSERVATION SETUP: Setting up @Observable-based observation")
+        debugPrint(mode: .liveUpdates, "👀 OBSERVATION SETUP: Setting up @Observable-based observation")
         
         observationTask = Task { @MainActor in
             // Observe changes to MatchupsHubViewModel
@@ -102,17 +102,17 @@ final class AllLivePlayersViewModel {
                 let currentUpdateTime = matchupsHubViewModel.lastUpdateTime
                 
                 if currentUpdateTime > lastObservedUpdate && currentUpdateTime > lastProcessedMatchupUpdate {
-                    // print("🔥 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
+                    debugPrint(mode: .liveUpdates, "🎯 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
                     
                     // Only process if we have initial data
                     guard !allPlayers.isEmpty else {
-                        // print("🔥 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
+                        debugPrint(mode: .liveUpdates, "🚫 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
                         lastObservedUpdate = currentUpdateTime
                         try? await Task.sleep(for: .seconds(1))
                         continue
                     }
                     
-                    // print("🔥 OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
+                    debugPrint(mode: .liveUpdates, "▶️ OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
                     lastProcessedMatchupUpdate = currentUpdateTime
                     lastObservedUpdate = currentUpdateTime
                     
@@ -238,17 +238,17 @@ extension AllLivePlayersViewModel {
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 3.0 else {
-            print("🔥 AUTO-REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            debugPrint(mode: .liveUpdates, "🚫 AUTO-REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
             return
         }
         
         // Only refresh if we have data and are not already loading
         guard !allPlayers.isEmpty && !isLoading else {
-            print("🔥 AUTO-REFRESH BLOCKED: No data yet or already loading")
+            debugPrint(mode: .liveUpdates, "🚫 AUTO-REFRESH BLOCKED: No data yet or already loading")
             return
         }
         
-        print("🔥 AUTO-REFRESH: Performing background live update")
+        debugPrint(mode: .liveUpdates, "🔄 AUTO-REFRESH: Performing background live update")
         await performLiveUpdate()
     }
     

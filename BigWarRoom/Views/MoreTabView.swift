@@ -13,11 +13,11 @@ struct MoreTabView: View {
     // MARK: - Menu Data Configuration
     private let menuItems: [MenuItem] = [
         MenuItem(
-            icon: "arrow.left.arrow.right.circle.fill",
-            iconColor: .purple,
-            title: "Start/Sit AssistantA",
-            subtitle: "Compare players and get recommendations",
-            destination: .playerComparison
+            icon: "eye.circle.fill",
+            iconColor: .cyan,
+            title: "Intelligence",
+            subtitle: "Opponent analysis and strategic insights",
+            destination: .intelligence
         ),
         MenuItem(
             icon: "magnifyingglass.circle.fill",
@@ -171,8 +171,8 @@ struct MoreTabView: View {
             FantasyMatchupListView(draftRoomViewModel: viewModel)
         case .bettingOddsTest:
             BettingOddsTestView()
-        case .playerComparison:
-            PlayerComparisonView()
+        case .intelligence:
+            OpponentIntelligenceDashboardView()
         }
     }
 }
@@ -189,7 +189,7 @@ struct MenuItem: Identifiable {
 }
 
 enum MenuDestination: CaseIterable {
-    case playerSearch, features, settings, teamRosters, warRoom, aiPicks, draftBoard, livePicks, myRoster, fantasy, bettingOddsTest, playerComparison
+    case playerSearch, features, settings, teamRosters, warRoom, aiPicks, draftBoard, livePicks, myRoster, fantasy, bettingOddsTest, intelligence
 }
 
 // MARK: - Enhanced More Row Component

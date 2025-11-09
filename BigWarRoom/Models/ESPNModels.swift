@@ -23,6 +23,7 @@ struct ESPNLeague: Codable, Identifiable {
     let members: [ESPNMember]?
     let settings: ESPNLeagueSettings?
     let scoringSettings: ESPNScoringSettings?
+    let positionAgainstOpponent: ESPNPositionalRatingsResponse? // 🔥 OPRK data (ESPN calls it positionAgainstOpponent)
     
     // Computed properties for Sleeper compatibility
     var leagueID: String { String(id) }
@@ -753,4 +754,25 @@ struct ESPNStatIDMapper {
         // - pass_drop (not in core stats)
         // - All the red zone attempt garbage (not in core ESPN stats)
     ]
+}
+
+// MARK: -> ESPN Positional Ratings (OPRK Data)
+
+/// ESPN Positional Ratings response structure
+/// This contains OPRK (Opponent Rank) data for defenses against each position
+/// Structure: positionAgainstOpponent -> positionalRatings -> [PositionID: PositionRatings]
+struct ESPNPositionalRatingsResponse: Codable {
+    let positionalRatings: [String: ESPNPositionRatings]?
+}
+
+/// Ratings for a specific position (contains average and by-opponent data)
+struct ESPNPositionRatings: Codable {
+    let average: Double?  // Just a number, not an object
+    let ratingsByOpponent: [String: ESPNPositionalRating]?  // [TeamID: Rating]
+}
+
+/// Individual team's defensive rating against this position
+struct ESPNPositionalRating: Codable {
+    let rank: Int           // This is OPRK! (1-32, lower = tougher defense)
+    let average: Double?    // Average points allowed to this position
 }

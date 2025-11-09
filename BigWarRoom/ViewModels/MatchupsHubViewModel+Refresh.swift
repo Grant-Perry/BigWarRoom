@@ -28,7 +28,7 @@ extension MatchupsHubViewModel {
     
     /// Refresh existing matchups without full reload
     /// 🔥 FIXED: Uses selected week instead of current week
-    private func refreshMatchups() async {
+    internal func refreshMatchups() async {
         guard !myMatchups.isEmpty && !isLoading else {
             // 🔥 CRITICAL FIX: Load for selected week, not current week!
             let selectedWeek = WeekSelectionManager.shared.selectedWeek
@@ -47,43 +47,50 @@ extension MatchupsHubViewModel {
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 3.0 else {
-            print("🔥 REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            debugPrint(mode: .globalRefresh, "REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
             isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
         // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
         cachedProviders.removeAll()
-        print("🔥 REFRESH: Cleared cached providers for fresh scores")
+        debugPrint(mode: .globalRefresh, "Cleared cached providers for fresh scores")
         
         // Get the currently selected week from WeekSelectionManager
         // 🔥 TODO: We'll need to inject WeekSelectionManager too
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
-        // Limit concurrent refreshes
-        let maxConcurrentRefresh = 2
-        var activeRefreshes = 0
-        
-        for matchup in myMatchups {
-            guard activeRefreshes < maxConcurrentRefresh else { break }
-            guard !currentlyLoadingLeagues.contains(matchup.league.id) else { continue }
-            
-            activeRefreshes += 1
-            currentlyLoadingLeagues.insert(matchup.league.id)
-            
-            Task {
-                defer { 
-                    currentlyLoadingLeagues.remove(matchup.league.id)
-                    activeRefreshes -= 1
+        // Refresh all matchups and WAIT for completion before returning
+        await withTaskGroup(of: Void.self) { group in
+            for matchup in myMatchups {
+                let leagueId = matchup.league.id
+                group.addTask {
+                    // Prevent duplicate loads for the same league (MainActor for isolation)
+                    let shouldSkip: Bool = await MainActor.run { () -> Bool in
+                        if self.currentlyLoadingLeagues.contains(leagueId) {
+                            return true
+                        }
+                        self.currentlyLoadingLeagues.insert(leagueId)
+                        return false
+                    }
+                    if shouldSkip { return }
+                    
+                    defer {
+                        Task { @MainActor in
+                            self.currentlyLoadingLeagues.remove(leagueId)
+                        }
+                    }
+                    
+                    await self.refreshSingleMatchup(matchup, forWeek: selectedWeek)
                 }
-                
-                await refreshSingleMatchup(matchup, forWeek: selectedWeek)
             }
+            // Wait for all league refreshes to finish
+            await group.waitForAll()
         }
         
         await MainActor.run {
             self.lastUpdateTime = Date()
-            // 🔥 NEW: Clear updating flag when refresh complete
+            // 🔥 Clear updating flag when refresh complete
             self.isUpdating = false
         }
     }
@@ -165,7 +172,7 @@ extension MatchupsHubViewModel {
     internal func performManualRefresh() async {
         // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
         guard !isLoading else { 
-            print("🔥 MANUAL REFRESH BLOCKED: Already loading")
+            debugPrint(mode: .globalRefresh, "MANUAL REFRESH BLOCKED: Already loading")
             return 
         }
         
@@ -176,12 +183,12 @@ extension MatchupsHubViewModel {
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 2.0 else {
-            print("🔥 MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
+            debugPrint(mode: .globalRefresh, "MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
             isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
-        print("🔥 MANUAL REFRESH START: Proceeding with manual refresh")
+        debugPrint(mode: .globalRefresh, "MANUAL REFRESH START: Proceeding with manual refresh")
         
         // 🔥 PRESERVE Just Me Mode state during refresh
         let wasMicroModeEnabled = microModeEnabled
@@ -219,8 +226,9 @@ extension MatchupsHubViewModel {
         let preservedBannerVisible = justMeModeBannerVisible // NEW: Preserve banner
         
         // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
+        let count = cachedProviders.count
         cachedProviders.removeAll()
-        print("🔥 REFRESH: Cleared \(cachedProviders.count) cached providers for fresh scores")
+        debugPrint(mode: .globalRefresh, "Cleared \(count) cached providers for fresh scores")
         
         await MainActor.run {
             // Only update timestamp, don't change isLoading or show loading screen

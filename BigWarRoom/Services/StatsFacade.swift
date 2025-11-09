@@ -119,33 +119,22 @@ protocol LocalStatsProvider {
 /// Wrapper for ChoppedTeamRosterViewModel to provide LocalStatsProvider interface
 struct ChoppedStatsProvider: LocalStatsProvider {
     let viewModel: ChoppedTeamRosterViewModel
-    
+
     func getLocalPlayerStats(for playerID: String) -> [String: Double]? {
         return viewModel.getPlayerStats(for: playerID)
     }
 }
 
-/// Wrapper for AllLivePlayersViewModel to provide LocalStatsProvider interface  
-struct GlobalStatsProvider: LocalStatsProvider {
-    let viewModel: AllLivePlayersViewModel
-    
+// MARK: - Direct Protocol Conformance
+
+extension ChoppedTeamRosterViewModel: LocalStatsProvider {
     func getLocalPlayerStats(for playerID: String) -> [String: Double]? {
-        return viewModel.playerStats[playerID]
+        return getPlayerStats(for: playerID)
     }
 }
 
-// MARK: - Convenience Extensions
-
-extension ChoppedTeamRosterViewModel {
-    /// Get a LocalStatsProvider wrapper for this view model
-    var statsProvider: LocalStatsProvider {
-        return ChoppedStatsProvider(viewModel: self)
-    }
-}
-
-extension AllLivePlayersViewModel {
-    /// Get a LocalStatsProvider wrapper for this view model
-    var statsProvider: LocalStatsProvider {
-        return GlobalStatsProvider(viewModel: self)
+extension AllLivePlayersViewModel: LocalStatsProvider {
+    func getLocalPlayerStats(for playerID: String) -> [String: Double]? {
+        return playerStats[playerID]
     }
 }

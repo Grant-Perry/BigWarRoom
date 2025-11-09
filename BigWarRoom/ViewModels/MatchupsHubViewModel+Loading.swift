@@ -15,14 +15,14 @@ extension MatchupsHubViewModel {
     /// Main loading function - Load all matchups across all connected leagues
     internal func performLoadAllMatchups() async {
         guard !isLoading else { 
-            print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups called - ALREADY LOADING, ignoring")
+            debugPrint(mode: .matchupLoading, "performLoadAllMatchups called - ALREADY LOADING, ignoring")
             return 
         }
         
-        print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups STARTING")
+        debugPrint(mode: .matchupLoading, "performLoadAllMatchups STARTING")
         
         let loadingSessionId = UUID().uuidString.prefix(8)
-        print("🔥 LOADING SESSION \(loadingSessionId): Starting new loading session")
+        debugPrint(mode: .matchupLoading, "LOADING SESSION \(loadingSessionId): Starting new loading session")
         
         await MainActor.run {
             isLoading = true
@@ -38,7 +38,7 @@ extension MatchupsHubViewModel {
             // print("  → Step 0: Fetching NFL game data...")
             await updateProgress(0.05, message: "Loading NFL data...", sessionId: String(loadingSessionId))
             await fetchNFLGameData()
-            print("  ✅ Step 0: NFL data loaded")
+            debugPrint(mode: .matchupLoading, "Step 0: NFL data loaded")
             
             // Step 1: Load all available leagues - 10% progress
             // print("  → Step 1: Loading available leagues...")
@@ -54,32 +54,32 @@ extension MatchupsHubViewModel {
             
             let availableLeagues = unifiedLeagueManager.allLeagues
             totalLeagueCount = availableLeagues.count
-            print("  ✅ Step 1: Found \(availableLeagues.count) leagues")
+            debugPrint(mode: .matchupLoading, "Step 1: Found \(availableLeagues.count) leagues")
             
             guard !availableLeagues.isEmpty else {
                 await MainActor.run {
                     errorMessage = "No leagues found. Connect your leagues first!"
                     isLoading = false
                 }
-                print("  ❌ No leagues found")
+                debugPrint(mode: .matchupLoading, "No leagues found")
                 return
             }
             
             // Step 2: Load matchups for each league in parallel
             // print("  → Step 2: Loading matchups from all leagues...")
             await loadMatchupsFromAllLeagues(availableLeagues, sessionId: String(loadingSessionId))
-            print("  ✅ Step 2: Matchups loaded")
+            debugPrint(mode: .matchupLoading, "Step 2: Matchups loaded")
             
         } catch {
             await MainActor.run {
                 errorMessage = "Failed to load leagues: \(error.localizedDescription)"
                 isLoading = false
             }
-            print("  ❌ Error: \(error)")
+            debugPrint(mode: .matchupLoading, "Error: \(error)")
         }
         
-        print("🔥 LOADING SESSION \(loadingSessionId): Completed - myMatchups.count=\(myMatchups.count)")
-        print("🔥🔥🔥 MATCHUPS HUB: performLoadAllMatchups COMPLETE")
+        debugPrint(mode: .matchupLoading, "LOADING SESSION \(loadingSessionId): Completed - myMatchups.count=\(myMatchups.count)")
+        debugPrint(mode: .matchupLoading, "performLoadAllMatchups COMPLETE")
     }
     
     /// 🔥 NEW: Bulletproof progress update that forces UI refresh
@@ -218,7 +218,7 @@ extension MatchupsHubViewModel {
         
         do {
             // print("🔥 SINGLE LEAGUE: Creating provider for \(league.league.name)")
-            print("🔥🔥🔥 MATCHUPS HUB: loadSingleLeague called for \(league.league.name)")
+            debugPrint(mode: .leagueProvider, limit: 10, "loadSingleLeague called for \(league.league.name)")
             
             // 🔥 NEW APPROACH: Create isolated provider for this league
             let provider = LeagueMatchupProvider(
@@ -230,25 +230,25 @@ extension MatchupsHubViewModel {
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.3)
             
             // print("🔥 SINGLE LEAGUE: Identifying team ID for \(league.league.name)")
-            print("  → Identifying team ID for \(league.league.name)...")
+            debugPrint(mode: .leagueProvider, limit: 10, "Identifying team ID for \(league.league.name)...")
             
             // Step 1: Identify user's team ID
             guard let myTeamID = await provider.identifyMyTeamID() else {
                 // print("🔥 SINGLE LEAGUE: Failed to identify team ID for \(league.league.name)")
-                print("  ❌ Failed to identify team ID")
+                debugPrint(mode: .leagueProvider, "Failed to identify team ID")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil
             }
             
             // print("🔥 SINGLE LEAGUE: Found team ID '\(myTeamID)' for \(league.league.name)")
-            print("  ✅ Found team ID: \(myTeamID)")
+            debugPrint(mode: .leagueProvider, "Found team ID: \(myTeamID)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.6)
             
             // Step 2: Fetch matchups using isolated provider
             // print("🔥 SINGLE LEAGUE: Fetching matchups for \(league.league.name)")
-            print("  → Fetching matchups via provider.fetchMatchups()...")
+            debugPrint(mode: .leagueProvider, "Fetching matchups via provider.fetchMatchups()...")
             let matchups = try await provider.fetchMatchups()
-            print("  ✅ Fetched \(matchups.count) matchups")
+            debugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
             // print("🔥 SINGLE LEAGUE: Fetched \(matchups.count) matchups for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
             
@@ -272,7 +272,7 @@ extension MatchupsHubViewModel {
             return await handleRegularLeague(league: league, matchups: matchups, myTeamID: myTeamID, provider: provider)
             
         } catch {
-            print("🔥 SINGLE LEAGUE: Error loading \(league.league.name): \(error)")
+            debugPrint(mode: .leagueProvider, "Error loading \(league.league.name): \(error)")
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
             return nil
         }

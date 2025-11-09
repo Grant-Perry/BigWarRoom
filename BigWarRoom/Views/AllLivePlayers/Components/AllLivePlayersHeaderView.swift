@@ -32,6 +32,11 @@ struct AllLivePlayersHeaderView: View {
     
     // 🔥 FIX: Maintain stable manager info during refreshes
     @State private var stableManager: ManagerInfo?
+
+    // NEW: Track delta since session start (first observed total), not per-update
+    @State private var baselineTotalPoints: Double? = nil
+    @State private var sessionDeltaPoints: Double = 0
+    @State private var showBaselineToast: Bool = false
     
     // 🔥 PHASE 2.5: Dependency injection initializer
     init(
@@ -82,6 +87,10 @@ struct AllLivePlayersHeaderView: View {
             if let newManager = allLivePlayersViewModel.firstAvailableManager {
                 stableManager = newManager
             }
+            // Initialize baseline on first appearance if we already have a total
+            if baselineTotalPoints == nil && totalPoints > 0 {
+                baselineTotalPoints = totalPoints
+            }
         }
         .onDisappear {
             stopGlobalRefreshCycle()
@@ -100,6 +109,19 @@ struct AllLivePlayersHeaderView: View {
             // 🔥 FIXED: Use gentle refresh instead of hard reset to preserve user settings
             Task {
                 await performBackgroundRefresh()
+            }
+            // Reset baseline for new week session
+            baselineTotalPoints = nil
+            sessionDeltaPoints = 0
+        }
+        .onChange(of: allLivePlayersViewModel.lastUpdateTime) { _, _ in
+            // Set baseline once, then compute session delta from baseline
+            let newTotal = totalPoints
+            if baselineTotalPoints == nil {
+                baselineTotalPoints = newTotal
+                sessionDeltaPoints = 0
+            } else if let base = baselineTotalPoints {
+                sessionDeltaPoints = newTotal - base
             }
         }
     }
@@ -133,21 +155,70 @@ struct AllLivePlayersHeaderView: View {
             
             Spacer()
             
-            // 🔥 NEW: Total points display 
-            Text("Total: \(totalPointsFormatted)")
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(.gpGreen)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.gpGreen.opacity(0.15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.gpGreen.opacity(0.3), lineWidth: 1)
+            // 🔥 NEW: HERO PILL (label + big number)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Total")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.secondary)
+                Text(totalPointsFormatted)
+                    .font(.bebas(size: 26))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
+                    .animation(.easeInOut(duration: 0.25), value: totalPoints)
+                if shouldShowDelta {
+                    HStack(spacing: 6) {
+                        Image(systemName: sessionDeltaPoints >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(sessionDeltaPoints >= 0 ? .gpGreen : .gpRedPink)
+                        Text(deltaFormatted)
+                            .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                            .foregroundColor(sessionDeltaPoints >= 0 ? .gpGreen : .gpRedPink)
+                    }
+                    .transition(.opacity)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(LinearGradient(colors: [.gpGreen.opacity(0.6), .gpGreen.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.2)
+                    )
+                    .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 6)
+            )
+            .scaleEffect(1.0 + (shouldShowDelta ? 0.0 : 0.0))
+            .onLongPressGesture(minimumDuration: 0.5) {
+                // Reset the delta baseline to current total
+                baselineTotalPoints = totalPoints
+                sessionDeltaPoints = 0
+                #if canImport(UIKit)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                #endif
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showBaselineToast = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showBaselineToast = false
+                    }
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if showBaselineToast {
+                    Text("Baseline reset")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(Color.black.opacity(0.6))
                         )
-                )
-                .animation(.easeInOut(duration: 0.3), value: totalPoints)
+                        .transition(.opacity)
+                        .padding(.bottom, -20)
+                }
+            }
             
             Spacer()
             
@@ -199,6 +270,7 @@ struct AllLivePlayersHeaderView: View {
                             ForEach(AllLivePlayersViewModel.SortingMethod.allCases) { method in
                                 Button(method.displayName) {
                                     allLivePlayersViewModel.setSortingMethod(method)
+                                    resetDeltaBaseline()
                                 }
                             }
                         } label: {
@@ -225,6 +297,7 @@ struct AllLivePlayersHeaderView: View {
                         if allLivePlayersViewModel.sortingMethod == .score {
                             Button(action: {
                                 allLivePlayersViewModel.toggleSortDirection()
+                                resetDeltaBaseline()
                             }) {
                                 // Up arrow for Highest (sortHighToLow = true), Down arrow for Lowest
                                 Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
@@ -242,6 +315,7 @@ struct AllLivePlayersHeaderView: View {
                         ForEach(AllLivePlayersViewModel.PlayerPosition.allCases) { position in
                             Button(position.displayName) {
                                 allLivePlayersViewModel.setPositionFilter(position)
+                                resetDeltaBaseline()
                             }
                         }
                     } label: {
@@ -268,6 +342,7 @@ struct AllLivePlayersHeaderView: View {
                     // Active Only toggle (toggles between "Yes" and "No")
                     Button(action: { 
                         allLivePlayersViewModel.setShowActiveOnly(!allLivePlayersViewModel.showActiveOnly)
+                        resetDeltaBaseline()
                     }) {
                         VStack(spacing: 2) {
                             Text(allLivePlayersViewModel.showActiveOnly ? "Yes" : "No")
@@ -294,6 +369,7 @@ struct AllLivePlayersHeaderView: View {
                         if allLivePlayersViewModel.isSearching {
                             allLivePlayersViewModel.clearSearch()
                             isSearchFocused = false // Clear focus when closing search
+                        resetDeltaBaseline()
                         } else {
                             allLivePlayersViewModel.isSearching = true
                             // 🔥 FIX: Focus the search field automatically when opening search
@@ -433,6 +509,7 @@ struct AllLivePlayersHeaderView: View {
                 // Rostered Only checkbox
                 Button(action: {
                     allLivePlayersViewModel.toggleRosteredFilter()
+                    resetDeltaBaseline()
                 }) {
                     HStack(spacing: 8) {
                         Image(systemName: allLivePlayersViewModel.showRosteredOnly ? "checkmark.square.fill" : "square")
@@ -523,11 +600,15 @@ struct AllLivePlayersHeaderView: View {
     // 🔥 NEW: Total points calculation - GUARANTEED LIVE
     private var totalPoints: Double {
         // 🔥 Force recalculation on every live update by depending on lastUpdateTime
-        let _ = allLivePlayersViewModel.lastUpdateTime
+        let updateTime = allLivePlayersViewModel.lastUpdateTime
         
-        return allLivePlayersViewModel.filteredPlayers.reduce(0) { total, player in
-            total + player.currentScore
+        let total = allLivePlayersViewModel.filteredPlayers.reduce(0) { sum, player in
+            sum + player.currentScore
         }
+        
+        debugPrint(mode: .liveUpdates, limit: 5, "💰 TOTAL CALCULATED: \(total) from \(allLivePlayersViewModel.filteredPlayers.count) players (updateTime: \(updateTime))")
+        
+        return total
     }
     
     private var totalPointsFormatted: String {
@@ -539,6 +620,22 @@ struct AllLivePlayersHeaderView: View {
         formatter.decimalSeparator = "."
         
         return formatter.string(from: NSNumber(value: totalPoints)) ?? "0.00"
+    }
+
+    private var deltaFormatted: String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        let value = sessionDeltaPoints
+        let sign = value > 0 ? "+" : (value < 0 ? "-" : "")
+        let num = formatter.string(from: NSNumber(value: abs(value))) ?? "0.00"
+        return "\(sign)\(num)"
+    }
+
+    private var shouldShowDelta: Bool {
+        // Hide tiny deltas caused by rounding noise
+        return abs(sessionDeltaPoints) >= 0.005
     }
     
     private var timerColor: Color {
@@ -581,7 +678,7 @@ struct AllLivePlayersHeaderView: View {
     private func performManualRefresh() async {
         // 🔥 FIXED: Manual refresh should do EXACTLY the same as the automatic 15-second timer
         // This ensures consistency between manual and automatic refreshes
-        print("🔄 Manual refresh: Using same logic as 15-second timer")
+        debugPrint(mode: .liveUpdates, "👆 MANUAL REFRESH: User tapped refresh button")
         await performBackgroundRefresh()
         onAnimationReset()
         resetCountdown()
@@ -595,8 +692,9 @@ struct AllLivePlayersHeaderView: View {
     
     // MARK: - Background Refresh (No UI Resets)
     private func performBackgroundRefresh() async {
-        // 🔥 FIXED: Use silent live update instead of full refresh to prevent spinning orbs
-        await allLivePlayersViewModel.performLiveUpdate()
+        debugPrint(mode: .liveUpdates, "⏰ TIMER TRIGGERED: 15-second auto-refresh timer fired")
+        // Let MatchupsHub's own timer perform API refresh. We only process the latest snapshot.
+        await allLivePlayersViewModel.processCurrentSnapshot()
         resetCountdown()
         // DO NOT call onAnimationReset() here - that causes the jarring refresh
     }
@@ -621,12 +719,16 @@ struct AllLivePlayersHeaderView: View {
         // 🔥 ENABLED: Restore AllLivePlayersView auto-refresh timer to fix live updates
         // This timer was previously disabled causing the missing automatic refresh issue
         
+        debugPrint(mode: .liveUpdates, "🎬 TIMER SETUP: Starting 15-second auto-refresh timer")
+        
         // Start the actual refresh timer (every 15 seconds)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
                 if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
+                } else {
+                    debugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(UIApplication.shared.applicationState == .active), loading=\(allLivePlayersViewModel.isLoading))")
                 }
             }
         }
@@ -659,6 +761,14 @@ struct AllLivePlayersHeaderView: View {
     
     private func resetCountdown() {
         refreshCountdown = Double(AppConstants.MatchupRefresh)
+    }
+
+    private func resetDeltaBaseline() {
+        baselineTotalPoints = totalPoints
+        sessionDeltaPoints = 0
+        #if canImport(UIKit)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
     }
 }
 

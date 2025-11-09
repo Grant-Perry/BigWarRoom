@@ -96,7 +96,7 @@ struct NonMicroTeamSection: View {
             // Manager record (only show if available)
             if let record = team.record {
                 Text(record.displayString)
-                    .font(.system(size: dualViewMode ? 9 : 8, weight: .medium))
+                    .font(.system(size: dualViewMode ? 12 : 11, weight: .medium))
                     .foregroundColor(.gray)
             }
             

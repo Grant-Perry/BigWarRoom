@@ -12,15 +12,11 @@ extension AllLivePlayersViewModel {
     // MARK: - Player Extraction from Single Matchup
     internal func extractPlayersFromSingleMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
-        
-        print("🔥 EXTRACT MATCHUP: \(matchup.league.league.name) (\(matchup.league.source.rawValue))")
 
         // Regular matchups - extract from MY team only
         if let fantasyMatchup = matchup.fantasyMatchup {
-            print("🔥 EXTRACT: Regular matchup found")
             if let myTeam = matchup.myTeam {
                 let myStarters = myTeam.roster.filter { $0.isStarter }
-                print("🔥 EXTRACT: Found \(myStarters.count) starters in myTeam")
                 for player in myStarters {
                     let calculatedScore = player.currentPoints ?? 0.0
                     
@@ -28,8 +24,6 @@ extension AllLivePlayersViewModel {
                     let existingPlayer = allPlayers.first { $0.player.id == player.id }
                     let previousScore = existingPlayer?.currentScore
                     let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
-                    
-                    print("🔥 EXTRACT: Adding \(player.fullName) with score \(calculatedScore)")
                     
                     players.append(LivePlayerEntry(
                         id: "\(matchup.id)_my_\(player.id)",
@@ -46,16 +40,12 @@ extension AllLivePlayersViewModel {
                         previousScore: previousScore
                     ))
                 }
-            } else {
-                print("🔥 EXTRACT: No myTeam found in regular matchup")
             }
         }
 
         // Chopped leagues - extract from my team ranking
         if let myTeamRanking = matchup.myTeamRanking {
-            print("🔥 EXTRACT: Chopped league found")
             let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
-            print("🔥 EXTRACT: Found \(myTeamStarters.count) starters in chopped team")
 
             for player in myTeamStarters {
                 let calculatedScore = player.currentPoints ?? 0.0
@@ -64,8 +54,6 @@ extension AllLivePlayersViewModel {
                 let existingPlayer = allPlayers.first { $0.player.id == player.id }
                 let previousScore = existingPlayer?.currentScore
                 let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
-                
-                print("🔥 EXTRACT: Adding chopped \(player.fullName) with score \(calculatedScore)")
                 
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
@@ -84,7 +72,6 @@ extension AllLivePlayersViewModel {
             }
         }
         
-        print("🔥 EXTRACT RESULT: Extracted \(players.count) players from matchup")
         return players
     }
     // MARK: - Build Player Data with Statistics
@@ -231,19 +218,27 @@ extension AllLivePlayersViewModel {
         }
         
         // Debug: Show before/after player counts
-        print("🔥 SILENT UPDATE: Updating allPlayers from \(allPlayers.count) to \(updatedPlayers.count) players")
+        debugPrint(mode: .liveUpdates, "🔄 SILENT UPDATE: Updating allPlayers from \(allPlayers.count) to \(updatedPlayers.count) players")
         
         // 🔥 CRITICAL FIX: Update allPlayers with fresh data
         let oldPlayerCount = allPlayers.count
         allPlayers = updatedPlayers
-        print("🔥 SILENT UPDATE: allPlayers updated (was \(oldPlayerCount), now \(allPlayers.count))")
+        debugPrint(mode: .liveUpdates, "✏️ allPlayers updated (was \(oldPlayerCount), now \(allPlayers.count))")
         
         // 🔥 CRITICAL FIX: Use the regular filter method instead of silent to trigger UI updates
         let oldFilteredCount = filteredPlayers.count
         applyPositionFilter()
-        print("🔥 SILENT UPDATE: filteredPlayers updated (was \(oldFilteredCount), now \(filteredPlayers.count))")
+        debugPrint(mode: .liveUpdates, "🔍 filteredPlayers updated (was \(oldFilteredCount), now \(filteredPlayers.count))")
         
-        print("🔥 SILENT UPDATE COMPLETE")
+        // Auto-recovery: if data is loaded and filters produced no results, relax filters
+        if isDataLoaded && !allPlayers.isEmpty && filteredPlayers.isEmpty {
+            debugPrint(mode: .liveUpdates, "🛟 AUTO-RECOVERY: No results with current filters. Falling back to All / No Active Only.")
+            showActiveOnly = false
+            selectedPosition = .all
+            applyPositionFilter()
+        }
+
+        debugPrint(mode: .liveUpdates, "✅ SILENT UPDATE COMPLETE")
     }
     
     // 🔥 NEW: Silent filter application (called during background updates)

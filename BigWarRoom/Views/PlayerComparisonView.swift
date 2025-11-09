@@ -13,6 +13,7 @@ struct PlayerComparisonView: View {
     @State private var showPlayer2Search = false
     @State private var searchText1 = ""
     @State private var searchText2 = ""
+    @State private var isPlayerSelectionCollapsed = false
     
     @Environment(\.dismiss) var dismiss
     
@@ -30,55 +31,106 @@ struct PlayerComparisonView: View {
                     // Header
                     headerSection
                     
-                    // Player 1 Selection
-                    playerSelectionSection(
-                        player: viewModel.player1,
-                        searchText: $searchText1,
-                        placeholder: "Search Player 1...",
-                        showSearch: $showPlayer1Search,
-                        onSelect: { viewModel.selectPlayer1($0) },
-                        onClear: { viewModel.clearPlayer1() },
-                        playerNumber: 1
-                    )
-                    
-                    // Player 2 Selection
-                    if viewModel.player1 != nil {
-                        playerSelectionSection(
-                            player: viewModel.player2,
-                            searchText: $searchText2,
-                            placeholder: "Search Player 2...",
-                            showSearch: $showPlayer2Search,
-                            onSelect: { viewModel.selectPlayer2($0) },
-                            onClear: { viewModel.clearPlayer2() },
-                            playerNumber: 2
-                        )
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    
-                    // Comparison Button
-                    if viewModel.player1 != nil && viewModel.player2 != nil {
-                        Button(action: {
-                            Task {
-                                await viewModel.performComparison()
+                    // Player Selection Panel (Collapsible - contains both players)
+                    VStack(spacing: 0) {
+                        // Collapsible header
+                        if viewModel.recommendation != nil {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                    isPlayerSelectionCollapsed.toggle()
+                                }
+                            }) {
+                                HStack {
+                                    Text("Player Selection")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: isPlayerSelectionCollapsed ? "chevron.down" : "chevron.up")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.white.opacity(0.1))
+                                )
                             }
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.left.arrow.right")
-                                Text("Compare Players")
-                                    .font(.system(size: 18, weight: .semibold))
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.blue)
-                            )
-                            .foregroundColor(.white)
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .disabled(viewModel.isLoading)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                        .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
-                        .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+                        
+                        // Player selection content
+                        if !isPlayerSelectionCollapsed {
+                            VStack(spacing: 24) {
+                                // Player 1
+                                playerSelectionSection(
+                                    player: viewModel.player1,
+                                    searchText: $searchText1,
+                                    placeholder: "Search Player 1...",
+                                    showSearch: $showPlayer1Search,
+                                    onSelect: { viewModel.selectPlayer1($0) },
+                                    onClear: { viewModel.clearPlayer1() },
+                                    playerNumber: 1
+                                )
+                                
+                                // Player 2
+                                if viewModel.player1 != nil {
+                                    playerSelectionSection(
+                                        player: viewModel.player2,
+                                        searchText: $searchText2,
+                                        placeholder: "Search Player 2...",
+                                        showSearch: $showPlayer2Search,
+                                        onSelect: { viewModel.selectPlayer2($0) },
+                                        onClear: { viewModel.clearPlayer2() },
+                                        playerNumber: 2
+                                    )
+                                    .transition(.move(edge: .top).combined(with: .opacity))
+                                }
+                                
+                                // Comparison Button (Smaller, Sexier)
+                                if viewModel.player1 != nil && viewModel.player2 != nil {
+                                    Button(action: {
+                                        // Collapse the panel
+                                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                            isPlayerSelectionCollapsed = true
+                                        }
+                                        
+                                        // Perform comparison
+                                        Task {
+                                            await viewModel.performComparison()
+                                        }
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "arrow.left.arrow.right")
+                                                .font(.system(size: 14, weight: .semibold))
+                                            Text("Compare Players")
+                                                .font(.system(size: 15, weight: .semibold))
+                                        }
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            LinearGradient(
+											 colors: [
+												Color.gpBlueLight,
+												Color.gpLtBlue.opacity(0.8)
+											 ],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .foregroundColor(.white)
+                                        .clipShape(Capsule())
+                                        .shadow(color: .blue.opacity(0.5), radius: 8, x: 0, y: 4)
+                                    }
+                                    .disabled(viewModel.isLoading)
+                                    .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
+                                    .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+                                }
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
                     
                     // Comparison Results
@@ -379,7 +431,7 @@ struct PlayerComparisonView: View {
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.blue)
+				  .fill(Color.blue.gradient)
             )
             .foregroundColor(.white)
         }
@@ -460,6 +512,18 @@ struct PlayerComparisonView: View {
             // Player Image - Clickable to view stats
             NavigationLink(destination: PlayerStatsCardView(player: player.sleeperPlayer, team: nil)) {
                 ZStack {
+                    // Team logo background (like Live Players)
+                    if let team = player.sleeperPlayer.team {
+                        let normalizedTeamCode = TeamCodeNormalizer.normalize(team) ?? team
+                        if let nflTeam = NFLTeam.team(for: normalizedTeamCode) {
+                            TeamAssetManager.shared.logoOrFallback(for: nflTeam.id)
+                                .frame(width: 120, height: 120)
+                                .opacity(0.25)
+                                .zIndex(0)
+                        }
+                    }
+                    
+                    // Player image on top
                     AsyncImage(url: player.sleeperPlayer.headshotURL) { image in
                         image
                             .resizable()
@@ -474,6 +538,7 @@ struct PlayerComparisonView: View {
                         Circle()
                             .stroke(isWinner ? Color.green : Color.red, lineWidth: 3)
                     )
+                    .zIndex(1)
                     
                     // Injury Status Badge
                     if let injuryStatus = player.sleeperPlayer.injuryStatus, !injuryStatus.isEmpty {
@@ -486,8 +551,10 @@ struct PlayerComparisonView: View {
                                     .offset(x: -6, y: -6)
                             }
                         }
+                        .zIndex(2)
                     }
                 }
+                .frame(width: 120, height: 120) // Container size for logo
             }
             
             // Player Name
@@ -497,24 +564,85 @@ struct PlayerComparisonView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
             
+            // Position Badge & Team Name (e.g., "QB1 Bills")
+            HStack(spacing: 4) {
+                // Position badge with roster position
+                Text(getPositionWithRosterNumber(for: player))
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(getPositionColor(for: player.position))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                // Team abbreviated name
+                if let teamName = getTeamAbbreviatedName(for: player) {
+                    Text(teamName)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+            
             // Grade
             Text(grade.rawValue)
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(gradeColor(grade))
             
-            // Projected Points
-            if let projected = player.projectedPoints {
-                VStack(spacing: 4) {
-                    Text("Projected")
-                        .font(.system(size: 10))
-                        .foregroundColor(.white.opacity(0.6))
-                    Text(projected.fantasyPointsString)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
+            // Projected Points & OPRK (Two columns)
+            HStack(spacing: 8) {
+                // Column 1: Projected
+                if let projected = player.projectedPoints {
+                    VStack(spacing: 4) {
+                        Text("Projected")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(projected.fantasyPointsString)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                
+                // Column 2: OPRK
+                if let team = player.sleeperPlayer.team,
+                   let matchupInfo = player.matchupInfo,
+                   let opponent = matchupInfo.opponent {
+                    let position = player.position
+                    let _ = debugPrint(mode: .oprk, "PlayerComparisonView: \(player.fullName) (\(position)) on \(team) playing vs \(opponent)")
+                    let oprk = OPRKService.shared.getOPRK(forTeam: opponent, position: position)
+                    let advantage = OPRKService.shared.getMatchupAdvantage(forOpponent: opponent, position: position)
+                    
+                    VStack(spacing: 4) {
+                        VStack(spacing: 0) {
+                            Text("vs \(opponent)")
+                                .font(.system(size: 10))
+                                .foregroundColor(.white.opacity(0.6))
+                            Text("OPRK")
+                                .font(.system(size: 9))
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+                        if let rank = oprk {
+                            HStack(spacing: 2) {
+                                // OPRK emoji indicator (40% smaller, shown first)
+                                Text(self.getOPRKEmoji(advantage))
+                                    .font(.system(size: 7.2))  // 40% smaller than 12
+                                Text("\(rank)")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundColor(.white)
+                            }
+                        } else {
+                            Text("--")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
+            .padding(.horizontal, 4)
             
-            // Recent Form
+            // Recent Form (Single column)
             if let form = player.recentForm {
                 VStack(spacing: 4) {
                     Text("Avg (3 games)")
@@ -654,6 +782,54 @@ struct PlayerComparisonView: View {
         case .high: return .green
         case .medium: return .yellow
         case .low: return .orange
+        }
+    }
+    
+    private func getPositionWithRosterNumber(for player: ComparisonPlayer) -> String {
+        // Build position string with roster number (e.g., "QB1", "WR2")
+        let position = player.position
+        
+        // Add roster position number if available
+        if let depthPosition = player.depthChartPosition {
+            return "\(position)\(depthPosition)"
+        }
+        
+        // No roster position, just return position
+        return position
+    }
+    
+    private func getTeamAbbreviatedName(for player: ComparisonPlayer) -> String? {
+        // Return abbreviated team name (e.g., "Bills", "Dolphins")
+        guard let teamCode = player.team else { return nil }
+        
+        let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
+        if let nflTeam = NFLTeam.team(for: normalizedTeamCode) {
+            return nflTeam.name  // Just the team name (e.g., "Bills", not "Buffalo Bills")
+        }
+        
+        // Fallback: return the team code if team not found
+        return teamCode
+    }
+    
+    private func getPositionColor(for position: String) -> Color {
+        // Return position-specific color (matching Live Players)
+        switch position {
+        case "QB": return .blue
+        case "RB": return .green
+        case "WR": return .purple
+        case "TE": return .orange
+        case "K": return .yellow
+        case "DEF", "DST", "D/ST": return .red
+        default: return .gray
+        }
+    }
+    
+    private func getOPRKEmoji(_ advantage: MatchupAdvantage) -> String {
+        switch advantage {
+        case .elite:      return "🟢"  // Easiest matchup
+        case .favorable:  return "🟡"  // Good matchup
+        case .neutral:    return "⚪"  // Average
+        case .difficult:  return "🔴"  // Tough matchup
         }
     }
     

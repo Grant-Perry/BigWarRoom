@@ -92,17 +92,17 @@ struct AllLivePlayersView: View {
             // 🔥 REVERTED: Back to simple, working logic
             let hasData = !allLivePlayersViewModel.allPlayers.isEmpty
             
-            print("🔥 LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
+            debugPrint(mode: .liveUpdates, "👁️ LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
             
             // Simple rule: If we don't have data, load it
             if !hasData && !hasPerformedInitialLoad {
-                print("🔥 LIVE PLAYERS: Starting data load")
+                debugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Starting data load")
                 hasPerformedInitialLoad = true
                 Task {
                     await allLivePlayersViewModel.loadAllPlayers()
                 }
             } else {
-                print("🔥 LIVE PLAYERS: Already have data or already loaded")
+                debugPrint(mode: .liveUpdates, limit: 1, "✅ LIVE PLAYERS: Already have data or already loaded")
                 hasPerformedInitialLoad = true
             }
         }
@@ -111,7 +111,7 @@ struct AllLivePlayersView: View {
         }
         .onChange(of: weekManager.selectedWeek) { _, _ in
             hasPerformedInitialLoad = false
-            print("🔥 WEEK CHANGED: Resetting initial load flag")
+            debugPrint(mode: .liveUpdates, "📅 WEEK CHANGED: Resetting initial load flag")
             Task {
                 await allLivePlayersViewModel.loadAllPlayers()
             }
@@ -295,7 +295,7 @@ struct AllLivePlayersView: View {
     private func performRefresh() async {
         print("🔄 PULL-TO-REFRESH: User initiated manual refresh")
         await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
-        await allLivePlayersViewModel.refresh()
+        await allLivePlayersViewModel.loadAllPlayers()
     }
     
     /// Load initial data with proper task management - ONLY run when needed

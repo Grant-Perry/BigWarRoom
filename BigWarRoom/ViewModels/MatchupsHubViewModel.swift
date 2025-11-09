@@ -93,7 +93,7 @@ final class MatchupsHubViewModel {
     
     // MARK: - 🔥 PHASE 3: Replace Combine subscription with @Observable observation
     private func setupCredentialObservation() {
-        print("🔥 CREDENTIALS OBSERVATION: Setting up @Observable-based credential monitoring")
+        debugPrint(mode: .viewModelLifecycle, "Setting up @Observable-based credential monitoring")
         
         observationTask = Task { @MainActor in
             var lastSleeperCredentials = sleeperCredentials.hasValidCredentials
@@ -105,13 +105,13 @@ final class MatchupsHubViewModel {
                 let currentSleeperUsername = sleeperCredentials.currentUsername
                 
                 if currentSleeperCredentials != lastSleeperCredentials {
-                    print("🔄 Sleeper credentials changed - refreshing leagues...")
+                    debugPrint(mode: .viewModelLifecycle, "Sleeper credentials changed - refreshing leagues...")
                     await manualRefresh()
                     lastSleeperCredentials = currentSleeperCredentials
                 }
                 
                 if currentSleeperUsername != lastSleeperUsername {
-                    print("🔄 Sleeper username changed to '\(currentSleeperUsername)' - refreshing leagues...")
+                    debugPrint(mode: .viewModelLifecycle, "Sleeper username changed to '\(currentSleeperUsername)' - refreshing leagues...")
                     await manualRefresh()
                     lastSleeperUsername = currentSleeperUsername
                 }
@@ -133,13 +133,13 @@ final class MatchupsHubViewModel {
     
     /// Load all matchups across all connected leagues
     func loadAllMatchups() async {
-        print("🔥🔥🔥 PUBLIC API: MatchupsHubViewModel.loadAllMatchups() called from LoadingScreen")
+        debugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadAllMatchups() called from LoadingScreen")
         await performLoadAllMatchups()
     }
     
     /// Load matchups for a specific week
     func loadMatchupsForWeek(_ week: Int) async {
-        print("🔥🔥🔥 PUBLIC API: MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
+        debugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
         await performLoadMatchupsForWeek(week)
     }
     

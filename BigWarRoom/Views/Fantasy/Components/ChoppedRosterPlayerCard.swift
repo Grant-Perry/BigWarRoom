@@ -541,7 +541,7 @@ struct ChoppedRosterPlayerCard: View {
             customScoringSettings: viewModel.parentViewModel.getLeagueScoringSettings()
         )
         
-        let localStatsProvider = viewModel.parentViewModel.statsProvider
+        let localStatsProvider: LocalStatsProvider = viewModel.parentViewModel
         
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: viewModel.player,

@@ -1,0 +1,6 @@
+#clog means I want a change log for my commit message, written as plain text so I can paste it directly (never as a file). The log must include:
+	1.	tl;dr section – a short summary of what I did.
+	2.	Version number – if I write #clog v7.6.21, then that’s the version number used in the log.
+	3.	Modified files list – at the end, I want a list of every file I changed in this commit.
+
+#clog v

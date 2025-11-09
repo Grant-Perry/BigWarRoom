@@ -12,7 +12,7 @@ extension FantasyViewModel {
     
     /// Fetch real ESPN fantasy data with proper authentication
     func fetchESPNFantasyData(leagueID: String, week: Int) async {
-        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&scoringPeriodId=\(week)") else {
+        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
             errorMessage = "Invalid ESPN API URL"
             return
         }
@@ -20,26 +20,26 @@ extension FantasyViewModel {
         // 🔥 FIX: First fetch the full league data with member info for name resolution AND scoring settings
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: leagueID)
-            print("✅ ESPN: Got league data with scoring settings for score breakdown")
+            debugPrint(mode: .espnAPI, "Got league data with scoring settings for score breakdown")
             
             // 🔥 NEW: Debug the scoring settings to ensure they're available
             if let scoringSettings = currentESPNLeague?.scoringSettings {
-                print("🔥 DEBUG: ESPN league has ROOT level scoring settings with \(scoringSettings.scoringItems?.count ?? 0) items")
+                debugPrint(mode: .espnAPI, limit: 3, "ESPN league has ROOT level scoring settings with \(scoringSettings.scoringItems?.count ?? 0) items")
             } else if let nestedScoring = currentESPNLeague?.settings?.scoringSettings {
-                print("🔥 DEBUG: ESPN league has NESTED scoring settings with \(nestedScoring.scoringItems?.count ?? 0) items")
+                debugPrint(mode: .espnAPI, limit: 3, "ESPN league has NESTED scoring settings with \(nestedScoring.scoringItems?.count ?? 0) items")
             } else {
-                print("⚠️ DEBUG: ESPN league has NO scoring settings available for breakdown")
+                debugPrint(mode: .espnAPI, "ESPN league has NO scoring settings available for breakdown")
             }
             
         } catch {
-            print("⚠️ ESPN: Failed to get league data, using fallback names - \(error)")
+            debugPrint(mode: .espnAPI, "Failed to get league data, using fallback names - \(error)")
             currentESPNLeague = nil
         }
 
         // 🔥 NEW: Fetch ESPN standings to get team records BEFORE processing matchups
         do {
             let standingsData = try await ESPNAPIClient.shared.fetchESPNStandings(leagueID: leagueID)
-            print("✅ ESPN: Got standings data for team records")
+            debugPrint(mode: .recordCalculation, "Got standings data for team records")
 
             // Extract and store team records from standings
             espnTeamRecords.removeAll() // Clear any existing records
@@ -50,15 +50,15 @@ extension FantasyViewModel {
                         losses: record.losses,
                         ties: record.ties
                     )
-                    print("📊 ESPN Standings Record: Team \(team.id) '\(team.displayName)': \(record.wins)-\(record.losses)")
+                    debugPrint(mode: .recordCalculation, limit: 10, "ESPN Standings Record: Team \(team.id) '\(team.displayName)': \(record.wins)-\(record.losses)")
                 } else {
-                    print("⚠️ ESPN Standings: Team \(team.id) '\(team.displayName)': NO RECORD in standings")
+                    debugPrint(mode: .recordCalculation, "ESPN Standings: Team \(team.id) '\(team.displayName)': NO RECORD in standings")
                 }
             }
-            print("📊 ESPN Standings Summary: \(espnTeamRecords.count) records stored from standings")
+            debugPrint(mode: .recordCalculation, "ESPN Standings Summary: \(espnTeamRecords.count) records stored from standings")
 
         } catch {
-            print("❌ ESPN: Failed to get standings data - \(error)")
+            debugPrint(mode: .recordCalculation, "Failed to get standings data - \(error)")
             // Continue without standings data - records will be nil but won't crash
         }
 
@@ -93,7 +93,7 @@ extension FantasyViewModel {
                 
                 if !problematicEntries.isEmpty {
                     for (index, entry) in problematicEntries.enumerated() {
-                        print("  Problem Entry \(index + 1): \(entry)")
+                        debugPrint(mode: .espnAPI, limit: 3, "  Problem Entry \(index + 1): \(entry)")
                     }
                 }
             }
@@ -174,7 +174,7 @@ extension FantasyViewModel {
     /// Process ESPN Fantasy data exactly like the working test view
     func processESPNFantasyData(espnModel: ESPNFantasyLeagueModel, leagueID: String, week: Int) async {
         // Store team names for later lookup (records are now fetched from standings separately)
-        print("🔍 ESPN Matchup API RESPONSE - Processing \(espnModel.teams.count) teams")
+        debugPrint(mode: .espnAPI, "ESPN Matchup API RESPONSE - Processing \(espnModel.teams.count) teams")
 
         for team in espnModel.teams {
             espnTeamNames[team.id] = team.name
@@ -182,7 +182,7 @@ extension FantasyViewModel {
             // The matchup endpoint (mMatchupScore&mLiveScoring&mRoster) does NOT include team records
         }
 
-        print("📊 ESPN Matchup Processing: Team names stored. Records fetched separately from standings endpoint.")
+        debugPrint(mode: .espnAPI, "ESPN Matchup Processing: Team names stored. Records fetched separately from standings endpoint.")
         
         var processedMatchups: [FantasyMatchup] = []
         var byeTeams: [FantasyTeam] = []
@@ -196,7 +196,7 @@ extension FantasyViewModel {
                 // Convert this specific schedule entry back to JSON for inspection
                 if let jsonData = try? JSONEncoder().encode(scheduleEntry),
                    let jsonString = String(data: jsonData, encoding: .utf8) {
-                    print("   \(jsonString)")
+                    debugPrint(mode: .espnAPI, limit: 2, "   \(jsonString)")
                 }
                 
                 // Check if this team appears as an away team in any other matchup
@@ -205,7 +205,7 @@ extension FantasyViewModel {
                 }
                 
                 if appearsAsAway {
-                    print("⚠️ DUPLICATE: Team \(scheduleEntry.home.teamId) ALSO appears as away team in another entry!")
+                    debugPrint(mode: .espnAPI, "DUPLICATE: Team \(scheduleEntry.home.teamId) ALSO appears as away team in another entry!")
                 }
                 
                 if let homeTeam = espnModel.teams.first(where: { $0.id == scheduleEntry.home.teamId }) {
@@ -265,9 +265,9 @@ extension FantasyViewModel {
         
         // 🔥 NEW: Verify that currentESPNLeague is still populated after processing
         if currentESPNLeague != nil {
-            print("✅ ESPN: currentESPNLeague is available for score breakdowns")
+            debugPrint(mode: .espnAPI, "currentESPNLeague is available for score breakdowns")
         } else {
-            print("❌ ESPN: currentESPNLeague is unexpectedly nil after processing")
+            debugPrint(mode: .espnAPI, "currentESPNLeague is unexpectedly nil after processing")
         }
     }
 
@@ -304,10 +304,10 @@ extension FantasyViewModel {
         // 🔥 FIX: Use the espnTeamRecords dictionary that was populated from standings endpoint
         if let storedRecord = espnTeamRecords[espnTeam.id] {
             record = storedRecord
-            print("✅ Using standings record for ESPN team \(espnTeam.id): \(storedRecord.displayString)")
+            debugPrint(mode: .recordCalculation, limit: 10, "Using standings record for ESPN team \(espnTeam.id): \(storedRecord.displayString)")
         } else {
             record = nil
-            print("❌ No standings record found for ESPN team \(espnTeam.id) - this should not happen")
+            debugPrint(mode: .recordCalculation, "No standings record found for ESPN team \(espnTeam.id) - this should not happen")
         }
         
         // 🔥 FIX: Improved team name resolution with better fallbacks
