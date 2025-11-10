@@ -359,7 +359,7 @@ final class LeagueMatchupProvider {
             let (data, _) = try await URLSession.shared.data(for: request)
             
             // 🔍 DEBUG: Check if positionAgainstOpponent key exists in response
-            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if AppConstants.debug, let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 print("🔍 LeagueMatchupProvider ESPN API Keys: \(jsonObject.keys.sorted())")
                 if jsonObject["positionAgainstOpponent"] != nil {
                     print("✅ positionAgainstOpponent EXISTS in LeagueMatchupProvider response")
@@ -534,12 +534,22 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperWeeklyStats() async {
-        // 🔥 FIX: Use SharedStatsService instead of making redundant API calls
+        // 🔥 WOODY'S FIX: Use SharedStatsService with force refresh instead of making redundant API calls
         do {
-            let sharedStats = try await SharedStatsService.shared.loadWeekStats(week: week, year: year)
+            let sharedStats = try await SharedStatsService.shared.loadWeekStats(
+                week: week, 
+                year: year, 
+                forceRefresh: true  // 🔥 CRITICAL: Always force fresh data for live league updates
+            )
             playerStats = sharedStats
+            if AppConstants.debug {
+                print("🔥 LeagueMatchupProvider: Loaded FRESH stats for \(sharedStats.count) players")
+            }
         } catch {
             playerStats = [:]  // Set empty to prevent crashes
+            if AppConstants.debug {
+                print("❌ LeagueMatchupProvider: Failed to load fresh stats: \(error)")
+            }
         }
     }
     

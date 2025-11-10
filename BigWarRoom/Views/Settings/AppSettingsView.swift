@@ -210,6 +210,31 @@ struct AppSettingsView: View {
                             .labelsHidden()
                     }
                     
+                    // Show Eliminated Chopped Leagues Toggle
+                    HStack {
+                        Image(systemName: "eye.slash.fill")
+                            .foregroundColor(.orange)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show Eliminated Chopped Leagues")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("Display leagues where you've been eliminated")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $viewModel.showEliminatedChoppedLeagues)
+                            .labelsHidden()
+                            .onChange(of: viewModel.showEliminatedChoppedLeagues) { _, newValue in
+                                viewModel.updateShowEliminatedChoppedLeagues(newValue)
+                            }
+                    }
+                    
                     // NFL Week Override
                     NavigationLink {
                         NFLWeekSettingsView()

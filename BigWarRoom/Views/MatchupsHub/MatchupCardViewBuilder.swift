@@ -83,7 +83,7 @@ struct MatchupCardViewBuilder: View {
             }
         )
         .frame(height: 120)
-        .padding(.bottom, 8)
+        .padding(.bottom, 4)
     }
     
     // MARK: -> Non-Micro Card
@@ -107,7 +107,7 @@ struct MatchupCardViewBuilder: View {
                 impactFeedback.impactOccurred()
             }
         )
-        .padding(.bottom, dualViewMode ? 44 : 20)
+        .padding(.bottom, dualViewMode ? 0 : 12)
     }
     
     // MARK: -> Properties Calculation
@@ -142,80 +142,48 @@ struct MatchupCardViewBuilder: View {
             shadowColor = .black.opacity(0.6)
             shadowRadius = 8
         } else if matchup.isChoppedLeague {
-            // Chopped league styling (but still alive)
-            if let ranking = matchup.myTeamRanking {
-                let dangerColor = ranking.eliminationStatus.color
-                borderColors = [dangerColor, dangerColor.opacity(0.7), dangerColor]
+            // 🔥 SIMPLIFIED: Chopped league uses same win/loss colors as regular matchups
+            if isWinning {
+                borderColors = [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
                 borderWidth = 2.5
                 borderOpacity = 0.9
-                shadowColor = dangerColor.opacity(0.4)
+                shadowColor = .gpGreen.opacity(0.4)
                 shadowRadius = 6
             } else {
-                borderColors = [.orange, .orange.opacity(0.7), .orange]
+                borderColors = [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
                 borderWidth = 2.5
                 borderOpacity = 0.9
-                shadowColor = .orange.opacity(0.4)
+                shadowColor = .gpRedPink.opacity(0.4)
                 shadowRadius = 6
             }
         } else if isLive {
-            // 🔥 FIXED: Check win/loss status even for live games
+            // 🔥 SIMPLIFIED: Live games use same win/loss colors
             if isWinning {
-                // Winning LIVE game: Keep the original live green theme
-                borderColors = [Color.gpGreen, Color.gpGreen.opacity(0.8), Color.cyan.opacity(0.6), Color.gpGreen.opacity(0.9), Color.gpGreen]
+                borderColors = [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
                 borderWidth = 2
                 borderOpacity = 0.8
-                shadowColor = Color.gpGreen.opacity(0.3)
+                shadowColor = .gpGreen.opacity(0.3)
                 shadowRadius = 4
             } else {
-                // 🔥 LOSING LIVE game: Cool gradient from gpPink to gpRed with light blue accents
-                borderColors = [
-                    Color.gpPink, 
-                    Color.gpRedPink.opacity(0.8),
-                    Color.cyan.opacity(0.4), // Light blue accent
-                    Color.gpRed.opacity(0.9),
-                    Color.gpPink.opacity(0.7),
-                    Color.gpRed
-                ]
+                borderColors = [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
                 borderWidth = 2.4
                 borderOpacity = 0.9
-                shadowColor = Color.gpRedPink.opacity(0.4)
+                shadowColor = .gpRedPink.opacity(0.4)
                 shadowRadius = 7
             }
         } else {
-            // Non-live games
-            if gamesHaventStarted {
-                // 🔥 NEW: Games haven't started - blue gradient to indicate "about to start"
-                borderColors = [
-                    Color.gpBlue,
-                    Color.marlinsPrimary,
-                    Color.gpBlue.opacity(0.8),
-                    Color.marlinsPrimary.opacity(0.9),
-                    Color.gpBlue
-                ]
-                borderWidth = 1.8
-                borderOpacity = 0.8
-                shadowColor = Color.gpBlue.opacity(0.3)
-                shadowRadius = 4
-            } else if isWinning {
-                // Winning: Keep the original blue theme
-                borderColors = [Color.blue.opacity(0.6), Color.cyan.opacity(0.4), Color.blue.opacity(0.6)]
+            // 🔥 SIMPLIFIED: Non-live games use same win/loss colors
+            if isWinning {
+                borderColors = [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
                 borderWidth = 1.5
                 borderOpacity = 0.7
-                shadowColor = Color.black.opacity(0.2)
+                shadowColor = .gpGreen.opacity(0.2)
                 shadowRadius = 2
             } else {
-                // 🔥 LOSING: Cool gradient from gpPink to gpRed with light blue accents
-                borderColors = [
-                    Color.gpPink, 
-                    Color.gpRedPink.opacity(0.8),
-                    Color.cyan.opacity(0.3), // Light blue accent
-                    Color.gpRed.opacity(0.9),
-                    Color.gpPink.opacity(0.7),
-                    Color.gpRed
-                ]
+                borderColors = [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
                 borderWidth = 2.2
                 borderOpacity = 0.85
-                shadowColor = Color.gpRedPink.opacity(0.35)
+                shadowColor = .gpRedPink.opacity(0.35)
                 shadowRadius = 5
             }
         }

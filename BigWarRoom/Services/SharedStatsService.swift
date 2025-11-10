@@ -90,16 +90,29 @@ final class SharedStatsService {
     }
     
     /// Load stats for a specific week/year
-    /// Uses caching to avoid redundant API calls
-    func loadWeekStats(week: Int, year: String) async throws -> [String: [String: Double]] {
+    /// Uses caching to avoid redundant API calls UNLESS forceRefresh is true
+    func loadWeekStats(week: Int, year: String, forceRefresh: Bool = false) async throws -> [String: [String: Double]] {
         let cacheKey = "\(week)_\(year)"
         
-        // Return cached data if available
-        if let cachedStats = weeklyStatsCache[cacheKey] {
+        // 🔥 WOODY'S FIX: Skip cache if forceRefresh is true
+        if !forceRefresh, let cachedStats = weeklyStatsCache[cacheKey] {
+            if AppConstants.debug {
+                print("🔍 SharedStatsService: Returning cached stats for \(cacheKey)")
+            }
             return cachedStats
         }
         
-        // Check if we're already loading this week
+        // 🔥 WOODY'S FIX: Cancel existing task if we're force refreshing
+        if forceRefresh {
+            loadingTasks[cacheKey]?.cancel()
+            loadingTasks.removeValue(forKey: cacheKey)
+            weeklyStatsCache.removeValue(forKey: cacheKey)
+            if AppConstants.debug {
+                print("🔥 SharedStatsService: Force refresh - cleared cache for \(cacheKey)")
+            }
+        }
+        
+        // Check if we're already loading this week (and not force refreshing)
         if let existingTask = loadingTasks[cacheKey] {
             return try await existingTask.value
         }
@@ -119,6 +132,10 @@ final class SharedStatsService {
             loadingTasks.removeValue(forKey: cacheKey)
             lastLoadTime = Date()
             
+            if AppConstants.debug {
+                print("✅ SharedStatsService: Cached fresh stats for \(cacheKey) - \(stats.count) players")
+            }
+            
             // Also update PlayerStatsCache for backward compatibility
             await playerStatsCache.updateWeeklyStats(stats, for: week)
             
@@ -128,6 +145,19 @@ final class SharedStatsService {
             loadingTasks.removeValue(forKey: cacheKey)
             throw error
         }
+    }
+
+    /// 🔥 WOODY'S FIX: Add dedicated force refresh method
+    func forceRefreshWeekStats(week: Int, year: String) async throws -> [String: [String: Double]] {
+        return try await loadWeekStats(week: week, year: year, forceRefresh: true)
+    }
+    
+    /// Load stats for the current week/year with optional force refresh
+    func loadCurrentWeekStats(forceRefresh: Bool = false) async throws -> [String: [String: Double]] {
+        let week = weekSelectionManager.selectedWeek
+        let year = seasonYearManager.selectedYear
+        
+        return try await loadWeekStats(week: week, year: year, forceRefresh: forceRefresh)
     }
     
     /// Get cached stats for a specific week without loading

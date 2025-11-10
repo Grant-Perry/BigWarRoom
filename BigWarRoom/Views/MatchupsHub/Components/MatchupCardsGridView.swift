@@ -25,21 +25,60 @@ struct MatchupCardsGridView: View {
             if sortedMatchups.isEmpty {
                 NoMatchupsThisWeekView()
             } else {
-                LazyVGrid(
-                    columns: gridColumns,
-                    spacing: gridSpacing
-                ) {
-                    ForEach(sortedMatchups, id: \.id) { matchup in
-                        MatchupCardViewBuilder(
-                            matchup: matchup,
-                            microMode: microMode,
-                            expandedCardId: expandedCardId,
-                            isWinning: getWinningStatus(matchup),
-                            // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
-                            // onShowDetail: { onShowDetail(matchup) },
-                            onMicroCardTap: onMicroCardTap,
-                            dualViewMode: dualViewMode
-                        )
+                // 🔥 NUCLEAR REBUILD: Simple, bulletproof grid
+                if microMode {
+                    // Micro cards - 4 columns
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4),
+                        spacing: 50 // Micro cards keep 50pt spacing
+                    ) {
+                        ForEach(sortedMatchups, id: \.id) { matchup in
+                            MatchupCardViewBuilder(
+                                matchup: matchup,
+                                microMode: true,
+                                expandedCardId: expandedCardId,
+                                isWinning: getWinningStatus(matchup),
+                                onMicroCardTap: onMicroCardTap,
+                                dualViewMode: dualViewMode
+                            )
+                        }
+                    }
+                } else if dualViewMode {
+                    // 🔥 BULLETPROOF: Dead simple 2-column grid
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 16),
+                            GridItem(.flexible(), spacing: 16)
+                        ],
+                        spacing: 70  // 🔥 INCREASED: Max spacing for NonMicro dual view
+                    ) {
+                        ForEach(sortedMatchups, id: \.id) { matchup in
+                            MatchupCardViewBuilder(
+                                matchup: matchup,
+                                microMode: false,
+                                expandedCardId: expandedCardId,
+                                isWinning: getWinningStatus(matchup),
+                                onMicroCardTap: onMicroCardTap,
+                                dualViewMode: true
+                            )
+                        }
+                    }
+                } else {
+                    // Single column view
+                    LazyVGrid(
+                        columns: [GridItem(.flexible())],
+                        spacing: 76 // Spacing between Matchup cards on Mission Control
+                    ) {
+                        ForEach(sortedMatchups, id: \.id) { matchup in
+                            MatchupCardViewBuilder(
+                                matchup: matchup,
+                                microMode: false,
+                                expandedCardId: expandedCardId,
+                                isWinning: getWinningStatus(matchup),
+                                onMicroCardTap: onMicroCardTap,
+                                dualViewMode: false
+                            )
+                        }
                     }
                 }
             }
@@ -58,22 +97,6 @@ struct MatchupCardsGridView: View {
                 onDismiss: onExpandedCardDismiss
             )
         )
-    }
-    
-    // MARK: - Grid Configuration
-    
-    private var gridColumns: [GridItem] {
-        if microMode {
-            return Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
-        } else if dualViewMode {
-            return Array(repeating: GridItem(.flexible(), spacing: 16), count: 2)
-        } else {
-            return [GridItem(.flexible(), spacing: 0)]
-        }
-    }
-    
-    private var gridSpacing: CGFloat {
-        microMode ? 8 : (dualViewMode ? 16 : 12)
     }
 }
 

@@ -96,6 +96,9 @@ struct NonMicroChoppedContent: View {
                         .fill(ranking.eliminationStatus.color.opacity(0.1))
                 )
             }
+            
+            // 🔥 FIXED: Add Spacer to fill remaining height so chopped cards match regular cards
+            Spacer()
         }
     }
     

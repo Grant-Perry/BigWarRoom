@@ -190,14 +190,23 @@ struct DebugMode: OptionSet {
         .nflData,
         .opponentIntel,
         .liveUpdates,
-        .oprk
+        .oprk,
+		.liveUpdate2
     ]
-    
-    // MARK: How to Add More States
-    // 1. Add new static let with next bit shift:
-    //    static let myNewMode = DebugMode(rawValue: 1 << 15)  // Next available
-    // 2. Add to .all combination above
-    // 3. Use it: debugPrint(mode: .myNewMode, "message")
+}
+
+extension DebugMode {
+    /// Add new debug flag for granular live player update diagnostics
+    static let liveUpdate2 = DebugMode(rawValue: 1 << 15) // 32768, next free bit!
+
+    // DO NOT redeclare 'all' – just edit the original static let all to include .liveUpdate2:
+    // Find your existing static let all, and change it to:
+    // static let all: DebugMode = [
+    //     ...,
+    //     .liveUpdates,
+    //     .oprk,
+    //     .liveUpdate2    // <--- Add this here at the end (or wherever style demands)
+    // ]
 }
 
 // MARK: - Debug Configuration

@@ -432,6 +432,13 @@ struct ChoppedRosterPlayerCard: View {
     }
     
     private var gameStatusText: String {
+        // Get actual game status from NFLGameDataService
+        if let team = viewModel.player.team,
+           let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            return gameInfo.statusBadgeText
+        }
+        
+        // Fallback to simple check
         if viewModel.player.isLive {
             return "LIVE"
         } else {
@@ -440,7 +447,14 @@ struct ChoppedRosterPlayerCard: View {
     }
     
     private var gameStatusColor: Color {
-        viewModel.player.isLive ? .red : .gray
+        // Get actual game status color from NFLGameDataService
+        if let team = viewModel.player.team,
+           let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            return gameInfo.statusColor
+        }
+        
+        // Fallback
+        return viewModel.player.isLive ? .red : .gray
     }
     
     private var simpleStatsDisplay: String {

@@ -124,6 +124,7 @@ struct NonMicroEliminatedContent: View {
                     .foregroundColor(.gray.opacity(0.6))
             }
         }
+        .frame(maxHeight: .infinity, alignment: .top) // 🔥 FIXED: Fill available height, align content to top
         .padding(.horizontal, 12)
         .padding(.vertical, dualViewMode ? 14 : 8)
         .background(NonMicroEliminatedBackground())
@@ -139,7 +140,6 @@ struct NonMicroEliminatedContent: View {
                     lineWidth: 2.0
                 )
         )
-        .shadow(color: .red.opacity(0.4), radius: 8, x: 0, y: 2)
-        .frame(height: dualViewMode ? 142 : 120)
+        .frame(height: dualViewMode ? 150 : 120)
     }
 }

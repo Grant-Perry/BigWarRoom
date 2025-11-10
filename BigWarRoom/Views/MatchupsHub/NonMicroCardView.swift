@@ -51,18 +51,26 @@ struct NonMicroCardView: View {
                 )
             }
         }
-        .scaleEffect(cardScale)
-        .background(
-            // 🔥 CELEBRATION: Massive expanding glow as background - doesn't affect layout
-            Group {
-                if isGamesFinishedForWeek && !matchup.isMyManagerEliminated {
-                    massiveCelebrationGlow
-                }
-            }
+        // 🔥 NUCLEAR FIXED SIZE: Set both width AND height explicitly
+        .frame(
+            width: dualViewMode ? 180 : 350,  // Fixed width based on mode
+            height: dualViewMode ? 150 : 120  // Fixed height
         )
+        .fixedSize() // 🔥 CRITICAL: Prevent any size changes
+        .scaleEffect(cardScale)
         // 🏈 NAVIGATION FREEDOM: Remove onTapGesture - conflicts with NavigationLink
         // BEFORE: .onTapGesture { handleTapFeedback() }
         // AFTER: NavigationLink handles all tap interactions
+        // 🔥 TEMP: Remove celebration glow entirely to test layout
+        // .overlay(
+        //     Group {
+        //         if isGamesFinishedForWeek && !matchup.isMyManagerEliminated {
+        //             constrainedCelebrationGlow
+        //                 .clipped()
+        //                 .allowsHitTesting(false)
+        //         }
+        //     }
+        // )
         .onAppear {
             if matchup.isLive {
                 startLiveAnimations()
@@ -72,10 +80,10 @@ struct NonMicroCardView: View {
                 startEliminatedAnimation()
             }
             
-            // 🔥 CELEBRATION: Start celebration if games are finished
-            if isGamesFinishedForWeek {
-                startMassiveCelebrationGlow()
-            }
+            // 🔥 TEMP: Don't start celebration glow
+            // if isGamesFinishedForWeek {
+            //     startMassiveCelebrationGlow()
+            // }
         }
         .background(
             RoundedRectangle(cornerRadius: 10)
@@ -129,81 +137,81 @@ struct NonMicroCardView: View {
         }
     }
     
-    /// Massive expanding glow behind the larger card - LAYOUT-SAFE
+    /// 🔥 CONSTRAINED: Celebration glow that respects card bounds
     @ViewBuilder
-    private var massiveCelebrationGlow: some View {
+    private var constrainedCelebrationGlow: some View {
         ZStack {
-            // Multiple layers of expanding glow - CONSTRAINED SIZE
-            ForEach(0..<3, id: \.self) { layer in
-                RoundedRectangle(cornerRadius: 16 + Double(layer) * 4)
+            // 🔥 CONSTRAINED: Much smaller glow layers that fit within card bounds
+            ForEach(0..<2, id: \.self) { layer in
+                RoundedRectangle(cornerRadius: 10 + Double(layer) * 2)
                     .fill(
                         RadialGradient(
                             colors: [
-                                celebrationGlowColor.opacity(0.6 - Double(layer) * 0.15),
                                 celebrationGlowColor.opacity(0.4 - Double(layer) * 0.1),
-                                celebrationSecondaryColor.opacity(0.3 - Double(layer) * 0.05),
+                                celebrationGlowColor.opacity(0.2 - Double(layer) * 0.05),
+                                celebrationSecondaryColor.opacity(0.15 - Double(layer) * 0.05),
                                 Color.clear
                             ],
                             center: .center,
                             startRadius: 0,
-                            endRadius: 80 + Double(layer) * 20
+                            endRadius: 40 + Double(layer) * 15
                         )
                     )
                     .frame(
-                        width: 160 + Double(layer) * 30,
-                        height: 130 + Double(layer) * 20
+                        width: 90 + Double(layer) * 15, // Much smaller - stays within card
+                        height: 70 + Double(layer) * 10  // Much smaller - stays within card
                     )
-                    .scaleEffect(celebrationGlowScale + Double(layer) * 0.15)
-                    .opacity(celebrationGlowOpacity * (1.0 - Double(layer) * 0.2))
-                    .blur(radius: 8 + Double(layer) * 4)
+                    .scaleEffect(1.0 + celebrationGlowScale * 0.15 + Double(layer) * 0.1) // Reduced scaling
+                    .opacity(celebrationGlowOpacity * (0.8 - Double(layer) * 0.2))
+                    .blur(radius: 4 + Double(layer) * 2) // Reduced blur
                     .animation(
-                        .easeInOut(duration: 2.2 + Double(layer) * 0.4)
+                        .easeInOut(duration: 2.0 + Double(layer) * 0.3)
                         .repeatForever(autoreverses: true)
-                        .delay(Double(layer) * 0.3),
+                        .delay(Double(layer) * 0.2),
                         value: celebrationGlowScale
                     )
                     .animation(
-                        .easeInOut(duration: 1.8 + Double(layer) * 0.3)
+                        .easeInOut(duration: 1.6 + Double(layer) * 0.2)
                         .repeatForever(autoreverses: true)
-                        .delay(Double(layer) * 0.2),
+                        .delay(Double(layer) * 0.1),
                         value: celebrationGlowOpacity
                     )
             }
             
-            // Central expanding aura - SMALLER
-            RoundedRectangle(cornerRadius: 16)
+            // 🔥 CONSTRAINED: Central pulse - much smaller
+            RoundedRectangle(cornerRadius: 10)
                 .fill(
                     LinearGradient(
                         colors: [
-                            celebrationGlowColor.opacity(0.8),
-                            celebrationSecondaryColor.opacity(0.5),
-                            celebrationGlowColor.opacity(0.4),
+                            celebrationGlowColor.opacity(0.6),
+                            celebrationSecondaryColor.opacity(0.3),
+                            celebrationGlowColor.opacity(0.2),
                             Color.clear
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 140, height: 110)
-                .scaleEffect(celebrationPulse ? 1.4 : 1.1)
-                .opacity(celebrationPulse ? 0.7 : 0.3)
-                .blur(radius: 8)
+                .frame(width: 80, height: 60) // Much smaller
+                .scaleEffect(celebrationPulse ? 1.15 : 1.0) // Reduced scaling
+                .opacity(celebrationPulse ? 0.5 : 0.2) // Reduced opacity
+                .blur(radius: 4) // Reduced blur
                 .animation(
-                    .easeInOut(duration: 1.5).repeatForever(autoreverses: true),
+                    .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
                     value: celebrationPulse
                 )
                 
-            // Subtle outer ripple - CONSTRAINED
-            RoundedRectangle(cornerRadius: 16)
+            // 🔥 CONSTRAINED: Subtle border pulse - stays within bounds
+            RoundedRectangle(cornerRadius: 10)
                 .stroke(
-                    celebrationGlowColor.opacity(0.5),
-                    lineWidth: 2
+                    celebrationGlowColor.opacity(0.4),
+                    lineWidth: 1
                 )
-                .frame(width: 100, height: 80)
-                .scaleEffect(celebrationSpread)
-                .opacity(2.0 - celebrationSpread) // Fade as it expands
+                .frame(width: 60, height: 45) // Much smaller
+                .scaleEffect(1.0 + celebrationSpread * 0.3) // Reduced expansion
+                .opacity(max(0.1, 1.0 - celebrationSpread * 0.4)) // Controlled fade
                 .animation(
-                    .easeOut(duration: 2.5).repeatForever(autoreverses: false),
+                    .easeOut(duration: 2.0).repeatForever(autoreverses: false),
                     value: celebrationSpread
                 )
         }
@@ -263,30 +271,30 @@ struct NonMicroCardView: View {
         }
     }
     
-    // 🔥 CELEBRATION: Start the celebration glow effects - LAYOUT-SAFE
+    // 🔥 CELEBRATION: Updated animation values for constrained effects
     private func startMassiveCelebrationGlow() {
-        // Controlled scale expansion - dramatic but not layout-breaking
-        withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-            celebrationGlowScale = 1.4
+        // Reduced scale expansion
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+            celebrationGlowScale = 0.8 // Reduced from 1.4
         }
         
-        // Opacity pulsing - intense but controlled
-        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-            celebrationGlowOpacity = 0.8
+        // Controlled opacity pulsing
+        withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+            celebrationGlowOpacity = 0.6 // Reduced from 0.8
         }
         
-        // Central pulse - dramatic
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+        // Subtle central pulse
+        withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
             celebrationPulse = true
         }
         
         // Constrained spreading ripple effect
-        withAnimation(.easeOut(duration: 2.5).repeatForever(autoreverses: false)) {
-            celebrationSpread = 2.5
+        withAnimation(.easeOut(duration: 2.0).repeatForever(autoreverses: false)) {
+            celebrationSpread = 1.8 // Reduced from 2.5
         }
         
-        // 🔥 NEW: Border pulsing with shadow
-        withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
+        // Border pulsing
+        withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
             celebrationBorderPulse = true
         }
     }

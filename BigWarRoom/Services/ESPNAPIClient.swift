@@ -146,7 +146,7 @@ final class ESPNAPIClient: DraftAPIClient {
             }
             
             // 🔍 DEBUG: Log top-level JSON keys to see if positionAgainstOpponent exists
-            if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if AppConstants.debug, let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 print("🔍 ESPN API Response Top-Level Keys: \(jsonObject.keys.sorted())")
                 if let positionData = jsonObject["positionAgainstOpponent"] {
                     print("✅ positionAgainstOpponent key EXISTS in response")
@@ -177,24 +177,26 @@ final class ESPNAPIClient: DraftAPIClient {
             // Try to decode and catch any errors related to positionAgainstOpponent
             do {
                 let espnLeague = try decoder.decode(ESPNLeague.self, from: data)
-                print("🔍 After decoding: positionAgainstOpponent is nil? \(espnLeague.positionAgainstOpponent == nil)")
-                
-                // If nil, try to decode just that field manually to see the error
-                if espnLeague.positionAgainstOpponent == nil {
-                    if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let posData = jsonObject["positionAgainstOpponent"] {
-                        print("⚠️ positionAgainstOpponent exists in JSON but failed to decode")
-                        print("⚠️ Attempting manual decode to see error...")
-                        
-                        let posDataJson = try JSONSerialization.data(withJSONObject: ["positionAgainstOpponent": posData])
-                        struct Wrapper: Codable {
-                            let positionAgainstOpponent: ESPNPositionalRatingsResponse?
-                        }
-                        do {
-                            let wrapper = try decoder.decode(Wrapper.self, from: posDataJson)
-                            print("✅ Manual decode successful: \(wrapper.positionAgainstOpponent != nil)")
-                        } catch {
-                            print("❌ Manual decode error: \(error)")
+                if AppConstants.debug {
+                    print("🔍 After decoding: positionAgainstOpponent is nil? \(espnLeague.positionAgainstOpponent == nil)")
+                    
+                    // If nil, try to decode just that field manually to see the error
+                    if espnLeague.positionAgainstOpponent == nil {
+                        if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let posData = jsonObject["positionAgainstOpponent"] {
+                            print("⚠️ positionAgainstOpponent exists in JSON but failed to decode")
+                            print("⚠️ Attempting manual decode to see error...")
+                            
+                            let posDataJson = try JSONSerialization.data(withJSONObject: ["positionAgainstOpponent": posData])
+                            struct Wrapper: Codable {
+                                let positionAgainstOpponent: ESPNPositionalRatingsResponse?
+                            }
+                            do {
+                                let wrapper = try decoder.decode(Wrapper.self, from: posDataJson)
+                                print("✅ Manual decode successful: \(wrapper.positionAgainstOpponent != nil)")
+                            } catch {
+                                print("❌ Manual decode error: \(error)")
+                            }
                         }
                     }
                 }
@@ -207,7 +209,9 @@ final class ESPNAPIClient: DraftAPIClient {
                 
                 return espnLeague.toSleeperLeague()
             } catch {
-                print("❌ ESPNLeague decode error: \(error)")
+                if AppConstants.debug {
+                    print("❌ ESPNLeague decode error: \(error)")
+                }
                 throw error
             }
     

@@ -74,6 +74,51 @@ extension AllLivePlayersViewModel {
         
         return players
     }
+
+    // MARK: - Diagnostic Instrument: Extract All Players
+    internal func extractAllPlayers() -> [LivePlayerEntry] {
+        let matchupsCount = matchupsHubViewModel.myMatchups.count
+        let matchupIDs = matchupsHubViewModel.myMatchups.map { $0.id }
+        var allPlayers: [LivePlayerEntry] = []
+
+        // 💣 INSTRUMENTATION: Only do when debug enabled, minimal perf hit.
+        if AppConstants.debug {
+            debugPrint(mode: .liveUpdate2, "[extractAllPlayers] matchupsCount = \(matchupsCount), matchupIDs: \(matchupIDs)")
+        }
+
+        // Only run extraction if we believe all matchups are loaded!
+        if matchupsCount < expectedLeagueCount() {
+            if AppConstants.debug {
+                debugPrint(
+                    mode: .liveUpdate2,
+                    "[extractAllPlayers] 🚨 ABORTED - only \(matchupsCount) matchups (expecting \(expectedLeagueCount())). Skipping total/allPlayers extraction for this cycle."
+                )
+            }
+            return [] // <- Don't extract partial, avoids total flip
+        }
+
+        for matchup in matchupsHubViewModel.myMatchups {
+            let playersForMatchup = extractPlayersFromSingleMatchup(matchup)
+            allPlayers.append(contentsOf: playersForMatchup)
+        }
+
+        if AppConstants.debug {
+            let prefs = allPlayers
+                .map { "\($0.playerName) (\($0.leagueName)): \($0.currentScoreString)" }
+                .joined(separator: ", ")
+            debugPrint(mode: .liveUpdate2, "[extractAllPlayers] Extracted \(allPlayers.count) players: \(prefs)")
+        }
+
+        return allPlayers
+    }
+
+    // 🧠 Helper to define what "complete" means; adjust logic if needed
+    internal func expectedLeagueCount() -> Int {
+        // Could be static, or could read from a config/service; adjust to your use-case
+        // This is just a placeholder, REPLACE with actual expected count logic!
+        return matchupsHubViewModel.connectedLeaguesCount
+    }
+
     // MARK: - Build Player Data with Statistics
     internal func buildPlayerData(from allPlayerEntries: [LivePlayerEntry]) async {
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
@@ -156,6 +201,22 @@ extension AllLivePlayersViewModel {
     
     // 🔥 FIXED: Changed from private to internal so DataLoading extension can access it
     internal func updatePlayerDataSilently(from allPlayerEntries: [LivePlayerEntry]) async {
+        if AppConstants.debug {
+            debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Called with \(allPlayerEntries.count) players")
+            let list = allPlayerEntries
+                .map { "\($0.playerName) (\($0.leagueName)): \($0.currentScoreString)" }
+                .joined(separator: ", ")
+            debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Player list: \(list)")
+        }
+
+        // You can optionally block updating if your extractor returned an empty set due to the gating above:
+        guard !allPlayerEntries.isEmpty else {
+            if AppConstants.debug {
+                debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] SKIPPED: No players (partial or incomplete extraction)")
+            }
+            return
+        }
+
         print("🔥 SILENT UPDATE START: Processing \(allPlayerEntries.count) player entries")
         
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)

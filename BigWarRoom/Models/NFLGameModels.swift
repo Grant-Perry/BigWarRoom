@@ -227,6 +227,26 @@ struct NFLGameInfo: Equatable {
         default: return .orange // Default to pregame color
         }
     }
+    
+    /// Simple status badge text (PREGAME, LIVE, FINAL)
+    var statusBadgeText: String {
+        let hasScores = homeScore > 0 || awayScore > 0
+        
+        switch gameStatus.lowercased() {
+        case "pre", "pregame":
+            return "PREGAME"
+        case "in", "live":
+            return "LIVE"
+        case "post", "final":
+            // Don't show FINAL unless game is actually completed
+            if hasScores && !isCompleted {
+                return "LIVE"
+            }
+            return "FINAL"
+        default:
+            return "PREGAME"
+        }
+    }
 }
 
 // MARK: -> NFL Game Data Service

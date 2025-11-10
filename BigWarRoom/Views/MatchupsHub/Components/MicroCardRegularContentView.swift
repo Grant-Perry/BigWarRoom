@@ -53,20 +53,10 @@ struct MicroCardRegularContentView: View {
                 .minimumScaleFactor(0.7)
             
             // Manager record
-            Text("Record: TEST")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.red)
-                .lineLimit(1)
-            
             if let record = record {
                 Text("Record: \(record)")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray.opacity(0.8))
-                    .lineLimit(1)
-            } else {
-                Text("Record: nil")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.red)
                     .lineLimit(1)
             }
             

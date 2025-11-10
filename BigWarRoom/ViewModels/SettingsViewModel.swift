@@ -16,6 +16,7 @@ final class SettingsViewModel {
     var autoRefreshEnabled: Bool = true
     var debugModeEnabled: Bool = AppConstants.debug
     var isTestingConnection: Bool = false
+    var showEliminatedChoppedLeagues: Bool = false
     
     // MARK: - Observable Properties (OnBoarding)
     var showingESPNSetup: Bool = false
@@ -93,6 +94,9 @@ final class SettingsViewModel {
             AppConstants.ESPNLeagueYear = savedYear
         }
         
+        // Load show eliminated chopped leagues preference (default: false)
+        showEliminatedChoppedLeagues = UserDefaults.standard.bool(forKey: "showEliminatedChoppedLeagues")
+        
         // Set up observers for changes (using withObservationTracking if needed)
         Task {
             await observeChanges()
@@ -127,6 +131,11 @@ final class SettingsViewModel {
         AppConstants.ESPNLeagueYear = newYear
         UserDefaults.standard.set(newYear, forKey: "selectedYear")
         NSLog("📅 Updated selected year to: \(newYear)")
+    }
+    
+    func updateShowEliminatedChoppedLeagues(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "showEliminatedChoppedLeagues")
+        NSLog("🔧 Show eliminated chopped leagues \(enabled ? "enabled" : "disabled")")
     }
     
     // MARK: - OnBoarding Methods
@@ -376,10 +385,14 @@ final class SettingsViewModel {
 // Create a typealias for backward compatibility
 typealias OnBoardingViewModel = SettingsViewModel
 
-// MARK: - Debug Mode Helper
+// MARK: - User Defaults Helpers
 
 extension UserDefaults {
     var isDebugModeEnabled: Bool {
         return bool(forKey: "debugModeEnabled")
+    }
+    
+    var showEliminatedChoppedLeagues: Bool {
+        return bool(forKey: "showEliminatedChoppedLeagues")
     }
 }

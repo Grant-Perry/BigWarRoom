@@ -77,30 +77,44 @@ extension AllLivePlayersViewModel {
         let currentYear = AppConstants.currentSeasonYear
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
-        print("🔄 STATS DEBUG: Loading player stats for week \(selectedWeek), year \(currentYear)")
+        if AppConstants.debug {
+            print("🔄 STATS DEBUG: Loading player stats for week \(selectedWeek), year \(currentYear)")
+        }
 
         do {
-            // 🔥 CRITICAL FIX: Use SharedStatsService instead of making redundant API calls
-            let freshStats = try await SharedStatsService.shared.loadWeekStats(week: selectedWeek, year: currentYear)
+            // 🔥 WOODY'S FIX: Use forceRefresh to bypass cache for live updates
+            let freshStats = try await SharedStatsService.shared.loadWeekStats(
+                week: selectedWeek, 
+                year: currentYear, 
+                forceRefresh: true  // 🔥 CRITICAL: Always force fresh data for live updates
+            )
             
-            print("🔄 STATS DEBUG: Successfully loaded stats from SharedStatsService for \(freshStats.keys.count) players")
+            if AppConstants.debug {
+                print("🔄 STATS DEBUG: Successfully loaded FRESH stats from SharedStatsService for \(freshStats.keys.count) players")
+            }
             
             // Log a few sample player scores for debugging
-            let sampleStats = Array(freshStats.prefix(3))
-            for (playerId, stats) in sampleStats {
-                let fantasyPoints = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
-                print("🔄 STATS DEBUG: Sample - Player \(playerId): \(fantasyPoints) pts")
+            if AppConstants.debug {
+                let sampleStats = Array(freshStats.prefix(3))
+                for (playerId, stats) in sampleStats {
+                    let fantasyPoints = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
+                    print("🔄 STATS DEBUG: Sample - Player \(playerId): \(fantasyPoints) pts")
+                }
             }
 
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.playerStats = freshStats
                 self.statsLoaded = true
-                print("🔄 STATS DEBUG: Updated playerStats on main thread with fresh data from SharedStatsService")
+                if AppConstants.debug {
+                    print("🔄 STATS DEBUG: Updated playerStats on main thread with FRESH data from SharedStatsService")
+                }
             }
             
         } catch {
-            print("🔄 STATS DEBUG: Failed to load stats from SharedStatsService: \(error)")
+            if AppConstants.debug {
+                print("🔄 STATS DEBUG: Failed to load stats from SharedStatsService: \(error)")
+            }
             await MainActor.run {
                 guard !Task.isCancelled else { return }
                 self.statsLoaded = true
@@ -116,7 +130,7 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Background Updates (Silent)
     func performLiveUpdate() async {
-        // 🔥 NO GUARDS: Always fetch fresh data from APIs
+        // 🔥 WOODY'S FIX: Always fetch fresh data - no guards against redundant calls
         
         // 🔥 NEW: Set updating flag for animation
         isUpdating = true
@@ -125,20 +139,21 @@ extension AllLivePlayersViewModel {
         debugPrint(mode: .liveUpdates, "Selected week = \(WeekSelectionManager.shared.selectedWeek)")
         let startTime = Date()
         
-        // 🔥 CRITICAL: Clear player stats cache to force fresh fetch
-        debugPrint(mode: .liveUpdates, "Clearing player stats cache for fresh data")
-        await PlayerStatsCache.shared.clearCache()
+        // 🔥 WOODY'S FIX: Force refresh stats to bypass cache
+        debugPrint(mode: .liveUpdates, "🔥 Forcing fresh stats reload to bypass cache")
+        await loadPlayerStats()  // This now uses forceRefresh: true
         
         // 🔥 CRITICAL FIX: Actually refresh MatchupsHub data from APIs!
-        // The old comment was wrong - we MUST call refresh to get fresh scores from ESPN/Sleeper
         debugPrint(mode: .liveUpdates, "🌐 Calling MatchupsHub to fetch fresh scores from APIs...")
         await matchupsHubViewModel.refreshMatchups()
         debugPrint(mode: .liveUpdates, "✅ API refresh complete - extracting updated player data")
         
         // Debug: Show week info from first matchup
-        if let firstMatchup = matchupsHubViewModel.myMatchups.first {
-            if let fantasyMatchup = firstMatchup.fantasyMatchup {
-                debugPrint(mode: .liveUpdates, "First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)")
+        if AppConstants.debug {
+            if let firstMatchup = matchupsHubViewModel.myMatchups.first {
+                if let fantasyMatchup = firstMatchup.fantasyMatchup {
+                    debugPrint(mode: .liveUpdates, "First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)")
+                }
             }
         }
         
@@ -154,24 +169,28 @@ extension AllLivePlayersViewModel {
         debugPrint(mode: .liveUpdates, "Extracted \(freshPlayerEntries.count) players")
         
         // Debug: Show sample scores before update
-        let sampleBefore = Array(allPlayers.prefix(3))
-        for player in sampleBefore {
-            debugPrint(mode: .liveUpdates, limit: 3, "BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
+        if AppConstants.debug {
+            let sampleBefore = Array(allPlayers.prefix(3))
+            for player in sampleBefore {
+                debugPrint(mode: .liveUpdates, limit: 3, "BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
+            }
         }
         
         // Update player data with fresh scores from matchups
         await updatePlayerDataSilently(from: freshPlayerEntries)
         
         // Debug: Show sample scores after update
-        let sampleAfter = Array(allPlayers.prefix(3))
-        for player in sampleAfter {
-            debugPrint(mode: .liveUpdates, limit: 3, "AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
-        }
-        
-        // Debug: Show filtered players
-        let filteredSample = Array(filteredPlayers.prefix(3))
-        for player in filteredSample {
-            debugPrint(mode: .liveUpdates, limit: 3, "FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
+        if AppConstants.debug {
+            let sampleAfter = Array(allPlayers.prefix(3))
+            for player in sampleAfter {
+                debugPrint(mode: .liveUpdates, limit: 3, "AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
+            }
+            
+            // Debug: Show filtered players
+            let filteredSample = Array(filteredPlayers.prefix(3))
+            for player in filteredSample {
+                debugPrint(mode: .liveUpdates, limit: 3, "FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
+            }
         }
         
         // 🔥 NEW: Update PlayerWatchService with fresh data
@@ -190,8 +209,6 @@ extension AllLivePlayersViewModel {
         // 🔥 NEW: Clear updating flag when complete
         isUpdating = false
         
-        // 🔥 PHASE 3: @Observable handles change notifications automatically
-        // No need for objectWillChange.send() anymore
         debugPrint(mode: .liveUpdates, limit: 1, "@Observable: Property changes will automatically trigger UI updates")
     }
 
@@ -268,18 +285,6 @@ extension AllLivePlayersViewModel {
     func loadStatsIfNeeded() {
         guard !statsLoaded else { return }
         Task { await loadPlayerStats() }
-    }
-    
-    // MARK: - Extract All Players from Matchups
-    internal func extractAllPlayers() -> [LivePlayerEntry] {
-        var allPlayerEntries: [LivePlayerEntry] = []
-        
-        for matchup in matchupsHubViewModel.myMatchups {
-            let playersFromMatchup = extractPlayersFromSingleMatchup(matchup)
-            allPlayerEntries.append(contentsOf: playersFromMatchup)
-        }
-        
-        return allPlayerEntries
     }
     
     // MARK: - PlayerWatchService Integration

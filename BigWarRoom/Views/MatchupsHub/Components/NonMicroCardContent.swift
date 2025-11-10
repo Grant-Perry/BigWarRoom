@@ -34,6 +34,9 @@ struct NonMicroCardContent: View {
                     scoreAnimation: scoreAnimation
                 )
             }
+            
+            // 🔥 FIXED: Add Spacer to ensure content fills the fixed height
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, dualViewMode ? 14 : 8)
@@ -49,13 +52,6 @@ struct NonMicroCardContent: View {
                 }
             }
         )
-        .shadow(
-            color: shadowColor,
-            radius: shadowRadius,
-            x: 0,
-            y: 2
-        )
-        .frame(height: dualViewMode ? 142 : 120)
     }
     
     // MARK: - Game Start Detection
@@ -186,51 +182,25 @@ struct NonMicroCardContent: View {
     
     private var overlayBorderColors: [Color] {
         if matchup.isChoppedLeague {
-            if let ranking = matchup.myTeamRanking {
-                let dangerColor = ranking.eliminationStatus.color
-                return [dangerColor, dangerColor.opacity(0.7), dangerColor]
-            }
-            return [.orange, .orange.opacity(0.7), .orange]
-        } else if matchup.isLive {
-            // 🔥 FIXED: Check win/loss status even for live games
+            // 🔥 SIMPLIFIED: Chopped league uses same win/loss colors as regular matchups
             if isWinning {
-                // Winning LIVE game: Keep the original live green theme
-                return [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen]
+                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
             } else {
-                // 🔥 LOSING LIVE game: Cool gradient from gpPink to gpRed with light blue accents
-                return [
-                    .gpPink, 
-                    .gpRedPink.opacity(0.8),
-                    .cyan.opacity(0.4), // Light blue accent
-                    .gpRed.opacity(0.9),
-                    .gpPink.opacity(0.7),
-                    .gpRed
-                ]
+                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
+            }
+        } else if matchup.isLive {
+            // 🔥 SIMPLIFIED: Live games use same win/loss colors
+            if isWinning {
+                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
+            } else {
+                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
             }
         } else {
-            // Non-live games
-            if gamesHaventStarted {
-                // 🔥 NEW: Games haven't started - blue gradient to indicate "about to start"
-                return [
-                    .gpBlue,
-                    .marlinsPrimary,
-                    .gpBlue.opacity(0.8),
-                    .marlinsPrimary.opacity(0.9),
-                    .gpBlue
-                ]
-            } else if isWinning {
-                // Winning: Keep the original blue theme
-                return [.blue.opacity(0.6), .cyan.opacity(0.4), .blue.opacity(0.6)]
+            // 🔥 SIMPLIFIED: Non-live games use same win/loss colors
+            if isWinning {
+                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
             } else {
-                // 🔥 LOSING: Cool gradient from gpPink to gpRed with light blue accents
-                return [
-                    .gpPink, 
-                    .gpRedPink.opacity(0.8),
-                    .cyan.opacity(0.3), // Light blue accent
-                    .gpRed.opacity(0.9),
-                    .gpPink.opacity(0.7),
-                    .gpRed
-                ]
+                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
             }
         }
     }
@@ -239,13 +209,8 @@ struct NonMicroCardContent: View {
         if matchup.isChoppedLeague {
             return 2.5
         } else if matchup.isLive {
-            // 🔥 FIXED: Different widths for winning vs losing live games
             return isWinning ? 2.0 : 2.4
-        } else if gamesHaventStarted {
-            // 🔥 NEW: Medium border width for games about to start
-            return 1.8
         } else {
-            // 🔥 NEW: Thicker border for losing matchups to make them stand out
             return isWinning ? 1.5 : 2.2
         }
     }
@@ -254,42 +219,20 @@ struct NonMicroCardContent: View {
         if matchup.isChoppedLeague {
             return 0.9
         } else if matchup.isLive {
-            // 🔥 FIXED: Higher opacity for losing live games
             return isWinning ? 0.8 : 0.9
-        } else if gamesHaventStarted {
-            // 🔥 NEW: Good visibility for games about to start
-            return 0.8
         } else {
-            // 🔥 NEW: Higher opacity for losing matchups to make them more dramatic
             return isWinning ? 0.7 : 0.85
         }
     }
     
     private var shadowColor: Color {
         if matchup.isChoppedLeague {
-            if let ranking = matchup.myTeamRanking {
-                return ranking.eliminationStatus.color.opacity(0.4)
-            }
-            return .orange.opacity(0.4)
+            // 🔥 SIMPLIFIED: Chopped league uses same win/loss shadow colors
+            return isWinning ? .gpGreen.opacity(0.4) : .gpRedPink.opacity(0.4)
         } else if matchup.isLive {
-            // 🔥 FIXED: Different shadows for winning vs losing live games
-            if isWinning {
-                return .gpGreen.opacity(0.3)
-            } else {
-                // Losing LIVE game: Cool reddish glow with slight blue tint
-                return .gpRedPink.opacity(0.4)
-            }
-        } else if gamesHaventStarted {
-            // 🔥 NEW: Blue glow for games about to start
-            return .gpBlue.opacity(0.3)
+            return isWinning ? .gpGreen.opacity(0.3) : .gpRedPink.opacity(0.4)
         } else {
-            // 🔥 NEW: Different shadow colors for winning vs losing
-            if isWinning {
-                return .black.opacity(0.2)
-            } else {
-                // Losing: Cool reddish glow with slight blue tint
-                return .gpRedPink.opacity(0.35)
-            }
+            return isWinning ? .gpGreen.opacity(0.3) : .gpRedPink.opacity(0.3)
         }
     }
     
@@ -297,13 +240,8 @@ struct NonMicroCardContent: View {
         if matchup.isChoppedLeague {
             return 8
         } else if matchup.isLive {
-            // 🔥 FIXED: Larger shadow for losing live games
             return isWinning ? 6 : 7
-        } else if gamesHaventStarted {
-            // 🔥 NEW: Medium shadow for games about to start
-            return 4
         } else {
-            // 🔥 NEW: Larger shadow radius for losing cards for more drama
             return isWinning ? 3 : 5
         }
     }

@@ -100,7 +100,24 @@ extension MatchupsHubView {
     // MARK: - Simple Computed Properties (Data Only)
     
     var sortedMatchups: [UnifiedMatchup] {
-        matchupsHubViewModel.sortedMatchups(sortByWinning: sortByWinning)
+        let allMatchups = matchupsHubViewModel.sortedMatchups(sortByWinning: sortByWinning)
+        
+        // Filter out eliminated chopped leagues if setting is disabled
+        let showEliminated = UserDefaults.standard.showEliminatedChoppedLeagues
+        if !showEliminated {
+            return allMatchups.filter { matchup in
+                // Keep non-chopped leagues
+                guard matchup.isChoppedLeague else { return true }
+                
+                // For chopped leagues, check if I'm eliminated
+                guard let myTeamRanking = matchup.myTeamRanking else { return true }
+                
+                // Filter out if eliminated
+                return !myTeamRanking.isEliminated
+            }
+        }
+        
+        return allMatchups
     }
     
     // MARK: - Sheet Views

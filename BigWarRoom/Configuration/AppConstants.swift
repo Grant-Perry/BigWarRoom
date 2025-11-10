@@ -6,10 +6,11 @@ struct AppConstants {
     @AppStorage("selectedESPNYear") static var ESPNLeagueYear: String = "2025"
     
     // Dynamic debug mode - can be toggled in settings
+   // turn debugging on/off
     static var debug: Bool {
         get {
             return UserDefaults.standard.object(forKey: "debugModeEnabled") != nil ? 
-                UserDefaults.standard.bool(forKey: "debugModeEnabled") : true
+                UserDefaults.standard.bool(forKey: "debugModeEnabled") : false
         }
     }
     
