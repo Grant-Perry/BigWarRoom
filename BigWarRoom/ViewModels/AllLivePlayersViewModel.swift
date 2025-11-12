@@ -91,7 +91,7 @@ final class AllLivePlayersViewModel {
     
     // 🔥 PHASE 3: Replace Combine subscription with @Observable observation
     private func setupObservation() {
-        debugPrint(mode: .liveUpdates, "👀 OBSERVATION SETUP: Setting up @Observable-based observation")
+        DebugPrint(mode: .liveUpdates, "👀 OBSERVATION SETUP: Setting up @Observable-based observation")
         
         observationTask = Task { @MainActor in
             // Observe changes to MatchupsHubViewModel
@@ -102,17 +102,17 @@ final class AllLivePlayersViewModel {
                 let currentUpdateTime = matchupsHubViewModel.lastUpdateTime
                 
                 if currentUpdateTime > lastObservedUpdate && currentUpdateTime > lastProcessedMatchupUpdate {
-                    debugPrint(mode: .liveUpdates, "🎯 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
+                    DebugPrint(mode: .liveUpdates, "🎯 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
                     
                     // Only process if we have initial data
                     guard !allPlayers.isEmpty else {
-                        debugPrint(mode: .liveUpdates, "🚫 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
+                        DebugPrint(mode: .liveUpdates, "🚫 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
                         lastObservedUpdate = currentUpdateTime
                         try? await Task.sleep(for: .seconds(1))
                         continue
                     }
                     
-                    debugPrint(mode: .liveUpdates, "▶️ OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
+                    DebugPrint(mode: .liveUpdates, "▶️ OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
                     lastProcessedMatchupUpdate = currentUpdateTime
                     lastObservedUpdate = currentUpdateTime
                     
@@ -235,7 +235,7 @@ extension AllLivePlayersViewModel {
     /// Main entry point for refreshing data
     func refresh() async {
         // 🔥 NO THROTTLING: Always fetch fresh data from APIs
-        debugPrint(mode: .liveUpdates, "🔄 AUTO-REFRESH: Performing background live update")
+        DebugPrint(mode: .liveUpdates, "🔄 AUTO-REFRESH: Performing background live update")
         await performLiveUpdate()
     }
     

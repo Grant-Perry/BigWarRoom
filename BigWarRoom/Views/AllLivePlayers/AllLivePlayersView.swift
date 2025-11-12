@@ -92,17 +92,17 @@ struct AllLivePlayersView: View {
             // 🔥 REVERTED: Back to simple, working logic
             let hasData = !allLivePlayersViewModel.allPlayers.isEmpty
             
-            debugPrint(mode: .liveUpdates, "👁️ LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
+            DebugPrint(mode: .liveUpdates, "👁️ LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
             
             // Simple rule: If we don't have data, load it
             if !hasData && !hasPerformedInitialLoad {
-                debugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Starting data load")
+                DebugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Starting data load")
                 hasPerformedInitialLoad = true
                 Task {
                     await allLivePlayersViewModel.loadAllPlayers()
                 }
             } else {
-                debugPrint(mode: .liveUpdates, limit: 1, "✅ LIVE PLAYERS: Already have data or already loaded")
+                DebugPrint(mode: .liveUpdates, limit: 1, "✅ LIVE PLAYERS: Already have data or already loaded")
                 hasPerformedInitialLoad = true
             }
         }
@@ -111,7 +111,7 @@ struct AllLivePlayersView: View {
         }
         .onChange(of: weekManager.selectedWeek) { _, _ in
             hasPerformedInitialLoad = false
-            debugPrint(mode: .liveUpdates, "📅 WEEK CHANGED: Resetting initial load flag")
+            DebugPrint(mode: .liveUpdates, "📅 WEEK CHANGED: Resetting initial load flag")
             Task {
                 await allLivePlayersViewModel.loadAllPlayers()
             }

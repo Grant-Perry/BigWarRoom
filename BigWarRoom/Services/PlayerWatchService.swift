@@ -457,33 +457,85 @@ final class PlayerWatchService {
     }
     
     // MARK: - Persistence
+
+    // 🔥 CRITICAL FIX: Use local file storage instead of UserDefaults to prevent overflow
+    private var watchedPlayersFileURL: URL {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsURL.appendingPathComponent("PlayerWatch_WatchedPlayers.json")
+    }
+    
+    private var watchSettingsFileURL: URL {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsURL.appendingPathComponent("PlayerWatch_Settings.json")
+    }
     
     private func saveWatchedPlayers() {
-        if let data = try? JSONEncoder().encode(watchedPlayers) {
-            userDefaults.set(data, forKey: watchedPlayersKey)
+        do {
+            let data = try JSONEncoder().encode(watchedPlayers)
+            try data.write(to: watchedPlayersFileURL)
+        } catch {
+            print("❌ PlayerWatchService: Failed to save watched players: \(error)")
         }
     }
     
     private func loadWatchedPlayers() {
-        if let data = userDefaults.data(forKey: watchedPlayersKey),
-           let players = try? JSONDecoder().decode([WatchedPlayer].self, from: data) {
-            watchedPlayers = players
+        // 🔥 MIGRATION: First check if we need to migrate from UserDefaults
+        if let legacyData = userDefaults.data(forKey: watchedPlayersKey) {
+            do {
+                try legacyData.write(to: watchedPlayersFileURL)
+                userDefaults.removeObject(forKey: watchedPlayersKey)
+                print("📁 PlayerWatchService: Migrated watched players from UserDefaults to file")
+            } catch {
+                print("❌ PlayerWatchService: Failed to migrate watched players: \(error)")
+            }
         }
-        loadManualOrderFlag() // Load the manual order flag too
-        loadSortDirection() // Load the sort direction too
-        loadSortMethod() // Load the sort method too
+        
+        // Load from file
+        if FileManager.default.fileExists(atPath: watchedPlayersFileURL.path) {
+            do {
+                let data = try Data(contentsOf: watchedPlayersFileURL)
+                watchedPlayers = try JSONDecoder().decode([WatchedPlayer].self, from: data)
+            } catch {
+                print("❌ PlayerWatchService: Failed to load watched players: \(error)")
+                watchedPlayers = []
+            }
+        }
+        
+        loadManualOrderFlag() // Load the manual order flag from UserDefaults (small data)
+        loadSortDirection() // Load the sort direction from UserDefaults (small data)
+        loadSortMethod() // Load the sort method from UserDefaults (small data)
     }
     
     private func saveSettings() {
-        if let data = try? JSONEncoder().encode(settings) {
-            userDefaults.set(data, forKey: watchSettingsKey)
+        do {
+            let data = try JSONEncoder().encode(settings)
+            try data.write(to: watchSettingsFileURL)
+        } catch {
+            print("❌ PlayerWatchService: Failed to save settings: \(error)")
         }
     }
     
     private func loadSettings() {
-        if let data = userDefaults.data(forKey: watchSettingsKey),
-           let loadedSettings = try? JSONDecoder().decode(WatchSettings.self, from: data) {
-            settings = loadedSettings
+        // 🔥 MIGRATION: First check if we need to migrate from UserDefaults
+        if let legacyData = userDefaults.data(forKey: watchSettingsKey) {
+            do {
+                try legacyData.write(to: watchSettingsFileURL)
+                userDefaults.removeObject(forKey: watchSettingsKey)
+                print("📁 PlayerWatchService: Migrated settings from UserDefaults to file")
+            } catch {
+                print("❌ PlayerWatchService: Failed to migrate settings: \(error)")
+            }
+        }
+        
+        // Load from file
+        if FileManager.default.fileExists(atPath: watchSettingsFileURL.path) {
+            do {
+                let data = try Data(contentsOf: watchSettingsFileURL)
+                settings = try JSONDecoder().decode(WatchSettings.self, from: data)
+            } catch {
+                print("❌ PlayerWatchService: Failed to load settings: \(error)")
+                settings = WatchSettings() // Use default settings
+            }
         }
     }
     

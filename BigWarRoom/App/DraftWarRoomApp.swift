@@ -413,6 +413,9 @@ struct MainTabView: View {
     }
     
     private func setupServices() {
+        // 🔥 CRITICAL: Clean up corrupted UserDefaults at startup to prevent 4MB+ overflow crashes
+        AppConstants.cleanupCorruptedUserDefaults()
+        
         // 🔥 PHASE 2 CORRECTED: Proper @Observable service creation with dependency injection
         guard nflWeekService == nil else { return }
         

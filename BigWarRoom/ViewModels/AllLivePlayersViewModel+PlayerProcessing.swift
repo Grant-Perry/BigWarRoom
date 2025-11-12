@@ -13,10 +13,17 @@ extension AllLivePlayersViewModel {
     internal func extractPlayersFromSingleMatchup(_ matchup: UnifiedMatchup) -> [LivePlayerEntry] {
         var players: [LivePlayerEntry] = []
 
+        // 🔥 DEBUG: Log what type of matchup we're processing
+        DebugPrint(mode: .liveUpdate2, "🔍 Processing matchup: \(matchup.league.league.name)")
+        DebugPrint(mode: .liveUpdate2, "  - Has fantasyMatchup: \(matchup.fantasyMatchup != nil)")
+        DebugPrint(mode: .liveUpdate2, "  - Has myTeamRanking: \(matchup.myTeamRanking != nil)")
+
         // Regular matchups - extract from MY team only
         if let fantasyMatchup = matchup.fantasyMatchup {
+            DebugPrint(mode: .liveUpdate2, "📊 REGULAR LEAGUE: \(matchup.league.league.name)")
             if let myTeam = matchup.myTeam {
                 let myStarters = myTeam.roster.filter { $0.isStarter }
+                DebugPrint(mode: .liveUpdate2, "  - Found \(myStarters.count) starters")
                 for player in myStarters {
                     let calculatedScore = player.currentPoints ?? 0.0
                     
@@ -45,9 +52,32 @@ extension AllLivePlayersViewModel {
 
         // Chopped leagues - extract from my team ranking
         if let myTeamRanking = matchup.myTeamRanking {
+            DebugPrint(mode: .liveUpdate2, "🏆 CHOPPED LEAGUE: \(matchup.league.league.name)")
             let myTeamStarters = myTeamRanking.team.roster.filter { $0.isStarter }
-
-            for player in myTeamStarters {
+            DebugPrint(mode: .liveUpdate2, "  - Total roster: \(myTeamRanking.team.roster.count) players")
+            DebugPrint(mode: .liveUpdate2, "  - Starters found: \(myTeamStarters.count) starters")
+            
+            // 🔥 FILTER OUT ELIMINATED TEAMS: Skip chopped leagues where you have no real players
+            let validPlayers = myTeamStarters.filter { player in
+                // Consider a player "valid" if they have a real name (not empty)
+                let hasValidName = !player.fullName.trimmingCharacters(in: .whitespaces).isEmpty
+                let hasValidPosition = player.position != nil && player.position != "FLEX"
+                return hasValidName || hasValidPosition
+            }
+            
+            // If no valid players, you've been chopped - skip this league entirely
+            if validPlayers.isEmpty {
+                DebugPrint(mode: .liveUpdate2, "  ❌ SKIPPING: No valid players found - you've been eliminated from this league")
+                return players // Skip processing this chopped league
+            }
+            
+            DebugPrint(mode: .liveUpdate2, "  ✅ Found \(validPlayers.count) valid players (you're still alive!)")
+            
+            for player in validPlayers {
+                DebugPrint(mode: .liveUpdate2, "    - PlayerID: '\(player.id)'")
+                DebugPrint(mode: .liveUpdate2, "    - SleeperID: '\(player.sleeperID ?? "nil")'") 
+                DebugPrint(mode: .liveUpdate2, "    - ESPNID: '\(player.espnID ?? "nil")'")
+                
                 let calculatedScore = player.currentPoints ?? 0.0
                 
                 // 🔥 NEW: Track activity for recent sort
@@ -72,6 +102,7 @@ extension AllLivePlayersViewModel {
             }
         }
         
+        DebugPrint(mode: .liveUpdate2, "✅ Extracted \(players.count) total players from \(matchup.league.league.name)")
         return players
     }
 
@@ -83,13 +114,13 @@ extension AllLivePlayersViewModel {
 
         // 💣 INSTRUMENTATION: Only do when debug enabled, minimal perf hit.
         if AppConstants.debug {
-            debugPrint(mode: .liveUpdate2, "[extractAllPlayers] matchupsCount = \(matchupsCount), matchupIDs: \(matchupIDs)")
+            DebugPrint(mode: .liveUpdate2, "[extractAllPlayers] matchupsCount = \(matchupsCount), matchupIDs: \(matchupIDs)")
         }
 
         // Only run extraction if we believe all matchups are loaded!
         if matchupsCount < expectedLeagueCount() {
             if AppConstants.debug {
-                debugPrint(
+                DebugPrint(
                     mode: .liveUpdate2,
                     "[extractAllPlayers] 🚨 ABORTED - only \(matchupsCount) matchups (expecting \(expectedLeagueCount())). Skipping total/allPlayers extraction for this cycle."
                 )
@@ -106,7 +137,7 @@ extension AllLivePlayersViewModel {
             let prefs = allPlayers
                 .map { "\($0.playerName) (\($0.leagueName)): \($0.currentScoreString)" }
                 .joined(separator: ", ")
-            debugPrint(mode: .liveUpdate2, "[extractAllPlayers] Extracted \(allPlayers.count) players: \(prefs)")
+            DebugPrint(mode: .liveUpdate2, "[extractAllPlayers] Extracted \(allPlayers.count) players: \(prefs)")
         }
 
         return allPlayers
@@ -172,58 +203,41 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Surgical Data Update (Silent Background Updates)
     internal func updatePlayerDataSurgically() async {
-//        print("🔄 SURGICAL UPDATE DEBUG: Starting surgical update")
         let allPlayerEntries = extractAllPlayers()
         guard !allPlayerEntries.isEmpty else { 
-//            print("🔄 SURGICAL UPDATE DEBUG: No player entries found")
             return 
-        }
-        
-//        print("🔄 SURGICAL UPDATE DEBUG: Extracted \(allPlayerEntries.count) player entries")
-        
-        // Log a few sample scores for comparison
-        let samplePlayers = Array(allPlayerEntries.prefix(3))
-        for player in samplePlayers {
-//            print("🔄 SURGICAL UPDATE DEBUG: Sample - \(player.playerName): \(player.currentScore) pts")
         }
         
         // 🔥 FIX: Update data silently but NOTIFY SwiftUI of changes
         await updatePlayerDataSilently(from: allPlayerEntries)
         lastUpdateTime = Date()
-        
-//        print("🔄 SURGICAL UPDATE DEBUG: Updated lastUpdateTime to \(lastUpdateTime)")
-        
-        // 🔥 REMOVED: Don't send objectWillChange during surgical updates - causes excessive rebuilds
-        // Only the @Published properties changing should trigger updates
-        // objectWillChange.send()
-//        print("🔄 SURGICAL UPDATE DEBUG: Sent objectWillChange notification")
     }
     
     // 🔥 FIXED: Changed from private to internal so DataLoading extension can access it
     internal func updatePlayerDataSilently(from allPlayerEntries: [LivePlayerEntry]) async {
         if AppConstants.debug {
-            debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Called with \(allPlayerEntries.count) players")
+            DebugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Called with \(allPlayerEntries.count) players")
             let list = allPlayerEntries
                 .map { "\($0.playerName) (\($0.leagueName)): \($0.currentScoreString)" }
                 .joined(separator: ", ")
-            debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Player list: \(list)")
+            DebugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] Player list: \(list)")
         }
 
         // You can optionally block updating if your extractor returned an empty set due to the gating above:
         guard !allPlayerEntries.isEmpty else {
             if AppConstants.debug {
-                debugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] SKIPPED: No players (partial or incomplete extraction)")
+                DebugPrint(mode: .liveUpdate2, "[updatePlayerDataSilently] SKIPPED: No players (partial or incomplete extraction)")
             }
             return
         }
 
-        print("🔥 SILENT UPDATE START: Processing \(allPlayerEntries.count) player entries")
+        DebugPrint(mode: .liveUpdate2, "🔥 SILENT UPDATE START: Processing \(allPlayerEntries.count) player entries")
         
         let scores = allPlayerEntries.map { $0.currentScore }.sorted(by: >)
         
         // Debug: Show score distribution
         let topScores = Array(scores.prefix(5))
-        print("🔥 SILENT UPDATE SCORES: Top 5 scores = \(topScores)")
+        DebugPrint(mode: .liveUpdate2, "🔥 SILENT UPDATE SCORES: Top 5 scores = \(topScores)")
         
         // Update statistics silently
         let newTopScore = scores.first ?? 1.0
@@ -232,7 +246,7 @@ extension AllLivePlayersViewModel {
         
         // 🔥 FIX: Only update if values actually changed to minimize UI churn
         if abs(topScore - newTopScore) > 0.01 {
-            print("🔥 SILENT UPDATE: Updating topScore from \(topScore) to \(newTopScore)")
+            DebugPrint(mode: .liveUpdate2, "🔥 SILENT UPDATE: Updating topScore from \(topScore) to \(newTopScore)")
             topScore = newTopScore
         }
         if abs(scoreRange - newScoreRange) > 0.01 {
@@ -279,27 +293,27 @@ extension AllLivePlayersViewModel {
         }
         
         // Debug: Show before/after player counts
-        debugPrint(mode: .liveUpdates, "🔄 SILENT UPDATE: Updating allPlayers from \(allPlayers.count) to \(updatedPlayers.count) players")
+        DebugPrint(mode: .liveUpdates, "🔄 SILENT UPDATE: Updating allPlayers from \(allPlayers.count) to \(updatedPlayers.count) players")
         
         // 🔥 CRITICAL FIX: Update allPlayers with fresh data
         let oldPlayerCount = allPlayers.count
         allPlayers = updatedPlayers
-        debugPrint(mode: .liveUpdates, "✏️ allPlayers updated (was \(oldPlayerCount), now \(allPlayers.count))")
+        DebugPrint(mode: .liveUpdates, "✏️ allPlayers updated (was \(oldPlayerCount), now \(allPlayers.count))")
         
         // 🔥 CRITICAL FIX: Use the regular filter method instead of silent to trigger UI updates
         let oldFilteredCount = filteredPlayers.count
         applyPositionFilter()
-        debugPrint(mode: .liveUpdates, "🔍 filteredPlayers updated (was \(oldFilteredCount), now \(filteredPlayers.count))")
+        DebugPrint(mode: .liveUpdates, "🔍 filteredPlayers updated (was \(oldFilteredCount), now \(filteredPlayers.count))")
         
         // Auto-recovery: if data is loaded and filters produced no results, relax filters
         if isDataLoaded && !allPlayers.isEmpty && filteredPlayers.isEmpty {
-            debugPrint(mode: .liveUpdates, "🛟 AUTO-RECOVERY: No results with current filters. Falling back to All / No Active Only.")
+            DebugPrint(mode: .liveUpdates, "🛟 AUTO-RECOVERY: No results with current filters. Falling back to All / No Active Only.")
             showActiveOnly = false
             selectedPosition = .all
             applyPositionFilter()
         }
 
-        debugPrint(mode: .liveUpdates, "✅ SILENT UPDATE COMPLETE")
+        DebugPrint(mode: .liveUpdates, "✅ SILENT UPDATE COMPLETE")
     }
     
     // 🔥 NEW: Silent filter application (called during background updates)

@@ -606,7 +606,7 @@ struct AllLivePlayersHeaderView: View {
             sum + player.currentScore
         }
         
-        debugPrint(mode: .liveUpdates, limit: 5, "💰 TOTAL CALCULATED: \(total) from \(allLivePlayersViewModel.filteredPlayers.count) players (updateTime: \(updateTime))")
+        DebugPrint(mode: .liveUpdates, limit: 5, "💰 TOTAL CALCULATED: \(total) from \(allLivePlayersViewModel.filteredPlayers.count) players (updateTime: \(updateTime))")
         
         return total
     }
@@ -678,7 +678,7 @@ struct AllLivePlayersHeaderView: View {
     private func performManualRefresh() async {
         // 🔥 FIXED: Manual refresh should do EXACTLY the same as the automatic 15-second timer
         // This ensures consistency between manual and automatic refreshes
-        debugPrint(mode: .liveUpdates, "👆 MANUAL REFRESH: User tapped refresh button")
+        DebugPrint(mode: .liveUpdates, "👆 MANUAL REFRESH: User tapped refresh button")
         await performBackgroundRefresh()
         onAnimationReset()
         resetCountdown()
@@ -692,9 +692,13 @@ struct AllLivePlayersHeaderView: View {
     
     // MARK: - Background Refresh (No UI Resets)
     private func performBackgroundRefresh() async {
-        debugPrint(mode: .liveUpdates, "⏰ TIMER TRIGGERED: 15-second auto-refresh timer fired")
-        // Let MatchupsHub's own timer perform API refresh. We only process the latest snapshot.
-        await allLivePlayersViewModel.processCurrentSnapshot()
+        DebugPrint(mode: .liveUpdates, "⏰ TIMER TRIGGERED: 15-second auto-refresh timer fired")
+        
+        // 🔥 FIXED: Use the SAME method as pull-to-refresh for consistent behavior
+        // Instead of processCurrentSnapshot() which only processes existing data,
+        // use the full refresh method that actually fetches fresh data from APIs
+        await allLivePlayersViewModel.refresh()  // This calls performLiveUpdate() which does fresh API calls
+        
         resetCountdown()
         // DO NOT call onAnimationReset() here - that causes the jarring refresh
     }
@@ -719,7 +723,7 @@ struct AllLivePlayersHeaderView: View {
         // 🔥 ENABLED: Restore AllLivePlayersView auto-refresh timer to fix live updates
         // This timer was previously disabled causing the missing automatic refresh issue
         
-        debugPrint(mode: .liveUpdates, "🎬 TIMER SETUP: Starting 15-second auto-refresh timer")
+        DebugPrint(mode: .liveUpdates, "🎬 TIMER SETUP: Starting 15-second auto-refresh timer")
         
         // Start the actual refresh timer (every 15 seconds)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
@@ -728,7 +732,7 @@ struct AllLivePlayersHeaderView: View {
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
                 } else {
-                    debugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(UIApplication.shared.applicationState == .active), loading=\(allLivePlayersViewModel.isLoading))")
+                    DebugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(UIApplication.shared.applicationState == .active), loading=\(allLivePlayersViewModel.isLoading))")
                 }
             }
         }

@@ -31,6 +31,9 @@ struct MicroCardBaseContentView: View {
     let matchup: UnifiedMatchup
     let isWinning: Bool
     
+    // 💊 RX button callback
+    let onRXTap: (() -> Void)?
+    
     var body: some View {
         VStack(spacing: 8) {
             // League name
@@ -55,7 +58,8 @@ struct MicroCardBaseContentView: View {
                     score: score,
                     scoreColor: scoreColor,
                     percentage: percentage,
-                    record: matchup.myTeam?.record?.displayString
+                    record: matchup.myTeam?.record?.displayString,
+                    onRXTap: onRXTap
                 )
             }
         }

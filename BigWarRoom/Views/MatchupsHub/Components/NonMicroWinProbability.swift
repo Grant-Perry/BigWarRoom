@@ -13,13 +13,15 @@ struct NonMicroWinProbability: View {
     let scoreDelta: Double?
     let isWinning: Bool
     let matchup: UnifiedMatchup?
+    let onRXTap: (() -> Void)?  // 💊 RX button callback
     
     // Default initializer for backward compatibility
-    init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil) {
+    init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil, onRXTap: (() -> Void)? = nil) {
         self.winProb = winProb
         self.scoreDelta = scoreDelta
         self.isWinning = isWinning
         self.matchup = matchup
+        self.onRXTap = onRXTap
     }
     
     var body: some View {

@@ -68,6 +68,8 @@ final class WeekSelectionManager {
         // Start with current NFL week (even if it's the default 1)
         self.selectedWeek = nflWeekService.currentWeek
         
+//        print("🗓️ WeekSelectionManager: Initialized to Week \(selectedWeek) (from NFLWeekService)")
+        
         // Set up subscriptions to get the REAL week when it's fetched
         setupNFLWeekSubscription()
         
@@ -78,8 +80,6 @@ final class WeekSelectionManager {
                 await nflWeekService.refresh()
             }
         }
-        
-//        print("🗓️ WeekSelectionManager: Initialized to Week \(selectedWeek)")
     }
     
     deinit {
@@ -155,7 +155,7 @@ final class WeekSelectionManager {
                 if self.isWaitingForRealWeek && 
                    self.nflWeekService.lastUpdated != nil && 
                    self.selectedWeek != self.nflWeekService.currentWeek {
-//                    print("🗓️ WeekSelectionManager: NFL service loaded, updating week to \(self.nflWeekService.currentWeek)")
+//                    print("🗓️ WeekSelectionManager: NFL service loaded, updating week from \(self.selectedWeek) to \(self.nflWeekService.currentWeek)")
                     await MainActor.run {
                         self.selectedWeek = self.nflWeekService.currentWeek
                         self.isWaitingForRealWeek = false

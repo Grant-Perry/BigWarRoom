@@ -14,7 +14,8 @@ import Observation
 final class PlayerDirectoryStore {
     
     // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
-    private static var _shared: PlayerDirectoryStore?
+    // Made internal so ESPNSleeperIDCanonicalizer can access it safely
+    internal static var _shared: PlayerDirectoryStore?
     
     static var shared: PlayerDirectoryStore {
         if let existing = _shared {
@@ -54,6 +55,14 @@ final class PlayerDirectoryStore {
         self.apiClient = apiClient
         loadCachedPlayers()
         calculatePositionalRankings()
+        
+        // 🆔 Debug ESPN ID coverage
+        if AppConstants.debug {
+            debugESPNIDCoverage()
+            
+            // Build canonical mapping to see DCO
+            ESPNSleeperIDCanonicalizer.shared.buildCanonicalMapping()
+        }
     }
     
     // MARK: -> Public Interface
@@ -254,40 +263,129 @@ final class PlayerDirectoryStore {
     }
     
     // MARK: -> Caching
+
+    // 🔥 CRITICAL FIX: Use local file storage instead of UserDefaults to prevent 4MB+ overflow
+    private var cacheFileURL: URL {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsURL.appendingPathComponent("PlayerDirectory_Cache.json")
+    }
+    
+    private var lastUpdatedFileURL: URL {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsURL.appendingPathComponent("PlayerDirectory_LastUpdated.json")
+    }
     
     private func cachePlayers() {
         do {
             let data = try JSONEncoder().encode(Array(players.values))
-            userDefaults.set(data, forKey: cacheKey)
-            userDefaults.set(Date(), forKey: lastUpdatedKey)
-            // x// x Print("💾 Cached \(players.count) players")
+            try data.write(to: cacheFileURL)
+            
+            // Store last updated timestamp
+            let timestampData = try JSONEncoder().encode(Date())
+            try timestampData.write(to: lastUpdatedFileURL)
+            
+            if AppConstants.debug {
+                let sizeKB = Double(data.count) / 1024.0
+                print("💾 PlayerDirectoryStore: Cached \(players.count) players (\(String(format: "%.2f", sizeKB)) KB) to file")
+            }
         } catch {
-            // x// x Print("❌ Failed to cache players: \(error)")
+            print("❌ PlayerDirectoryStore: Failed to cache players to file: \(error)")
         }
     }
     
     private func loadCachedPlayers() {
-        guard let data = userDefaults.data(forKey: cacheKey),
-              let cachedPlayers = try? JSONDecoder().decode([SleeperPlayer].self, from: data) else {
-            // x// x Print("📭 No cached players found")
+        // 🔥 MIGRATION: First check if we need to migrate from UserDefaults
+        if let legacyData = userDefaults.data(forKey: cacheKey) {
+            do {
+                try legacyData.write(to: cacheFileURL)
+                userDefaults.removeObject(forKey: cacheKey)
+                userDefaults.removeObject(forKey: lastUpdatedKey)
+                print("📁 PlayerDirectoryStore: Migrated cache from UserDefaults to file")
+            } catch {
+                print("❌ PlayerDirectoryStore: Failed to migrate cache: \(error)")
+            }
+        }
+        
+        // Load from file
+        guard FileManager.default.fileExists(atPath: cacheFileURL.path) else {
+            print("📭 PlayerDirectoryStore: No cached players file found")
             return
         }
         
-        var playerDict: [String: SleeperPlayer] = [:]
-        for player in cachedPlayers {
-            playerDict[player.playerID] = player
+        do {
+            let data = try Data(contentsOf: cacheFileURL)
+            let cachedPlayers = try JSONDecoder().decode([SleeperPlayer].self, from: data)
+            
+            var playerDict: [String: SleeperPlayer] = [:]
+            for player in cachedPlayers {
+                playerDict[player.playerID] = player
+            }
+            
+            players = playerDict
+            
+            // Load last updated timestamp
+            if FileManager.default.fileExists(atPath: lastUpdatedFileURL.path) {
+                do {
+                    let timestampData = try Data(contentsOf: lastUpdatedFileURL)
+                    lastUpdated = try JSONDecoder().decode(Date.self, from: timestampData)
+                } catch {
+                    lastUpdated = nil
+                }
+            }
+            
+            if AppConstants.debug {
+                let sizeKB = Double(data.count) / 1024.0
+                print("💾 PlayerDirectoryStore: Loaded \(players.count) cached players (\(String(format: "%.2f", sizeKB)) KB) from file")
+                if let lastUpdated = lastUpdated {
+                    print("📅 Cache from: \(lastUpdated)")
+                }
+            }
+            
+            // Calculate positional rankings for cached data
+            calculatePositionalRankings()
+            
+        } catch {
+            print("❌ PlayerDirectoryStore: Failed to load cached players from file: \(error)")
+        }
+    }
+    
+    /// Debug method to analyze ESPN ID coverage in Sleeper player data
+    func debugESPNIDCoverage() {
+        let totalPlayers = players.count
+        let playersWithESPNID = players.values.filter { 
+            $0.espnID != nil && !$0.espnID!.isEmpty 
+        }.count
+        
+        DebugLogger.playerIDMapping("ESPN ID Coverage: \(playersWithESPNID)/\(totalPlayers) players have ESPN IDs (\(String(format: "%.1f", Double(playersWithESPNID)/Double(totalPlayers)*100))%)", level: .info)
+        
+        // Show some examples of players WITH ESPN IDs
+        let playersWithIDs = players.values.filter { $0.espnID != nil && !$0.espnID!.isEmpty }.prefix(5)
+        if !playersWithIDs.isEmpty {
+            DebugLogger.playerIDMapping("Players WITH ESPN IDs:", level: .info)
+            for player in playersWithIDs {
+                DebugLogger.playerIDMapping("  ✅ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID!)'")
+            }
         }
         
-        players = playerDict
-        lastUpdated = userDefaults.object(forKey: lastUpdatedKey) as? Date
-        
-        // x// x Print("💾 Loaded \(players.count) cached players")
-        if let lastUpdated = lastUpdated {
-            // x// x Print("📅 Cache from: \(lastUpdated)")
+        // Show some examples of players WITHOUT ESPN IDs
+        let playersWithoutIDs = players.values.filter { $0.espnID == nil || $0.espnID!.isEmpty }.prefix(5)
+        if !playersWithoutIDs.isEmpty {
+            DebugLogger.playerIDMapping("Players WITHOUT ESPN IDs:", level: .info)
+            for player in playersWithoutIDs {
+                DebugLogger.playerIDMapping("  ❌ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID ?? "nil")'")
+            }
         }
         
-        // Calculate positional rankings for cached data
-        calculatePositionalRankings()
+        // Check some high-profile players specifically
+        let testPlayers = ["Lamar Jackson", "Patrick Mahomes", "Josh Allen", "Derrick Henry", "Christian McCaffrey"]
+        DebugLogger.playerIDMapping("High-profile player ESPN ID check:", level: .info)
+        for testName in testPlayers {
+            if let foundPlayer = players.values.first(where: { $0.fullName.contains(testName) }) {
+                DebugLogger.playerIDMapping("  \(foundPlayer.fullName) -> ESPN ID: '\(foundPlayer.espnID ?? "nil")'")
+            } else {
+                DebugLogger.playerIDMapping("  \(testName) -> NOT FOUND in player database")
+            }
+        }
     }
 }
 

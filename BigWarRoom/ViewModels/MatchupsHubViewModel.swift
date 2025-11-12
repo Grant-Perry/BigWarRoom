@@ -93,7 +93,7 @@ final class MatchupsHubViewModel {
     
     // MARK: - 🔥 PHASE 3: Replace Combine subscription with @Observable observation
     private func setupCredentialObservation() {
-        debugPrint(mode: .viewModelLifecycle, "Setting up @Observable-based credential monitoring")
+        DebugPrint(mode: .viewModelLifecycle, "Setting up @Observable-based credential monitoring")
         
         observationTask = Task { @MainActor in
             var lastSleeperCredentials = sleeperCredentials.hasValidCredentials
@@ -105,13 +105,13 @@ final class MatchupsHubViewModel {
                 let currentSleeperUsername = sleeperCredentials.currentUsername
                 
                 if currentSleeperCredentials != lastSleeperCredentials {
-                    debugPrint(mode: .viewModelLifecycle, "Sleeper credentials changed - refreshing leagues...")
+                    DebugPrint(mode: .viewModelLifecycle, "Sleeper credentials changed - refreshing leagues...")
                     await manualRefresh()
                     lastSleeperCredentials = currentSleeperCredentials
                 }
                 
                 if currentSleeperUsername != lastSleeperUsername {
-                    debugPrint(mode: .viewModelLifecycle, "Sleeper username changed to '\(currentSleeperUsername)' - refreshing leagues...")
+                    DebugPrint(mode: .viewModelLifecycle, "Sleeper username changed to '\(currentSleeperUsername)' - refreshing leagues...")
                     await manualRefresh()
                     lastSleeperUsername = currentSleeperUsername
                 }
@@ -133,13 +133,13 @@ final class MatchupsHubViewModel {
     
     /// Load all matchups across all connected leagues
     func loadAllMatchups() async {
-        debugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadAllMatchups() called from LoadingScreen")
+        DebugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadAllMatchups() called from LoadingScreen")
         await performLoadAllMatchups()
     }
     
     /// Load matchups for a specific week
     func loadMatchupsForWeek(_ week: Int) async {
-        debugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
+        DebugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
         await performLoadMatchupsForWeek(week)
     }
     

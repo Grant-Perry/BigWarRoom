@@ -267,14 +267,12 @@ struct ESPNTeam: Codable, Identifiable {
     
     /// Convert to SleeperRoster for compatibility with league context for manager names
     func toSleeperRoster(leagueID: String, league: ESPNLeague? = nil) -> SleeperRoster {
-        // Convert ESPN player IDs to Sleeper player IDs using espnID matching
+        // 🎯 NEW: Convert ESPN player IDs to Sleeper IDs using canonical mapping
         let sleeperPlayerIDs = roster?.entries?.compactMap { entry -> String? in
             let espnPlayerID = String(entry.playerId)
-            // Find corresponding Sleeper player using ESPN ID
-            if let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerID) {
-                return sleeperPlayer.playerID
-            }
-            return nil
+            // Use canonical ESPN→Sleeper ID mapping instead of unreliable lookup
+            let canonicalSleeperID = ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: espnPlayerID)
+            return canonicalSleeperID
         } ?? []
         
         let recordString = record?.overall.map { overall in
@@ -528,9 +526,12 @@ struct ESPNDraftPick: Codable, Identifiable {
     func toSleeperPick(draftID: String, playerDirectory: [Int: ESPNPlayer]) -> SleeperPick? {
         guard playerDirectory[playerId] != nil else { return nil }
         
-        // Convert ESPN player ID to Sleeper player ID using espnID matching
+        // 🎯 NEW: Convert ESPN player ID to Sleeper ID using canonical mapping
         let espnPlayerIDString = String(playerId)
-        guard let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerIDString) else {
+        let canonicalSleeperID = ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: espnPlayerIDString)
+        
+        // Get player info from canonical Sleeper ID
+        guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: canonicalSleeperID) else {
             return nil
         }
         
@@ -541,7 +542,7 @@ struct ESPNDraftPick: Codable, Identifiable {
             draftSlot: ((overallPickNumber ?? id) % 12) + 1, // Estimate slot
             rosterID: teamId,
             pickedBy: String(teamId), // Use team ID as picker
-            playerID: sleeperPlayer.playerID, // Use Sleeper player ID instead of ESPN ID
+            playerID: canonicalSleeperID, // 🎯 Use canonical Sleeper ID
             metadata: SleeperPickMetadata(
                 firstName: sleeperPlayer.firstName,
                 lastName: sleeperPlayer.lastName,

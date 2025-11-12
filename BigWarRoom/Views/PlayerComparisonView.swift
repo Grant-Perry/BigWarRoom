@@ -609,7 +609,7 @@ struct PlayerComparisonView: View {
                    let matchupInfo = player.matchupInfo,
                    let opponent = matchupInfo.opponent {
                     let position = player.position
-                    let _ = debugPrint(mode: .oprk, "PlayerComparisonView: \(player.fullName) (\(position)) on \(team) playing vs \(opponent)")
+                    let _ = DebugPrint(mode: .oprk, "PlayerComparisonView: \(player.fullName) (\(position)) on \(team) playing vs \(opponent)")
                     let oprk = OPRKService.shared.getOPRK(forTeam: opponent, position: position)
                     let advantage = OPRKService.shared.getMatchupAdvantage(forOpponent: opponent, position: position)
                     

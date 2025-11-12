@@ -31,44 +31,9 @@ struct MicroCardBackgroundView: View {
             .overlay(highlightOverlay)
             .overlay(darkenOverlay)
             .overlay(
-                // 🔥 CELEBRATION: Use celebration border if games are finished, otherwise regular border
-                Group {
-                    if isGamesFinished && !isEliminated {
-                        celebrationBorderOverlay
-                    } else {
-                        regularBorderOverlay
-                    }
-                }
+                // 🔥 SIMPLIFIED: Just use regular border always, no celebration logic
+                regularBorderOverlay
             )
-    }
-    
-    // MARK: - 🔥 CELEBRATION: Win/Loss logic for both regular and chopped leagues
-    private var isCelebrationWin: Bool {
-        if matchup.isChoppedLeague {
-            // 🔥 CHOPPED LOGIC: Win if I survived (not eliminated), Loss if I got chopped
-            guard let ranking = matchup.myTeamRanking,
-                  let choppedSummary = matchup.choppedSummary else {
-                return isWinning // Fallback to regular logic
-            }
-            
-            // Check if I'm in the elimination zone (bottom spots)
-            let totalTeams = choppedSummary.rankings.count
-            let myRank = ranking.rank
-            
-            // Calculate elimination threshold - typically 1-2 players eliminated per week
-            // For larger leagues (20+ teams), usually 2 eliminated
-            // For smaller leagues (8-12 teams), usually 1 eliminated
-            let eliminationCount = totalTeams >= 20 ? 2 : 1
-            let eliminationThreshold = totalTeams - eliminationCount + 1 // Last N positions
-            
-            // 🔥 WIN: If I'm NOT in the elimination zone (survived)
-            // 🔥 LOSS: If I'm in the elimination zone (got chopped)
-            return myRank < eliminationThreshold
-            
-        } else {
-            // Regular matchup logic - use existing win/loss determination
-            return scoreColor == .gpGreen
-        }
     }
     
     // MARK: - Computed Properties (Data Only)
@@ -107,30 +72,12 @@ struct MicroCardBackgroundView: View {
             .fill(Color.black.opacity(0.3)) // Back to original 0.3
     }
     
-    // 🔥 CELEBRATION: Celebration border overlay
-    private var celebrationBorderOverlay: some View {
-        RoundedRectangle(cornerRadius: 8)
-            .stroke(
-                LinearGradient(
-                    colors: celebrationBorderColors,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                lineWidth: celebrationBorderPulse ? 3 : 2.5
-            )
-            .opacity(celebrationBorderPulse ? 0.9 : 0.7)
-            .animation(
-                .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
-                value: celebrationBorderPulse
-            )
-    }
-    
     // Regular border overlay
     private var regularBorderOverlay: some View {
         RoundedRectangle(cornerRadius: 8)
             .stroke(
                 LinearGradient(
-                    colors: isEliminated ? [.red, .black, .red] : borderColors,
+                    colors: isEliminated ? [.red, .black, .red] : simplifiedBorderColors,
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
@@ -139,14 +86,12 @@ struct MicroCardBackgroundView: View {
             .opacity(shouldPulse ? pulseOpacity : borderOpacity)
     }
     
-    /// Celebration border colors based on win/loss - works for both regular and chopped
-    private var celebrationBorderColors: [Color] {
-        if isCelebrationWin {
-            // Winning/Survived: .gpGreen + teal
-            return [.gpGreen, .teal, .gpGreen.opacity(0.8), .cyan, .gpGreen]
+    /// 🔥 SIMPLIFIED: Just use .gpGreen for winning, .gpRedPink for losing
+    private var simplifiedBorderColors: [Color] {
+        if isWinning {
+            return [.gpGreen, .gpGreen, .gpGreen]
         } else {
-            // Losing/Chopped: .gpRedPink + yellow
-            return [.gpRedPink, .yellow, .gpRedPink.opacity(0.8), .orange, .gpRedPink]
+            return [.gpRedPink, .gpRedPink, .gpRedPink]
         }
     }
 }

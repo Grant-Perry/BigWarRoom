@@ -47,14 +47,14 @@ extension MatchupsHubViewModel {
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 3.0 else {
-            debugPrint(mode: .globalRefresh, "REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
+            DebugPrint(mode: .globalRefresh, "REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
             isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
         // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
         cachedProviders.removeAll()
-        debugPrint(mode: .globalRefresh, "Cleared cached providers for fresh scores")
+        DebugPrint(mode: .globalRefresh, "Cleared cached providers for fresh scores")
         
         // Get the currently selected week from WeekSelectionManager
         // 🔥 TODO: We'll need to inject WeekSelectionManager too
@@ -172,7 +172,7 @@ extension MatchupsHubViewModel {
     internal func performManualRefresh() async {
         // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
         guard !isLoading else { 
-            debugPrint(mode: .globalRefresh, "MANUAL REFRESH BLOCKED: Already loading")
+            DebugPrint(mode: .globalRefresh, "MANUAL REFRESH BLOCKED: Already loading")
             return 
         }
         
@@ -183,12 +183,12 @@ extension MatchupsHubViewModel {
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 2.0 else {
-            debugPrint(mode: .globalRefresh, "MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
+            DebugPrint(mode: .globalRefresh, "MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
             isUpdating = false // 🔥 Clear updating flag when throttled
             return
         }
         
-        debugPrint(mode: .globalRefresh, "MANUAL REFRESH START: Proceeding with manual refresh")
+        DebugPrint(mode: .globalRefresh, "MANUAL REFRESH START: Proceeding with manual refresh")
         
         // 🔥 PRESERVE Just Me Mode state during refresh
         let wasMicroModeEnabled = microModeEnabled
@@ -228,7 +228,7 @@ extension MatchupsHubViewModel {
         // 🔥 CRITICAL FIX: Clear cached providers to force fresh score data
         let count = cachedProviders.count
         cachedProviders.removeAll()
-        debugPrint(mode: .globalRefresh, "Cleared \(count) cached providers for fresh scores")
+        DebugPrint(mode: .globalRefresh, "Cleared \(count) cached providers for fresh scores")
         
         await MainActor.run {
             // Only update timestamp, don't change isLoading or show loading screen

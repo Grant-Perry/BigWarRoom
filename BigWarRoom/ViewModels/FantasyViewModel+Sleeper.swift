@@ -367,7 +367,7 @@ extension FantasyViewModel {
         
         // 🔥 DEBUG: Log Bo Nix specifically
         if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
-            debugPrint(mode: .statsLookup, limit: 3, """
+            DebugPrint(mode: .statsLookup, limit: 3, """
             Bo Nix Debug:
                Player ID: \(playerId)
                Stats: \(playerStats)
@@ -385,7 +385,7 @@ extension FantasyViewModel {
                 // 🔥 DEBUG: Log each stat calculation for Bo Nix
                 if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
                     if points != 0.0 {
-                        debugPrint(mode: .statsLookup, limit: 10, "  \(statKey): \(statValue) × \(scoring) = \(points)")
+                        DebugPrint(mode: .statsLookup, limit: 10, "  \(statKey): \(statValue) × \(scoring) = \(points)")
                     }
                 }
             }
@@ -393,7 +393,7 @@ extension FantasyViewModel {
         
         // 🔥 DEBUG: Log final total for Bo Nix
         if playerId.contains("4046") || playerStats.contains(where: { $0.key == "pass_yd" && $0.value > 100 }) {
-            debugPrint(mode: .statsLookup, limit: 3, "  TOTAL: \(totalScore)")
+            DebugPrint(mode: .statsLookup, limit: 3, "  TOTAL: \(totalScore)")
         }
         
         return totalScore

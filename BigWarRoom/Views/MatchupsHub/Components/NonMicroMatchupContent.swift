@@ -17,6 +17,9 @@ struct NonMicroMatchupContent: View {
     // 🔥 NEW: Team roster navigation callback
     var onTeamLogoTap: ((String) -> Void)? = nil
     
+    // 💊 RX button callback
+    var onRXTap: (() -> Void)? = nil
+    
     private var isLiveGame: Bool {
         return matchup.isLive
     }
@@ -72,7 +75,8 @@ struct NonMicroMatchupContent: View {
                     winProb: winProb,
                     scoreDelta: matchup.scoreDifferential,
                     isWinning: isWinning,
-                    matchup: matchup
+                    matchup: matchup,
+                    onRXTap: onRXTap
                 )
             }
         }

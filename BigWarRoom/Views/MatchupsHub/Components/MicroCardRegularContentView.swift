@@ -14,6 +14,7 @@ struct MicroCardRegularContentView: View {
     let scoreColor: Color
     let percentage: String
     let record: String?  // Add record parameter
+    let onRXTap: (() -> Void)?  // 💊 RX button callback
     
     var body: some View {
         VStack(spacing: 6) {
@@ -60,6 +61,12 @@ struct MicroCardRegularContentView: View {
                     .lineLimit(1)
             }
             
+            // 💊 RX Button - above score/percentage
+            if let onRXTap = onRXTap {
+                MicroCardRXButton(onTap: onRXTap)
+                    .padding(.top, 2)
+            }
+            
             // Score + Percentage
             VStack(spacing: 4) {
                 Text(score)
@@ -73,5 +80,33 @@ struct MicroCardRegularContentView: View {
                     .lineLimit(1)
             }
         }
+    }
+}
+
+// MARK: - RX Button Component for Micro Cards
+struct MicroCardRXButton: View {
+    let onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 3) {
+                Text("⚕️")
+                    .font(.system(size: 10))
+                Text("RX")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gpBlue.opacity(0.2))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6)
+                            .stroke(Color.gpBlue, lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }

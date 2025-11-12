@@ -20,6 +20,15 @@ final class ESPNSleeperIDCanonicalizer {
     // MARK: - Singleton
     static let shared = ESPNSleeperIDCanonicalizer()
     
+    // MARK: - State Management
+    private enum MappingState {
+        case notBuilt
+        case building
+        case built
+    }
+    
+    private var mappingState: MappingState = .notBuilt
+    
     // MARK: - Properties
     
     /// Canonical ESPN ID → Sleeper ID mapping (one-to-one)
@@ -38,6 +47,11 @@ final class ESPNSleeperIDCanonicalizer {
     
     private init() {
         loadCachedMapping()
+        // If we loaded from cache successfully, mark as built
+        if !canonicalMapping.isEmpty {
+            mappingState = .built
+            DebugLogger.playerIDMapping("✅ Canonical mapping loaded from cache (\(canonicalMapping.count) entries)")
+        }
     }
     
     // MARK: - Public Interface
@@ -46,25 +60,52 @@ final class ESPNSleeperIDCanonicalizer {
     /// - Parameter espnID: ESPN player ID
     /// - Returns: Canonical Sleeper ID, or the ESPN ID as fallback
     func getCanonicalSleeperID(forESPNID espnID: String) -> String {
+        // Build mapping on first use if needed (lazy loading)
+        buildCanonicalMappingIfNeeded()
+        
         // Check canonical mapping first
         if let sleeperID = canonicalMapping[espnID] {
             return sleeperID
         }
         
         // Not in mapping - return ESPN ID as fallback
-        DebugLogger.playerIDMapping("⚠️ ESPN ID '\(espnID)' not in canonical mapping, using as fallback")
         return espnID
     }
     
-    /// Build canonical mapping from PlayerDirectoryStore data
-    /// This deduplicates multiple ESPN IDs for same player
+    /// Build canonical mapping from PlayerDirectoryStore data - IDEMPOTENT
+    /// Only builds if not already built or currently building
     func buildCanonicalMapping() {
+        buildCanonicalMappingIfNeeded()
+    }
+    
+    /// Internal idempotent mapping builder
+    private func buildCanonicalMappingIfNeeded() {
+        // Guard against multiple builds
+        switch mappingState {
+        case .built:
+            // Already built, nothing to do
+            return
+        case .building:
+            // Currently building, avoid recursion
+            DebugLogger.playerIDMapping("⚠️ Canonical mapping already building, skipping duplicate call")
+            return
+        case .notBuilt:
+            // Need to build
+            break
+        }
+        
+        mappingState = .building
         DebugLogger.playerIDMapping("🏗️ Building canonical ESPN→Sleeper ID mapping...", level: .info)
         
-        let playerDirectory = PlayerDirectoryStore.shared
+        // Get player directory WITHOUT calling .shared during init to avoid circular dependency
+        guard let playerDirectory = getPlayerDirectorySafely() else {
+            DebugLogger.playerIDMapping("⚠️ PlayerDirectoryStore not available yet, deferring mapping build")
+            mappingState = .notBuilt
+            return
+        }
+        
         var newCanonicalMapping: [String: String] = [:]
         var newReverseMapping: [String: String] = [:]
-        var playerNameToSleeperID: [String: String] = [:] // For deduplication
         var duplicateESPNIDs: [String: [String]] = [:] // Track duplicates
         
         // First pass: Group players by normalized name to detect duplicates
@@ -90,9 +131,6 @@ final class ESPNSleeperIDCanonicalizer {
                 }
             } else {
                 // Multiple players with same name - DEDUPLICATION NEEDED
-                DebugLogger.playerIDMapping("🔍 Found \(playersWithSameName.count) players named '\(normalizedName)':")
-                
-                // Pick the "canonical" player using smart logic
                 let canonicalPlayer = selectCanonicalPlayer(from: playersWithSameName)
                 let canonicalESPNID = canonicalPlayer.espnID!
                 
@@ -103,35 +141,39 @@ final class ESPNSleeperIDCanonicalizer {
                         
                         if espnID != canonicalESPNID {
                             duplicateESPNIDs[normalizedName, default: []].append(espnID)
-                            DebugLogger.playerIDMapping("  🔗 Mapping duplicate ESPN ID '\(espnID)' → Sleeper ID '\(canonicalPlayer.playerID)'")
                         }
                     }
                 }
                 
                 // Store reverse mapping with canonical ESPN ID
                 newReverseMapping[canonicalPlayer.playerID] = canonicalESPNID
-                
-                DebugLogger.playerIDMapping("  ✅ Canonical: ESPN ID '\(canonicalESPNID)' → Sleeper ID '\(canonicalPlayer.playerID)'")
             }
         }
         
         // Update mappings
         canonicalMapping = newCanonicalMapping
         reverseMapping = newReverseMapping
+        mappingState = .built
         
         // Save to cache
         saveCachedMapping()
         
-        // Log results
+        // Log results ONCE
         DebugLogger.playerIDMapping("🎯 Canonical mapping complete:", level: .info)
         DebugLogger.playerIDMapping("  📊 Total ESPN→Sleeper mappings: \(canonicalMapping.count)")
         DebugLogger.playerIDMapping("  🔗 Players with duplicate ESPN IDs: \(duplicateESPNIDs.count)")
         
-        // Show some duplicate examples
-        let duplicateExamples = Array(duplicateESPNIDs.prefix(5))
+        // Show some duplicate examples (limit spam)
+        let duplicateExamples = Array(duplicateESPNIDs.prefix(3))
         for (playerName, espnIDs) in duplicateExamples {
             DebugLogger.playerIDMapping("  🔄 '\(playerName)' had ESPN IDs: \(espnIDs.joined(separator: ", "))")
         }
+    }
+    
+    /// Safely get PlayerDirectoryStore without causing circular init
+    private func getPlayerDirectorySafely() -> PlayerDirectoryStore? {
+        // Check if shared instance exists without triggering init
+        return PlayerDirectoryStore._shared
     }
     
     /// Force refresh canonical mapping (clears cache and rebuilds)
@@ -139,12 +181,16 @@ final class ESPNSleeperIDCanonicalizer {
         DebugLogger.playerIDMapping("♻️ Force refreshing canonical mapping...", level: .info)
         canonicalMapping.removeAll()
         reverseMapping.removeAll()
-        buildCanonicalMapping()
+        mappingState = .notBuilt
+        buildCanonicalMappingIfNeeded()
     }
     
     /// Get debug statistics
     func getDebugStats() -> (totalMappings: Int, duplicatesResolved: Int) {
-        let playerDirectory = PlayerDirectoryStore.shared
+        guard let playerDirectory = getPlayerDirectorySafely() else {
+            return (totalMappings: canonicalMapping.count, duplicatesResolved: 0)
+        }
+        
         let totalPlayersWithESPNID = playerDirectory.players.values.filter { 
             $0.espnID != nil && !$0.espnID!.isEmpty 
         }.count
@@ -234,8 +280,16 @@ final class ESPNSleeperIDCanonicalizer {
             let data = try Data(contentsOf: cacheFileURL)
             canonicalMapping = try JSONDecoder().decode([String: String].self, from: data)
             
-            // Rebuild reverse mapping
-            reverseMapping = Dictionary(uniqueKeysWithValues: canonicalMapping.map { ($1, $0) })
+            // Rebuild reverse mapping - only keep first ESPN ID for each Sleeper ID
+            // (Multiple ESPN IDs can map to same Sleeper ID, but reverse is one-to-one)
+            var tempReverseMapping: [String: String] = [:]
+            for (espnID, sleeperID) in canonicalMapping {
+                // Only set if not already set (keeps first occurrence)
+                if tempReverseMapping[sleeperID] == nil {
+                    tempReverseMapping[sleeperID] = espnID
+                }
+            }
+            reverseMapping = tempReverseMapping
             
             DebugLogger.playerIDMapping("💾 Loaded cached canonical mapping (\(canonicalMapping.count) entries)")
         } catch {

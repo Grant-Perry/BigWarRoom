@@ -135,24 +135,24 @@ extension AllLivePlayersViewModel {
         // 🔥 NEW: Set updating flag for animation
         isUpdating = true
         
-        debugPrint(mode: .liveUpdates, "🔥 LIVE UPDATE START: Beginning live update process...")
-        debugPrint(mode: .liveUpdates, "Selected week = \(WeekSelectionManager.shared.selectedWeek)")
+        DebugPrint(mode: .liveUpdates, "🔥 LIVE UPDATE START: Beginning live update process...")
+        DebugPrint(mode: .liveUpdates, "Selected week = \(WeekSelectionManager.shared.selectedWeek)")
         let startTime = Date()
         
         // 🔥 WOODY'S FIX: Force refresh stats to bypass cache
-        debugPrint(mode: .liveUpdates, "🔥 Forcing fresh stats reload to bypass cache")
+        DebugPrint(mode: .liveUpdates, "🔥 Forcing fresh stats reload to bypass cache")
         await loadPlayerStats()  // This now uses forceRefresh: true
         
         // 🔥 CRITICAL FIX: Actually refresh MatchupsHub data from APIs!
-        debugPrint(mode: .liveUpdates, "🌐 Calling MatchupsHub to fetch fresh scores from APIs...")
+        DebugPrint(mode: .liveUpdates, "🌐 Calling MatchupsHub to fetch fresh scores from APIs...")
         await matchupsHubViewModel.refreshMatchups()
-        debugPrint(mode: .liveUpdates, "✅ API refresh complete - extracting updated player data")
+        DebugPrint(mode: .liveUpdates, "✅ API refresh complete - extracting updated player data")
         
         // Debug: Show week info from first matchup
         if AppConstants.debug {
             if let firstMatchup = matchupsHubViewModel.myMatchups.first {
                 if let fantasyMatchup = firstMatchup.fantasyMatchup {
-                    debugPrint(mode: .liveUpdates, "First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)")
+                    DebugPrint(mode: .liveUpdates, "First matchup - Week: \(fantasyMatchup.week), Status: \(fantasyMatchup.status)")
                 }
             }
         }
@@ -160,19 +160,19 @@ extension AllLivePlayersViewModel {
         // Extract from freshly-refreshed matchup data with new API scores
         let freshPlayerEntries = extractAllPlayers()
         guard !freshPlayerEntries.isEmpty else {
-            debugPrint(mode: .liveUpdates, "❌ LIVE UPDATE ERROR: No fresh player entries found after extraction")
-            debugPrint(mode: .liveUpdates, "matchupsHubViewModel.myMatchups.count = \(matchupsHubViewModel.myMatchups.count)")
+            DebugPrint(mode: .liveUpdates, "❌ LIVE UPDATE ERROR: No fresh player entries found after extraction")
+            DebugPrint(mode: .liveUpdates, "matchupsHubViewModel.myMatchups.count = \(matchupsHubViewModel.myMatchups.count)")
             isUpdating = false // 🔥 Clear updating flag on error
             return
         }
         
-        debugPrint(mode: .liveUpdates, "Extracted \(freshPlayerEntries.count) players")
+        DebugPrint(mode: .liveUpdates, "Extracted \(freshPlayerEntries.count) players")
         
         // Debug: Show sample scores before update
         if AppConstants.debug {
             let sampleBefore = Array(allPlayers.prefix(3))
             for player in sampleBefore {
-                debugPrint(mode: .liveUpdates, limit: 3, "BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
+                DebugPrint(mode: .liveUpdates, limit: 3, "BEFORE UPDATE: \(player.playerName) = \(player.currentScore) pts")
             }
         }
         
@@ -183,13 +183,13 @@ extension AllLivePlayersViewModel {
         if AppConstants.debug {
             let sampleAfter = Array(allPlayers.prefix(3))
             for player in sampleAfter {
-                debugPrint(mode: .liveUpdates, limit: 3, "AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
+                DebugPrint(mode: .liveUpdates, limit: 3, "AFTER UPDATE: \(player.playerName) = \(player.currentScore) pts")
             }
             
             // Debug: Show filtered players
             let filteredSample = Array(filteredPlayers.prefix(3))
             for player in filteredSample {
-                debugPrint(mode: .liveUpdates, limit: 3, "FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
+                DebugPrint(mode: .liveUpdates, limit: 3, "FILTERED RESULT: \(player.playerName) = \(player.currentScore) pts")
             }
         }
         
@@ -200,16 +200,16 @@ extension AllLivePlayersViewModel {
         let oldTime = lastUpdateTime
         lastUpdateTime = Date()
         
-        debugPrint(mode: .liveUpdates, "✅ LIVE UPDATE COMPLETE: Updated lastUpdateTime from \(oldTime) to \(lastUpdateTime)")
-        debugPrint(mode: .liveUpdates, "LIVE UPDATE STATS: allPlayers.count = \(allPlayers.count), filteredPlayers.count = \(filteredPlayers.count)")
+        DebugPrint(mode: .liveUpdates, "✅ LIVE UPDATE COMPLETE: Updated lastUpdateTime from \(oldTime) to \(lastUpdateTime)")
+        DebugPrint(mode: .liveUpdates, "LIVE UPDATE STATS: allPlayers.count = \(allPlayers.count), filteredPlayers.count = \(filteredPlayers.count)")
         
         let elapsed = Date().timeIntervalSince(startTime)
-        debugPrint(mode: .liveUpdates, "Completed in \(String(format: "%.2f", elapsed))s")
+        DebugPrint(mode: .liveUpdates, "Completed in \(String(format: "%.2f", elapsed))s")
         
         // 🔥 NEW: Clear updating flag when complete
         isUpdating = false
         
-        debugPrint(mode: .liveUpdates, limit: 1, "@Observable: Property changes will automatically trigger UI updates")
+        DebugPrint(mode: .liveUpdates, limit: 1, "@Observable: Property changes will automatically trigger UI updates")
     }
 
     // MARK: - Snapshot Processing (no API calls)

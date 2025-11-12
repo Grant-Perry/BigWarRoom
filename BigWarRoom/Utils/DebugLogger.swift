@@ -1,16 +1,18 @@
 import Foundation
 import os.log
 
+//  MARK: NOTICE: STOP USING THIS METHOD - it is depreciated. Use DebugPrint() instead
+
 /// Centralized debug logging utility with toggleable debug modes
 enum DebugLogger {
-    
+
     // MARK: - Debug Flags
     /// Master debug switch - set to false to disable ALL debug logging
     private static let isDebugEnabled = false
-    
+
     /// Specific debug categories - can be toggled independently
-    private static let debugCategories: Set<DebugCategory> = []
-    
+    private static let debugCategories: Set<DebugCategory> = [.fantasy] // just add the DebugCategory you want to add .api or many [.api, .scoring, .ui]
+
     // MARK: - Debug Categories
     enum DebugCategory: String, CaseIterable {
         case api = "API"
@@ -22,6 +24,7 @@ enum DebugLogger {
         case playerStats = "STATS"
         case ui = "UI"
         case general = "GENERAL"
+        case playerIDMapping = "PLAYER_ID_MAPPING"
         
         var emoji: String {
             switch self {
@@ -34,6 +37,7 @@ enum DebugLogger {
             case .playerStats: return "👤"
             case .ui: return "🖥️"
             case .general: return "🔍"
+            case .playerIDMapping: return "🆔"
             }
         }
     }
@@ -117,6 +121,11 @@ enum DebugLogger {
         log(message, category: .ui, level: level, file: file, function: function, line: line)
     }
     
+    /// Log player ID mapping-related messages
+    static func playerIDMapping(_ message: String, level: LogLevel = .debug, file: String = #file, function: String = #function, line: Int = #line) {
+        log(message, category: .playerIDMapping, level: level, file: file, function: function, line: line)
+    }
+    
     // MARK: - Quick Methods for Common Cases
     
     /// Log errors that should always be visible (regardless of debug settings)
@@ -153,29 +162,31 @@ private extension DateFormatter {
 struct DebugMode: OptionSet {
     let rawValue: Int
     
-    // MARK: Mode Definitions
-    
-    static let none               = DebugMode([])
-    static let globalRefresh      = DebugMode(rawValue: 1 << 0)   // 1
-    static let espnAPI            = DebugMode(rawValue: 1 << 1)   // 2
-    static let sleeperAPI         = DebugMode(rawValue: 1 << 2)   // 4
-    static let matchupLoading     = DebugMode(rawValue: 1 << 3)   // 8
-    static let recordCalculation  = DebugMode(rawValue: 1 << 4)   // 16
-    static let statsLookup        = DebugMode(rawValue: 1 << 5)   // 32
-    static let navigation         = DebugMode(rawValue: 1 << 6)   // 64
-    static let caching            = DebugMode(rawValue: 1 << 7)   // 128
-    static let leagueProvider     = DebugMode(rawValue: 1 << 8)   // 256
-    static let viewModelLifecycle = DebugMode(rawValue: 1 << 9)   // 512
-    static let dataSync           = DebugMode(rawValue: 1 << 10)  // 1024
-    static let nflData            = DebugMode(rawValue: 1 << 11)  // 2048
-    static let opponentIntel      = DebugMode(rawValue: 1 << 12)  // 4096
-    static let liveUpdates        = DebugMode(rawValue: 1 << 13)  // 8192
-    static let oprk               = DebugMode(rawValue: 1 << 14)  // 16384
-    
+    // MARK: debugMode definitions
+
+    static let none               	= DebugMode([])
+    static let globalRefresh		= DebugMode(rawValue: 1 << 0)  // 1
+    static let espnAPI           	= DebugMode(rawValue: 1 << 1)  // 2
+    static let sleeperAPI         	= DebugMode(rawValue: 1 << 2)  // 4
+    static let matchupLoading     	= DebugMode(rawValue: 1 << 3)  // 8
+    static let recordCalculation  	= DebugMode(rawValue: 1 << 4)  // 16
+    static let statsLookup        	= DebugMode(rawValue: 1 << 5)  // 32
+    static let navigation         	= DebugMode(rawValue: 1 << 6)  // 64
+    static let caching            	= DebugMode(rawValue: 1 << 7)  // 128
+    static let leagueProvider     	= DebugMode(rawValue: 1 << 8)  // 256
+    static let viewModelLifecycle 	= DebugMode(rawValue: 1 << 9)  // 512
+    static let dataSync           	= DebugMode(rawValue: 1 << 10)  // 1024
+    static let nflData            	= DebugMode(rawValue: 1 << 11)  // 2048
+    static let opponentIntel      	= DebugMode(rawValue: 1 << 12)  // 4096
+    static let liveUpdates        	= DebugMode(rawValue: 1 << 13)  // 8192
+    static let oprk               	= DebugMode(rawValue: 1 << 14)  // 16384
+    static let lineupRX           	= DebugMode(rawValue: 1 << 15)  // 32768
+    static let liveUpdate2 		  	= DebugMode(rawValue: 1 << 16)  // 65536, next free bit!
+
     // Convenience combinations
-    static let allAPIs: DebugMode = [.espnAPI, .sleeperAPI]
-    static let allData: DebugMode = [.statsLookup, .caching, .dataSync]
-    static let all: DebugMode = [
+    static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
+    static let allData: DebugMode 	= [.statsLookup, .caching, .dataSync]
+    static let all: DebugMode 		= [
         .globalRefresh,
         .espnAPI,
         .sleeperAPI,
@@ -191,22 +202,9 @@ struct DebugMode: OptionSet {
         .opponentIntel,
         .liveUpdates,
         .oprk,
+        .lineupRX,
 		.liveUpdate2
     ]
-}
-
-extension DebugMode {
-    /// Add new debug flag for granular live player update diagnostics
-    static let liveUpdate2 = DebugMode(rawValue: 1 << 15) // 32768, next free bit!
-
-    // DO NOT redeclare 'all' – just edit the original static let all to include .liveUpdate2:
-    // Find your existing static let all, and change it to:
-    // static let all: DebugMode = [
-    //     ...,
-    //     .liveUpdates,
-    //     .oprk,
-    //     .liveUpdate2    // <--- Add this here at the end (or wherever style demands)
-    // ]
 }
 
 // MARK: - Debug Configuration
@@ -220,8 +218,8 @@ enum DebugConfig {
     /// - `.globalRefresh` - Only global refresh logs
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
-	/// [.allAPIs, .recordCalculation, .nflData]
-    static var activeMode: DebugMode = .none
+	/// Current: Lineup RX debugging enabled
+    static var activeMode: DebugMode = [.lineupRX, .sleeperAPI]
     
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {
@@ -249,18 +247,18 @@ private var debugPrintIterations: [String: Int] = [:]
 /// Examples:
 /// ```swift
 /// // Single mode
-/// debugPrint(mode: .globalRefresh, "Starting refresh")
+/// DebugPrint(mode: .globalRefresh, "Starting refresh")
 ///
 /// // Multiple modes
-/// debugPrint(mode: [.espnAPI, .sleeperAPI], "API response received")
+/// DebugPrint(mode: [.espnAPI, .sleeperAPI], "API response received")
 ///
 /// // With iteration limit (only prints 5 times)
-/// debugPrint(mode: .statsLookup, limit: 5, "Checking stats for \(playerID)")
+/// DebugPrint(mode: .statsLookup, limit: 5, "Checking stats for \(playerID)")
 ///
 /// // Default to .all (prints if anything is active)
-/// debugPrint("General debug message")
+/// DebugPrint("General debug message")
 /// ```
-func debugPrint(
+func DebugPrint(
     mode: DebugMode = .all,
     limit: Int = 0, // 0 = infinite
     file: String = #file,

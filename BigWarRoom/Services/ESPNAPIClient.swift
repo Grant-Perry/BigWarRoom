@@ -204,7 +204,7 @@ final class ESPNAPIClient: DraftAPIClient {
                 // Register scoring settings with ScoringSettingsManager
                 ScoringSettingsManager.shared.registerESPNScoringSettings(from: espnLeague, leagueID: leagueID)
                 
-                // 🔥 NEW: Update OPRK data from ESPN positional ratings
+                // Update OPRK data from ESPN positional ratings
                 OPRKService.shared.updateOPRKData(from: espnLeague)
                 
                 return espnLeague.toSleeperLeague()
@@ -600,8 +600,8 @@ final class ESPNAPIClient: DraftAPIClient {
     
     /// Fetch ESPN league data with a specific token
     private func fetchESPNLeagueDataWithToken(leagueID: String, token: String) async throws -> ESPNLeague {
-        // Use minimal view parameters to just get team and member data
-        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mSettings"
+        // Include mRoster view to get all team rosters
+        let urlString = "\(baseURL)/\(AppConstants.currentSeasonYear)/segments/0/leagues/\(leagueID)?view=mTeam&view=mRoster&view=mSettings"
         
         guard let url = URL(string: urlString) else {
             throw ESPNAPIError.invalidResponse

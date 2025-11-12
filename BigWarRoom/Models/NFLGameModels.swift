@@ -128,7 +128,7 @@ struct NFLGameInfo: Equatable {
                     return "FINAL"
                 } else {
                     // 🔥 DEBUG: Log unexpected format for debugging
-                    debugPrint(mode: .nflData, "Unexpected gameTime format: '\(gameTime)' -> using LIVE")
+                    DebugPrint(mode: .nflData, "Unexpected gameTime format: '\(gameTime)' -> using LIVE")
                     return "LIVE"
                 }
                 
@@ -154,11 +154,11 @@ struct NFLGameInfo: Equatable {
                 if !quarterDisplay.isEmpty {
                     if !timeDisplay.isEmpty {
                         let result = "\(quarterDisplay) \(timeDisplay)"
-                        debugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)'")
+                        DebugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)'")
                         return result
                     } else {
                         let result = quarterDisplay
-                        debugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)' (no time)")
+                        DebugPrint(mode: .nflData, limit: 3, "'\(gameTime)' -> '\(result)' (no time)")
                         return result
                     }
                 }
@@ -310,12 +310,12 @@ final class NFLGameDataService {
            let cache = cache,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration {
-            debugPrint(mode: .nflData, "Using cached data from \(timestamp)")
+            DebugPrint(mode: .nflData, "Using cached data from \(timestamp)")
             processGameData(cache)
             return
         }
         
-        debugPrint(mode: .nflData, "Fetching fresh data for week \(week), year \(currentYear)")
+        DebugPrint(mode: .nflData, "Fetching fresh data for week \(week), year \(currentYear)")
         
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=\(week)&dates=\(currentYear)") else {
             errorMessage = "Invalid API URL"
@@ -340,7 +340,7 @@ final class NFLGameDataService {
                     self?.isLoading = false
                     
                     if case .failure(let error) = completion {
-                        debugPrint(mode: .nflData, "NFL ERROR: \(error.localizedDescription)")
+                        DebugPrint(mode: .nflData, "NFL ERROR: \(error.localizedDescription)")
                         self?.errorMessage = "Failed to fetch NFL data: \(error.localizedDescription)"
                     }
                 },
@@ -348,7 +348,7 @@ final class NFLGameDataService {
                     // Remove from pending requests
                     self?.pendingRequests.remove(requestKey)
                     
-                    debugPrint(mode: .nflData, "Received fresh data with \(response.events.count) games")
+                    DebugPrint(mode: .nflData, "Received fresh data with \(response.events.count) games")
                     
                     self?.cache = response
                     self?.cacheTimestamp = Date()
@@ -378,7 +378,7 @@ final class NFLGameDataService {
             
             // 🔥 DEBUG: Log raw ESPN data for problematic games
             if homeTeam == "IND" || homeTeam == "TEN" || homeTeam == "DAL" || homeTeam == "DEN" {
-                debugPrint(mode: .nflData, limit: 2, """
+                DebugPrint(mode: .nflData, limit: 2, """
                 ESPN RAW DATA for \(awayTeam) vs \(homeTeam):
                    - status.state: '\(gameStatus)'
                    - status.detail: '\(gameTime)'

@@ -162,7 +162,7 @@ final class LeagueMatchupProvider {
     
     /// Fetch all matchup data for this league
     func fetchMatchups() async throws -> [FantasyMatchup] {
-        debugPrint(mode: .leagueProvider, "fetchMatchups() called for \(league.league.leagueID), source=\(league.source)")
+        DebugPrint(mode: .leagueProvider, "fetchMatchups() called for \(league.league.leagueID), source=\(league.source)")
         // Clear previous state
         matchups = []
         byeWeekTeams = []
@@ -170,14 +170,14 @@ final class LeagueMatchupProvider {
         detectedAsChoppedLeague = false
         
         if league.source == .espn {
-            debugPrint(mode: .leagueProvider, "Fetching ESPN data")
+            DebugPrint(mode: .leagueProvider, "Fetching ESPN data")
             await fetchESPNData()
         } else {
-            debugPrint(mode: .leagueProvider, "Fetching Sleeper data")
+            DebugPrint(mode: .leagueProvider, "Fetching Sleeper data")
             await fetchSleeperData()
         }
         
-        debugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
+        DebugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
         return matchups
     }
     
@@ -199,7 +199,7 @@ final class LeagueMatchupProvider {
 
     /// Calculate team records from matchup history when standings don't provide them
     private func calculateRecordsFromMatchupHistory(leagueID: String) async {
-        debugPrint(mode: .recordCalculation, "Starting calculation for league \(leagueID)")
+        DebugPrint(mode: .recordCalculation, "Starting calculation for league \(leagueID)")
 
         // Get all past weeks (1-8 since we're in week 9)
         let pastWeeks = 1..<week
@@ -207,11 +207,11 @@ final class LeagueMatchupProvider {
 
         for pastWeek in pastWeeks {
             do {
-                debugPrint(mode: .recordCalculation, limit: 5, "Calculating records for week \(pastWeek)...")
+                DebugPrint(mode: .recordCalculation, limit: 5, "Calculating records for week \(pastWeek)...")
 
                 // Fetch matchup data for this past week
                 guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(pastWeek)") else {
-                    debugPrint(mode: .recordCalculation, "Failed to create URL for week \(pastWeek)")
+                    DebugPrint(mode: .recordCalculation, "Failed to create URL for week \(pastWeek)")
                     continue
                 }
 
@@ -370,7 +370,7 @@ final class LeagueMatchupProvider {
             
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
             
-            // 🔥 NEW: Also try to decode full ESPNLeague for OPRK data
+            // Also try to decode full ESPNLeague for OPRK data
             if let fullLeagueData = try? JSONDecoder().decode(ESPNLeague.self, from: data) {
                 OPRKService.shared.updateOPRKData(from: fullLeagueData)
             }
@@ -381,7 +381,7 @@ final class LeagueMatchupProvider {
     }
     
     private func processESPNData(_ espnModel: ESPNFantasyLeagueModel) async {
-        debugPrint(mode: .espnAPI, "processESPNData called for \(espnModel.teams.count) teams")
+        DebugPrint(mode: .espnAPI, "processESPNData called for \(espnModel.teams.count) teams")
         
         // Store team records and names
         for team in espnModel.teams {
@@ -448,15 +448,34 @@ final class LeagueMatchupProvider {
                     stat.scoringPeriodId == week && stat.statSourceId == 0
                 }?.appliedTotal ?? 0.0
                 
+                // 💊 MAP ESPN ID TO SLEEPER ID for Lineup RX projections
+                let espnIDString = String(player.id)
+                var sleeperPlayer = playerDirectoryStore.playerByESPNID(espnIDString)
+                var sleeperID = sleeperPlayer?.playerID
+                
+                // Fallback: Search by name if ESPN ID mapping fails
+                if sleeperID == nil {
+                    let firstName = player.fullName.firstName ?? ""
+                    let lastName = player.fullName.lastName ?? ""
+                    let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
+                    
+                    // Search through all players for a name match
+                    sleeperPlayer = playerDirectoryStore.players.values.first { sleeperPlayer in
+                        let sleeperFullName = "\(sleeperPlayer.firstName ?? "") \(sleeperPlayer.lastName ?? "")".trimmingCharacters(in: .whitespaces)
+                        return sleeperFullName.lowercased() == fullName.lowercased()
+                    }
+                    sleeperID = sleeperPlayer?.playerID
+                }
+                
                 return FantasyPlayer(
                     id: String(player.id),
-                    sleeperID: nil,
-                    espnID: String(player.id),
+                    sleeperID: sleeperID,
+                    espnID: espnIDString,
                     firstName: player.fullName.firstName,
                     lastName: player.fullName.lastName,
                     position: positionString(entry.lineupSlotId),
                     team: player.nflTeamAbbreviation,
-                    jerseyNumber: getJerseyNumberForPlayer(espnID: String(player.id), team: player.nflTeamAbbreviation, name: "\(player.fullName.firstName) \(player.fullName.lastName)"),
+                    jerseyNumber: getJerseyNumberForPlayer(espnID: espnIDString, team: player.nflTeamAbbreviation, name: "\(player.fullName.firstName) \(player.fullName.lastName)"),
                     currentPoints: weeklyScore,
                     projectedPoints: weeklyScore * 1.1,
                     gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
@@ -534,21 +553,40 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperWeeklyStats() async {
-        // 🔥 WOODY'S FIX: Use SharedStatsService with force refresh instead of making redundant API calls
+        // 🔥 COORDINATION FIX: Only force refresh if SharedStatsService doesn't have recent data
+        // This prevents multiple concurrent LeagueMatchupProvider instances from racing
         do {
+            let hasRecentStats = SharedStatsService.shared.hasCache(week: week, year: year)
+            let shouldForceRefresh = !hasRecentStats
+            
+            if AppConstants.debug && shouldForceRefresh {
+                print("🔥 LeagueMatchupProvider: No recent stats found, forcing fresh load for week \(week)")
+            } else if AppConstants.debug {
+                print("🔥 LeagueMatchupProvider: Using cached stats for week \(week) to prevent race conditions")
+            }
+            
             let sharedStats = try await SharedStatsService.shared.loadWeekStats(
                 week: week, 
                 year: year, 
-                forceRefresh: true  // 🔥 CRITICAL: Always force fresh data for live league updates
+                forceRefresh: shouldForceRefresh  // 🔥 CRITICAL FIX: Only force refresh if needed
             )
             playerStats = sharedStats
+            
             if AppConstants.debug {
-                print("🔥 LeagueMatchupProvider: Loaded FRESH stats for \(sharedStats.count) players")
+                let freshness = shouldForceRefresh ? "FRESH" : "CACHED"
+                print("🔥 LeagueMatchupProvider: Loaded \(freshness) stats for \(sharedStats.count) players")
+                
+                // Debug: Log a few sample scores for consistency tracking
+                let samplePlayers = Array(sharedStats.prefix(3))
+                for (playerId, stats) in samplePlayers {
+                    let pprScore = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
+                    print("🔥 LeagueMatchupProvider STATS: Player \(playerId) = \(pprScore) pts")
+                }
             }
         } catch {
             playerStats = [:]  // Set empty to prevent crashes
             if AppConstants.debug {
-                print("❌ LeagueMatchupProvider: Failed to load fresh stats: \(error)")
+                print("❌ LeagueMatchupProvider: Failed to load stats: \(error)")
             }
         }
     }
@@ -595,13 +633,13 @@ final class LeagueMatchupProvider {
             }
             
             rosterIDToManagerID = newRosterMapping
-            debugPrint(mode: .dataSync, limit: 5, "Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
+            DebugPrint(mode: .dataSync, limit: 5, "Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
             
             // Fetch users
             await fetchSleeperUsers()
             
         } catch {
-            debugPrint(mode: .sleeperAPI, "Failed to fetch Sleeper rosters: \(error)")
+            DebugPrint(mode: .sleeperAPI, "Failed to fetch Sleeper rosters: \(error)")
         }
     }
     
@@ -927,7 +965,7 @@ final class LeagueMatchupProvider {
                 FantasyViewModel.shared.espnTeamRecords[teamId] = record
             }
             if !espnTeamRecords.isEmpty {
-                debugPrint(mode: .recordCalculation, "Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
+                DebugPrint(mode: .recordCalculation, "Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
             }
         }
     }

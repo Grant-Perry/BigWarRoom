@@ -7,22 +7,22 @@
 
 import Foundation
 
+// 🔥 MIGRATION FLAG: Use class-level storage for migration tracking
+private class GameAlertsMigration {
+    static var hasRunMigration = false
+}
+
 extension AllLivePlayersViewModel {
     // MARK: - Game Alerts Properties
     
+    // 🔥 CRITICAL FIX: Use local file storage instead of UserDefaults to prevent 4MB+ overflow
     /// Storage for player scores before refresh (to calculate deltas)
     private var previousPlayerScores: [String: Double] {
         get {
-            if let data = UserDefaults.standard.data(forKey: "AllLivePlayers_PreviousScores"),
-               let scores = try? JSONDecoder().decode([String: Double].self, from: data) {
-                return scores
-            }
-            return [:]
+            return GameAlertsFileManager.shared.loadPreviousScores()
         }
         set {
-            if let data = try? JSONEncoder().encode(newValue) {
-                UserDefaults.standard.set(data, forKey: "AllLivePlayers_PreviousScores")
-            }
+            GameAlertsFileManager.shared.savePreviousScores(newValue)
         }
     }
     
@@ -30,6 +30,12 @@ extension AllLivePlayersViewModel {
     
     /// Capture player scores before refresh and check for highest scoring play after refresh
     internal func processGameAlerts(from playerEntries: [LivePlayerEntry]) {
+        // 🔥 MIGRATE: On first run, migrate any existing UserDefaults data
+        if !GameAlertsMigration.hasRunMigration {
+            GameAlertsFileManager.shared.migrateFromUserDefaults()
+            GameAlertsMigration.hasRunMigration = true
+        }
+        
         // Get previous scores for comparison
         let prevScores = previousPlayerScores
         
@@ -63,18 +69,29 @@ extension AllLivePlayersViewModel {
             )
         }
         
-        // Update previous scores for next refresh
+        // Update previous scores for next refresh (FILE STORAGE)
         var newPreviousScores: [String: Double] = [:]
         for entry in playerEntries {
             newPreviousScores[entry.player.id] = entry.currentScore
         }
         previousPlayerScores = newPreviousScores
+        
+        // 🔥 DEBUG: Log file storage info
+        if AppConstants.debug {
+            let info = GameAlertsFileManager.shared.getStorageInfo()
+            let sizeKB = Double(info.totalSize) / 1024.0
+            print("🚨 GAME ALERTS: Updated file storage with \(newPreviousScores.count) player scores (\(String(format: "%.2f", sizeKB)) KB)")
+        }
     }
     
     /// Clear game alerts and reset previous scores (for testing)
     func clearGameAlertsData() {
         GameAlertsManager.shared.clearAlerts()
-        previousPlayerScores = [:]
+        GameAlertsFileManager.shared.clearAllData()
+        
+        if AppConstants.debug {
+            print("🚨 GAME ALERTS: Cleared all file storage and GameAlerts data")
+        }
     }
     
     /// Test the game alerts system with direct manager calls (for development)
@@ -110,5 +127,15 @@ extension AllLivePlayersViewModel {
             pointsScored: 8.75,
             leagueName: "Friends League"
         )
+    }
+    
+    // MARK: - Debug Utilities
+    
+    /// Print GameAlerts file storage information (debug only)
+    func debugGameAlertsStorage() {
+        #if DEBUG
+        GameAlertsFileManager.shared.printStorageInfo()
+        GameAlertsFileManager.shared.printSampleData()
+        #endif
     }
 }

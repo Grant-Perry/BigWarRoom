@@ -178,7 +178,7 @@ struct NoMatchupsThisWeekView: View {
                     .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
                 
                 VStack(spacing: 8) {
-                    Text("No Matchups This Week")
+                    Text("Loading matchups for this week...")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.primary)
                     

@@ -109,6 +109,38 @@ struct AppConstants {
         }
     }
 
+    // MARK: - UserDefaults Cleanup (CRITICAL FIX)
+    
+    /// Clean up corrupted UserDefaults data that's causing 4MB+ overflow
+    static func cleanupCorruptedUserDefaults() {
+        let keysToRemove = [
+            "AllLivePlayers_PreviousScores", // GameAlerts was storing 142 player scores here (NOW FIXED - moved to files)
+            "AllLivePlayers_PlayerStatsCache", // In case stats were cached here
+            "AllLivePlayers_MatchupCache" // In case matchup data was cached here
+        ]
+        
+        var totalSizeFreed = 0
+        
+        for key in keysToRemove {
+            if let data = UserDefaults.standard.data(forKey: key) {
+                totalSizeFreed += data.count
+                print("🚨 CLEANUP: Removing corrupted UserDefaults key: \(key) (\(data.count) bytes)")
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        
+        // Force UserDefaults to save and clear its cache
+        UserDefaults.standard.synchronize()
+        
+        if totalSizeFreed > 0 {
+            let sizeKB = Double(totalSizeFreed) / 1024.0
+            let sizeMB = sizeKB / 1024.0
+            print("🚨 CLEANUP: UserDefaults cleanup complete - freed \(String(format: "%.2f", sizeMB)) MB")
+        } else {
+            print("🚨 CLEANUP: No corrupted UserDefaults data found")
+        }
+    }
+
     // MARK: VIEWS
 
     // App Logo - Main branding logo for loading screen and about page

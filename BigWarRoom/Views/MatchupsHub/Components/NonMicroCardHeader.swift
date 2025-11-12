@@ -11,6 +11,7 @@ import SwiftUI
 struct NonMicroCardHeader: View {
     let matchup: UnifiedMatchup
     let dualViewMode: Bool
+    let onRXTap: (() -> Void)?  // 💊 RX button callback
     
     var body: some View {
         HStack {
@@ -37,9 +38,19 @@ struct NonMicroCardHeader: View {
             
             Spacer()
             
-            // LIVE status badge based on roster analysis
-            if !matchup.isChoppedLeague {
-                NonMicroLiveStatusBadge(isLive: matchup.isLive)
+            // 💊 RX indicator - replaces LIVE
+            if !matchup.isChoppedLeague, let onRXTap = onRXTap {
+                Button(action: onRXTap) {
+                    Image(systemName: "cross.case.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.white)
+                        .padding(6)
+                        .background(
+                            Circle()
+                                .fill(Color.gpRedPink)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
         }
     }

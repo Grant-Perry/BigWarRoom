@@ -18,10 +18,13 @@ struct NonMicroCardContent: View {
     let isGamesFinished: Bool
     let celebrationBorderPulse: Bool
     
+    // 💊 RX button callback
+    var onRXTap: (() -> Void)? = nil
+    
     var body: some View {
         VStack(spacing: dualViewMode ? 8 : 4) {
             // Compact header with league and status
-            NonMicroCardHeader(matchup: matchup, dualViewMode: dualViewMode)
+            NonMicroCardHeader(matchup: matchup, dualViewMode: dualViewMode, onRXTap: onRXTap)
             
             // Main content
             if matchup.isChoppedLeague {
@@ -31,7 +34,8 @@ struct NonMicroCardContent: View {
                     matchup: matchup,
                     isWinning: isWinning,
                     dualViewMode: dualViewMode,
-                    scoreAnimation: scoreAnimation
+                    scoreAnimation: scoreAnimation,
+                    onRXTap: nil  // 💊 No longer needed in bottom section
                 )
             }
             
@@ -181,69 +185,29 @@ struct NonMicroCardContent: View {
     // MARK: - Computed Styling Properties
     
     private var overlayBorderColors: [Color] {
-        if matchup.isChoppedLeague {
-            // 🔥 SIMPLIFIED: Chopped league uses same win/loss colors as regular matchups
-            if isWinning {
-                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
-            } else {
-                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
-            }
-        } else if matchup.isLive {
-            // 🔥 SIMPLIFIED: Live games use same win/loss colors
-            if isWinning {
-                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
-            } else {
-                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
-            }
+        // 🔥 SIMPLIFIED: Just use .gpGreen for winning, .gpRedPink for losing
+        if isWinning {
+            return [.gpGreen, .gpGreen, .gpGreen]
         } else {
-            // 🔥 SIMPLIFIED: Non-live games use same win/loss colors
-            if isWinning {
-                return [.gpGreen, .gpGreen.opacity(0.8), .gpGreen]
-            } else {
-                return [.gpRedPink, .gpRedPink.opacity(0.8), .gpRedPink]
-            }
+            return [.gpRedPink, .gpRedPink, .gpRedPink]
         }
     }
     
     private var overlayBorderWidth: CGFloat {
-        if matchup.isChoppedLeague {
-            return 2.5
-        } else if matchup.isLive {
-            return isWinning ? 2.0 : 2.4
-        } else {
-            return isWinning ? 1.5 : 2.2
-        }
+        return 2.0
     }
     
     private var overlayBorderOpacity: Double {
-        if matchup.isChoppedLeague {
-            return 0.9
-        } else if matchup.isLive {
-            return isWinning ? 0.8 : 0.9
-        } else {
-            return isWinning ? 0.7 : 0.85
-        }
+        return 0.8
     }
     
     private var shadowColor: Color {
-        if matchup.isChoppedLeague {
-            // 🔥 SIMPLIFIED: Chopped league uses same win/loss shadow colors
-            return isWinning ? .gpGreen.opacity(0.4) : .gpRedPink.opacity(0.4)
-        } else if matchup.isLive {
-            return isWinning ? .gpGreen.opacity(0.3) : .gpRedPink.opacity(0.4)
-        } else {
-            return isWinning ? .gpGreen.opacity(0.3) : .gpRedPink.opacity(0.3)
-        }
+        // 🔥 SIMPLIFIED: Just use .gpGreen shadow for winning, .gpRedPink shadow for losing
+        return isWinning ? .gpGreen.opacity(0.3) : .gpRedPink.opacity(0.3)
     }
     
     private var shadowRadius: CGFloat {
-        if matchup.isChoppedLeague {
-            return 8
-        } else if matchup.isLive {
-            return isWinning ? 6 : 7
-        } else {
-            return isWinning ? 3 : 5
-        }
+        return 4.0
     }
     
     private var backgroundColors: [Color] {

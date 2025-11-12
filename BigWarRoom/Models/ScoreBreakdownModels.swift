@@ -128,13 +128,9 @@ struct ScoreBreakdownFactory {
         // Get the week, defaulting to current selected week
         let effectiveWeek = week ?? WeekSelectionManager.shared.selectedWeek
         
-        // Step 1: Get player stats using StatsFacade
-        guard let sleeperPlayer = PlayerMatchService.shared.matchPlayer(
-            fullName: player.fullName,
-            shortName: player.shortName ?? (player.firstName ?? ""),
-            team: player.team,
-            position: player.position
-        ) else {
+        // 🎯 NEW: Use canonical ESPN→Sleeper ID mapping
+        let canonicalSleeperID = ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: player.id)
+        guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: canonicalSleeperID) else {
             return createEmptyBreakdown(player: player, week: effectiveWeek)
         }
         

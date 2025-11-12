@@ -28,20 +28,7 @@ struct PlayerStatsHeaderView: View {
             return espnID
         }
         
-        // Method 2: Try PlayerMatchService to find another Sleeper player with ESPN ID
-        let matchService = PlayerMatchService.shared
-        let matchResult = matchService.matchPlayerWithConfidence(
-            fullName: player.fullName,
-            shortName: player.shortName,
-            team: player.team,
-            position: player.position ?? ""
-        )
-        
-        if let matchedPlayer = matchResult.player, let espnID = matchedPlayer.espnID {
-            return espnID
-        }
-        
-        // Method 3: Try fallback mapping service for high-profile players
+        // Method 2: Try fallback mapping service for high-profile players
         let fallbackService = ESPNIDMappingService.shared
         if let fallbackESPNID = fallbackService.getFallbackESPNID(
             fullName: player.fullName,

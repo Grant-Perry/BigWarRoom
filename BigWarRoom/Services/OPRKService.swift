@@ -35,25 +35,10 @@ final class OPRKService {
     /// Update OPRK data from ESPN league response
     /// - Parameter espnLeague: ESPN league data containing positional ratings
     func updateOPRKData(from espnLeague: ESPNLeague) {
-        debugPrint(mode: .oprk, "Checking ESPN league response...")
-        debugPrint(mode: .oprk, "positionAgainstOpponent property exists? \(espnLeague.positionAgainstOpponent != nil)")
-        
-        guard let positionalRatingsResponse = espnLeague.positionAgainstOpponent else {
-            debugPrint(mode: .oprk, "⚠️ No positionAgainstOpponent object in ESPN response")
-            debugPrint(mode: .oprk, "⚠️ This likely means the API call is missing view=mPositionalRatings parameter")
+        guard let positionalRatingsResponse = espnLeague.positionAgainstOpponent,
+              let ratingsData = positionalRatingsResponse.positionalRatings else {
             return
         }
-        
-        debugPrint(mode: .oprk, "positionAgainstOpponent decoded successfully")
-        debugPrint(mode: .oprk, "positionalRatings property is nil? \(positionalRatingsResponse.positionalRatings == nil)")
-        
-        guard let ratingsData = positionalRatingsResponse.positionalRatings else {
-            debugPrint(mode: .oprk, "⚠️ positionAgainstOpponent object exists but positionalRatings is nil")
-            debugPrint(mode: .oprk, "⚠️ This likely means the JSON structure doesn't match our model")
-            return
-        }
-        
-        debugPrint(mode: .oprk, "✅ Found positional ratings data with \(ratingsData.count) positions")
         
         var newCache: [String: [String: Int]] = [:]
         
@@ -69,18 +54,10 @@ final class OPRKService {
         
         // Process each position's ratings
         for (positionId, positionRatings) in ratingsData {
-            guard let position = positionMap[positionId] else {
-                debugPrint(mode: .oprk, "⚠️ Unknown position ID: \(positionId)")
+            guard let position = positionMap[positionId],
+                  let teamRatings = positionRatings.ratingsByOpponent else {
                 continue
             }
-            
-            // Get the ratingsByOpponent data
-            guard let teamRatings = positionRatings.ratingsByOpponent else {
-                debugPrint(mode: .oprk, "⚠️ No ratingsByOpponent for position \(position)")
-                continue
-            }
-            
-            debugPrint(mode: .oprk, "Processing position \(position) with \(teamRatings.count) teams")
             
             // Process each team's rating for this position
             for (teamIdString, rating) in teamRatings {
@@ -102,16 +79,6 @@ final class OPRKService {
         // Update cache
         oprkCache = newCache
         lastUpdateTime = Date()
-        
-        debugPrint(mode: .oprk, "✅ Updated rankings for \(newCache.count) teams across \(positionMap.count) positions")
-        
-        // Debug: Show sample of what was stored
-        if let miaData = newCache["MIA"] {
-            debugPrint(mode: .oprk, "Cache Sample - MIA: \(miaData)")
-        }
-        if let bufData = newCache["BUF"] {
-            debugPrint(mode: .oprk, "Cache Sample - BUF: \(bufData)")
-        }
     }
     
     /// Get OPRK rank for a specific team and position
@@ -120,10 +87,8 @@ final class OPRKService {
     ///   - position: Position string (e.g., "QB", "RB", "WR", "TE")
     /// - Returns: OPRK rank (1-32) where 1 = toughest defense, 32 = easiest defense
     func getOPRK(forTeam team: String, position: String) -> Int? {
-        // Normalize team abbreviation (already uppercased)
         let normalizedTeam = team.uppercased()
         
-        // Normalize position (handle variations)
         let normalizedPosition: String
         switch position.uppercased() {
         case "QB": normalizedPosition = "QB"
@@ -134,10 +99,7 @@ final class OPRKService {
         default: return nil
         }
         
-        let result = oprkCache[normalizedTeam]?[normalizedPosition]
-        debugPrint(mode: .oprk, "Lookup: team=\(normalizedTeam), position=\(normalizedPosition) → rank=\(result ?? -1)")
-        
-        return result
+        return oprkCache[normalizedTeam]?[normalizedPosition]
     }
     
     /// Get matchup advantage based on OPRK
@@ -146,21 +108,17 @@ final class OPRKService {
     ///   - position: Player's position
     /// - Returns: MatchupAdvantage enum
     func getMatchupAdvantage(forOpponent team: String, position: String) -> MatchupAdvantage {
-        // Normalize team name first
         let normalizedTeam = team.uppercased()
         
         guard let oprk = getOPRK(forTeam: normalizedTeam, position: position) else {
             return .neutral
         }
         
-        // Map OPRK rank to matchup advantage
-        // Lower OPRK = tougher defense = worse matchup
-        // Higher OPRK = weaker defense = better matchup
         switch oprk {
-        case 1...8:    return .difficult  // Top 8 defenses (ranks 1-8)
-        case 9...16:   return .neutral    // Middle tier defenses (ranks 9-16)
-        case 17...24:  return .favorable  // Easier matchups (ranks 17-24)
-        case 25...32:  return .elite      // Easiest matchups (ranks 25-32)
+        case 1...8:    return .difficult
+        case 9...16:   return .neutral
+        case 17...24:  return .favorable
+        case 25...32:  return .elite
         default:       return .neutral
         }
     }
@@ -170,27 +128,13 @@ final class OPRKService {
         guard let lastUpdate = lastUpdateTime else {
             return true
         }
-        
         return Date().timeIntervalSince(lastUpdate) > cacheExpiration
     }
     
-    /// Clear OPRK cache (useful for testing or manual refresh)
+    /// Clear OPRK cache
     func clearCache() {
         oprkCache.removeAll()
         lastUpdateTime = nil
-        debugPrint(mode: .oprk, "🗑️ Cache cleared")
-    }
-    
-    /// Get all OPRK data for debugging
-    func debugPrintOPRK() {
-        debugPrint(mode: .oprk, "📊 Cache Status:")
-        debugPrint(mode: .oprk, "  - Teams: \(oprkCache.count)")
-        debugPrint(mode: .oprk, "  - Last Update: \(lastUpdateTime?.description ?? "Never")")
-        debugPrint(mode: .oprk, "  - Needs Refresh: \(needsRefresh)")
-        
-        for (team, positions) in oprkCache.sorted(by: { $0.key < $1.key }) {
-            debugPrint(mode: .oprk, "  - \(team): QB=\(positions["QB"] ?? 0), RB=\(positions["RB"] ?? 0), WR=\(positions["WR"] ?? 0), TE=\(positions["TE"] ?? 0)")
-        }
     }
 }
 

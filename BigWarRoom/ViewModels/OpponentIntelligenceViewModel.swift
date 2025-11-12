@@ -153,7 +153,7 @@ final class OpponentIntelligenceViewModel {
                 let currentMatchupsCount = matchupsHubViewModel.myMatchups.count
                 
                 if currentMatchupsCount != lastObservedMatchupsCount {
-                    debugPrint(mode: .opponentIntel, "Matchups changed from \(lastObservedMatchupsCount) to \(currentMatchupsCount)")
+                    DebugPrint(mode: .opponentIntel, "Matchups changed from \(lastObservedMatchupsCount) to \(currentMatchupsCount)")
                     await refreshIntelligence()
                     lastObservedMatchupsCount = currentMatchupsCount
                 }
@@ -170,7 +170,7 @@ final class OpponentIntelligenceViewModel {
         isLoading = true
         errorMessage = nil
         
-        debugPrint(mode: .opponentIntel, "Starting injury data loading...")
+        DebugPrint(mode: .opponentIntel, "Starting injury data loading...")
         isInjuryDataLoading = true // Start with injury loading true
         
         // Force a small delay to ensure the UI updates before we start processing
@@ -180,24 +180,24 @@ final class OpponentIntelligenceViewModel {
             // Ensure matchups are loaded
             await matchupsHubViewModel.loadAllMatchups()
             
-            debugPrint(mode: .opponentIntel, "Analyzing opponents...")
+            DebugPrint(mode: .opponentIntel, "Analyzing opponents...")
             // Analyze opponents (this is fast)
             let intelligence = intelligenceService.analyzeOpponents(from: matchupsHubViewModel.myMatchups)
             
-            debugPrint(mode: .opponentIntel, "Generating recommendations (including injury scan)...")
+            DebugPrint(mode: .opponentIntel, "Generating recommendations (including injury scan)...")
             // Generate recommendations (this includes injury scanning - the slow part)
             let recommendations = intelligenceService.generateRecommendations(from: intelligence)
             
-            debugPrint(mode: .opponentIntel, "Updating UI with \(recommendations.filter { $0.type == .injuryAlert }.count) injury alerts...")
+            DebugPrint(mode: .opponentIntel, "Updating UI with \(recommendations.filter { $0.type == .injuryAlert }.count) injury alerts...")
             // Update UI
             await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
             
-            debugPrint(mode: .opponentIntel, "Injury data loading complete!")
+            DebugPrint(mode: .opponentIntel, "Injury data loading complete!")
             isInjuryDataLoading = false // Only set to false after recommendations are complete
             
         } catch {
             errorMessage = "Failed to load opponent intelligence: \(error.localizedDescription)"
-            debugPrint(mode: .opponentIntel, "Error during loading: \(error)")
+            DebugPrint(mode: .opponentIntel, "Error during loading: \(error)")
             isInjuryDataLoading = false // Stop injury loading on error
         }
         
@@ -206,7 +206,7 @@ final class OpponentIntelligenceViewModel {
     
     /// Refresh intelligence data (background refresh)
     func refreshIntelligence() async {
-        debugPrint(mode: .opponentIntel, "Background refresh - starting injury loading...")
+        DebugPrint(mode: .opponentIntel, "Background refresh - starting injury loading...")
         // Start injury loading for refresh
         isInjuryDataLoading = true
         
@@ -218,7 +218,7 @@ final class OpponentIntelligenceViewModel {
         
         await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
         
-        debugPrint(mode: .opponentIntel, "Background refresh complete - stopping injury loading")
+        DebugPrint(mode: .opponentIntel, "Background refresh complete - stopping injury loading")
         // Stop injury loading after refresh complete
         isInjuryDataLoading = false
     }
@@ -226,7 +226,7 @@ final class OpponentIntelligenceViewModel {
     /// Manual refresh trigger
     func manualRefresh() async {
         // 🔥 FIX: Clear cache immediately to force fresh injury scan
-        debugPrint(mode: .opponentIntel, "Manual refresh - clearing cache and starting injury loading...")
+        DebugPrint(mode: .opponentIntel, "Manual refresh - clearing cache and starting injury loading...")
         intelligenceService.clearCache()
         
         isInjuryDataLoading = true // Show injury loading during manual refresh
@@ -235,7 +235,7 @@ final class OpponentIntelligenceViewModel {
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
         // Also refresh AllLivePlayersViewModel to ensure injury alerts use fresh data
-        debugPrint(mode: .opponentIntel, "Manual refresh - also refreshing AllLivePlayersViewModel")
+        DebugPrint(mode: .opponentIntel, "Manual refresh - also refreshing AllLivePlayersViewModel")
         await AllLivePlayersViewModel.shared.refresh()
         
         // Now do the main intelligence refresh with fresh data
@@ -251,7 +251,7 @@ final class OpponentIntelligenceViewModel {
     /// Nuclear option: Clear ALL caches and force complete reload when week changes
     /// This ensures loading state stays true until ALL fresh data is ready
     func weekChangeReload() async {
-        debugPrint(mode: .opponentIntel, "Week change reload started")
+        DebugPrint(mode: .opponentIntel, "Week change reload started")
         
         // Lock loading state - prevent any intermediate updates
         isLoading = true
@@ -271,25 +271,25 @@ final class OpponentIntelligenceViewModel {
             await AllLivePlayersViewModel.shared.refresh()
             
             // Force matchups hub to do a fresh load (not using cached data)
-            debugPrint(mode: .opponentIntel, "Forcing MatchupsHubViewModel refresh...")
+            DebugPrint(mode: .opponentIntel, "Forcing MatchupsHubViewModel refresh...")
             await matchupsHubViewModel.manualRefresh()
             
             // Reduced wait time since we're now more aggressive about cache clearing
             try await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds instead of 0.5
             
             // Now analyze with truly fresh data
-            debugPrint(mode: .opponentIntel, "Analyzing opponents with fresh data...")
+            DebugPrint(mode: .opponentIntel, "Analyzing opponents with fresh data...")
             let intelligence = intelligenceService.analyzeOpponents(from: matchupsHubViewModel.myMatchups)
             let recommendations = intelligenceService.generateRecommendations(from: intelligence)
             
             // Update UI with fresh data
             await updateIntelligenceData(intelligence: intelligence, recommendations: recommendations)
             
-            debugPrint(mode: .opponentIntel, "Week change reload completed successfully")
+            DebugPrint(mode: .opponentIntel, "Week change reload completed successfully")
             
         } catch {
             errorMessage = "Failed to reload for new week: \(error.localizedDescription)"
-            debugPrint(mode: .opponentIntel, "Week change reload failed: \(error)")
+            DebugPrint(mode: .opponentIntel, "Week change reload failed: \(error)")
         }
         
         // Only now set loading to false
@@ -373,7 +373,7 @@ final class OpponentIntelligenceViewModel {
         // Calculate overall threat assessment
         overallThreatAssessment = calculateOverallThreat(from: intelligence)
         
-        debugPrint(mode: .opponentIntel, "Updated with \(intelligence.count) opponents, \(conflictPlayers.count) conflicts, \(recommendations.count) recommendations")
+        DebugPrint(mode: .opponentIntel, "Updated with \(intelligence.count) opponents, \(conflictPlayers.count) conflicts, \(recommendations.count) recommendations")
     }
     
     private func calculateOverallThreat(from intelligence: [OpponentIntelligence]) -> ThreatLevel {
