@@ -112,6 +112,29 @@ struct AppInitializationLoadingView: View {
                 }
             }
             .padding(.horizontal, 40)
+            
+            // Version at bottom - overlaid with background for visibility
+            VStack {
+                Spacer()
+                
+                HStack {
+                    Spacer()
+                    
+                    Text("Version: \(AppConstants.getVersion())")
+                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(Color.black.opacity(0.6))
+                        )
+                        .padding(.bottom, 50)
+                        .padding(.trailing, 20)
+                    
+                    Spacer()
+                }
+            }
         }
         .onAppear {
             logInfo("AppInitializationLoadingView appeared", category: "LoadingView")

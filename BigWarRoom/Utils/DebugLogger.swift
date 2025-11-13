@@ -219,8 +219,8 @@ enum DebugConfig {
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
 	/// Current: Lineup RX debugging enabled
-    static var activeMode: DebugMode = [.lineupRX, .sleeperAPI]
-    
+    static var activeMode: DebugMode = [] // [.lineupRX]
+
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {
         debugPrintIterations.removeAll()

@@ -172,6 +172,10 @@ struct PlayerComparisonView: View {
                     viewModel.clearBoth()
                     searchText1 = ""
                     searchText2 = ""
+                    // Reset UI state to show player selection
+                    isPlayerSelectionCollapsed = false
+                    showPlayer1Search = false
+                    showPlayer2Search = false
                 }
                 .foregroundColor(.white)
             }

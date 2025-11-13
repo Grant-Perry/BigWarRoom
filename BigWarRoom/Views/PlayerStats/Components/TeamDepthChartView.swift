@@ -85,7 +85,7 @@ struct TeamDepthChartView: View {
         LazyVStack(spacing: 6) {
             ForEach(["QB", "RB", "WR", "TE", "K", "DEF"], id: \.self) { position in
                 if let positionData = depthChartData[position], !positionData.players.isEmpty {
-                    PositionGroupView(
+                    DepthChartPositionGroupView(
                         positionData: positionData,
                         team: team,
                         onPlayerTap: onPlayerTap // 🏈 PLAYER NAVIGATION: Pass callback down
@@ -152,8 +152,8 @@ struct TeamDepthChartView: View {
     }
 }
 
-/// Position group within depth chart
-private struct PositionGroupView: View {
+/// Position group within depth chart - renamed to avoid conflict with OptimalLineupView's PositionGroupView
+private struct DepthChartPositionGroupView: View {
     let positionData: DepthChartData
     let team: NFLTeam?
     let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Accept callback

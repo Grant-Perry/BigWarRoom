@@ -442,8 +442,14 @@ final class LeagueMatchupProvider {
         var fantasyPlayers: [FantasyPlayer] = []
         
         if let roster = espnTeam.roster {
+            DebugPrint(mode: .lineupRX, "🔍 ESPN ROSTER DEBUG for team \(espnTeam.id):")
             fantasyPlayers = roster.entries.map { entry in
                 let player = entry.playerPoolEntry.player
+                let slotId = entry.lineupSlotId
+                let isActive = LineupSlots.isActiveSlot(slotId)
+                
+                DebugPrint(mode: .lineupRX, "  Player: \(player.fullName.firstName ?? "") \(player.fullName.lastName ?? "") | Slot: \(slotId) (\(positionString(slotId))) | isStarter: \(isActive)")
+                
                 let weeklyScore = player.stats.first { stat in
                     stat.scoringPeriodId == week && stat.statSourceId == 0
                 }?.appliedTotal ?? 0.0
@@ -479,7 +485,7 @@ final class LeagueMatchupProvider {
                     currentPoints: weeklyScore,
                     projectedPoints: weeklyScore * 1.1,
                     gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
-                    isStarter: [0, 2, 3, 4, 5, 6, 23, 16, 17].contains(entry.lineupSlotId),
+                    isStarter: LineupSlots.isActiveSlot(entry.lineupSlotId),
                     lineupSlot: positionString(entry.lineupSlotId)
                 )
             }
@@ -768,14 +774,39 @@ final class LeagueMatchupProvider {
     ) -> FantasyTeam {
         var fantasyPlayers: [FantasyPlayer] = []
         
-        if let allPlayers = matchupResponse.players {
+        // 🔥 KEY FIX: Get roster_positions from league to map starters to slots
+        let rosterPositions = league.league.rosterPositions ?? []
+        
+        if let allPlayers = matchupResponse.players,
+           let starterIDs = matchupResponse.starters {
+            
+            DebugPrint(mode: .lineupRX, "🎯 SLEEPER ROSTER MAPPING:")
+            DebugPrint(mode: .lineupRX, "   Roster positions: \(rosterPositions)")
+            DebugPrint(mode: .lineupRX, "   Starters count: \(starterIDs.count)")
+            
+            // 🔥 THE KEY: Map starters to their actual slots using array indices
+            var starterSlotMap: [String: String] = [:]
+            for (index, playerID) in starterIDs.enumerated() {
+                if index < rosterPositions.count {
+                    let slot = rosterPositions[index]
+                    starterSlotMap[playerID] = slot
+                    
+                    if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
+                        DebugPrint(mode: .lineupRX, "   Starter \(index): \(sleeperPlayer.fullName) → \(slot)")
+                    }
+                }
+            }
+            
+            // Process all players
             for playerID in allPlayers {
                 if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
-                    let isStarter = matchupResponse.starters?.contains(playerID) ?? false
+                    let isStarter = starterIDs.contains(playerID)
                     let playerScore = calculateSleeperPlayerScore(playerId: playerID)
-                    
-                    // 🔥 PRIORITY FIX: Ensure team is ALWAYS loaded for colors
                     let playerTeam = sleeperPlayer.team ?? getPlayerTeamFromCache(playerID) ?? "UNK"
+                    let playerPosition = sleeperPlayer.position ?? "FLEX"
+                    
+                    // 🔥 FIX: Use the actual slot from mapping, not just position
+                    let lineupSlot = isStarter ? starterSlotMap[playerID] : nil
                     
                     let fantasyPlayer = FantasyPlayer(
                         id: playerID,
@@ -783,14 +814,14 @@ final class LeagueMatchupProvider {
                         espnID: sleeperPlayer.espnID,
                         firstName: sleeperPlayer.firstName,
                         lastName: sleeperPlayer.lastName,
-                        position: sleeperPlayer.position ?? "FLEX",
-                        team: playerTeam,  // 🔥 GUARANTEED to have a value for team colors
+                        position: playerPosition,
+                        team: playerTeam,
                         jerseyNumber: sleeperPlayer.number?.description,
                         currentPoints: playerScore,
                         projectedPoints: playerScore * 1.1,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: playerTeam),
                         isStarter: isStarter,
-                        lineupSlot: sleeperPlayer.position
+                        lineupSlot: lineupSlot
                     )
                     
                     fantasyPlayers.append(fantasyPlayer)
@@ -847,6 +878,9 @@ final class LeagueMatchupProvider {
         )
     }
     
+    // 🔥 REMOVE: This is no longer needed since we have actual slot mapping
+    // DELETE the old determineLineupSlot() function
+
     // 🔥 NEW: Player team cache for instant color loading
     private func getPlayerTeamFromCache(_ playerID: String) -> String? {
         // Try to get team from known associations (cache popular players)

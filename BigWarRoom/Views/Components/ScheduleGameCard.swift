@@ -57,6 +57,8 @@ struct ScheduleGameCard: View {
                         Text(game.scoreDisplay)
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                             .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         
                         Text(game.displayTime.uppercased())
@@ -85,17 +87,23 @@ struct ScheduleGameCard: View {
                             Text("\(game.awayScore)")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(game.awayScore > game.homeScore ? .gpGreen : .white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             
                             Text("-")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             
                             // Home team score
                             Text("\(game.homeScore)")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(game.homeScore > game.awayScore ? .gpGreen : .white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         }
                         
