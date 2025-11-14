@@ -2,7 +2,7 @@
 //  CurrentLineupAnalysisView.swift
 //  BigWarRoom
 //
-//  Current Lineup Analysis section for Lineup RX
+//  Displays current lineup analysis with optimization status
 //
 
 import SwiftUI
@@ -10,49 +10,105 @@ import SwiftUI
 struct CurrentLineupAnalysisView: View {
     let result: LineupOptimizerService.OptimizationResult
     
-    @State private var isExpanded: Bool = true
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                HStack {
-                    SectionHeader(icon: "chart.bar.fill", title: "Current Lineup Analysis", color: .gpBlue)
-                    
-                    Spacer()
-                    
-                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.gpBlue)
+        VStack(alignment: .leading, spacing: 12) {
+            // Header with status
+            HStack {
+                SectionHeader(icon: "chart.bar.fill", title: "Current Lineup Analysis", color: .gpBlue)
+                
+                Spacer()
+                
+                // 🔥 CRITICAL: Check for bye week players FIRST
+                if hasActiveByeWeekPlayers {
+                    statusBadge(
+                        icon: "exclamationmark.triangle.fill",
+                        text: "BYE WEEK EMERGENCY!",
+                        color: .gpRedPink,
+                        isOptimized: false
+                    )
+                } else if result.improvement >= 0.5 {
+                    statusBadge(
+                        icon: "wrench.and.screwdriver.fill",
+                        text: "Needs Optimization",
+                        color: .gpYellow,
+                        isOptimized: false
+                    )
+                } else {
+                    statusBadge(
+                        icon: "checkmark.seal.fill",
+                        text: "Lineup Optimized!",
+                        color: .gpGreen,
+                        isOptimized: true
+                    )
                 }
             }
             
-            if isExpanded {
-                // Show congratulatory badge if lineup is already optimized
-                if result.improvement <= 0.1 {
-                    OptimizedLineupBadge()
+            // Status message with emoji
+            if hasActiveByeWeekPlayers {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.octagon.fill")
+                        .foregroundColor(.gpRedPink)
+                        .font(.system(size: 20))
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("⚠️ EMERGENCY: Active Bye Week Player(s)")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.gpRedPink)
+                        
+                        Text("You have players on BYE in your active lineup! They will score 0.0 points.")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white)
+                    }
                 }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.gpRedPink.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gpRedPink, lineWidth: 2)
+                        )
+                )
+            } else if result.improvement >= 0.5 {
+                HStack(spacing: 8) {
+                    Image(systemName: "lightbulb.fill")
+                        .foregroundColor(.gpYellow)
+                    
+                    Text("We found lineup optimizations for you")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.gpGreen)
+                    
+                    Text("Your lineup is at maximum projected points")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white)
+                }
+            }
+            
+            // Score breakdown
+            HStack(spacing: 20) {
+                ScoreCard(
+                    title: "Current Score",
+                    value: result.currentPoints,
+                    color: .white
+                )
                 
-                HStack(spacing: 20) {
-                    StatCard(
-                        title: "Current Score",
-                        value: String(format: "%.1f", result.currentPoints),
-                        color: .white
-                    )
-                    
-                    StatCard(
-                        title: "Optimal Score",
-                        value: String(format: "%.1f", result.projectedPoints),
-                        color: .gpGreen
-                    )
-                    
-                    StatCard(
+                ScoreCard(
+                    title: "Optimal Score",
+                    value: result.projectedPoints,
+                    color: .gpGreen
+                )
+                
+                if result.improvement != 0 {
+                    ScoreCard(
                         title: "Improvement",
-                        value: String(format: "+%.1f", result.improvement),
-                        color: result.improvement > 0 ? .gpGreen : .gray
+                        value: result.improvement,
+                        color: result.improvement > 0 ? .gpGreen : .gpRedPink,
+                        showPlus: true
                     )
                 }
             }
@@ -67,91 +123,68 @@ struct CurrentLineupAnalysisView: View {
                 )
         )
     }
-}
-
-struct OptimizedLineupBadge: View {
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.gpGreen, .gpGreen.opacity(0.7)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 50, height: 50)
-                
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 24))
-                    .foregroundColor(.white)
+    
+    // 🔥 FIXED: Check if any CURRENT starters have bye week (0.0 projection)
+    private var hasActiveByeWeekPlayers: Bool {
+        // Get current starters from the roster
+        let currentStarters = result.currentRoster.filter { $0.isStarter }
+        
+        // Check if any starter has 0.0 projection (bye week)
+        for starter in currentStarters {
+            if let sleeperID = starter.sleeperID,
+               let projection = result.playerProjections[sleeperID],
+               projection == 0.0 {
+                return true
             }
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("🎯 Lineup Optimized!")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.gpGreen)
-                
-                Text("Your lineup is already at maximum projected points")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            
-            Spacer()
         }
-        .padding()
+        
+        return false
+    }
+    
+    private func statusBadge(icon: String, text: String, color: Color, isOptimized: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .bold))
+            
+            Text(text)
+                .font(.system(size: 14, weight: .bold))
+        }
+        .foregroundColor(isOptimized ? color : .white)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gpGreen.opacity(0.15))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(color.opacity(isOptimized ? 0.2 : 0.3))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.gpGreen.opacity(0.4), lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(color, lineWidth: 1.5)
                 )
         )
     }
 }
 
-struct StatCard: View {
+struct ScoreCard: View {
     let title: String
-    let value: String
+    let value: Double
     let color: Color
+    var showPlus: Bool = false
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .center, spacing: 6) {
             Text(title)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
             
-            Text(value)
-                .font(.system(size: 20, weight: .black))
+            Text(showPlus && value > 0 ? "+\(value.formatted(.number.precision(.fractionLength(1))))" : value.formatted(.number.precision(.fractionLength(1))))
+                .font(.system(size: 22, weight: .black))
                 .foregroundColor(color)
         }
         .frame(maxWidth: .infinity)
-        .padding()
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black.opacity(0.3))
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.black.opacity(0.4))
         )
-    }
-}
-
-struct SectionHeader: View {
-    let icon: String
-    let title: String
-    let color: Color
-    
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(color)
-            
-            Text(title)
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
-            
-            Spacer()
-        }
     }
 }

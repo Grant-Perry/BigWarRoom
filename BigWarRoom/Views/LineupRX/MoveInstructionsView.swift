@@ -46,8 +46,14 @@ struct MoveInstructionsView: View {
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(.gray)
             
-            ForEach(result.moveChains.indices, id: \.self) { index in
-                MoveChainCard(chain: result.moveChains[index], chainNumber: index + 1)
+            LazyVStack(spacing: 12) {
+                ForEach(result.moveChains.indices, id: \.self) { index in
+                    MoveChainCard(
+                        chain: result.moveChains[index],
+                        chainNumber: index + 1
+                    )
+                    .id("chain_\(index)")
+                }
             }
             
             if !result.changes.isEmpty {
@@ -95,14 +101,48 @@ struct MoveChainCard: View {
     let chainNumber: Int
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             chainHeader
+            
             ForEach(chain.steps.indices, id: \.self) { stepIndex in
-                CascadingMoveStepRow(
-                    step: chain.steps[stepIndex],
-                    stepNumber: stepIndex + 1,
-                    isLastStep: stepIndex == chain.steps.count - 1
-                )
+                let step = chain.steps[stepIndex]
+                
+                if step.fromSlot == "BENCH" {
+                    // Player coming OFF the bench
+                    MoveStepSimpleRow(
+                        step: step,
+                        stepNumber: stepIndex + 1,
+                        isLastStep: stepIndex == chain.steps.count - 1
+                    )
+                    .id("step_\(stepIndex)")
+                } else if step.toSlot == "BENCH" {
+                    // Player being benched - show who they're replacing
+                    if stepIndex + 1 < chain.steps.count {
+                        let nextStep = chain.steps[stepIndex + 1]
+                        MoveStepWithReplacementRow(
+                            benchedStep: step,
+                            replacementStep: nextStep,
+                            stepNumber: stepIndex + 1,
+                            isLastStep: stepIndex + 1 == chain.steps.count - 1
+                        )
+                        .id("step_\(stepIndex)")
+                    } else {
+                        MoveStepSimpleRow(
+                            step: step,
+                            stepNumber: stepIndex + 1,
+                            isLastStep: true
+                        )
+                        .id("step_\(stepIndex)")
+                    }
+                } else {
+                    // Lateral move (position to position)
+                    MoveStepSimpleRow(
+                        step: step,
+                        stepNumber: stepIndex + 1,
+                        isLastStep: stepIndex == chain.steps.count - 1
+                    )
+                    .id("step_\(stepIndex)")
+                }
             }
         }
         .padding()
@@ -135,10 +175,21 @@ struct MoveChainCard: View {
     }
 }
 
-struct CascadingMoveStepRow: View {
+// Simple move step (one player, one action)
+struct MoveStepSimpleRow: View {
     let step: LineupOptimizerService.MoveStep
     let stepNumber: Int
     let isLastStep: Bool
+    
+    private var stepColor: Color {
+        if step.toSlot == "BENCH" {
+            return .gpRedPink
+        } else if step.fromSlot == "BENCH" {
+            return .gpGreen
+        } else {
+            return .gpBlue
+        }
+    }
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -161,37 +212,33 @@ struct CascadingMoveStepRow: View {
             if !isLastStep {
                 Rectangle()
                     .fill(Color.gpBlue.opacity(0.3))
-                    .frame(width: 2, height: 30)
+                    .frame(width: 2, height: 40)
             }
         }
     }
     
     private var stepDetailsView: some View {
         VStack(alignment: .leading, spacing: 6) {
-            playerNameRow
-            actionRow
+            HStack {
+                Text(step.player.fullName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                Text("(\(step.player.position), \(String(format: "%.1f", step.projection)) pts)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            
+            HStack(spacing: 6) {
+                actionIcon
+                actionText
+            }
+            
             Text(step.reason)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.gray.opacity(0.8))
                 .italic()
-        }
-    }
-    
-    private var playerNameRow: some View {
-        HStack {
-            Text(step.player.fullName)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-            Text("(\(step.player.position), \(String(format: "%.1f", step.projection)) pts)")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.gray)
-        }
-    }
-    
-    private var actionRow: some View {
-        HStack(spacing: 6) {
-            actionIcon
-            actionText
+                .lineLimit(2)
         }
     }
     
@@ -225,14 +272,99 @@ struct CascadingMoveStepRow: View {
                 .foregroundColor(.gpBlue)
         }
     }
+}
+
+// Move step with replacement (shows both benched player and replacement)
+struct MoveStepWithReplacementRow: View {
+    let benchedStep: LineupOptimizerService.MoveStep
+    let replacementStep: LineupOptimizerService.MoveStep
+    let stepNumber: Int
+    let isLastStep: Bool
     
-    private var stepColor: Color {
-        if step.toSlot == "BENCH" {
-            return .gpRedPink
-        } else if step.fromSlot == "BENCH" {
-            return .gpGreen
-        } else {
-            return .gpBlue
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                stepNumberView
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    // Player being benched
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundColor(.gpRedPink)
+                                .font(.system(size: 14))
+                            
+                            Text("BENCH:")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.gpRedPink)
+                            
+                            Text(benchedStep.player.fullName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            
+                            Text("(\(benchedStep.player.position), \(String(format: "%.1f", benchedStep.projection)) pts)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Text("Currently in \(benchedStep.fromSlot)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.8))
+                            .italic()
+                    }
+                    
+                    Divider()
+                        .background(Color.gray.opacity(0.3))
+                    
+                    // Replacement player
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.up.circle.fill")
+                                .foregroundColor(.gpGreen)
+                                .font(.system(size: 14))
+                            
+                            Text("START:")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(.gpGreen)
+                            
+                            Text(replacementStep.player.fullName)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                            
+                            Text("(\(replacementStep.player.position), \(String(format: "%.1f", replacementStep.projection)) pts)")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Text(replacementStep.reason)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.8))
+                            .italic()
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+    
+    private var stepNumberView: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Circle()
+                    .fill(Color.gpBlue)
+                    .frame(width: 32, height: 32)
+                Text("\(stepNumber)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            if !isLastStep {
+                Rectangle()
+                    .fill(Color.gpBlue.opacity(0.3))
+                    .frame(width: 2, height: 60)
+            }
         }
     }
 }

@@ -10,6 +10,8 @@ import SwiftUI
 struct RecommendedChangesView: View {
     let result: LineupOptimizerService.OptimizationResult
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
     
     @State private var isExpanded: Bool = true
     
@@ -32,9 +34,16 @@ struct RecommendedChangesView: View {
             }
             
             if isExpanded {
-                ForEach(result.changes.indices, id: \.self) { index in
-                    let change = result.changes[index]
-                    ChangeCard(change: change, sleeperPlayerCache: sleeperPlayerCache)
+                LazyVStack(spacing: 12) {
+                    ForEach(result.changes.indices, id: \.self) { index in
+                        ChangeCard(
+                            change: result.changes[index],
+                            sleeperPlayerCache: sleeperPlayerCache,
+                            matchupInfoCache: matchupInfoCache,
+                            gameTimeCache: gameTimeCache
+                        )
+                        .id("change_\(index)")
+                    }
                 }
             }
         }
@@ -53,6 +62,8 @@ struct RecommendedChangesView: View {
 struct ChangeCard: View {
     let change: LineupOptimizerService.LineupChange
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
     
     var body: some View {
         VStack(spacing: 12) {
@@ -70,6 +81,7 @@ struct ChangeCard: View {
                     Text(change.reason)
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gpGreen)
+                        .lineLimit(1)
                 }
             }
             
@@ -81,7 +93,9 @@ struct ChangeCard: View {
                     labelColor: .gpRedPink,
                     projectedPoints: change.projectedPointsOut,
                     iconName: "arrow.down",
-                    sleeperPlayerCache: sleeperPlayerCache
+                    sleeperPlayerCache: sleeperPlayerCache,
+                    matchupInfoCache: matchupInfoCache,
+                    gameTimeCache: gameTimeCache
                 )
                 
                 Divider()
@@ -95,7 +109,9 @@ struct ChangeCard: View {
                 labelColor: .gpGreen,
                 projectedPoints: change.projectedPointsIn,
                 iconName: "arrow.up",
-                sleeperPlayerCache: sleeperPlayerCache
+                sleeperPlayerCache: sleeperPlayerCache,
+                matchupInfoCache: matchupInfoCache,
+                gameTimeCache: gameTimeCache
             )
         }
         .padding()
@@ -117,6 +133,26 @@ struct PlayerComparisonRow: View {
     let projectedPoints: Double
     let iconName: String?
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
+    
+    // Pre-compute sleeper player
+    private var sleeperPlayer: SleeperPlayer? {
+        player.sleeperID.flatMap { sleeperPlayerCache[$0] }
+    }
+    
+    // Get matchup info for this player
+    private var matchupInfo: LineupRXView.MatchupInfo? {
+        guard let team = player.team else { return nil }
+        let cacheKey = "\(team)_\(player.position)"
+        return matchupInfoCache[cacheKey]
+    }
+    
+    // Get game time for this player's team
+    private var gameTime: String? {
+        guard let team = player.team else { return nil }
+        return gameTimeCache[team]
+    }
     
     var body: some View {
         HStack(spacing: 12) {
@@ -128,17 +164,18 @@ struct PlayerComparisonRow: View {
                     .frame(width: 20)
             }
             
-            // Player headshot
-            if let sleeperID = player.sleeperID,
-               let sleeperPlayer = sleeperPlayerCache[sleeperID] {
-                AsyncImage(url: sleeperPlayer.headshotURL) { phase in
-                    if let image = phase.image {
+            // Player headshot - optimized
+            if let url = sleeperPlayer?.headshotURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                    } else {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
+                    case .failure, .empty:
+                        Circle().fill(Color.gray.opacity(0.3))
+                    @unknown default:
+                        Circle().fill(Color.gray.opacity(0.3))
                     }
                 }
                 .frame(width: 40, height: 40)
@@ -163,6 +200,7 @@ struct PlayerComparisonRow: View {
                     Text(player.fullName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
+                        .lineLimit(1)
                 }
                 
                 HStack(spacing: 8) {
@@ -173,7 +211,34 @@ struct PlayerComparisonRow: View {
                             .foregroundColor(.gray)
                         
                         if let team = player.team {
-                            TeamLogoView(teamCode: team, size: 24)
+                            TeamLogoView(teamCode: team, size: 20)
+                        }
+                    }
+                }
+                
+                // Matchup info (vs opponent, OPRK, game time)
+                if let matchupInfo = matchupInfo {
+                    HStack(spacing: 6) {
+                        Text("vs")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.7))
+                        
+                        TeamLogoView(teamCode: matchupInfo.opponentTeam, size: 18)
+                        
+                        if let oprk = matchupInfo.oprk {
+                            Text("#\(oprk)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(oprkColor(oprk))
+                        }
+                        
+                        if let gameTime = gameTime {
+                            Text("•")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.gray.opacity(0.5))
+                            
+                            Text(gameTime)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.gray.opacity(0.7))
                         }
                     }
                 }
@@ -191,6 +256,17 @@ struct PlayerComparisonRow: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.gray)
             }
+        }
+    }
+    
+    // Color OPRK based on ranking (1-10 green, 11-20 yellow, 21+ red)
+    private func oprkColor(_ oprk: Int) -> Color {
+        if oprk <= 10 {
+            return .gpGreen
+        } else if oprk <= 20 {
+            return .yellow
+        } else {
+            return .gpRedPink
         }
     }
 }

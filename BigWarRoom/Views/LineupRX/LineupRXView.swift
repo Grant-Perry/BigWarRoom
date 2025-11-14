@@ -54,7 +54,9 @@ struct LineupRXView: View {
                                 if !result.changes.isEmpty {
                                     RecommendedChangesView(
                                         result: result,
-                                        sleeperPlayerCache: sleeperPlayerCache
+                                        sleeperPlayerCache: sleeperPlayerCache,
+                                        matchupInfoCache: matchupInfoCache,
+                                        gameTimeCache: gameTimeCache
                                     )
                                     .id("changes")
                                     
@@ -68,7 +70,9 @@ struct LineupRXView: View {
                                 if !waiverRecommendations.isEmpty {
                                     WaiverWireView(
                                         groupedWaivers: groupedWaivers,
-                                        sleeperPlayerCache: sleeperPlayerCache
+                                        sleeperPlayerCache: sleeperPlayerCache,
+                                        matchupInfoCache: matchupInfoCache,
+                                        gameTimeCache: gameTimeCache
                                     )
                                     .id("waiver")
                                 }
@@ -134,6 +138,15 @@ struct LineupRXView: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             HStack {
+                // 🔥 NEW: Platform logo indicator
+                if matchup.league.source == .espn {
+                    AppConstants.espnLogo
+                        .frame(width: 24, height: 24)
+                } else {
+                    AppConstants.sleeperLogo
+                        .frame(width: 24, height: 24)
+                }
+                
                 Text(matchup.league.league.name)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)

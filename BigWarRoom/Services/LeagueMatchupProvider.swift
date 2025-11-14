@@ -473,13 +473,16 @@ final class LeagueMatchupProvider {
                     sleeperID = sleeperPlayer?.playerID
                 }
                 
+                // 🔥 CRITICAL FIX: Use player's ACTUAL position from Sleeper, not slot position
+                let actualPosition = sleeperPlayer?.position ?? positionString(entry.lineupSlotId)
+                
                 return FantasyPlayer(
                     id: String(player.id),
                     sleeperID: sleeperID,
                     espnID: espnIDString,
                     firstName: player.fullName.firstName,
                     lastName: player.fullName.lastName,
-                    position: positionString(entry.lineupSlotId),
+                    position: actualPosition,  // 🔥 Use ACTUAL position, not slot!
                     team: player.nflTeamAbbreviation,
                     jerseyNumber: getJerseyNumberForPlayer(espnID: espnIDString, team: player.nflTeamAbbreviation, name: "\(player.fullName.firstName) \(player.fullName.lastName)"),
                     currentPoints: weeklyScore,

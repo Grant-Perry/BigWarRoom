@@ -13,13 +13,9 @@ struct NonMicroCardContent: View {
     let isWinning: Bool
     let dualViewMode: Bool
     let scoreAnimation: Bool
-    
-    // 🔥 CELEBRATION: New parameters for celebration border
     let isGamesFinished: Bool
     let celebrationBorderPulse: Bool
-    
-    // 💊 RX button callback
-    var onRXTap: (() -> Void)? = nil
+    let onRXTap: (() -> Void)?
     
     var body: some View {
         VStack(spacing: dualViewMode ? 8 : 4) {

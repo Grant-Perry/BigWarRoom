@@ -10,6 +10,8 @@ import SwiftUI
 struct WaiverWireView: View {
     let groupedWaivers: [WaiverGroup]
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
     
     @State private var isExpanded: Bool = true
     
@@ -33,7 +35,12 @@ struct WaiverWireView: View {
             
             if isExpanded {
                 ForEach(groupedWaivers, id: \.dropPlayer.id) { group in
-                    GroupedWaiverCard(group: group, sleeperPlayerCache: sleeperPlayerCache)
+                    GroupedWaiverCard(
+                        group: group,
+                        sleeperPlayerCache: sleeperPlayerCache,
+                        matchupInfoCache: matchupInfoCache,
+                        gameTimeCache: gameTimeCache
+                    )
                 }
             }
         }
@@ -68,6 +75,8 @@ struct WaiverAddOption {
 struct GroupedWaiverCard: View {
     let group: WaiverGroup
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -78,7 +87,9 @@ struct GroupedWaiverCard: View {
                 labelColor: .gpRedPink,
                 projectedPoints: group.dropProjectedPoints,
                 iconName: nil,
-                sleeperPlayerCache: sleeperPlayerCache
+                sleeperPlayerCache: sleeperPlayerCache,
+                matchupInfoCache: matchupInfoCache,
+                gameTimeCache: gameTimeCache
             )
             
             Divider()
@@ -96,7 +107,9 @@ struct GroupedWaiverCard: View {
                         team: option.team,
                         projectedPoints: option.projectedPoints,
                         improvement: option.improvement,
-                        sleeperPlayerCache: sleeperPlayerCache
+                        sleeperPlayerCache: sleeperPlayerCache,
+                        matchupInfoCache: matchupInfoCache,
+                        gameTimeCache: gameTimeCache
                     )
                     
                     HStack {
@@ -132,6 +145,19 @@ struct WaiverPlayerRow: View {
     let projectedPoints: Double
     let improvement: Double
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let matchupInfoCache: [String: LineupRXView.MatchupInfo]
+    let gameTimeCache: [String: String]
+    
+    // Get matchup info for this player
+    private var matchupInfo: LineupRXView.MatchupInfo? {
+        let cacheKey = "\(team)_\(position)"
+        return matchupInfoCache[cacheKey]
+    }
+    
+    // Get game time for this player's team
+    private var gameTime: String? {
+        return gameTimeCache[team]
+    }
     
     var body: some View {
         HStack(spacing: 12) {
@@ -169,6 +195,7 @@ struct WaiverPlayerRow: View {
                     Text(name)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
+                        .lineLimit(1)
                 }
                 
                 HStack(spacing: 8) {
@@ -176,7 +203,34 @@ struct WaiverPlayerRow: View {
                         .font(.system(size: 12, weight: .medium))
                         .foregroundColor(.gray)
                     
-                    TeamLogoView(teamCode: team, size: 24)
+                    TeamLogoView(teamCode: team, size: 20)
+                }
+                
+                // Matchup info (vs opponent, OPRK, game time)
+                if let matchupInfo = matchupInfo {
+                    HStack(spacing: 6) {
+                        Text("vs")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.7))
+                        
+                        TeamLogoView(teamCode: matchupInfo.opponentTeam, size: 18)
+                        
+                        if let oprk = matchupInfo.oprk {
+                            Text("#\(oprk)")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(oprkColor(oprk))
+                        }
+                        
+                        if let gameTime = gameTime {
+                            Text("•")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundColor(.gray.opacity(0.5))
+                            
+                            Text(gameTime)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.gray.opacity(0.7))
+                        }
+                    }
                 }
             }
             
@@ -198,6 +252,17 @@ struct WaiverPlayerRow: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.gray)
             }
+        }
+    }
+    
+    // Color OPRK based on ranking (1-10 green, 11-20 yellow, 21+ red)
+    private func oprkColor(_ oprk: Int) -> Color {
+        if oprk <= 10 {
+            return .gpGreen
+        } else if oprk <= 20 {
+            return .yellow
+        } else {
+            return .gpRedPink
         }
     }
 }

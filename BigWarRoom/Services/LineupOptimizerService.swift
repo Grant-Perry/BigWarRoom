@@ -23,6 +23,7 @@ final class LineupOptimizerService {
         let changes: [LineupChange]
         let moveChains: [MoveChain]
         let playerProjections: [String: Double]
+        let currentRoster: [FantasyPlayer] // 🔥 NEW: Full current roster for bye week checking
     }
     
     struct LineupChange {
@@ -105,6 +106,18 @@ final class LineupOptimizerService {
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Team: \(myTeam.ownerName), Roster: \(myTeam.roster.count) players")
         
+        // 🔥 NEW: Log ALL roster players BEFORE optimization
+        print("💊 OPTIMIZER: FULL ROSTER DUMP:")
+        for player in myTeam.roster {
+            let name = player.fullName
+            let pos = player.position
+            let starterStr = player.isStarter ? "STARTER" : "BENCH"
+            let slotStr = player.lineupSlot ?? "nil"
+            let sleeperStr = player.sleeperID ?? "nil"
+            let line = "💊 OPTIMIZER:    - " + name + " (" + pos + ") | " + starterStr + " | Slot: " + slotStr + " | SID: " + sleeperStr
+            print(line)
+        }
+        
         // Fetch projections
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Fetching projections for week \(week) \(year)...")
         
@@ -125,14 +138,26 @@ final class LineupOptimizerService {
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Lineup requirements: \(lineupRequirements)")
         
-        // Build player projections map
+        // Build player projections map with BYE WEEK OVERRIDE
         var playerProjections: [String: Double] = [:]
         for player in myTeam.roster {
             guard let sleeperID = player.sleeperID else {
+                DebugPrint(mode: .lineupRX, "⚠️ OPTIMIZER: \(player.fullName) has no Sleeper ID - skipping projections")
+                continue
+            }
+            
+            // 🔥 CRITICAL FIX: Check if player is on BYE WEEK
+            let isByeWeek = checkIfPlayerOnBye(player: player)
+            
+            if isByeWeek {
+                // 🚨 BYE WEEK = 0.0 POINTS GUARANTEED
+                playerProjections[sleeperID] = 0.0
+                DebugPrint(mode: .lineupRX, "🚨 OPTIMIZER: \(player.fullName) is on BYE → 0.0 pts")
                 continue
             }
             
             guard let projection = projections[sleeperID] else {
+                DebugPrint(mode: .lineupRX, "⚠️ OPTIMIZER: \(player.fullName) has no projection data")
                 continue
             }
             
@@ -150,6 +175,7 @@ final class LineupOptimizerService {
             
             if let points = points {
                 playerProjections[sleeperID] = points
+                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: \(player.fullName) projection = \(String(format: "%.1f", points)) pts")
             }
         }
         
@@ -194,7 +220,8 @@ final class LineupOptimizerService {
             improvement: improvement,
             changes: changes,
             moveChains: changes.map { $0.moveChain },
-            playerProjections: playerProjections
+            playerProjections: playerProjections,
+            currentRoster: myTeam.roster
         )
     }
     
@@ -328,20 +355,55 @@ final class LineupOptimizerService {
             
             let starters = myTeam.roster.filter { $0.isStarter }
             
+            // 🔥 NEW: More robust WR/TE detection logic
+            // Count position occurrences and look for TEs in non-TE slots
+            var positionCounts: [String: Int] = [:]
+            var teInFlexPosition = false
+            var wrteFlexCount = 0
+            
             for player in starters {
-                if let slot = player.lineupSlot {
-                    let posKey = slot.uppercased()
-                    // Skip bench/IR slots
-                    if !["BN", "BENCH", "IR"].contains(posKey) {
-                        requirements[posKey, default: 0] += 1
-                    }
+                guard let slot = player.lineupSlot else { continue }
+                let posKey = slot.uppercased()
+                let playerPos = player.position.uppercased()
+                
+                // Skip bench slots
+                if ["BN", "BENCH", "IR"].contains(posKey) { continue }
+                
+                // 🔥 CRITICAL: Detect TE in WR position = WR/TE flex
+                if posKey == "WR" && playerPos == "TE" {
+                    teInFlexPosition = true
+                    wrteFlexCount += 1
+                    DebugPrint(mode: .lineupRX, "🔥 Detected WR/TE flex: \(player.fullName) (TE) in WR slot")
+                    continue // Don't count as regular WR
                 }
+                
+                // 🔥 ALSO: Check if the slot itself is named "WR/TE"
+                if posKey == "WR/TE" || posKey.contains("WR/TE") {
+                    teInFlexPosition = true
+                    wrteFlexCount += 1
+                    DebugPrint(mode: .lineupRX, "🔥 Detected WR/TE flex: slot name \(posKey)")
+                    continue
+                }
+                
+                // Count regular positions
+                positionCounts[posKey, default: 0] += 1
             }
             
             // Add unlimited bench
             requirements["BN"] = 99
             requirements["BENCH"] = 99
             requirements["IR"] = 99
+            
+            // Add WR/TE flex count
+            if wrteFlexCount > 0 {
+                requirements["WR/TE"] = wrteFlexCount
+                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Detected \(wrteFlexCount) WR/TE flex slots")
+            }
+            
+            // Add standard positions
+            for (pos, count) in positionCounts {
+                requirements[pos] = count
+            }
             
             DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Inferred requirements: \(requirements)")
             
@@ -381,6 +443,15 @@ final class LineupOptimizerService {
         }
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Starting optimization with \(availablePlayers.count) players")
+        print("💊 OPTIMIZER: Top 5 projected players:")
+        for (index, player) in availablePlayers.prefix(5).enumerated() {
+            let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+            let name = player.fullName
+            let pos = player.position
+            let projStr = String(format: "%.1f", proj)
+            let line = "💊 OPTIMIZER:    " + String(index + 1) + ". " + name + " (" + pos + ") - " + projStr + " pts"
+            print(line)
+        }
         
         // Fill standard positions first (QB, RB, WR, TE, K, DEF, D/ST)
         let standardPositions = ["QB", "RB", "WR", "TE", "K", "DEF", "D/ST"]
@@ -391,17 +462,33 @@ final class LineupOptimizerService {
             var filled = 0
             var playersForPosition: [FantasyPlayer] = []
             
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(count) \(position) slot(s)")
+            
             for player in availablePlayers where player.position == position && filled < count {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 playersForPosition.append(player)
                 filled += 1
-                DebugPrint(mode: .lineupRX, "   Assigned \(player.fullName) to \(position)")
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) to \(position) (\(String(format: "%.1f", proj)) pts)")
             }
             
-            optimalLineup[position] = playersForPosition
-            // Remove assigned players from available pool
-            availablePlayers.removeAll { player in
-                playersForPosition.contains(where: { $0.id == player.id })
+            if !playersForPosition.isEmpty {
+                optimalLineup[position] = playersForPosition
+                // Remove assigned players from available pool
+                availablePlayers.removeAll { player in
+                    playersForPosition.contains(where: { $0.id == player.id })
+                }
             }
+        }
+        
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: After standard positions, \(availablePlayers.count) players remain")
+        print("💊 OPTIMIZER: Top remaining players:")
+        for (index, player) in availablePlayers.prefix(5).enumerated() {
+            let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+            let name = player.fullName
+            let pos = player.position
+            let projStr = String(format: "%.1f", proj)
+            let line = "💊 OPTIMIZER:    " + String(index + 1) + ". " + name + " (" + pos + ") - " + projStr + " pts"
+            print(line)
         }
         
         // Fill SUPER_FLEX positions (QB/RB/WR/TE)
@@ -412,8 +499,9 @@ final class LineupOptimizerService {
             DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(superFlexCount) SUPER_FLEX slots from \(superFlexEligible.count) eligible players")
             
             for player in superFlexEligible.prefix(superFlexCount) {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 superFlexPlayers.append(player)
-                DebugPrint(mode: .lineupRX, "   Assigned \(player.fullName) (\(player.position)) to SUPER_FLEX")
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) (\(player.position)) to SUPER_FLEX (\(String(format: "%.1f", proj)) pts)")
             }
             
             optimalLineup["SUPER_FLEX"] = superFlexPlayers
@@ -428,10 +516,16 @@ final class LineupOptimizerService {
             let flexEligible = availablePlayers.filter { ["RB", "WR", "TE"].contains($0.position) }
             
             DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(flexCount) FLEX slots from \(flexEligible.count) eligible players")
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top FLEX-eligible players:")
+            for (index, player) in flexEligible.prefix(flexCount + 3).enumerated() {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+                DebugPrint(mode: .lineupRX, "   \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
+            }
             
             for player in flexEligible.prefix(flexCount) {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 flexPlayers.append(player)
-                DebugPrint(mode: .lineupRX, "   Assigned \(player.fullName) (\(player.position)) to FLEX")
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) (\(player.position)) to FLEX (\(String(format: "%.1f", proj)) pts)")
             }
             
             optimalLineup["FLEX"] = flexPlayers
@@ -448,8 +542,9 @@ final class LineupOptimizerService {
             DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(wrrbFlexCount) WRRB_FLEX slots from \(wrrbFlexEligible.count) eligible players")
             
             for player in wrrbFlexEligible.prefix(wrrbFlexCount) {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 wrrbFlexPlayers.append(player)
-                DebugPrint(mode: .lineupRX, "   Assigned \(player.fullName) (\(player.position)) to WRRB_FLEX")
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) (\(player.position)) to WRRB_FLEX (\(String(format: "%.1f", proj)) pts)")
             }
             
             optimalLineup["WRRB_FLEX"] = wrrbFlexPlayers
@@ -466,8 +561,9 @@ final class LineupOptimizerService {
             DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(recFlexCount) REC_FLEX slots from \(recFlexEligible.count) eligible players")
             
             for player in recFlexEligible.prefix(recFlexCount) {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 recFlexPlayers.append(player)
-                DebugPrint(mode: .lineupRX, "   Assigned \(player.fullName) (\(player.position)) to REC_FLEX")
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) (\(player.position)) to REC_FLEX (\(String(format: "%.1f", proj)) pts)")
             }
             
             optimalLineup["REC_FLEX"] = recFlexPlayers
@@ -476,10 +572,38 @@ final class LineupOptimizerService {
             }
         }
         
+        // 🔥 NEW: Fill WR/TE positions (ESPN's WR/TE flex)
+        if let wrteCount = requirements["WR/TE"], wrteCount > 0 {
+            var wrtePlayers: [FantasyPlayer] = []
+            let wrteEligible = availablePlayers.filter { ["WR", "TE"].contains($0.position) }
+            
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(wrteCount) WR/TE slots from \(wrteEligible.count) eligible players")
+            
+            for player in wrteEligible.prefix(wrteCount) {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+                wrtePlayers.append(player)
+                DebugPrint(mode: .lineupRX, "   ✅ Assigned \(player.fullName) (\(player.position)) to WR/TE (\(String(format: "%.1f", proj)) pts)")
+            }
+            
+            optimalLineup["WR/TE"] = wrtePlayers
+            availablePlayers.removeAll { player in
+                wrtePlayers.contains(where: { $0.id == player.id })
+            }
+        }
+        
         // Remaining players go to bench
         optimalLineup["BENCH"] = availablePlayers
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Optimization complete. Bench: \(availablePlayers.count) players")
+        print("💊 OPTIMIZER: Benched players with projections:")
+        for player in availablePlayers.prefix(10) {
+            let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+            let name = player.fullName
+            let pos = player.position
+            let projStr = String(format: "%.1f", proj)
+            let line = "💊 OPTIMIZER:    🪑 " + name + " (" + pos + ") - " + projStr + " pts"
+            print(line)
+        }
         
         return optimalLineup
     }
@@ -515,6 +639,21 @@ final class LineupOptimizerService {
         let starters = roster.filter { $0.isStarter }
         
         DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: Found \(starters.count) starters out of \(roster.count) total players")
+        print("💊 OPTIMIZER: Current starters (\(starters.count)):")
+        
+        // 🔥 FIX: Detect WR/TE flex slots
+        var detectedWRTEFlex = false
+        
+        for player in starters {
+            if let slot = player.lineupSlot {
+                let posKey = slot.uppercased()
+                let playerPos = player.position.uppercased()
+                let name = player.fullName
+                
+                let line = "💊 OPTIMIZER:    - " + name + " (" + playerPos + ") in slot: " + posKey
+                print(line)
+            }
+        }
         
         // Sum projected points for starters
         for player in starters {
@@ -539,246 +678,149 @@ final class LineupOptimizerService {
         projections: [String: Double]
     ) -> [LineupChange] {
         
-        DebugPrint(mode: .lineupRX, "🎯 CRITICAL PATH FINDER: Identifying key moves only")
+        DebugPrint(mode: .lineupRX, "🎯 CHANGE DETECTOR: Finding all starter swaps")
         
         var changes: [LineupChange] = []
         
-        // Get current starters and bench players
         let currentStarters = currentRoster.filter { $0.isStarter }
         let benchPlayers = currentRoster.filter { !$0.isStarter }
         
-        // Build current lineup map: playerID -> RAW slot
-        var currentRawSlotMap: [String: String] = [:]
-        for starter in currentStarters {
-            if let slot = starter.lineupSlot {
-                currentRawSlotMap[starter.id] = slot
-                DebugPrint(mode: .lineupRX, "🎯 CURRENT: \(starter.fullName) in \(slot)")
+        DebugPrint(mode: .lineupRX, "📊 OPTIMAL LINEUP:")
+        for (position, players) in optimalLineup {
+            DebugPrint(mode: .lineupRX, "   \(position): \(players.count) player(s)")
+            for player in players {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+                DebugPrint(mode: .lineupRX, "      - \(player.fullName) (\(String(format: "%.1f", proj)) pts)")
             }
         }
         
-        // Build optimal lineup map: playerID -> position from optimal
-        var optimalStarterIDs = Set<String>()
-        var optimalSlotMap: [String: String] = [:]
+        var currentStarterIDs = Set<String>()
+        for starter in currentStarters {
+            currentStarterIDs.insert(starter.id)
+        }
         
+        var optimalStarterIDs = Set<String>()
         for (position, players) in optimalLineup {
             if position != "BENCH" && position != "BN" && position != "IR" {
                 for player in players {
                     optimalStarterIDs.insert(player.id)
-                    optimalSlotMap[player.id] = position
-                    DebugPrint(mode: .lineupRX, "🎯 OPTIMAL: \(player.fullName) in \(position)")
                 }
             }
         }
         
-        DebugPrint(mode: .lineupRX, "🎯 Comparing Current vs Optimal:")
+        DebugPrint(mode: .lineupRX, "🔍 Current starter IDs: \(currentStarterIDs.count)")
+        DebugPrint(mode: .lineupRX, "🔍 Optimal starter IDs: \(optimalStarterIDs.count)")
         
-        // Find players who MUST move (not just flex shuffling)
-        var criticalBench: [FantasyPlayer] = []
-        var criticalStart: [FantasyPlayer] = []
-        var criticalReposition: [(player: FantasyPlayer, from: String, to: String)] = []
+        var playersToBench: [FantasyPlayer] = []
+        var playersToStart: [FantasyPlayer] = []
         
-        // 1. Find bench players who should start
-        for bench in benchPlayers {
-            if optimalStarterIDs.contains(bench.id) {
-                criticalStart.append(bench)
-                let optimalSlot = optimalSlotMap[bench.id] ?? "?"
-                DebugPrint(mode: .lineupRX, "🎯 CRITICAL START: \(bench.fullName) → \(optimalSlot)")
-            }
-        }
-        
-        // 2. Find starters who should be benched
         for starter in currentStarters {
             if !optimalStarterIDs.contains(starter.id) {
-                criticalBench.append(starter)
-                let currentSlot = currentRawSlotMap[starter.id] ?? "?"
-                DebugPrint(mode: .lineupRX, "🎯 CRITICAL BENCH: \(starter.fullName) from \(currentSlot)")
+                playersToBench.append(starter)
+                let proj = starter.sleeperID.flatMap { projections[$0] } ?? 0
+                DebugPrint(mode: .lineupRX, "🎯 BENCH: \(starter.fullName) (\(String(format: "%.1f", proj)) pts)")
             }
         }
         
-        // 3. 🔥 PATH-FINDING: Only include moves on the direct path to getting bench players started
-        // For each bench player, trace the path of moves needed
-        
-        for benchPlayer in criticalStart {
-            let benchOptimalSlot = normalizeSlotName(optimalSlotMap[benchPlayer.id] ?? "")
-            
-            DebugPrint(mode: .lineupRX, "🎯 Tracing path for \(benchPlayer.fullName) → \(benchOptimalSlot)")
-            
-            // Find who's currently in that slot
-            var currentSlot = benchOptimalSlot
-            var pathPlayers: [FantasyPlayer] = []
-            var visitedSlots = Set<String>()
-            
-            while true {
-                // Safety: Prevent infinite loops
-                if visitedSlots.contains(currentSlot) {
-                    DebugPrint(mode: .lineupRX, "   ⚠️ Loop detected at \(currentSlot)")
-                    break
-                }
-                visitedSlots.insert(currentSlot)
-                
-                // Find who's currently in this slot
-                guard let occupant = currentStarters.first(where: {
-                    normalizeSlotName(currentRawSlotMap[$0.id] ?? "") == currentSlot
-                }) else {
-                    // Slot is empty or we've reached the end
-                    DebugPrint(mode: .lineupRX, "   ✅ \(currentSlot) is available")
-                    break
-                }
-                
-                DebugPrint(mode: .lineupRX, "   → \(occupant.fullName) occupies \(currentSlot)")
-                
-                // Where does this occupant want to go?
-                let occupantOptimalSlot = normalizeSlotName(optimalSlotMap[occupant.id] ?? "")
-                
-                if occupantOptimalSlot == currentSlot {
-                    // Occupant is already in optimal slot - can't move
-                    DebugPrint(mode: .lineupRX, "   ❌ \(occupant.fullName) is already optimal, can't displace")
-                    break
-                }
-                
-                // Add to path
-                pathPlayers.append(occupant)
-                
-                // Check if occupant should be benched
-                if !optimalStarterIDs.contains(occupant.id) {
-                    DebugPrint(mode: .lineupRX, "   ✅ \(occupant.fullName) will be benched")
-                    break
-                }
-                
-                // Continue following the chain
-                currentSlot = occupantOptimalSlot
-                DebugPrint(mode: .lineupRX, "   → Need to free \(currentSlot) for \(occupant.fullName)")
-            }
-            
-            // Add all players in this path to critical repositioning
-            for player in pathPlayers {
-                guard let currentRawSlot = currentRawSlotMap[player.id],
-                      let optimalSlot = optimalSlotMap[player.id] else { continue }
-                
-                let currentNormalized = normalizeSlotName(currentRawSlot)
-                let optimalNormalized = normalizeSlotName(optimalSlot)
-                
-                if currentNormalized != optimalNormalized {
-                    // Check if already added
-                    if !criticalReposition.contains(where: { $0.player.id == player.id }) {
-                        criticalReposition.append((
-                            player: player,
-                            from: currentRawSlot,
-                            to: optimalSlot
-                        ))
-                        DebugPrint(mode: .lineupRX, "   ✅ CRITICAL: \(player.fullName) \(currentNormalized) → \(optimalNormalized)")
-                    }
-                }
+        for bench in benchPlayers {
+            if optimalStarterIDs.contains(bench.id) {
+                playersToStart.append(bench)
+                let proj = bench.sleeperID.flatMap { projections[$0] } ?? 0
+                DebugPrint(mode: .lineupRX, "🎯 START: \(bench.fullName) (\(String(format: "%.1f", proj)) pts)")
             }
         }
         
-        // Build chain if there are critical moves
-        if !criticalBench.isEmpty || !criticalReposition.isEmpty || !criticalStart.isEmpty {
+        let sortedToBench = playersToBench.sorted { p1, p2 in
+            let proj1 = p1.sleeperID.flatMap { projections[$0] } ?? 0
+            let proj2 = p2.sleeperID.flatMap { projections[$0] } ?? 0
+            return proj1 < proj2
+        }
+        
+        let sortedToStart = playersToStart.sorted { p1, p2 in
+            let proj1 = p1.sleeperID.flatMap { projections[$0] } ?? 0
+            let proj2 = p2.sleeperID.flatMap { projections[$0] } ?? 0
+            return proj1 > proj2
+        }
+        
+        DebugPrint(mode: .lineupRX, "🎯 Creating individual changes for \(sortedToStart.count) players to start")
+        
+        for playerToStart in sortedToStart {
+            let playerProj = playerToStart.sleeperID.flatMap { projections[$0] } ?? 0
+            let targetSlot = findTargetSlot(for: playerToStart, in: optimalLineup)
+            
+            let playerOut = sortedToBench.first { benchedPlayer in
+                let benchedSlot = benchedPlayer.lineupSlot ?? ""
+                return normalizeSlotName(benchedSlot) == normalizeSlotName(targetSlot) ||
+                       benchedPlayer.position == playerToStart.position
+            }
+            
+            let playerOutProj = playerOut?.sleeperID.flatMap { projections[$0] } ?? 0
+            let improvement = playerProj - playerOutProj
+            
             var steps: [MoveStep] = []
             
-            DebugPrint(mode: .lineupRX, "🎯 Building chain with:")
-            DebugPrint(mode: .lineupRX, "🎯   Bench: \(criticalBench.count)")
-            DebugPrint(mode: .lineupRX, "🎯   Reposition: \(criticalReposition.count)")
-            DebugPrint(mode: .lineupRX, "🎯   Start: \(criticalStart.count)")
-            
-            // STEP 1: Bench players
-            for player in criticalBench {
-                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-                let fromSlot = player.lineupSlot ?? "UNKNOWN"
-                
+            if let playerOut = playerOut {
+                let slot = playerOut.lineupSlot ?? playerOut.position
                 steps.append(MoveStep(
-                    player: player,
-                    fromSlot: formatSlotName(fromSlot),
+                    player: playerOut,
+                    fromSlot: slot,
                     toSlot: "Bench",
-                    reason: "Free up \(formatSlotName(normalizeSlotName(fromSlot))) slot",
-                    projection: proj,
+                    reason: playerOutProj == 0.0 ? "Player on BYE" : "Lower projection",
+                    projection: playerOutProj,
                     isRepositioning: false
                 ))
             }
             
-            // STEP 2: Reposition players (only critical moves)
-            // 🔥 SORT: FROM SUPER_FLEX moves first
-            let sortedReposition = criticalReposition.sorted { r1, r2 in
-                let from1 = normalizeSlotName(r1.from)
-                let from2 = normalizeSlotName(r2.from)
-                
-                if from1 == "SUPER_FLEX" && from2 != "SUPER_FLEX" { return true }
-                if from2 == "SUPER_FLEX" && from1 != "SUPER_FLEX" { return false }
-                
-                return false
-            }
+            steps.append(MoveStep(
+                player: playerToStart,
+                fromSlot: "Bench",
+                toSlot: targetSlot,
+                reason: "Higher projection",
+                projection: playerProj,
+                isRepositioning: false
+            ))
             
-            for (player, from, to) in sortedReposition {
-                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-                
-                steps.append(MoveStep(
-                    player: player,
-                    fromSlot: formatSlotName(from),
-                    toSlot: formatSlotName(to),
-                    reason: "Free up \(formatSlotName(from)) slot",
-                    projection: proj,
-                    isRepositioning: true
-                ))
-                
-                DebugPrint(mode: .lineupRX, "🎯 Added step: Move \(player.fullName) \(formatSlotName(from)) → \(formatSlotName(to))")
-            }
+            let chain = MoveChain(
+                steps: steps,
+                netImprovement: improvement,
+                playerBenched: playerOut,
+                playerStarted: playerToStart
+            )
             
-            // STEP 3: Start bench players
-            for player in criticalStart {
-                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-                let toSlot = optimalSlotMap[player.id] ?? "UNKNOWN"
-                
-                steps.append(MoveStep(
-                    player: player,
-                    fromSlot: "Bench",
-                    toSlot: formatSlotName(toSlot),
-                    reason: "Start in \(formatSlotName(toSlot))",
-                    projection: proj,
-                    isRepositioning: false
-                ))
-            }
+            let change = LineupChange(
+                playerOut: playerOut,
+                playerIn: playerToStart,
+                position: targetSlot,
+                projectedPointsOut: playerOutProj,
+                projectedPointsIn: playerProj,
+                improvement: improvement,
+                moveChain: chain
+            )
             
-            // Calculate net improvement
-            let pointsLost = criticalBench.compactMap { $0.sleeperID.flatMap { projections[$0] } }.reduce(0, +)
-            let pointsGained = criticalStart.compactMap { $0.sleeperID.flatMap { projections[$0] } }.reduce(0, +)
-            let netImprovement = pointsGained - pointsLost
+            changes.append(change)
             
-            DebugPrint(mode: .lineupRX, "🎯 Total steps: \(steps.count)")
-            DebugPrint(mode: .lineupRX, "🎯 Net: +\(String(format: "%.1f", netImprovement)) pts")
-            
-            let primaryStarter = criticalStart.max { p1, p2 in
-                let proj1 = p1.sleeperID.flatMap { projections[$0] } ?? 0
-                let proj2 = p2.sleeperID.flatMap { projections[$0] } ?? 0
-                return proj1 < proj2
-            } ?? criticalStart.first
-            
-            if let primaryStarter = primaryStarter {
-                let chain = MoveChain(
-                    steps: steps,
-                    netImprovement: netImprovement,
-                    playerBenched: criticalBench.first,
-                    playerStarted: primaryStarter
-                )
-                
-                let primaryPos = optimalSlotMap[primaryStarter.id] ?? "UNKNOWN"
-                
-                let change = LineupChange(
-                    playerOut: criticalBench.first,
-                    playerIn: primaryStarter,
-                    position: formatSlotName(primaryPos),
-                    projectedPointsOut: criticalBench.first?.sleeperID.flatMap { projections[$0] } ?? 0,
-                    projectedPointsIn: primaryStarter.sleeperID.flatMap { projections[$0] } ?? 0,
-                    improvement: netImprovement,
-                    moveChain: chain
-                )
-                
-                changes.append(change)
-            }
+            DebugPrint(mode: .lineupRX, "✅ Created change: \(playerOut?.fullName ?? "Empty") → \(playerToStart.fullName) at \(targetSlot) (+\(String(format: "%.1f", improvement)) pts)")
         }
         
-        DebugPrint(mode: .lineupRX, "🎯 Generated \(changes.count) move chains")
+        changes.sort { $0.improvement > $1.improvement }
+        
+        DebugPrint(mode: .lineupRX, "🎯 Generated \(changes.count) lineup changes")
         
         return changes
+    }
+
+
+    
+    /// Find what slot a player should go to in the optimal lineup
+    private func findTargetSlot(for player: FantasyPlayer, in optimalLineup: [String: [FantasyPlayer]]) -> String {
+        for (position, players) in optimalLineup {
+            if position != "BENCH" && position != "BN" && position != "IR" {
+                if players.contains(where: { $0.id == player.id }) {
+                    return formatSlotName(position)
+                }
+            }
+        }
+        return "Unknown"
     }
     
     /// Format slot names for display
@@ -847,6 +889,24 @@ final class LineupOptimizerService {
             team: player.team ?? "FA",
             projectedPoints: projectedPoints
         )
+    }
+    
+    /// Check if player is on BYE week using game status service
+    private func checkIfPlayerOnBye(player: FantasyPlayer) -> Bool {
+        guard let team = player.team else { 
+            return false 
+        }
+        
+        // Use NFLGameDataService to check if team is on bye
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            let isBye = gameInfo.gameStatus.lowercased() == "bye"
+            if isBye {
+                DebugPrint(mode: .lineupRX, "🚨 BYE WEEK: \(player.fullName) (\(team)) is on BYE")
+            }
+            return isBye
+        }
+        
+        return false
     }
     
     // MARK: - Errors

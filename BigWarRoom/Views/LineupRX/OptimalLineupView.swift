@@ -46,9 +46,10 @@ struct OptimalLineupView: View {
             .padding(.bottom, 4)
             
             if isExpanded {
-                let positionOrder = ["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "SUPER_FLEX", "WRRB_FLEX", "REC_FLEX", "D/ST", "DEF", "K"]
+                let positionOrder = ["QB", "RB", "WR", "WR/TE", "TE", "FLEX", "SUPERFLEX", "SUPER_FLEX", "WRRB_FLEX", "REC_FLEX", "D/ST", "DEF", "K"]
                 
-                ForEach(positionOrder, id: \.self) { position in
+                ForEach(positionOrder.indices, id: \.self) { idx in
+                    let position = positionOrder[idx]
                     if let players = result.optimalLineup[position], !players.isEmpty {
                         PositionGroupView(
                             position: position,
@@ -58,6 +59,7 @@ struct OptimalLineupView: View {
                             sleeperPlayerCache: sleeperPlayerCache,
                             changeInfoCache: changeInfoCache
                         )
+                        .id("position_\(position)")
                     }
                 }
                 
@@ -65,8 +67,10 @@ struct OptimalLineupView: View {
                     BenchGroupView(
                         players: benchPlayers,
                         changes: result.changes,
-                        sleeperPlayerCache: sleeperPlayerCache
+                        sleeperPlayerCache: sleeperPlayerCache,
+                        projections: result.playerProjections
                     )
+                    .id("bench")
                 }
             }
         }
@@ -100,16 +104,16 @@ struct PositionGroupView: View {
                 .padding(.bottom, 2)
             
             LazyVStack(spacing: 4) {
-                ForEach(players, id: \.id) { player in
+                ForEach(players.indices, id: \.self) { idx in
                     OptimalLineupPlayerRow(
-                        player: player,
+                        player: players[idx],
                         position: position,
                         projections: projections,
                         changes: changes,
                         sleeperPlayerCache: sleeperPlayerCache,
                         changeInfoCache: changeInfoCache
                     )
-                    .id("\(player.id)_\(position)")
+                    .id("\(players[idx].id)_\(position)")
                 }
             }
             .padding(.horizontal, 8)
@@ -126,6 +130,7 @@ struct BenchGroupView: View {
     let players: [FantasyPlayer]
     let changes: [LineupOptimizerService.LineupChange]
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let projections: [String: Double]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -143,13 +148,14 @@ struct BenchGroupView: View {
             .padding(.bottom, 2)
             
             LazyVStack(spacing: 4) {
-                ForEach(players, id: \.id) { player in
+                ForEach(players.indices, id: \.self) { idx in
                     BenchPlayerRow(
-                        player: player,
+                        player: players[idx],
                         changes: changes,
-                        sleeperPlayerCache: sleeperPlayerCache
+                        sleeperPlayerCache: sleeperPlayerCache,
+                        projections: projections
                     )
-                    .id(player.id)
+                    .id(players[idx].id)
                 }
             }
             .padding(.horizontal, 8)
@@ -170,47 +176,46 @@ struct OptimalLineupPlayerRow: View {
     let sleeperPlayerCache: [String: SleeperPlayer]
     let changeInfoCache: [String: (isChanged: Bool, improvement: Double?)]
     
-    var body: some View {
-        // Compute everything inline - no heavy init
-        let cacheKey = "\(player.id)_\(position)"
-        let changeInfo = changeInfoCache[cacheKey] ?? (
+    // Pre-compute everything for performance
+    private var cacheKey: String {
+        "\(player.id)_\(position)"
+    }
+    
+    private var changeInfo: (isChanged: Bool, improvement: Double?) {
+        changeInfoCache[cacheKey] ?? (
             changes.contains(where: { $0.playerIn.id == player.id && $0.position == position }),
             changes.first(where: { $0.playerIn.id == player.id && $0.position == position })?.improvement
         )
-        let sleeperPlayer = player.sleeperID.flatMap { sleeperPlayerCache[$0] }
-        let projectedPts = player.sleeperID.flatMap { projections[$0] } ?? 0.0
-        
+    }
+    
+    private var sleeperPlayer: SleeperPlayer? {
+        player.sleeperID.flatMap { sleeperPlayerCache[$0] }
+    }
+    
+    private var projectedPts: Double {
+        player.sleeperID.flatMap { projections[$0] } ?? 0.0
+    }
+    
+    private var isChanged: Bool {
+        changeInfo.isChanged
+    }
+    
+    var body: some View {
         HStack(spacing: 12) {
             // SWAP SYMBOL for changed players
-            Image(systemName: changeInfo.0 ? "arrow.triangle.swap" : "checkmark.circle.fill")
-                .foregroundColor(changeInfo.0 ? .gpBlue : .gpGreen)
+            Image(systemName: isChanged ? "arrow.triangle.swap" : "checkmark.circle.fill")
+                .foregroundColor(isChanged ? .gpBlue : .gpGreen)
                 .font(.system(size: 16))
             
-            // Player headshot
-            if let headshotURL = sleeperPlayer?.headshotURL {
-                AsyncImage(url: headshotURL) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
-            } else {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 40, height: 40)
-            }
+            // Player headshot - optimized with cached image
+            CachedPlayerImage(url: sleeperPlayer?.headshotURL, size: 40)
             
             // Player info
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.fullName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(1)
                 
                 HStack(spacing: 6) {
                     if let depth = sleeperPlayer?.depthChartPosition {
@@ -258,7 +263,7 @@ struct OptimalLineupPlayerRow: View {
         .padding(.horizontal, 10)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(changeInfo.0 ? Color.gpBlue.opacity(0.15) : Color.black.opacity(0.4))
+                .fill(isChanged ? Color.gpBlue.opacity(0.15) : Color.black.opacity(0.4))
         )
     }
 }
@@ -267,41 +272,36 @@ struct BenchPlayerRow: View {
     let player: FantasyPlayer
     let changes: [LineupOptimizerService.LineupChange]
     let sleeperPlayerCache: [String: SleeperPlayer]
+    let projections: [String: Double]
+    
+    // Pre-compute for performance
+    private var wasStarting: Bool {
+        changes.contains(where: { $0.playerOut?.id == player.id })
+    }
+    
+    private var sleeperPlayer: SleeperPlayer? {
+        player.sleeperID.flatMap { sleeperPlayerCache[$0] }
+    }
+    
+    private var projectedPts: Double {
+        player.sleeperID.flatMap { projections[$0] } ?? 0.0
+    }
     
     var body: some View {
-        let wasStarting = changes.contains(where: { $0.playerOut?.id == player.id })
-        let sleeperPlayer = player.sleeperID.flatMap { sleeperPlayerCache[$0] }
-        
         HStack(spacing: 12) {
             // SWAP SYMBOL for benched players
             Image(systemName: wasStarting ? "arrow.triangle.swap" : "circle.fill")
                 .foregroundColor(wasStarting ? .gpRedPink : .gray.opacity(0.3))
                 .font(.system(size: wasStarting ? 16 : 8))
             
-            // Player headshot
-            if let headshotURL = sleeperPlayer?.headshotURL {
-                AsyncImage(url: headshotURL) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 32, height: 32)
-                .clipShape(Circle())
-            } else {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 32, height: 32)
-            }
+            // Player headshot - optimized
+            CachedPlayerImage(url: sleeperPlayer?.headshotURL, size: 32)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.fullName)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.gray)
+                    .lineLimit(1)
                 
                 HStack(spacing: 4) {
                     Text(player.position)
@@ -315,6 +315,17 @@ struct BenchPlayerRow: View {
             }
             
             Spacer()
+            
+            // Projected points
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(String(format: "%.1f", projectedPts))
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.gray)
+                
+                Text("pts")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.gray.opacity(0.6))
+            }
         }
         .padding(.vertical, 5)
         .padding(.horizontal, 8)
@@ -322,5 +333,59 @@ struct BenchPlayerRow: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(wasStarting ? Color.gpRedPink.opacity(0.1) : Color.clear)
         )
+    }
+}
+
+// MARK: - Optimized Cached Player Image Component
+
+struct CachedPlayerImage: View {
+    let url: URL?
+    let size: CGFloat
+    
+    var body: some View {
+        if let url = url {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                case .failure, .empty:
+                    placeholderView
+                @unknown default:
+                    placeholderView
+                }
+            }
+            .frame(width: size, height: size)
+            .clipShape(Circle())
+        } else {
+            placeholderView
+                .frame(width: size, height: size)
+        }
+    }
+    
+    private var placeholderView: some View {
+        Circle()
+            .fill(Color.gray.opacity(0.3))
+    }
+}
+
+// MARK: - Section Header Component
+
+struct SectionHeader: View {
+    let icon: String
+    let title: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(color)
+            
+            Text(title)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(.white)
+        }
     }
 }

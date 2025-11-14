@@ -1,107 +1,98 @@
-//
-//  AvailablePlayersService.swift
-//  BigWarRoom
-//
-//  💊 Identifies available (unrostered) players for waiver wire recommendations
-//
-
 import Foundation
 
-@MainActor
-@Observable
-final class AvailablePlayersService {
+/// Service for determining which players are available (not rostered) in a league
+actor AvailablePlayersService {
+    
     static let shared = AvailablePlayersService()
     
-    // MARK: - Public API
+    private init() {}
     
-    /// Get all available players for a league (not rostered by any team)
+    /// Get available players for a specific position in a league
     /// - Parameters:
-    ///   - matchup: The matchup containing league and roster info
-    ///   - position: Optional position filter (e.g., "RB", "WR", "QB")
-    /// - Returns: Array of available player IDs
+    ///   - leagueWrapper: The league wrapper to check
+    ///   - position: Optional position filter (nil = all positions)
+    /// - Returns: Array of available SleeperPlayer objects
     func getAvailablePlayers(
-        for matchup: UnifiedMatchup,
+        for leagueWrapper: UnifiedLeagueManager.LeagueWrapper,
         position: String? = nil
-    ) async -> [String] {
-        DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: Finding available players for \(matchup.league.league.name)")
+    ) async -> [SleeperPlayer] {
+        DebugPrint(mode: .waivers, "💊 Finding available players for \(leagueWrapper.league.name)")
         
-        // Get all rostered player IDs in the league
-        let rosteredPlayerIDs = await getAllRosteredPlayerIDs(for: matchup)
+        // Get all rostered player IDs/ESPNIDs based on league source
+        let rosteredInfo = await getAllRosteredPlayerInfo(for: leagueWrapper)
+        DebugPrint(mode: .waivers, "💊 Found \(rosteredInfo.sleeperIDs.count) rostered players")
         
-        DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: Found \(rosteredPlayerIDs.count) rostered players")
-        
-        // Get all players from PlayerDirectoryStore
-        let allPlayers = PlayerDirectoryStore.shared.players
-        
-        // Filter to available players
-        var availablePlayers = allPlayers.values.filter { player in
-            // Get Sleeper ID
-            let sleeperID = player.playerID
-            
-            // Debug: Log key players
-            let debugNames = ["McCaffrey", "Achane", "Nacua", "St. Brown"]
-            if debugNames.contains(where: { player.fullName.contains($0) }) {
-                let isRostered = rosteredPlayerIDs.contains(sleeperID)
-                DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: Checking \(player.fullName) - Sleeper ID: \(sleeperID), Is Rostered: \(isRostered)")
-            }
-            
-            // Must not be rostered
-            guard !rosteredPlayerIDs.contains(sleeperID) else { return false }
-            
-            // Must have a valid position (not DEF, K unless specified)
-            guard let playerPosition = player.position else { return false }
-            let validPositions = ["QB", "RB", "WR", "TE"]
-            guard validPositions.contains(playerPosition) else { return false }
-            
-            // Position filter if specified
-            if let position = position {
-                guard playerPosition == position else { return false }
-            }
-            
-            return true
+        // Get all Sleeper players from MainActor context
+        let allPlayers = await MainActor.run {
+            Array(PlayerDirectoryStore.shared.players.values)
         }
         
-        // Sort by some relevance metric (for now, just alphabetically)
-        availablePlayers.sort { $0.fullName < $1.fullName }
+        // Filter by position if specified
+        var filteredPlayers = allPlayers
+        if let position = position {
+            filteredPlayers = allPlayers.filter { $0.position == position }
+        }
         
-        let availablePlayerIDs = availablePlayers.map { $0.playerID }
+        // Remove rostered players based on league source
+        let availablePlayers = filteredPlayers.filter { player in
+            // For ESPN leagues, check both Sleeper ID and ESPN ID
+            if leagueWrapper.source == .espn {
+                let isRosteredBySleeperID = rosteredInfo.sleeperIDs.contains(player.playerID)
+                let isRosteredByESPNID = player.espnID.map { rosteredInfo.espnIDs.contains($0) } ?? false
+                
+                let isRostered = isRosteredBySleeperID || isRosteredByESPNID
+                return !isRostered
+            } else {
+                // For Sleeper leagues, only check Sleeper ID
+                let isRostered = rosteredInfo.sleeperIDs.contains(player.playerID)
+                return !isRostered
+            }
+        }
         
-        DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: Found \(availablePlayerIDs.count) available players" + (position != nil ? " at \(position!)" : ""))
+        // Sort by some relevance criteria (e.g., projected points if available)
+        let sortedPlayers = availablePlayers.sorted { player1, player2 in
+            // Sort by position priority, then by name
+            let positionPriority = ["QB": 0, "RB": 1, "WR": 2, "TE": 3, "K": 4, "DEF": 5]
+            let pos1Priority = positionPriority[player1.position ?? ""] ?? 99
+            let pos2Priority = positionPriority[player2.position ?? ""] ?? 99
+            
+            if pos1Priority != pos2Priority {
+                return pos1Priority < pos2Priority
+            }
+            return player1.fullName < player2.fullName
+        }
         
-        return availablePlayerIDs
+        DebugPrint(mode: .waivers, "💊 Found \(sortedPlayers.count) available players at \(position ?? "all positions")")
+        
+        return sortedPlayers
     }
     
-    /// Get top available players sorted by projected points
-    /// - Parameters:
-    ///   - matchup: The matchup containing league and roster info
-    ///   - position: Optional position filter
-    ///   - week: Week number for projections
-    ///   - year: Season year
-    ///   - limit: Maximum number of players to return
-    ///   - scoringFormat: "ppr", "half_ppr", or "std"
-    /// - Returns: Array of (playerID, projectedPoints) tuples
+    /// Get top available players by projections for a position
     func getTopAvailablePlayers(
         for matchup: UnifiedMatchup,
-        position: String? = nil,
+        position: String,
         week: Int,
         year: String,
-        limit: Int = 20,
+        limit: Int = 10,
         scoringFormat: String = "ppr"
-    ) async throws -> [(playerID: String, projectedPoints: Double)] {
-        // Get available players
-        let availablePlayerIDs = await getAvailablePlayers(for: matchup, position: position)
+    ) async throws -> [(String, Double)] {
+        // Get all available players for the position
+        let availablePlayers = await getAvailablePlayers(
+            for: matchup.league,
+            position: position
+        )
         
-        // Fetch projections for the week
+        // Fetch projections
         let projections = try await SleeperProjectionsService.shared.fetchProjections(
             week: week,
             year: year
         )
         
-        // Map available players to their projections
-        var playerProjections: [(playerID: String, projectedPoints: Double)] = []
+        // Build list of (playerID, projectedPoints) tuples
+        var playerProjectionsList: [(String, Double)] = []
         
-        for playerID in availablePlayerIDs {
-            guard let projection = projections[playerID] else { continue }
+        for player in availablePlayers {
+            guard let projection = projections[player.playerID] else { continue }
             
             let points: Double?
             switch scoringFormat.lowercased() {
@@ -115,65 +106,91 @@ final class AvailablePlayersService {
                 points = projection.pts_ppr
             }
             
-            if let points = points, points > 0 {
-                playerProjections.append((playerID: playerID, projectedPoints: points))
+            if let points = points {
+                playerProjectionsList.append((player.playerID, points))
             }
         }
         
-        // Sort by projected points (descending)
-        playerProjections.sort { $0.projectedPoints > $1.projectedPoints }
+        // Sort by projected points (descending) and take top N
+        let topPlayers = playerProjectionsList
+            .sorted { $0.1 > $1.1 }
+            .prefix(limit)
         
-        // Limit results
-        let topPlayers = Array(playerProjections.prefix(limit))
-        
-        DebugPrint(mode: .lineupRX, "💊 TOP AVAILABLE: Found \(topPlayers.count) top available players" + (position != nil ? " at \(position!)" : ""))
-        
-        return topPlayers
+        return Array(topPlayers)
     }
     
-    // MARK: - Private Helpers
-    
-    /// Get all rostered player IDs across all teams in the league
-    private func getAllRosteredPlayerIDs(for matchup: UnifiedMatchup) async -> Set<String> {
-        var rosteredIDs = Set<String>()
+    /// Get all rostered player information (both Sleeper IDs and ESPN IDs)
+    private func getAllRosteredPlayerInfo(for leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async -> RosteredPlayerInfo {
+        var rosteredSleeperIDs: Set<String> = []
+        var rosteredESPNIDs: Set<String> = []
         
-        // For Sleeper leagues, fetch all rosters
-        if matchup.league.source == .sleeper {
-            if let rosters = try? await fetchSleeperRosters(leagueID: matchup.league.league.leagueID) {
-                for roster in rosters {
-                    rosteredIDs.formUnion(roster.players)
+        switch leagueWrapper.source {
+        case .sleeper:
+            // For Sleeper leagues, get Sleeper player IDs directly
+            do {
+                guard let sleeperClient = leagueWrapper.client as? SleeperAPIClient else {
+                    return RosteredPlayerInfo(sleeperIDs: [], espnIDs: [])
                 }
+                
+                let rosters = try await sleeperClient.fetchRosters(leagueID: leagueWrapper.league.id)
+                rosteredSleeperIDs = Set(rosters.flatMap { $0.playerIDs ?? [] })
+            } catch {
+                DebugPrint(mode: .waivers, "❌ Failed to fetch Sleeper rosters: \(error)")
             }
-        }
-        // For ESPN leagues, fetch ALL teams in the league
-        else if matchup.league.source == .espn {
-            if let espnLeague = try? await fetchESPNLeague(leagueID: matchup.league.league.leagueID) {
-                // Iterate through ALL teams in the league
-                if let teams = espnLeague.teams {
+            
+        case .espn:
+            // 🔥 USE HYBRID APPROACH: Canonical mapping + name/team fallback
+            do {
+                guard let espnClient = leagueWrapper.client as? ESPNAPIClient else {
+                    return RosteredPlayerInfo(sleeperIDs: [], espnIDs: [])
+                }
+                
+                let espnLeagueData = try await espnClient.fetchESPNLeagueData(leagueID: leagueWrapper.league.id)
+                
+                // Get player directory for name/team lookups
+                let playerDirectory = await MainActor.run {
+                    PlayerDirectoryStore.shared.players
+                }
+                
+                var canonicalHits = 0
+                var fallbackHits = 0
+                
+                // Extract player IDs with hybrid approach
+                if let teams = espnLeagueData.teams {
                     for team in teams {
-                        // Get all players from this team's roster
-                        if let entries = team.roster?.entries {
-                            for entry in entries {
-                                let espnPlayerID = String(entry.playerId)
-                                
-                                // Try ESPN ID lookup first
-                                var sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnPlayerID)
-                                
-                                // If that fails, try name-based lookup as fallback
-                                if sleeperPlayer == nil, let playerName = entry.player?.fullName {
-                                    sleeperPlayer = PlayerDirectoryStore.shared.players.values.first(where: { 
-                                        $0.fullName.lowercased() == playerName.lowercased() 
-                                    })
-                                }
-                                
-                                if let sleeperPlayer = sleeperPlayer {
-                                    let sleeperID = sleeperPlayer.playerID
-                                    rosteredIDs.insert(sleeperID)
+                        guard let roster = team.roster, let entries = roster.entries else { continue }
+                        
+                        for entry in entries {
+                            let espnID = String(entry.playerId)
+                            rosteredESPNIDs.insert(espnID)
+                            
+                            // Try canonical mapping first
+                            let canonicalID = await MainActor.run {
+                                ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: espnID)
+                            }
+                            
+                            // Check if canonical mapping found a match (returns different ID)
+                            if canonicalID != espnID {
+                                // Canonical mapping succeeded
+                                rosteredSleeperIDs.insert(canonicalID)
+                                canonicalHits += 1
+                            } else {
+                                // 🔥 FALLBACK: Look up by name + team
+                                if let espnPlayer = entry.playerPoolEntry?.player,
+                                   let fullName = espnPlayer.fullName,
+                                   let proTeamId = espnPlayer.proTeamId,
+                                   let teamAbbrev = ESPNTeamMap.teamIdToAbbreviation[proTeamId] {
                                     
-                                    // Debug: Log key players
-                                    let debugNames = ["McCaffrey", "Achane", "Nacua", "St. Brown"]
-                                    if debugNames.contains(where: { sleeperPlayer.fullName.contains($0) }) {
-                                        DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: Found \(sleeperPlayer.fullName) - ESPN ID: \(espnPlayerID), Sleeper ID: \(sleeperID)")
+                                    // Search player directory by name + team
+                                    let normalizedName = normalizePlayerName(fullName)
+                                    
+                                    if let sleeperPlayer = playerDirectory.values.first(where: { player in
+                                        let playerNormalizedName = normalizePlayerName(player.fullName)
+                                        let teamMatches = player.team?.uppercased() == teamAbbrev.uppercased()
+                                        return playerNormalizedName == normalizedName && teamMatches
+                                    }) {
+                                        rosteredSleeperIDs.insert(sleeperPlayer.playerID)
+                                        fallbackHits += 1
                                     }
                                 }
                             }
@@ -181,37 +198,38 @@ final class AvailablePlayersService {
                     }
                 }
                 
-                DebugPrint(mode: .lineupRX, "💊 AVAILABLE PLAYERS: ESPN league has \(espnLeague.teams?.count ?? 0) teams with \(rosteredIDs.count) total rostered players")
+                if AppConstants.debug {
+                    DebugPrint(mode: .waivers, "✅ ESPN→Sleeper: \(canonicalHits) canonical, \(fallbackHits) fallback, \(rosteredSleeperIDs.count) total")
+                }
+                
+            } catch {
+                DebugPrint(mode: .waivers, "❌ Failed to fetch ESPN league data: \(error)")
             }
         }
         
-        return rosteredIDs
+        return RosteredPlayerInfo(
+            sleeperIDs: rosteredSleeperIDs,
+            espnIDs: rosteredESPNIDs
+        )
     }
     
-    /// Fetch all rosters for a Sleeper league
-    private func fetchSleeperRosters(leagueID: String) async throws -> [SleeperRoster] {
-        let urlString = "https://api.sleeper.app/v1/league/\(leagueID)/rosters"
-        guard let url = URL(string: urlString) else {
-            throw NSError(domain: "AvailablePlayersService", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
-        }
-        
-        let (data, _) = try await URLSession.shared.data(from: url)
-        let decoder = JSONDecoder()
-        return try decoder.decode([SleeperRoster].self, from: data)
-    }
-    
-    /// Fetch ESPN league data (includes all teams and rosters)
-    private func fetchESPNLeague(leagueID: String) async throws -> ESPNLeague {
-        return try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: leagueID)
-    }
-    
-    // MARK: - Models
-    
-    struct SleeperRoster: Codable {
-        let roster_id: Int
-        let owner_id: String
-        let players: [String]
-        let starters: [String]?
+    /// Normalize player name for matching (remove punctuation, lowercase, etc.)
+    private func normalizePlayerName(_ name: String) -> String {
+        return name.lowercased()
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: "'", with: "")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: " jr", with: "")
+            .replacingOccurrences(of: " sr", with: "")
+            .replacingOccurrences(of: " iii", with: "")
+            .replacingOccurrences(of: " ii", with: "")
+            .trimmingCharacters(in: .whitespaces)
     }
 }
 
+/// Container for rostered player information
+private struct RosteredPlayerInfo {
+    let sleeperIDs: Set<String>
+    let espnIDs: Set<String>
+}
