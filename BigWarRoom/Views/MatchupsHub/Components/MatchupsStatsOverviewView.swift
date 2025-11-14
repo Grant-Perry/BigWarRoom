@@ -15,14 +15,13 @@ struct MatchupsStatsOverviewView: View {
     let winningCount: Int
     let losingCount: Int
     let onWeekPickerTapped: () -> Void
-    
-    // #GoodNav: Intelligence-style actions
     let onFiltersToggle: () -> Void
     let onWatchedPlayersToggle: () -> Void
     let onRefreshTapped: () -> Void
     let watchedPlayersCount: Int
     
-    @State private var watchService = PlayerWatchService.shared
+    // 🔥 USE .shared internally
+    private var watchService: PlayerWatchService { PlayerWatchService.shared }
     
     var body: some View {
         HStack {

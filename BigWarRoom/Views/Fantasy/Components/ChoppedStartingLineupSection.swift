@@ -56,7 +56,8 @@ struct ChoppedStartingLineupSection: View {
                             isStarter: true,
                             parentViewModel: parentViewModel,
                             onPlayerTap: onPlayerTap,
-                            compact: true
+                            compact: true,
+                            watchService: PlayerWatchService.shared
                         )
                     }
                 }

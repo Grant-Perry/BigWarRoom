@@ -11,7 +11,10 @@ import SwiftUI
 /// 
 /// Strategic opponent analysis across all leagues
 struct OpponentIntelligenceDashboardView: View {
-    @State private var viewModel = OpponentIntelligenceViewModel()
+    @State private var viewModel = OpponentIntelligenceViewModel(
+        matchupsHubViewModel: MatchupsHubViewModel.shared,
+        allLivePlayersViewModel: AllLivePlayersViewModel.shared
+    )
     @State private var watchService = PlayerWatchService.shared
     @State private var showingFilters = false
     @State private var selectedIntelligence: OpponentIntelligence?
@@ -270,7 +273,7 @@ struct OpponentIntelligenceDashboardView: View {
                 // Threat Level filter with dropdown
                 Menu {
                     Button("All") {
-                        viewModel.setThreatLevelFilter(nil)
+                        viewModel.setThreatLevelFilter(.none)
                     }
                     Button("Critical") {
                         viewModel.setThreatLevelFilter(.critical)
@@ -465,7 +468,7 @@ struct OpponentIntelligenceDashboardView: View {
             infoAction: { showingThreatAlertsInfo = true }
         ) {
             LazyVStack(spacing: 12) {
-                ForEach(viewModel.nonInjuryRecommendations.prefix(5), id: \.id) { recommendation in
+                ForEach(viewModel.nonInjuryRecommendations.prefix(5)) { recommendation in
                     RecommendationCard(recommendation: recommendation)
                         .onTapGesture {
                             handleRecommendationTap(recommendation)

@@ -13,21 +13,16 @@ import Observation
 @MainActor
 final class GameStatusService {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: GameStatusService?
     
     static var shared: GameStatusService {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance with default dependencies
-        let nflGameService = NFLGameDataService.shared
-        let instance = GameStatusService(nflGameDataService: nflGameService)
-        _shared = instance
-        return instance
+        fatalError("GameStatusService.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: GameStatusService) {
         _shared = instance
     }

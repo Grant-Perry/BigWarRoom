@@ -15,10 +15,12 @@ struct PlayerScoreBarCardView: View {
     // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels
     @Bindable var viewModel: AllLivePlayersViewModel
     
+    // 🔥 PHASE 3 DI: Add watchService as parameter
+    let watchService: PlayerWatchService
+    
     @State private var scoreBarWidth: Double = 0.0
     @State private var cardOffset: Double = 50.0
     @State private var cardOpacity: Double = 0.0
-    @State private var playerDirectory = PlayerDirectoryStore.shared
     
     private let maxScoreBarWidth: Double = 120.0 // Maximum width in points
     private let cardHeight: Double = 110.0 // Increased card height to accommodate stats at bottom (was 95.0)
@@ -91,7 +93,9 @@ struct PlayerScoreBarCardView: View {
             cardHeight: cardHeight,
             formattedPlayerName: formattedPlayerName,
             playerScoreColor: playerScoreColor,
-            viewModel: viewModel
+            viewModel: viewModel,
+            watchService: watchService,
+            playerDirectory: viewModel.playerDirectory // 🔥 PHASE 3 DI: Pass playerDirectory from viewModel
         )
     }
     

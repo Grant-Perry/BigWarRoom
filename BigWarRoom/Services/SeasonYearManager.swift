@@ -22,20 +22,18 @@ import Observation
 @MainActor
 final class SeasonYearManager {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: SeasonYearManager?
     
     static var shared: SeasonYearManager {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
         let instance = SeasonYearManager()
         _shared = instance
         return instance
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: SeasonYearManager) {
         _shared = instance
     }

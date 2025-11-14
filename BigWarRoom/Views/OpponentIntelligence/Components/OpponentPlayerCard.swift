@@ -15,7 +15,7 @@ import SwiftUI
 struct OpponentPlayerCard: View {
     let player: OpponentPlayer
     @State private var watchService = PlayerWatchService.shared
-    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel()
+    @State private var fantasyPlayerViewModel: FantasyPlayerViewModel?
     
     var body: some View {
         HStack(spacing: 12) {
@@ -53,13 +53,23 @@ struct OpponentPlayerCard: View {
                     )
             )
         )
+        .onAppear {
+            if fantasyPlayerViewModel == nil {
+                fantasyPlayerViewModel = FantasyPlayerViewModel(
+                    livePlayersViewModel: AllLivePlayersViewModel.shared,
+                    playerDirectory: PlayerDirectoryStore.shared,
+                    nflGameDataService: NFLGameDataService.shared,
+                    nflWeekService: NFLWeekService.shared
+                )
+            }
+        }
     }
     
     // MARK: - Component Builders
     
     @ViewBuilder
     private func buildPlayerImage() -> some View {
-        if let sleeperPlayer = fantasyPlayerViewModel.getSleeperPlayerData(for: player.player) {
+        if let sleeperPlayer = fantasyPlayerViewModel?.getSleeperPlayerData(for: player.player) {
             NavigationLink(destination: PlayerStatsCardView(
                 player: sleeperPlayer,
                 team: NFLTeam.team(for: player.player.team ?? "")

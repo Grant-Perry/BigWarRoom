@@ -19,9 +19,12 @@ struct MatchupTeamFinalView: View {
     let player: FantasyPlayer
     let scaleEffect: CGFloat
     
-    @State private var gameViewModel = NFLGameMatchupViewModel()
-    @State private var currentWeek: Int = NFLWeekService.shared.currentWeek
-    @State private var nflWeekService = NFLWeekService.shared
+    // 🔥 USE ENVIRONMENT for dependencies
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
+    
+    @State private var gameViewModel: NFLGameMatchupViewModel?
+    @State private var currentWeek: Int = 1
     
     /// Initialize with default scale
     init(player: FantasyPlayer) {
@@ -37,20 +40,28 @@ struct MatchupTeamFinalView: View {
     
     var body: some View {
         VStack(spacing: 1) {
-            if gameViewModel.isLoading && gameViewModel.gameInfo == nil {
-                loadingView
-            } else if let gameInfo = gameViewModel.gameInfo {
-                gameInfoView(gameInfo)
+            if let viewModel = gameViewModel {
+                if viewModel.isLoading && viewModel.gameInfo == nil {
+                    loadingView
+                } else if let gameInfo = viewModel.gameInfo {
+                    gameInfoView(gameInfo)
+                } else {
+                    fallbackTeamView
+                }
             } else {
-                fallbackTeamView
+                loadingView
             }
         }
         .scaleEffect(scaleEffect)
         .onAppear {
-            setupGameData()
+            // 🔥 CREATE ViewModel with environment dependency
+            if gameViewModel == nil {
+                gameViewModel = NFLGameMatchupViewModel(gameDataService: nflGameDataService)
+                setupGameData()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            gameViewModel.refresh(week: currentWeek)
+            gameViewModel?.refresh(week: currentWeek)
         }
         .onChange(of: nflWeekService.currentWeek) { _, newWeek in
             if currentWeek != newWeek {
@@ -233,12 +244,12 @@ struct MatchupTeamFinalView: View {
     // MARK: - Private Methods
     
     private func setupGameData() {
-        guard let team = player.team else { return }
+        guard let team = player.team, let viewModel = gameViewModel else { return }
         
         currentWeek = nflWeekService.currentWeek
         let currentYear = nflWeekService.currentYear
         
-        gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
+        viewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
     }
     
     private func normalizeTeamAbbreviation(_ team: String) -> String {

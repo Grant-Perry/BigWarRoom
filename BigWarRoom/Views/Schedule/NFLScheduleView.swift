@@ -9,40 +9,49 @@
 import SwiftUI
 
 struct NFLScheduleView: View {
-    @State private var viewModel = NFLScheduleViewModel()
-    // 🔥 PHASE 3: Use @State for @Observable ViewModel
+    @State private var viewModel: NFLScheduleViewModel?
     @State private var matchupsHubViewModel = MatchupsHubViewModel.shared
-    @State private var weekManager = WeekSelectionManager.shared // Use shared week manager
     @State private var showingWeekPicker = false
-    
-    // 🔥 NEW: Sheet state for team filtered matchups
     @State private var showingTeamMatchups = false
-    // 🔥 NEW: Navigation state for team filtered matchups  
     @State private var selectedGame: ScheduleGame?
-    // 🔥 NUCLEAR: Use NavigationPath for programmatic navigation
     @State private var navigationPath = NavigationPath()
     
+    // 🔥 SIMPLIFIED: No params needed, use .shared internally
+    init() {}
+    
     var body: some View {
-        // 🏈 NAVIGATION FREEDOM: Remove NavigationStack - parent TabView provides it
         ZStack {
             // FOX-style background
             foxStyleBackground
                 .ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // Header Section
-                scheduleHeader
-                    .padding(.top, 12)
-                    .padding(.bottom, 16)
-                
-                // Games List
-                gamesList
+            if let viewModel = viewModel {
+                VStack(spacing: 0) {
+                    // Header Section
+                    scheduleHeader(viewModel: viewModel)
+                        .padding(.top, 12)
+                        .padding(.bottom, 16)
+                    
+                    // Games List
+                    gamesList(viewModel: viewModel)
+                }
+            } else {
+                ProgressView("Loading...")
+                    .onAppear {
+                        // 🔥 CREATE ViewModel with .shared services
+                        viewModel = NFLScheduleViewModel(
+                            gameDataService: NFLGameDataService.shared,
+                            weekService: NFLWeekService.shared
+                        )
+                    }
             }
-            
         }
         .navigationBarHidden(true)
-        .sheet(isPresented: $viewModel.showingGameDetail) {
-            if let game = viewModel.selectedGame {
+        .sheet(isPresented: Binding(
+            get: { viewModel?.showingGameDetail ?? false },
+            set: { if let vm = viewModel { vm.showingGameDetail = $0 } }
+        )) {
+            if let game = viewModel?.selectedGame {
                 GameDetailView(game: game)
             }
         }
@@ -92,26 +101,19 @@ struct NFLScheduleView: View {
         // BEFORE: .sheet(isPresented: $showingTeamMatchups) { TeamFilteredMatchupsView(...) }
         // AFTER: NavigationLinks in game cards handle navigation
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)
+            WeekPickerView(weekManager: WeekSelectionManager.shared, isPresented: $showingWeekPicker)
         }
         // Sync with shared week manager
-        .onChange(of: weekManager.selectedWeek) { _, newWeek in
-            viewModel.selectWeek(newWeek)
+        .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
+            viewModel?.selectWeek(newWeek)
         }
         .onAppear {
             print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
             // Sync initial week
-            viewModel.selectWeek(weekManager.selectedWeek)
-            
-            // Load matchup data when view appears
-            Task {
-                print("🔍 SCHEDULE DEBUG: Starting matchup data load...")
-                await matchupsHubViewModel.loadAllMatchups()
-                print("🔍 SCHEDULE DEBUG: Matchup data load complete - \(matchupsHubViewModel.myMatchups.count) matchups loaded")
-            }
+            viewModel?.selectWeek(WeekSelectionManager.shared.selectedWeek)
             
             // Start global auto-refresh for live scores
-            viewModel.refreshSchedule() // Initial load only
+            viewModel?.refreshSchedule() // Initial load only
         }
     }
     
@@ -126,18 +128,18 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Header Section
-    private var scheduleHeader: some View {
+    private func scheduleHeader(viewModel: NFLScheduleViewModel) -> some View {
         VStack(spacing: 12) {
             // Large "WEEK" title like FOX - CENTERED
             VStack(spacing: 4) {
-                Text("WEEK \(weekManager.selectedWeek)") // Use weekManager instead of viewModel
+                Text("WEEK \(WeekSelectionManager.shared.selectedWeek)")
                     .font(.system(size: 60, weight: .bold, design: .default))
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 4)
                 
                 // Week starting date
                 Text("Week starting: \(getWeekStartDate())")
-				  .font(.system(size: 14, weight: .regular))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundColor(.white.opacity(0.9))
                     .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
             }
@@ -155,7 +157,7 @@ struct NFLScheduleView: View {
                 
                 // Week picker - now uses Mission Control's WeekPickerView
                 Button(action: { showingWeekPicker = true }) {
-                    Text("Week \(weekManager.selectedWeek)") // Use weekManager
+                    Text("Week \(WeekSelectionManager.shared.selectedWeek)")
                         .font(.subheadline)
                         .foregroundColor(.gpPostBot)
                 }
@@ -195,7 +197,7 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Games List
-    private var gamesList: some View {
+    private func gamesList(viewModel: NFLScheduleViewModel) -> some View {
         Group {
             if viewModel.isLoading && viewModel.games.isEmpty {
                 loadingView
@@ -204,7 +206,7 @@ struct NFLScheduleView: View {
             } else if viewModel.games.isEmpty {
                 emptyStateView
             } else {
-                gamesScrollView
+                gamesScrollView(viewModel: viewModel)
             }
         }
     }
@@ -259,7 +261,7 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Games Scroll View
-    private var gamesScrollView: some View {
+    private func gamesScrollView(viewModel: NFLScheduleViewModel) -> some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.games, id: \.id) { game in
@@ -293,7 +295,7 @@ struct NFLScheduleView: View {
         let calendar = Calendar.current
         
         // Calculate the start date for the selected week
-        let weekStartDate = calendar.date(byAdding: .day, value: (weekManager.selectedWeek - 1) * 7, to: season2024Start)!
+        let weekStartDate = calendar.date(byAdding: .day, value: (WeekSelectionManager.shared.selectedWeek - 1) * 7, to: season2024Start)!
         
         // Format as "Thursday, January 4"
         let formatter = DateFormatter()

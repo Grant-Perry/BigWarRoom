@@ -40,7 +40,8 @@ struct MatchupDetailSheet: View {
                 FantasyMatchupDetailView(
                     matchup: matchup.fantasyMatchup!,
                     fantasyViewModel: matchup.createConfiguredFantasyViewModel(),
-                    leagueName: matchup.league.league.name
+                    leagueName: matchup.league.league.name,
+                    livePlayersViewModel: AllLivePlayersViewModel.shared
                 )
             }
         }

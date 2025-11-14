@@ -135,15 +135,14 @@ struct FantasyTeam: Identifiable, Codable {
     
     /// Calculate number of players yet to play for this team
     /// Players "yet to play" are starters with 0 points who haven't played yet
-    var playersYetToPlay: Int {
+    /// 🔥 PHASE 3 DI: Now requires GameStatusService to be passed in
+    func playersYetToPlay(gameStatusService: GameStatusService) -> Int {
         return roster.filter { player in
             // Only count starters
             guard player.isStarter else { return false }
             
-            // Use GameStatusService for authoritative "yet to play" calculation
-            // Pass nil for gameDate since we don't have matchup context here
-            // The service will use its own logic to determine game status
-            return GameStatusService.shared.isPlayerYetToPlay(
+            // 🔥 PHASE 3 DI: Use injected GameStatusService
+            return gameStatusService.isPlayerYetToPlay(
                 playerTeam: player.team,
                 currentPoints: player.currentPoints
             )
@@ -152,9 +151,10 @@ struct FantasyTeam: Identifiable, Codable {
     
     /// Calculate number of players yet to play for this team with week context
     /// This version can be more accurate by considering the week being viewed
-    func playersYetToPlay(forWeek week: Int) -> Int {
+    /// 🔥 PHASE 3 DI: Now requires GameStatusService and WeekSelectionManager
+    func playersYetToPlay(forWeek week: Int, weekSelectionManager: WeekSelectionManager, gameStatusService: GameStatusService) -> Int {
         // Simple heuristic: If viewing a past week, no players are "yet to play"
-        let currentWeek = WeekSelectionManager.shared.currentNFLWeek
+        let currentWeek = weekSelectionManager.currentNFLWeek
         
         // If looking at a past week, all games are finished
         if week < currentWeek {
@@ -165,8 +165,8 @@ struct FantasyTeam: Identifiable, Codable {
             // Only count starters
             guard player.isStarter else { return false }
             
-            // For current/future weeks, use normal logic
-            return GameStatusService.shared.isPlayerYetToPlay(
+            // For current/future weeks, use normal logic with injected service
+            return gameStatusService.isPlayerYetToPlay(
                 playerTeam: player.team,
                 currentPoints: player.currentPoints
             )

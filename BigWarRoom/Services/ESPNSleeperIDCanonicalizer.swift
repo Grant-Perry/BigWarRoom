@@ -17,8 +17,19 @@ import Observation
 @MainActor
 final class ESPNSleeperIDCanonicalizer {
     
-    // MARK: - Singleton
-    static let shared = ESPNSleeperIDCanonicalizer()
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
+    private static var _shared: ESPNSleeperIDCanonicalizer?
+    
+    static var shared: ESPNSleeperIDCanonicalizer {
+        if let existing = _shared {
+            return existing
+        }
+        fatalError("ESPNSleeperIDCanonicalizer.shared accessed before initialization. Call setSharedInstance() first.")
+    }
+    
+    static func setSharedInstance(_ instance: ESPNSleeperIDCanonicalizer) {
+        _shared = instance
+    }
     
     // MARK: - State Management
     private enum MappingState {
@@ -43,9 +54,13 @@ final class ESPNSleeperIDCanonicalizer {
         return documentsURL.appendingPathComponent("ESPNSleeperIDCanonical.json")
     }
     
+    // 🔥 PHASE 3 DI: Inject PlayerDirectoryStore dependency
+    private let playerDirectory: PlayerDirectoryStore
+    
     // MARK: - Initialization
     
-    private init() {
+    init(playerDirectory: PlayerDirectoryStore) {
+        self.playerDirectory = playerDirectory
         loadCachedMapping()
         // If we loaded from cache successfully, mark as built
         if !canonicalMapping.isEmpty {
@@ -96,13 +111,6 @@ final class ESPNSleeperIDCanonicalizer {
         
         mappingState = .building
         DebugLogger.playerIDMapping("🏗️ Building canonical ESPN→Sleeper ID mapping...", level: .info)
-        
-        // Get player directory WITHOUT calling .shared during init to avoid circular dependency
-        guard let playerDirectory = getPlayerDirectorySafely() else {
-            DebugLogger.playerIDMapping("⚠️ PlayerDirectoryStore not available yet, deferring mapping build")
-            mappingState = .notBuilt
-            return
-        }
         
         var newCanonicalMapping: [String: String] = [:]
         var newReverseMapping: [String: String] = [:]
@@ -170,12 +178,6 @@ final class ESPNSleeperIDCanonicalizer {
         }
     }
     
-    /// Safely get PlayerDirectoryStore without causing circular init
-    private func getPlayerDirectorySafely() -> PlayerDirectoryStore? {
-        // Check if shared instance exists without triggering init
-        return PlayerDirectoryStore._shared
-    }
-    
     /// Force refresh canonical mapping (clears cache and rebuilds)
     func refreshCanonicalMapping() {
         DebugLogger.playerIDMapping("♻️ Force refreshing canonical mapping...", level: .info)
@@ -187,10 +189,6 @@ final class ESPNSleeperIDCanonicalizer {
     
     /// Get debug statistics
     func getDebugStats() -> (totalMappings: Int, duplicatesResolved: Int) {
-        guard let playerDirectory = getPlayerDirectorySafely() else {
-            return (totalMappings: canonicalMapping.count, duplicatesResolved: 0)
-        }
-        
         let totalPlayersWithESPNID = playerDirectory.players.values.filter { 
             $0.espnID != nil && !$0.espnID!.isEmpty 
         }.count

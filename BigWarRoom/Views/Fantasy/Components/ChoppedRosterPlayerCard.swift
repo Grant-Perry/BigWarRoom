@@ -16,10 +16,19 @@ struct ChoppedRosterPlayerCard: View {
     let compact: Bool
     
     @State private var showingScoreBreakdown = false
-    @State private var watchService = PlayerWatchService.shared
+    // 🔥 PHASE 3 DI: Remove .shared assignment, will be passed from parent
+    @State private var watchService: PlayerWatchService
     @State private var playerDirectory = PlayerDirectoryStore.shared
     
-    init(player: FantasyPlayer, isStarter: Bool, parentViewModel: ChoppedTeamRosterViewModel, onPlayerTap: @escaping (SleeperPlayer) -> Void, compact: Bool = false) {
+    // 🔥 PHASE 3 DI: Add watchService parameter
+    init(
+        player: FantasyPlayer,
+        isStarter: Bool,
+        parentViewModel: ChoppedTeamRosterViewModel,
+        onPlayerTap: @escaping (SleeperPlayer) -> Void,
+        compact: Bool = false,
+        watchService: PlayerWatchService
+    ) {
         self.viewModel = ChoppedPlayerCardViewModel(
             player: player,
             isStarter: isStarter,
@@ -27,6 +36,7 @@ struct ChoppedRosterPlayerCard: View {
         )
         self.onPlayerTap = onPlayerTap
         self.compact = compact
+        self._watchService = State(initialValue: watchService)
     }
     
     private let cardHeight: Double = 110.0 // Match All Live Players height

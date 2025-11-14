@@ -13,21 +13,16 @@ import Observation
 @MainActor
 final class PlayerDirectoryStore {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
-    // Made internal so ESPNSleeperIDCanonicalizer can access it safely
-    internal static var _shared: PlayerDirectoryStore?
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
+    private static var _shared: PlayerDirectoryStore?
     
     static var shared: PlayerDirectoryStore {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance with default SleeperAPIClient
-        let instance = PlayerDirectoryStore(apiClient: SleeperAPIClient())
-        _shared = instance
-        return instance
+        fatalError("PlayerDirectoryStore.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: PlayerDirectoryStore) {
         _shared = instance
     }
@@ -60,8 +55,8 @@ final class PlayerDirectoryStore {
         if AppConstants.debug {
             debugESPNIDCoverage()
             
-            // Build canonical mapping to see DCO
-            ESPNSleeperIDCanonicalizer.shared.buildCanonicalMapping()
+            // 🔥 PHASE 3: Defer canonical mapping build to avoid circular dependency
+            // Will be built lazily when needed
         }
     }
     
@@ -389,21 +384,18 @@ final class PlayerDirectoryStore {
     }
 }
 
-// MARK: -> Helper Extensions (UPDATED to remove .shared usage)
+// MARK: -> Helper Extensions (UPDATED to use dependency injection)
 
 extension SleeperPlayer {
     /// Get the player's positional ranking (e.g., "RB1", "WR2")
-    /// NOTE: This will need to be updated once we implement dependency injection
-    /// For now, this will break - we'll fix it in Phase 3
-    var positionalRank: String? {
-        // TODO: This needs to be updated to not use .shared - will be fixed in Phase 3
-        return nil // Temporarily disabled until dependency injection is implemented
+    /// Requires PlayerDirectoryStore to be passed in
+    func positionalRank(from playerDirectory: PlayerDirectoryStore) -> String? {
+        return playerDirectory.positionalRank(for: self.playerID)
     }
     
     /// Get the player's numeric positional ranking
-    /// NOTE: This will need to be updated once we implement dependency injection  
-    var numericPositionalRank: Int? {
-        // TODO: This needs to be updated to not use .shared - will be fixed in Phase 3
-        return nil // Temporarily disabled until dependency injection is implemented
+    /// Requires PlayerDirectoryStore to be passed in
+    func numericPositionalRank(from playerDirectory: PlayerDirectoryStore) -> Int? {
+        return playerDirectory.numericPositionalRank(for: self.playerID)
     }
 }

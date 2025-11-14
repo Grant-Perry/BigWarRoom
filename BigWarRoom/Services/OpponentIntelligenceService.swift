@@ -126,8 +126,16 @@ final class OpponentIntelligenceService {
             let currentWeek = threat.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
             
             // Calculate yet-to-play counts for both teams
-            let myYetToPlay = threat.myTeam.playersYetToPlay(forWeek: currentWeek)
-            let theirYetToPlay = opponentTeam.playersYetToPlay(forWeek: currentWeek)
+            let myYetToPlay = threat.myTeam.playersYetToPlay(
+                forWeek: currentWeek,
+                weekSelectionManager: WeekSelectionManager.shared,
+                gameStatusService: GameStatusService.shared
+            )
+            let theirYetToPlay = opponentTeam.playersYetToPlay(
+                forWeek: currentWeek,
+                weekSelectionManager: WeekSelectionManager.shared,
+                gameStatusService: GameStatusService.shared
+            )
             
             // 🔥 FIXED: Check if winning or losing and format message accordingly
             let scoreDiff = abs(threat.scoreDifferential)
@@ -525,8 +533,16 @@ final class OpponentIntelligenceService {
             }
             
             let currentWeek = intel.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
-            let myYetToPlay = intel.myTeam.playersYetToPlay(forWeek: currentWeek)
-            let theirYetToPlay = opponentTeam.playersYetToPlay(forWeek: currentWeek)
+            let myYetToPlay = intel.myTeam.playersYetToPlay(
+                forWeek: currentWeek,
+                weekSelectionManager: WeekSelectionManager.shared,
+                gameStatusService: GameStatusService.shared
+            )
+            let theirYetToPlay = opponentTeam.playersYetToPlay(
+                forWeek: currentWeek,
+                weekSelectionManager: WeekSelectionManager.shared,
+                gameStatusService: GameStatusService.shared
+            )
             let yetToPlayDifference = theirYetToPlay - myYetToPlay
             
             // Current score differential
@@ -578,7 +594,11 @@ final class OpponentIntelligenceService {
             
             let deltaDistance = abs(myRanking.pointsFromSafety)
             let currentWeek = intel.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
-            let myYetToPlay = intel.myTeam.playersYetToPlay(forWeek: currentWeek)
+            let myYetToPlay = intel.myTeam.playersYetToPlay(
+                forWeek: currentWeek,
+                weekSelectionManager: WeekSelectionManager.shared,
+                gameStatusService: GameStatusService.shared
+            )
             
             let threatDescription = "You're \(deltaDistance.formatted(.number.precision(.fractionLength(1)))) points behind the cutoff in \(intel.leagueName). Rank: \(myRanking.rankDisplay). You have \(myYetToPlay) players left to play"
             

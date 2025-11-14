@@ -15,16 +15,24 @@ import Foundation
 /// 3. Global (AllLivePlayersViewModel)
 struct StatsFacade {
     
+    // 🔥 PHASE 3 DI: Accept playerStatsCache as parameter
+    
     /// Get player stats with automatic fallback through all available sources
     /// - Parameters:
     ///   - playerID: Sleeper player ID
     ///   - week: NFL week number
     ///   - localStatsProvider: Optional local stats provider (ChoppedTeamRosterViewModel, etc.)
+    ///   - allLivePlayersViewModel: Optional AllLivePlayersViewModel for global stats lookup
+    ///   - playerStatsCache: PlayerStatsCache instance for cached stats
+    ///   - weekSelectionManager: WeekSelectionManager for current week
     /// - Returns: Player stats dictionary or nil if no stats found
     static func getPlayerStats(
         playerID: String,
         week: Int,
-        localStatsProvider: LocalStatsProvider? = nil
+        localStatsProvider: LocalStatsProvider? = nil,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil,
+        playerStatsCache: PlayerStatsCache? = nil,
+        weekSelectionManager: WeekSelectionManager? = nil
     ) -> [String: Double]? {
         
         // STEP 1: Try local stats provider first (highest priority)
@@ -33,14 +41,15 @@ struct StatsFacade {
             return localStats
         }
         
-        // STEP 2: Try PlayerStatsCache (cached API data)
-        if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: playerID, week: week) {
+        // STEP 2: Try PlayerStatsCache (cached API data) if provided
+        if let cache = playerStatsCache,
+           let cachedStats = cache.getPlayerStats(playerID: playerID, week: week) {
             print("📊 StatsFacade: Found cached stats for \(playerID) (\(cachedStats.count) stats)")
             return cachedStats
         }
         
-        // STEP 3: Try AllLivePlayersViewModel (global live data)
-        if let globalStats = AllLivePlayersViewModel.shared.playerStats[playerID] {
+        // STEP 3: Try AllLivePlayersViewModel (global live data) if provided
+        if let globalStats = allLivePlayersViewModel?.playerStats[playerID] {
             print("📊 StatsFacade: Found global stats for \(playerID) (\(globalStats.count) stats)")
             return globalStats
         }
@@ -53,13 +62,26 @@ struct StatsFacade {
     /// - Parameters:
     ///   - playerID: Sleeper player ID
     ///   - localStatsProvider: Optional local stats provider
+    ///   - allLivePlayersViewModel: Optional AllLivePlayersViewModel for global stats lookup
+    ///   - playerStatsCache: PlayerStatsCache instance for cached stats
+    ///   - weekSelectionManager: WeekSelectionManager for current week
     /// - Returns: Player stats dictionary or nil
     static func getPlayerStats(
         playerID: String,
-        localStatsProvider: LocalStatsProvider? = nil
+        localStatsProvider: LocalStatsProvider? = nil,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil,
+        playerStatsCache: PlayerStatsCache? = nil,
+        weekSelectionManager: WeekSelectionManager? = nil
     ) -> [String: Double]? {
-        let currentWeek = WeekSelectionManager.shared.selectedWeek
-        return getPlayerStats(playerID: playerID, week: currentWeek, localStatsProvider: localStatsProvider)
+        let currentWeek = weekSelectionManager?.selectedWeek ?? 1
+        return getPlayerStats(
+            playerID: playerID,
+            week: currentWeek,
+            localStatsProvider: localStatsProvider,
+            allLivePlayersViewModel: allLivePlayersViewModel,
+            playerStatsCache: playerStatsCache,
+            weekSelectionManager: weekSelectionManager
+        )
     }
     
     /// Check if any stats are available for a player
@@ -67,13 +89,26 @@ struct StatsFacade {
     ///   - playerID: Sleeper player ID
     ///   - week: NFL week number
     ///   - localStatsProvider: Optional local stats provider
+    ///   - allLivePlayersViewModel: Optional AllLivePlayersViewModel for global stats lookup
+    ///   - playerStatsCache: PlayerStatsCache instance for cached stats
+    ///   - weekSelectionManager: WeekSelectionManager for current week
     /// - Returns: True if stats are available from any source
     static func hasStats(
         playerID: String,
         week: Int,
-        localStatsProvider: LocalStatsProvider? = nil
+        localStatsProvider: LocalStatsProvider? = nil,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil,
+        playerStatsCache: PlayerStatsCache? = nil,
+        weekSelectionManager: WeekSelectionManager? = nil
     ) -> Bool {
-        return getPlayerStats(playerID: playerID, week: week, localStatsProvider: localStatsProvider) != nil
+        return getPlayerStats(
+            playerID: playerID,
+            week: week,
+            localStatsProvider: localStatsProvider,
+            allLivePlayersViewModel: allLivePlayersViewModel,
+            playerStatsCache: playerStatsCache,
+            weekSelectionManager: weekSelectionManager
+        ) != nil
     }
     
     /// Get stats source description for debugging
@@ -81,22 +116,29 @@ struct StatsFacade {
     ///   - playerID: Sleeper player ID  
     ///   - week: NFL week number
     ///   - localStatsProvider: Optional local stats provider
+    ///   - allLivePlayersViewModel: Optional AllLivePlayersViewModel for global stats lookup
+    ///   - playerStatsCache: PlayerStatsCache instance for cached stats
+    ///   - weekSelectionManager: WeekSelectionManager for current week
     /// - Returns: Description of which source provided the stats
     static func getStatsSource(
         playerID: String,
         week: Int,
-        localStatsProvider: LocalStatsProvider? = nil
+        localStatsProvider: LocalStatsProvider? = nil,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil,
+        playerStatsCache: PlayerStatsCache? = nil,
+        weekSelectionManager: WeekSelectionManager? = nil
     ) -> String {
         
         if localStatsProvider?.getLocalPlayerStats(for: playerID) != nil {
             return "Local (\(type(of: localStatsProvider!)))"
         }
         
-        if PlayerStatsCache.shared.getPlayerStats(playerID: playerID, week: week) != nil {
+        if let cache = playerStatsCache,
+           cache.getPlayerStats(playerID: playerID, week: week) != nil {
             return "Cache"
         }
         
-        if AllLivePlayersViewModel.shared.playerStats[playerID] != nil {
+        if let viewModel = allLivePlayersViewModel, viewModel.playerStats[playerID] != nil {
             return "Global"
         }
         

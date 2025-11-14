@@ -33,9 +33,6 @@ struct FantasyDetailHeaderView: View {
     // 🔥 PHASE 3 DI: Remove .shared assignment, will be passed from parent
     @State private var watchService: PlayerWatchService
     
-    // 🔥 PHASE 3 DI: Accept GameStatusService for "yet to play" calculations  
-    let gameStatusService: GameStatusService?
-    
     // 🔥 PHASE 3 DI: Add initializer with watchService
     init(
         leagueName: String,
@@ -49,8 +46,7 @@ struct FantasyDetailHeaderView: View {
         onSortDirectionChanged: @escaping () -> Void,
         selectedPosition: Binding<FantasyPosition>,
         showActiveOnly: Binding<Bool>,
-        watchService: PlayerWatchService,
-        gameStatusService: GameStatusService? = nil
+        watchService: PlayerWatchService
     ) {
         self.leagueName = leagueName
         self.matchup = matchup
@@ -64,7 +60,6 @@ struct FantasyDetailHeaderView: View {
         self._selectedPosition = selectedPosition
         self._showActiveOnly = showActiveOnly
         self._watchService = State(initialValue: watchService)
-        self.gameStatusService = gameStatusService
     }
     
     /// Dynamic sort direction text based on current method and direction

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AllLivePlayersView: View {
-    // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels that need two-way binding
+    // 🔥 HYBRID PATTERN: Use @State to create ViewModel with .shared services
     @Bindable private var allLivePlayersViewModel: AllLivePlayersViewModel
     private let watchService: PlayerWatchService
     private let weekManager: WeekSelectionManager
@@ -29,7 +29,14 @@ struct AllLivePlayersView: View {
     // 🔥 PROPER: Clean state management without band-aids
     @State private var hasPerformedInitialLoad = false
     
-    // 🔥 PHASE 2.5: Dependency injection initializer
+    // 🔥 HYBRID PATTERN: Default init uses .shared, but DI init still available
+    init() {
+        self.allLivePlayersViewModel = AllLivePlayersViewModel.shared
+        self.watchService = PlayerWatchService.shared
+        self.weekManager = WeekSelectionManager.shared
+    }
+    
+    // 🔥 PHASE 2.5: Dependency injection initializer (for testing/BigWarRoom.swift)
     init(
         allLivePlayersViewModel: AllLivePlayersViewModel,
         watchService: PlayerWatchService,
@@ -181,7 +188,8 @@ struct AllLivePlayersView: View {
                     AllLivePlayersListView(
                         allLLivePlayersViewModel: allLivePlayersViewModel,
                         animatedPlayers: $animatedPlayers,
-                        onPlayerTap: handlePlayerTap
+                        onPlayerTap: handlePlayerTap,
+                        watchService: watchService
                     )
                 )
             }

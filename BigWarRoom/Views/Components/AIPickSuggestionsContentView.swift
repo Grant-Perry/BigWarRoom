@@ -292,7 +292,7 @@ struct AIPickSuggestionCardView: View {
                 .foregroundColor(.primary)
             
             if let sleeperPlayer = findSleeperPlayerForSuggestion(),
-               let positionRank = sleeperPlayer.positionalRank {
+               let positionRank = PlayerDirectoryStore.shared.positionalRank(for: sleeperPlayer.playerID) {
                 Text("- \(positionRank)")
                     .font(.caption2)
                     .fontWeight(.bold)

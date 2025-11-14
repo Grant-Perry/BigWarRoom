@@ -32,8 +32,16 @@ struct NonMicroWinProbability: View {
                let awayTeam = matchup.fantasyMatchup?.awayTeam {
                 
                 let currentWeek = WeekSelectionManager.shared.selectedWeek
-                let homeToPlay = homeTeam.playersYetToPlay(forWeek: currentWeek)
-                let awayToPlay = awayTeam.playersYetToPlay(forWeek: currentWeek)
+                let homeToPlay = homeTeam.playersYetToPlay(
+                    forWeek: currentWeek,
+                    weekSelectionManager: WeekSelectionManager.shared,
+                    gameStatusService: GameStatusService.shared
+                )
+                let awayToPlay = awayTeam.playersYetToPlay(
+                    forWeek: currentWeek,
+                    weekSelectionManager: WeekSelectionManager.shared,
+                    gameStatusService: GameStatusService.shared
+                )
                 
                 HStack {
                     Text("to play: \(homeToPlay)")

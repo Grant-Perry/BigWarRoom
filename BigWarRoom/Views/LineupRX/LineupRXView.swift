@@ -11,7 +11,8 @@ struct LineupRXView: View {
     let matchup: UnifiedMatchup
     
     @Environment(\.dismiss) private var dismiss
-    @State private var isLoading = true
+    @State private var isInitialLoad = true // 🔥 NEW: Track first load vs refresh
+    @State private var isLoading = false // 🔥 CHANGED: Don't start as true
     @State private var optimizationResult: LineupOptimizerService.OptimizationResult?
     @State private var waiverRecommendations: [LineupOptimizerService.WaiverRecommendation] = []
     @State private var errorMessage: String?
@@ -44,10 +45,11 @@ struct LineupRXView: View {
                         // Header
                         headerSection
                         
-                        if isLoading {
-                            loadingView
-                        } else if let error = errorMessage {
+                        if let error = errorMessage {
                             errorView(error)
+                        } else if optimizationResult == nil && isInitialLoad {
+                            // 🔥 SKELETON SCREEN: Show immediately on first load
+                            skeletonLoadingView
                         } else {
                             // Content sections - ALL EXTERNAL VIEWS NOW
                             if let result = optimizationResult {
@@ -225,6 +227,46 @@ struct LineupRXView: View {
     }
     
     // MARK: - Loading & Error Views
+    
+    // 🔥 NEW: Skeleton loading screen (way better UX than spinner)
+    private var skeletonLoadingView: some View {
+        VStack(spacing: 16) {
+            // Skeleton cards with shimmer effect
+            ForEach(0..<5, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 120)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.clear,
+                                        Color.white.opacity(0.1),
+                                        Color.clear
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .offset(x: isLoading ? 300 : -300)
+                            .animation(
+                                Animation.linear(duration: 1.5)
+                                    .repeatForever(autoreverses: false),
+                                value: isLoading
+                            )
+                    )
+            }
+            
+            Text("Analyzing lineup and fetching projections...")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.7))
+                .padding(.top, 8)
+        }
+        .onAppear {
+            isLoading = true
+        }
+    }
     
     private var loadingView: some View {
         VStack(spacing: 20) {
@@ -441,7 +483,7 @@ struct LineupRXView: View {
     // MARK: - Data Loading
     
     private func loadData() async {
-        isLoading = true
+        // 🔥 DON'T show loading spinner - use skeleton instead
         errorMessage = nil
         
         sleeperPlayerCache.removeAll()
@@ -460,7 +502,7 @@ struct LineupRXView: View {
             
             let scoringFormat = "ppr"
             
-            // 🔥 CHANGED: Use instance optimizer instead of .shared
+            // 🔥 FAST PATH: Load lineup optimization
             let result = try await optimizer.optimizeLineup(
                 for: matchup,
                 week: week,
@@ -469,25 +511,33 @@ struct LineupRXView: View {
             )
             
             optimizationResult = result
-            
-            // 🔥 CHANGED: Use instance optimizer instead of .shared
-            let waiver = try await optimizer.getWaiverRecommendations(
-                for: matchup,
-                week: week,
-                year: year,
-                limit: 5,
-                scoringFormat: scoringFormat
-            )
-            
-            waiverRecommendations = waiver
-            
-            groupWaiverRecommendations()
             populateCaches(result: result)
             
-            isLoading = false
+            // 🔥 SHOW DATA IMMEDIATELY
+            isInitialLoad = false
+            
+            // 🔥 BACKGROUND: Load waiver recs without blocking
+            Task.detached(priority: .userInitiated) { @MainActor in
+                do {
+                    let waiver = try await self.optimizer.getWaiverRecommendations(
+                        for: self.matchup,
+                        week: week,
+                        year: year,
+                        limit: 5,
+                        scoringFormat: scoringFormat
+                    )
+                    
+                    self.waiverRecommendations = waiver
+                    self.groupWaiverRecommendations()
+                } catch {
+                    // Silently fail waiver recs
+                    print("⚠️ Failed to load waiver recommendations: \(error)")
+                }
+            }
+            
         } catch {
             errorMessage = error.localizedDescription
-            isLoading = false
+            isInitialLoad = false
         }
     }
     

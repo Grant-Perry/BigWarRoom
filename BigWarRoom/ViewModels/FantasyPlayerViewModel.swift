@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  View model handling business logic for individual fantasy player displays
+//  🔥 PHASE 3 DI: Converted to use dependency injection
 //
 
 import Foundation
@@ -17,20 +18,34 @@ class FantasyPlayerViewModel {
     var teamColor: Color = .gray
     var nflPlayer: NFLPlayer?
     var glowIntensity: Double = 0.0
-    var currentWeek: Int = NFLWeekService.shared.currentWeek
+    var currentWeek: Int = 1
     var statsAvailable: Bool = false
     var showingPlayerDetail: Bool = false
     
-    // MARK: - Dependencies
-    private let gameViewModel = NFLGameMatchupViewModel()
-    private let nflWeekService = NFLWeekService.shared
-    private let livePlayersViewModel = AllLivePlayersViewModel.shared
-    private let playerDirectory = PlayerDirectoryStore.shared
+    // MARK: - Dependencies (injected)
+    private let gameViewModel: NFLGameMatchupViewModel
+    private let nflWeekService: NFLWeekService
+    // 🔥 PHASE 3 DI: Make livePlayersViewModel internal so FantasyPlayerCard can access it
+    internal let livePlayersViewModel: AllLivePlayersViewModel
+    // 🔥 PHASE 3 DI: Inject PlayerDirectoryStore
+    internal let playerDirectory: PlayerDirectoryStore
     
     private var observationTask: Task<Void, Never>?
     
     // MARK: - Initialization
-    init() {
+    
+    // 🔥 PHASE 3: Dependency injection initializer
+    init(
+        livePlayersViewModel: AllLivePlayersViewModel, 
+        playerDirectory: PlayerDirectoryStore,
+        nflGameDataService: NFLGameDataService,
+        nflWeekService: NFLWeekService
+    ) {
+        self.livePlayersViewModel = livePlayersViewModel
+        self.playerDirectory = playerDirectory
+        self.gameViewModel = NFLGameMatchupViewModel(gameDataService: nflGameDataService)
+        self.nflWeekService = nflWeekService
+        self.currentWeek = nflWeekService.currentWeek
         startObservingDependencies()
     }
     

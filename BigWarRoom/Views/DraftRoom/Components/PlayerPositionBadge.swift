@@ -7,7 +7,7 @@ struct PlayerPositionBadge: View {
     var body: some View {
         Group {
             if let sleeperPlayer = viewModel.findSleeperPlayer(for: suggestion.player),
-               let positionRank = sleeperPlayer.positionalRank {
+               let positionRank = PlayerDirectoryStore.shared.positionalRank(for: sleeperPlayer.playerID) {
                 Text(positionRank)
                     .font(.caption2)
                     .fontWeight(.bold)

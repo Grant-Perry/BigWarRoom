@@ -28,4 +28,14 @@ extension SleeperPlayer {
     var formattedInjuryStatus: String? {
         return injuryStatus?.lowercased().capitalized
     }
+    
+    /// Get positional rank (e.g., "RB12", "WR5") from PlayerDirectoryStore
+    var positionalRank: String? {
+        return PlayerDirectoryStore.shared.positionalRank(for: playerID)
+    }
+    
+    /// Get numeric positional rank (e.g., 12 for "RB12") from PlayerDirectoryStore
+    var numericPositionalRank: Int? {
+        return PlayerDirectoryStore.shared.numericPositionalRank(for: playerID)
+    }
 }

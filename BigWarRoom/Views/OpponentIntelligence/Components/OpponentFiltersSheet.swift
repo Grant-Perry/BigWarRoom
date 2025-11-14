@@ -205,5 +205,8 @@ private struct FilterChip: View {
 }
 
 #Preview("Opponent Filters Sheet") {
-    OpponentFiltersSheet(viewModel: OpponentIntelligenceViewModel())
+    OpponentFiltersSheet(viewModel: OpponentIntelligenceViewModel(
+        matchupsHubViewModel: MatchupsHubViewModel.shared,
+        allLivePlayersViewModel: AllLivePlayersViewModel.shared
+    ))
 }

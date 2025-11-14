@@ -4,6 +4,7 @@
 //
 //  🏈 NFL TEAM ROSTER VIEW MODEL 🏈
 //  Handles all business logic for NFL team roster display with smart filtering
+//  🔥 PHASE 3 DI: Converted to use dependency injection
 //
 
 import Foundation
@@ -30,12 +31,14 @@ final class NFLTeamRosterViewModel {
     
     // MARK: - Private Properties
     private let teamCode: String
-    private let coordinator = TeamRosterCoordinator.shared
-    private let nflGameService = NFLGameDataService.shared // 🔥 FIXED: Use NFL game service instead of game status service
+    private let coordinator: TeamRosterCoordinator // 🔥 PHASE 3: Now injected
+    private let nflGameService: NFLGameDataService
     
-    // MARK: - Initialization
-    init(teamCode: String) {
+    // 🔥 PHASE 3 DI: Dependency injection initializer
+    init(teamCode: String, coordinator: TeamRosterCoordinator, nflGameService: NFLGameDataService) {
         self.teamCode = teamCode
+        self.coordinator = coordinator
+        self.nflGameService = nflGameService
         self.teamInfo = NFLTeamInfo(
             teamCode: teamCode,
             teamName: getTeamName(for: teamCode),
@@ -119,10 +122,10 @@ final class NFLTeamRosterViewModel {
         }
     }
     
-    /// Get actual player points for current week from coordinator's cached data
+    /// Get actual player points for current week from AllLivePlayersViewModel
     func getPlayerPoints(for player: SleeperPlayer) -> Double? {
-        // Get stats from the live players view model (which coordinator ensures is loaded)
-        if let stats = AllLivePlayersViewModel.shared.playerStats[player.playerID] {
+        // 🔥 PHASE 3: Access through coordinator's injected dependency
+        if let stats = coordinator.livePlayersViewModel.playerStats[player.playerID] {
             return stats["pts_ppr"] ?? stats["pts_half_ppr"] ?? stats["pts_std"]
         }
         return nil
@@ -130,7 +133,7 @@ final class NFLTeamRosterViewModel {
     
     /// Format player stat breakdown based on position
     func formatPlayerStatBreakdown(_ player: SleeperPlayer) -> String? {
-        guard let stats = AllLivePlayersViewModel.shared.playerStats[player.playerID] else { return nil }
+        guard let stats = coordinator.livePlayersViewModel.playerStats[player.playerID] else { return nil }
         return formatStatsForPosition(stats: stats, position: player.position ?? "")
     }
     

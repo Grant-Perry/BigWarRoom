@@ -34,7 +34,11 @@ struct EnhancedNFLTeamRosterView: View {
     init(teamCode: String, rootDismiss: (() -> Void)? = nil) {
         self.teamCode = teamCode
         self.rootDismiss = rootDismiss
-        self.viewModel = NFLTeamRosterViewModel(teamCode: teamCode)
+        self.viewModel = NFLTeamRosterViewModel(
+            teamCode: teamCode,
+            coordinator: TeamRosterCoordinator(livePlayersViewModel: AllLivePlayersViewModel.shared),
+            nflGameService: NFLGameDataService.shared
+        )
     }
     
     var body: some View {

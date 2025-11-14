@@ -10,8 +10,8 @@ import SwiftUI
 struct PlayerScoreBarCardTeamLogoView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
-    // 🔥 NEW: State for accessing player directory for injury data
-    @State private var playerDirectory = PlayerDirectoryStore.shared
+    // 🔥 USE .shared for player directory
+    private var playerDirectory: PlayerDirectoryStore { PlayerDirectoryStore.shared }
     
     var body: some View {
         ZStack {

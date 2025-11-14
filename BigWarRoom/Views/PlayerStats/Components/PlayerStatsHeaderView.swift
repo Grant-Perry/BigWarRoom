@@ -13,22 +13,22 @@ struct PlayerStatsHeaderView: View {
     let team: NFLTeam?
     
     @State private var teamAssets = TeamAssetManager.shared
-    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    
+    // 🔥 USE ENVIRONMENT for dependencies
+    @Environment(AllLivePlayersViewModel.self) private var livePlayersViewModel
+    @Environment(PlayerWatchService.self) private var watchService
+    
     @State private var playerNewsViewModel = PlayerNewsViewModel()
-    @State private var watchService = PlayerWatchService.shared
     
     // 🗞️ NEWS: Player news sheet state
     @State private var showingPlayerNews = false
     
     // NEW: Computed ESPN ID that tries multiple methods to find ESPN ID
     private var resolvedESPNID: String? {
-        
-        // Method 1: Try the direct ESPN ID from Sleeper
         if let espnID = player.espnID {
             return espnID
         }
         
-        // Method 2: Try fallback mapping service for high-profile players
         let fallbackService = ESPNIDMappingService.shared
         if let fallbackESPNID = fallbackService.getFallbackESPNID(
             fullName: player.fullName,
@@ -374,5 +374,7 @@ struct PlayerStatsHeaderView: View {
     
     let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
     
-    return PlayerStatsHeaderView(player: mockPlayer, team: nil)
+    // 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
+    // TODO: Create proper mock instances for preview
+    Text("Preview disabled - dependency injection required")
 }

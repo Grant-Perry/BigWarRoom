@@ -262,7 +262,8 @@ struct LeagueMatchupsTabView: View {
                 FantasyMatchupDetailView(
                     matchup: matchup,
                     fantasyViewModel: fantasyViewModel,
-                    leagueName: leagueName
+                    leagueName: leagueName,
+                    livePlayersViewModel: AllLivePlayersViewModel.shared
                 )
                 .frame(maxWidth: .infinity)
                 .tag(index)

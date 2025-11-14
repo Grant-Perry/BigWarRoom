@@ -16,20 +16,16 @@ import Observation
 @MainActor
 final class PlayerWatchService {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: PlayerWatchService?
     
     static var shared: PlayerWatchService {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
-        let instance = PlayerWatchService()
-        _shared = instance
-        return instance
+        fatalError("PlayerWatchService.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: PlayerWatchService) {
         _shared = instance
     }
@@ -60,17 +56,14 @@ final class PlayerWatchService {
     
     // MARK: - Dependencies
     private let weekManager: WeekSelectionManager
+    private weak var allLivePlayersViewModel: AllLivePlayersViewModel? // 🔥 NEW: Weak reference to avoid retain cycle
     
     // MARK: - Initialization
     
-    // 🔥 PHASE 2.5: Default initializer for bridge pattern
-    convenience init() {
-        self.init(weekManager: WeekSelectionManager.shared)
-    }
-    
-    // 🔥 PHASE 2.5: Dependency injection initializer
-    init(weekManager: WeekSelectionManager) {
+    // 🔥 ONLY initializer: Dependency injection
+    init(weekManager: WeekSelectionManager, allLivePlayersViewModel: AllLivePlayersViewModel? = nil) {
         self.weekManager = weekManager
+        self.allLivePlayersViewModel = allLivePlayersViewModel
         loadWatchedPlayers()
         loadSettings()
         setupWeekChangeObservation()
@@ -111,8 +104,12 @@ final class PlayerWatchService {
         
         // Option 2: Update scores for new week (keep existing watches but with new data)
         
-        // Get fresh data from AllLivePlayersViewModel for the new week
-        let allLiveVM = AllLivePlayersViewModel.shared
+        // 🔥 FIXED: Use injected dependency instead of .shared
+        guard let allLiveVM = allLivePlayersViewModel else {
+            print("📅 PlayerWatchService: AllLivePlayersViewModel not available - manual refresh required")
+            return
+        }
+        
         await allLiveVM.loadAllPlayers() // This should load data for the current week
         
         // Update watched player scores with the new week's data

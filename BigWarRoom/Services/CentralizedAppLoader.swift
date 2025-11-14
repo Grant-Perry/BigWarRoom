@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  🔥 UPDATED: Progressive loading - show data as it becomes available
+//  🔥 PHASE 3 DI: Removed bridge pattern, pure dependency injection
 //
 
 import Foundation
@@ -13,24 +14,20 @@ import Observation
 @MainActor
 final class CentralizedAppLoader {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: CentralizedAppLoader?
     
     static var shared: CentralizedAppLoader {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
-        let instance = CentralizedAppLoader()
-        _shared = instance
-        return instance
+        fatalError("CentralizedAppLoader.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: CentralizedAppLoader) {
         _shared = instance
     }
-    
+
     // MARK: - Observable Properties (No @Published needed with @Observable)
     var isLoading = true
     var loadingProgress: Double = 0.0
@@ -38,9 +35,10 @@ final class CentralizedAppLoader {
     var hasCompletedInitialization = false
     var canShowPartialData = false  // 🔥 NEW: Allow showing partial data
     
-    // MARK: - Dependencies
+    // MARK: - Dependencies (injected)
     private let matchupsHubViewModel: MatchupsHubViewModel
     private let allLivePlayersViewModel: AllLivePlayersViewModel
+    private let sharedStatsService: SharedStatsService
     
     private var loadingMessages = [
         "Loading your fantasy data...",
@@ -51,18 +49,15 @@ final class CentralizedAppLoader {
     
     // MARK: - Initialization
     
-    // 🔥 PHASE 2.5: Default initializer for bridge pattern
-    convenience init() {
-        self.init(
-            matchupsHubViewModel: MatchupsHubViewModel.shared,
-            allLivePlayersViewModel: AllLivePlayersViewModel.shared
-        )
-    }
-    
-    // 🔥 PHASE 2.5: Dependency injection initializer
-    init(matchupsHubViewModel: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+    // 🔥 PHASE 3 DI: Pure dependency injection - no more bridge pattern
+    init(
+        matchupsHubViewModel: MatchupsHubViewModel,
+        allLivePlayersViewModel: AllLivePlayersViewModel,
+        sharedStatsService: SharedStatsService
+    ) {
         self.matchupsHubViewModel = matchupsHubViewModel
         self.allLivePlayersViewModel = allLivePlayersViewModel
+        self.sharedStatsService = sharedStatsService
     }
     
     /// 🔥 NEW: Progressive initialization - show data as it becomes available
@@ -103,7 +98,7 @@ final class CentralizedAppLoader {
     /// Load shared stats first to eliminate redundant API calls
     private func loadSharedStats() async {
         do {
-            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            let _ = try await sharedStatsService.loadCurrentWeekStats()
 //            print("✅ CentralizedAppLoader: Shared stats loaded")
         } catch {
 //            print("❌ CentralizedAppLoader: Failed to load shared stats: \(error)")

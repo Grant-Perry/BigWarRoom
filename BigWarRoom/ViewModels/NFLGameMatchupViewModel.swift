@@ -15,10 +15,13 @@ final class NFLGameMatchupViewModel {
     var gameInfo: NFLGameInfo?
     var isLoading = false
     
-    private let gameDataService = NFLGameDataService.shared
+    // 🔥 INJECT dependency instead of using .shared
+    private let gameDataService: NFLGameDataService
     private var observationTask: Task<Void, Never>?
 
-    init() {
+    // 🔥 DEPENDENCY INJECTION: Accept gameDataService via init
+    init(gameDataService: NFLGameDataService) {
+        self.gameDataService = gameDataService
         setupObservation()
     }
     

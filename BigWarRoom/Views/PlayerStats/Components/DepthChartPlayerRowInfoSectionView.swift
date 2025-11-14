@@ -10,8 +10,14 @@ import SwiftUI
 struct DepthChartPlayerRowInfoSectionView: View {
     let depthPlayer: DepthChartPlayer
     
-    // 🔥 PHASE 3: Use @State for @Observable ViewModel
-    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    // 🔥 PHASE 3 DI: Remove .shared assignment, will be injected
+    @State private var livePlayersViewModel: AllLivePlayersViewModel
+    
+    // 🔥 PHASE 3 DI: Add initializer with dependency
+    init(depthPlayer: DepthChartPlayer, livePlayersViewModel: AllLivePlayersViewModel) {
+        self.depthPlayer = depthPlayer
+        self._livePlayersViewModel = State(initialValue: livePlayersViewModel)
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {

@@ -12,7 +12,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
     
     // 🔥 NEW: State for player detail sheet
     @State private var showingPlayerDetail = false
-    @State private var playerDirectory = PlayerDirectoryStore.shared
+    // 🔥 PHASE 3 DI: PlayerDirectory removed - not used in this view
     
     var body: some View {
         ZStack {
@@ -142,13 +142,13 @@ struct PlayerScoreBarCardPlayerImageView: View {
     private func getSleeperPlayerData() -> SleeperPlayer? {
         // 🔥 FIX: Try SleeperID first (most reliable) - SAME AS CONTENT VIEW
         if let sleeperID = playerEntry.player.sleeperID,
-           let sleeperPlayer = playerDirectory.players[sleeperID] {
+           let sleeperPlayer = PlayerDirectoryStore.shared.players[sleeperID] {
             return sleeperPlayer
         }
         
         // Try ESPN ID mapping to Sleeper
         if let espnID = playerEntry.player.espnID,
-           let sleeperPlayer = playerDirectory.playerByESPNID(espnID) {
+           let sleeperPlayer = PlayerDirectoryStore.shared.playerByESPNID(espnID) {
             return sleeperPlayer
         }
         
@@ -157,7 +157,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
         let shortName = playerEntry.player.shortName.lowercased()
         let team = playerEntry.player.team?.lowercased()
         
-        return playerDirectory.players.values.first { sleeperPlayer in
+        return PlayerDirectoryStore.shared.players.values.first { sleeperPlayer in
             sleeperPlayer.fullName.lowercased() == playerName ||
             (sleeperPlayer.shortName.lowercased() == shortName &&
              sleeperPlayer.team?.lowercased() == team)

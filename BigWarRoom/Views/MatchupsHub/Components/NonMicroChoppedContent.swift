@@ -110,6 +110,10 @@ struct NonMicroChoppedContent: View {
         
         // Use the FantasyTeam's playersYetToPlay method with week context
         let currentWeek = WeekSelectionManager.shared.selectedWeek
-        return ranking.team.playersYetToPlay(forWeek: currentWeek)
+        return ranking.team.playersYetToPlay(
+            forWeek: currentWeek,
+            weekSelectionManager: WeekSelectionManager.shared,
+            gameStatusService: GameStatusService.shared
+        )
     }
 }

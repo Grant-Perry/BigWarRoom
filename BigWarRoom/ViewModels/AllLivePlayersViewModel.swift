@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  🔥 REFACTORED: Core coordination only - all functionality moved to focused extensions
+//  🔥 NO SINGLETON - Use dependency injection
 //
 
 import Foundation
@@ -12,6 +13,21 @@ import Observation
 @MainActor
 @Observable
 final class AllLivePlayersViewModel {
+    
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
+    private static var _shared: AllLivePlayersViewModel?
+    
+    static var shared: AllLivePlayersViewModel {
+        if let existing = _shared {
+            return existing
+        }
+        fatalError("AllLivePlayersViewModel.shared accessed before initialization. Call setSharedInstance() first.")
+    }
+    
+    static func setSharedInstance(_ instance: AllLivePlayersViewModel) {
+        _shared = instance
+    }
+    
     // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
     var allPlayers: [LivePlayerEntry] = []
     var filteredPlayers: [LivePlayerEntry] = []
@@ -46,6 +62,10 @@ final class AllLivePlayersViewModel {
     
     // 🔥 PHASE 2.5: Accept dependencies instead of hardcoded .shared
     let matchupsHubViewModel: MatchupsHubViewModel
+    internal let playerDirectory: PlayerDirectoryStore
+    internal let gameStatusService: GameStatusService
+    internal let sharedStatsService: SharedStatsService
+    internal let weekSelectionManager: WeekSelectionManager
     
     // MARK: - Internal State (not published)
     internal var debounceTask: Task<Void, Never>?
@@ -63,8 +83,18 @@ final class AllLivePlayersViewModel {
     
     // 🔥 PHASE 2.5: Dependency injection initializer
     @MainActor
-    init(matchupsHubViewModel: MatchupsHubViewModel) {
+    init(
+        matchupsHubViewModel: MatchupsHubViewModel,
+        playerDirectory: PlayerDirectoryStore,
+        gameStatusService: GameStatusService,
+        sharedStatsService: SharedStatsService,
+        weekSelectionManager: WeekSelectionManager
+    ) {
         self.matchupsHubViewModel = matchupsHubViewModel
+        self.playerDirectory = playerDirectory
+        self.gameStatusService = gameStatusService
+        self.sharedStatsService = sharedStatsService
+        self.weekSelectionManager = weekSelectionManager
         // setupObservation()  // 🔥 DISABLED: Creates race condition with 15-second timer, causes throttle to block all API calls
         setupAutoRefresh()
     }

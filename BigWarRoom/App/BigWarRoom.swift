@@ -8,13 +8,20 @@ import SwiftUI
 
 struct BigWarRoom: View {
     @State private var draftRoomViewModel = DraftRoomViewModel()
-    @State private var initManager = AppInitializationManager.shared
+    @State private var initManager: AppInitializationManager? // Created after services
     @State private var selectedTab = 3 // Changed from 0 to 3 - Start on Live Players tab
     
-    // 🔥 PHASE 2: Create services with proper @State + dependency injection
+    // 🔥 PHASE 3 DI: Core services created in dependency order
     @State private var sleeperAPIClient = SleeperAPIClient()
+    @State private var playerDirectory: PlayerDirectoryStore?
+    @State private var idCanonicalizer: ESPNSleeperIDCanonicalizer?
+    @State private var nflGameDataService: NFLGameDataService?
+    @State private var gameStatusService: GameStatusService?
     @State private var nflWeekService: NFLWeekService?
     @State private var weekSelectionManager: WeekSelectionManager?
+    @State private var seasonYearManager: SeasonYearManager?
+    @State private var playerStatsCache: PlayerStatsCache?
+    @State private var sharedStatsService: SharedStatsService?
     @State private var espnCredentials: ESPNCredentialsManager?
     @State private var sleeperCredentials: SleeperCredentialsManager?
     @State private var playerWatchService: PlayerWatchService?
@@ -24,12 +31,16 @@ struct BigWarRoom: View {
     
     var body: some View {
         ZStack {
-            if initManager.isInitialized && !initManager.isLoading && servicesInitialized {
+            if let initManager = initManager,
+               initManager.isInitialized && !initManager.isLoading && servicesInitialized {
                 // 🔥 MAIN APP: Only show after initialization is complete
                 mainAppContent
-            } else {
+            } else if let initManager = initManager {
                 // 🔥 LOADING: Show loading screen during initialization
                 AppInitializationLoadingView(initManager: initManager)
+            } else {
+                // Initial setup loading
+                ProgressView("Initializing...")
                     .onAppear {
                         setupServices()
                     }
@@ -39,9 +50,10 @@ struct BigWarRoom: View {
         .onAppear {
             setupServices()
             // 🔥 INITIALIZE: Start centralized initialization on app start
-            if !initManager.isInitialized && !initManager.isLoading {
+            if let manager = initManager,
+               !manager.isInitialized && !manager.isLoading {
                 Task {
-                    await initManager.initializeApp()
+                    await manager.initializeApp()
                 }
             }
         }
@@ -54,34 +66,67 @@ struct BigWarRoom: View {
     private func setupServices() {
         guard !servicesInitialized else { return }
         
-        // 🔥 PHASE 2 CORRECTED: Proper @Observable service creation with dependency injection
+        // 🔥 PHASE 3 DI: Create services in dependency order
+        
+        // 1. Core Data Services
+        playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+        idCanonicalizer = ESPNSleeperIDCanonicalizer(playerDirectory: playerDirectory!)
+        
+        // 2. NFL Game Services
+        nflGameDataService = NFLGameDataService()
+        gameStatusService = GameStatusService(nflGameDataService: nflGameDataService!)
+        
+        // 3. Week/Season Management
+        nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+        weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService!)
+        seasonYearManager = SeasonYearManager()
+        
+        // 4. Stats Services
+        playerStatsCache = PlayerStatsCache()
+        sharedStatsService = SharedStatsService(
+            weekSelectionManager: weekSelectionManager!,
+            seasonYearManager: seasonYearManager!,
+            playerStatsCache: playerStatsCache!
+        )
+        
+        // 5. Credential Management
         sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
         
         // Break circular dependency: Create ESPN credentials first, then API client
         let espnCreds = ESPNCredentialsManager()
         let espnAPIClient = ESPNAPIClient(credentialsManager: espnCreds)
-        espnCreds.setAPIClient(espnAPIClient) // Complete the circular dependency
+        espnCreds.setAPIClient(espnAPIClient)
         espnCredentials = espnCreds
         
-        // Create NFL week service and week selection manager
-        nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
-        weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService!)
-        
-        // Create watch service
-        playerWatchService = PlayerWatchService()
-        
-        // 🔥 PHASE 2.5: Create MatchupsHubViewModel with proper dependencies
+        // 6. ViewModels with dependencies
         matchupsHubViewModel = MatchupsHubViewModel(
             espnCredentials: espnCreds,
-            sleeperCredentials: sleeperCredentials!
+            sleeperCredentials: sleeperCredentials!,
+            playerDirectory: playerDirectory!,
+            gameStatusService: gameStatusService!,
+            sharedStatsService: sharedStatsService!
         )
-        
-        // 🔥 PHASE 2.5: Set the shared instance for bridge compatibility
-        MatchupsHubViewModel.setSharedInstance(matchupsHubViewModel!)
         
         // Create AllLivePlayersViewModel with dependencies
         allLivePlayersViewModel = AllLivePlayersViewModel(
-            matchupsHubViewModel: matchupsHubViewModel!
+            matchupsHubViewModel: matchupsHubViewModel!,
+            playerDirectory: playerDirectory!,
+            gameStatusService: gameStatusService!,
+            sharedStatsService: sharedStatsService!,
+            weekSelectionManager: weekSelectionManager!
+        )
+        
+        playerWatchService = PlayerWatchService(
+            weekManager: weekSelectionManager!,
+            allLivePlayersViewModel: allLivePlayersViewModel
+        )
+        
+        // 7. Initialization Manager
+        initManager = AppInitializationManager(
+            matchupsHubViewModel: matchupsHubViewModel!,
+            allLivePlayersViewModel: allLivePlayersViewModel!,
+            playerDirectory: playerDirectory!,
+            sharedStatsService: sharedStatsService!
         )
         
         servicesInitialized = true
@@ -114,12 +159,14 @@ struct BigWarRoom: View {
                 .tag(0)
                 
                 // NFL SCHEDULE TAB - PRIORITIZED FOR VISIBILITY
-                NFLScheduleView()
-                    .tabItem {
-                        Image(systemName: "calendar.circle.fill")
-                        Text("Schedule")
-                    }
-                    .tag(1)
+                Group {
+                    NFLScheduleView()
+                }
+                .tabItem {
+                    Image(systemName: "calendar.circle.fill")
+                    Text("Schedule")
+                }
+                .tag(1)
                 
                 // Fantasy Tab 
                 FantasyMatchupListView(draftRoomViewModel: draftRoomViewModel)

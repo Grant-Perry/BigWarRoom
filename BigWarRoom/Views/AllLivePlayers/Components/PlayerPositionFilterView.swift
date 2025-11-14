@@ -47,9 +47,5 @@ struct PlayerPositionFilterView: View {
     }
 }
 
-#Preview {
-    PlayerPositionFilterView(
-        allLivePlayersViewModel: AllLivePlayersViewModel.shared,
-        onPositionChange: {}
-    )
-}
+// 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
+// TODO: Create preview mock instances or use PreviewContainer pattern

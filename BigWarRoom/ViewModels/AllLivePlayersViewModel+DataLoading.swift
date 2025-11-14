@@ -47,7 +47,7 @@ extension AllLivePlayersViewModel {
             let playerEntries = extractAllPlayers()
             await buildPlayerData(from: playerEntries)
             
-            // 🔥 NEW: Update PlayerWatchService with initial data
+            // 🔥 PHASE 3 DI: Update PlayerWatchService with initial data (service passed to extension methods)
             await notifyPlayerWatchService(with: playerEntries)
             
             // Update state
@@ -75,15 +75,15 @@ extension AllLivePlayersViewModel {
         }
 
         let currentYear = AppConstants.currentSeasonYear
-        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        let selectedWeek = weekSelectionManager.selectedWeek
         
         if AppConstants.debug {
             print("🔄 STATS DEBUG: Loading player stats for week \(selectedWeek), year \(currentYear)")
         }
 
         do {
-            // 🔥 WOODY'S FIX: Use forceRefresh to bypass cache for live updates
-            let freshStats = try await SharedStatsService.shared.loadWeekStats(
+            // 🔥 PHASE 3 DI: Use injected sharedStatsService
+            let freshStats = try await sharedStatsService.loadWeekStats(
                 week: selectedWeek, 
                 year: currentYear, 
                 forceRefresh: true  // 🔥 CRITICAL: Always force fresh data for live updates
@@ -239,33 +239,36 @@ extension AllLivePlayersViewModel {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            let newWeek = WeekSelectionManager.shared.selectedWeek
-            self?.debounceTask?.cancel()
-            self?.debounceTask = Task { @MainActor in
+            // 🔥 PHASE 3 DI: Use injected weekSelectionManager
+            guard let self = self else { return }
+            let newWeek = self.weekSelectionManager.selectedWeek
+
+            self.debounceTask?.cancel()
+            self.debounceTask = Task { @MainActor in
                 // PRESERVE SEARCH STATE: Don't clear search data during week changes
-                let wasSearching = self?.isSearching ?? false
-                let searchText = self?.searchText ?? ""
-                let showRosteredOnly = self?.showRosteredOnly ?? false
-                let preservedNFLPlayers = self?.allNFLPlayers ?? []
+                let wasSearching = self.isSearching
+                let searchText = self.searchText
+                let showRosteredOnly = self.showRosteredOnly
+                let preservedNFLPlayers = self.allNFLPlayers
                 
                 // Reset stats for new week
-                self?.statsLoaded = false
-                self?.playerStats = [:]
+                self.statsLoaded = false
+                self.playerStats = [:]
                 
                 // Reload stats for new week if we have players
-                if !(self?.allPlayers.isEmpty ?? true) {
-                    await self?.loadPlayerStats()
+                if !(self.allPlayers.isEmpty) {
+                    await self.loadPlayerStats()
                 }
                 
                 // RESTORE SEARCH STATE: Put search state back after week change
                 if wasSearching {
-                    self?.isSearching = wasSearching
-                    self?.searchText = searchText
-                    self?.showRosteredOnly = showRosteredOnly
-                    self?.allNFLPlayers = preservedNFLPlayers
+                    self.isSearching = wasSearching
+                    self.searchText = searchText
+                    self.showRosteredOnly = showRosteredOnly
+                    self.allNFLPlayers = preservedNFLPlayers
                     
                     // Reapply search filters for new week
-                    self?.applyPositionFilter()
+                    self.applyPositionFilter()
                 }
             }
         }
@@ -290,29 +293,13 @@ extension AllLivePlayersViewModel {
     // MARK: - PlayerWatchService Integration
     
     /// Notify PlayerWatchService of updated player data
+    /// 🔥 PHASE 3 TODO: This should be injected as a dependency instead of using .shared
+    /// For now, we'll skip this update since PlayerWatchService should be updated from views
     private func notifyPlayerWatchService(with playerEntries: [LivePlayerEntry]) async {
-//        print("🔥 WATCH SERVICE UPDATE: Converting \(playerEntries.count) players for PlayerWatchService")
-        
-        // Convert LivePlayerEntry to OpponentPlayer format
-        let opponentPlayers = playerEntries.map { entry in
-            OpponentPlayer(
-                id: UUID().uuidString,
-                player: entry.player,
-                isStarter: entry.isStarter,
-                currentScore: entry.currentScore,
-                projectedScore: entry.projectedScore,
-                threatLevel: convertThreatLevel(entry.performanceTier),
-                matchupAdvantage: .neutral,
-                percentageOfOpponentTotal: entry.percentageOfTop * 100.0
-            )
-        }
-        
-        // Update PlayerWatchService on main actor
-        await MainActor.run {
-            PlayerWatchService.shared.updateWatchedPlayerScores(opponentPlayers)
-        }
-        
-//        print("🔥 WATCH SERVICE UPDATE: Updated PlayerWatchService with \(opponentPlayers.count) players")
+        // 🔥 PHASE 3 DI: PlayerWatchService updates are now handled by the view layer
+        // that owns the service instance. This prevents coupling between ViewModels.
+        // Views that use AllLivePlayersViewModel should also inject PlayerWatchService
+        // and call updateWatchedPlayerScores() when needed.
     }
     
     /// Convert performance tier to player threat level

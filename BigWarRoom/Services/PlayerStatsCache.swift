@@ -13,11 +13,24 @@ import Foundation
 /// so they can be accessed by player cards without making duplicate API calls
 @MainActor
 class PlayerStatsCache {
-    static let shared = PlayerStatsCache()
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
+    private static var _shared: PlayerStatsCache?
+    
+    static var shared: PlayerStatsCache {
+        if let existing = _shared {
+            return existing
+        }
+        let instance = PlayerStatsCache()
+        _shared = instance
+        return instance
+    }
+    
+    static func setSharedInstance(_ instance: PlayerStatsCache) {
+        _shared = instance
+    }
     
     private var weeklyStats: [Int: [String: [String: Double]]] = [:]
     
-    // 🔥 PHASE 2.5: Make init public for dependency injection
     init() {}
 
     /// Update cached stats for a specific week

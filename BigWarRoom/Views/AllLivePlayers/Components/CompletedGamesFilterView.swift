@@ -61,9 +61,5 @@ struct CompletedGamesFilterView: View {
     }
 }
 
-#Preview {
-    CompletedGamesFilterView(
-        allLivePlayersViewModel: AllLivePlayersViewModel.shared,
-        onFilterChange: {}
-    )
-}
+// 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
+// TODO: Create preview mock instances or use PreviewContainer pattern

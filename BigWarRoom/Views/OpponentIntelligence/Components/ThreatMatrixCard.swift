@@ -117,8 +117,19 @@ struct ThreatMatrixCard: View {
            HStack {
                if let opponentTeam = intelligence.opponentTeam {
                    // Regular matchup display
-                   let myTeamColor: Color = intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) > opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) ? .gpGreen : .gpRedPink
-                   let oppTeamColor: Color = opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) > intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek) ? .gpGreen : .gpRedPink
+                   let currentWeek = intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek
+                   let myToPlay = intelligence.myTeam.playersYetToPlay(
+                       forWeek: currentWeek,
+                       weekSelectionManager: WeekSelectionManager.shared,
+                       gameStatusService: GameStatusService.shared
+                   )
+                   let oppToPlay = opponentTeam.playersYetToPlay(
+                       forWeek: currentWeek,
+                       weekSelectionManager: WeekSelectionManager.shared,
+                       gameStatusService: GameStatusService.shared
+                   )
+                   let myTeamColor: Color = myToPlay > oppToPlay ? .gpGreen : .gpRedPink
+                   let oppTeamColor: Color = oppToPlay > myToPlay ? .gpGreen : .gpRedPink
                    
                    // My team info
                    VStack(alignment: .leading, spacing: 3) {
@@ -126,7 +137,7 @@ struct ThreatMatrixCard: View {
                            .font(.system(size: 13, weight: .semibold, design: .rounded))
                            .foregroundColor(intelligence.isLosingTo ? .red : .gpGreen)
 
-                       Text("to play: \(intelligence.myTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
+                       Text("to play: \(myToPlay)")
                            .font(.system(size: 10, weight: .regular))
                            .foregroundColor(myTeamColor)
                    }
@@ -139,7 +150,7 @@ struct ThreatMatrixCard: View {
                            .font(.system(size: 13, weight: .semibold, design: .rounded))
                            .foregroundColor(intelligence.isLosingTo ? .gpGreen : .red)
 
-                       Text("to play: \(opponentTeam.playersYetToPlay(forWeek: intelligence.matchup.fantasyMatchup?.week ?? WeekSelectionManager.shared.selectedWeek))")
+                       Text("to play: \(oppToPlay)")
                            .font(.system(size: 10, weight: .regular))
                            .foregroundColor(oppTeamColor)
                    }

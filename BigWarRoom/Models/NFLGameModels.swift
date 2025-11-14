@@ -254,20 +254,16 @@ struct NFLGameInfo: Equatable {
 @MainActor
 final class NFLGameDataService {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: NFLGameDataService?
     
     static var shared: NFLGameDataService {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
-        let instance = NFLGameDataService()
-        _shared = instance
-        return instance
+        fatalError("NFLGameDataService.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: NFLGameDataService) {
         _shared = instance
     }
@@ -287,7 +283,7 @@ final class NFLGameDataService {
     @ObservationIgnored private var lastRequestTimestamp: Date?
     @ObservationIgnored private let minimumRequestInterval: TimeInterval = 2.0 // Minimum 2 seconds between requests
     
-    // 🔥 PHASE 2 CORRECTED: Remove .shared singleton, use proper dependency injection
+    // 🔥 PHASE 3 DI: Public init for dependency injection
     init() {}
     
     /// Fetch real NFL game data from ESPN API with deduplication and throttling

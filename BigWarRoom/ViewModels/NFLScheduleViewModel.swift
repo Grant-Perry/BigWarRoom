@@ -21,11 +21,14 @@ final class NFLScheduleViewModel {
     var showingGameDetail = false
     var selectedGameId: String? // For NavigationLink selection
     
-    private let gameDataService = NFLGameDataService.shared
-    private let weekService = NFLWeekService.shared
+    // 🔥 PHASE 3 DI: Inject dependencies instead of using .shared
+    private let gameDataService: NFLGameDataService
+    private let weekService: NFLWeekService
     private var observationTask: Task<Void, Never>?
     
-    init() {
+    init(gameDataService: NFLGameDataService, weekService: NFLWeekService) {
+        self.gameDataService = gameDataService
+        self.weekService = weekService
         self.selectedWeek = weekService.currentWeek
         setupObservation()
         

@@ -19,7 +19,8 @@ struct FantasyMatchupDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     // Shared instance to ensure stats are loaded early
-    @State private var livePlayersViewModel = AllLivePlayersViewModel.shared
+    // 🔥 PHASE 3 DI: Remove .shared assignment, will be injected
+    @State private var livePlayersViewModel: AllLivePlayersViewModel
 
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position
@@ -33,17 +34,21 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Initializers
 
     /// Default initializer for backward compatibility
-    init(matchup: FantasyMatchup, leagueName: String) {
+    // 🔥 PHASE 3 DI: Add livePlayersViewModel parameter
+    init(matchup: FantasyMatchup, leagueName: String, livePlayersViewModel: AllLivePlayersViewModel) {
         self.matchup = matchup
         self.leagueName = leagueName
         self.fantasyViewModel = nil
+        self._livePlayersViewModel = State(initialValue: livePlayersViewModel)
     }
 
     /// Full initializer with FantasyViewModel
-    init(matchup: FantasyMatchup, fantasyViewModel: FantasyViewModel, leagueName: String) {
+    // 🔥 PHASE 3 DI: Add livePlayersViewModel parameter
+    init(matchup: FantasyMatchup, fantasyViewModel: FantasyViewModel, leagueName: String, livePlayersViewModel: AllLivePlayersViewModel) {
         self.matchup = matchup
         self.leagueName = leagueName
         self.fantasyViewModel = fantasyViewModel
+        self._livePlayersViewModel = State(initialValue: livePlayersViewModel)
     }
 
     // MARK: - Body
@@ -110,7 +115,8 @@ struct FantasyMatchupDetailView: View {
                     }
                 },
                 selectedPosition: $selectedPosition,
-                showActiveOnly: $showActiveOnly
+                showActiveOnly: $showActiveOnly,
+                watchService: PlayerWatchService(weekManager: WeekSelectionManager.shared, allLivePlayersViewModel: livePlayersViewModel) // 🔥 PHASE 3 DI: Create instance
             )
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -189,11 +195,10 @@ struct FantasyMatchupDetailView: View {
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
                             matchup: matchup,
-                            teamIndex: 1, // Home team index
+                            teamIndex: 1,
                             isBench: false
                         )
-                        // FIX: Reduce horizontal padding to prevent double padding
-                        .padding(.horizontal, 8) // Reduced from default
+                        .padding(.horizontal, 8)
                     }
                 }
             }
@@ -211,11 +216,10 @@ struct FantasyMatchupDetailView: View {
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
                             matchup: matchup,
-                            teamIndex: 0, // Away team index
+                            teamIndex: 0,
                             isBench: false
                         )
-                        // FIX: Reduce horizontal padding to prevent double padding
-                        .padding(.horizontal, 8) // Reduced from default
+                        .padding(.horizontal, 8)
                     }
                 }
             }

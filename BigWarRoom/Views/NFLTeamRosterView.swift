@@ -25,7 +25,11 @@ struct NFLTeamRosterView: View {
     
     init(teamCode: String) {
         self.teamCode = teamCode
-        self.viewModel = NFLTeamRosterViewModel(teamCode: teamCode)
+        self.viewModel = NFLTeamRosterViewModel(
+            teamCode: teamCode,
+            coordinator: TeamRosterCoordinator(livePlayersViewModel: AllLivePlayersViewModel.shared),
+            nflGameService: NFLGameDataService.shared
+        )
     }
     
     var body: some View {

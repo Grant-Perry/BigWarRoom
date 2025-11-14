@@ -14,22 +14,16 @@ import Observation
 @Observable
 final class MatchupsHubViewModel {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: MatchupsHubViewModel?
     
     static var shared: MatchupsHubViewModel {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance with default dependencies
-        let espnCredentials = ESPNCredentialsManager()
-        let sleeperCredentials = SleeperCredentialsManager(apiClient: SleeperAPIClient())
-        let instance = MatchupsHubViewModel(espnCredentials: espnCredentials, sleeperCredentials: sleeperCredentials)
-        _shared = instance
-        return instance
+        fatalError("MatchupsHubViewModel.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: MatchupsHubViewModel) {
         _shared = instance
     }
@@ -57,11 +51,16 @@ final class MatchupsHubViewModel {
     // 🔥 NEW: Cache loaded LeagueMatchupProvider instances for score consistency
     internal var cachedProviders: [String: LeagueMatchupProvider] = [:]
     
-    // MARK: - Dependencies - Injected instead of .shared (PHASE 2 CORRECTED)
+    // MARK: - Dependencies - Injected instead of .shared (PHASE 3 DI COMPLETE)
     private let espnCredentials: ESPNCredentialsManager
-    internal let sleeperCredentials: SleeperCredentialsManager  // 🔥 CHANGED: Made internal for extensions
+    internal let sleeperCredentials: SleeperCredentialsManager
     internal let unifiedLeagueManager: UnifiedLeagueManager
     internal var refreshTimer: Timer?
+    
+    // 🔥 PHASE 3 DI: New dependencies
+    private let playerDirectory: PlayerDirectoryStore
+    private let gameStatusService: GameStatusService
+    private let sharedStatsService: SharedStatsService
     
     // 🔥 PHASE 3: Replace Combine with observation task
     private var observationTask: Task<Void, Never>?
@@ -71,12 +70,21 @@ final class MatchupsHubViewModel {
     internal let loadingLock = NSLock()
     internal let maxConcurrentLoads = 3
     
-    // MARK: - Initialization with Dependency Injection (PHASE 2 CORRECTED)
-    init(espnCredentials: ESPNCredentialsManager, sleeperCredentials: SleeperCredentialsManager) {
+    // MARK: - Initialization with Dependency Injection (PHASE 3 DI COMPLETE)
+    init(
+        espnCredentials: ESPNCredentialsManager,
+        sleeperCredentials: SleeperCredentialsManager,
+        playerDirectory: PlayerDirectoryStore,
+        gameStatusService: GameStatusService,
+        sharedStatsService: SharedStatsService
+    ) {
         self.espnCredentials = espnCredentials
         self.sleeperCredentials = sleeperCredentials
+        self.playerDirectory = playerDirectory
+        self.gameStatusService = gameStatusService
+        self.sharedStatsService = sharedStatsService
         
-        // 🔥 PHASE 2 CORRECTED: Create UnifiedLeagueManager with proper dependency injection
+        // 🔥 PHASE 3 DI: Create UnifiedLeagueManager with proper dependency injection
         // We need to create API clients here - this is a bit complex but proper
         let sleeperAPIClient = SleeperAPIClient()
         let espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)

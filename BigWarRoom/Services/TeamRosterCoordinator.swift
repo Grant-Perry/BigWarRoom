@@ -5,6 +5,7 @@
 //  🏈 TEAM ROSTER DATA COORDINATOR 🏈
 //  Eliminates race conditions for NFL team roster loading
 //  Ensures proper data dependency coordination between services
+//  🔥 PHASE 3 DI: Converted from singleton to dependency injection
 //
 
 import Foundation
@@ -15,7 +16,7 @@ import Foundation
 /// Ensures all dependencies are properly loaded before roster data is accessed.
 @MainActor
 final class TeamRosterCoordinator {
-    static let shared = TeamRosterCoordinator()
+    // 🔥 PHASE 3: Removed static shared singleton
     
     // MARK: - State Management
     var isLoadingStats = false
@@ -23,16 +24,19 @@ final class TeamRosterCoordinator {
     var statsReady = false
     var lastStatsLoadTime: Date?
     
-    // MARK: - Dependencies
-    private let livePlayersViewModel = AllLivePlayersViewModel.shared
-    private let nflRosterService = NFLTeamRosterService.shared
+    // MARK: - Dependencies (injected)
+    internal let livePlayersViewModel: AllLivePlayersViewModel
+    private let nflRosterService = NFLTeamRosterService.shared // ⚠️ Still using singleton for NFL service (not part of this refactor)
     
     // MARK: - Cache
     private var cachedRosters: [String: NFLTeamRoster] = [:]
     private var cacheTimestamps: [String: Date] = [:]
     private let cacheTimeout: TimeInterval = 300 // 5 minutes
     
-    private init() {}
+    // 🔥 PHASE 3: Dependency injection initializer
+    init(livePlayersViewModel: AllLivePlayersViewModel) {
+        self.livePlayersViewModel = livePlayersViewModel
+    }
     
     // MARK: - Public Interface
     

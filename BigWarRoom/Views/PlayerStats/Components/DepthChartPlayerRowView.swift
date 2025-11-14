@@ -29,7 +29,10 @@ struct DepthChartPlayerRowView: View {
                 DepthChartPlayerRowImageView(depthPlayer: depthPlayer, team: team)
                 
                 // Enhanced player info section - use component
-                DepthChartPlayerRowInfoSectionView(depthPlayer: depthPlayer)
+                DepthChartPlayerRowInfoSectionView(
+                    depthPlayer: depthPlayer,
+                    livePlayersViewModel: AllLivePlayersViewModel.shared
+                )
                 
                 Spacer(minLength: 0)
                 

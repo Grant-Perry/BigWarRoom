@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  ViewModel for Opponent Intelligence Dashboard (OID)
+//  🔥 PHASE 3 DI: Converted to use dependency injection
 //
 
 import Foundation
@@ -41,11 +42,11 @@ final class OpponentIntelligenceViewModel {
     var totalConflictCount: Int = 0
     var overallThreatAssessment: ThreatLevel = .low
     
-    // MARK: - Dependencies
+    // MARK: - Dependencies (injected)
     
     private let intelligenceService = OpponentIntelligenceService.shared
-    // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-    private let matchupsHubViewModel = MatchupsHubViewModel.shared
+    private let matchupsHubViewModel: MatchupsHubViewModel // 🔥 PHASE 3: Now injected
+    private let allLivePlayersViewModel: AllLivePlayersViewModel // 🔥 PHASE 3: Now injected
     private var observationTask: Task<Void, Never>?
     
     // MARK: - Game Alerts Integration 🚨
@@ -127,7 +128,10 @@ final class OpponentIntelligenceViewModel {
     
     // MARK: - Initialization
     
-    init() {
+    // 🔥 PHASE 3 DI: Dependency injection initializer
+    init(matchupsHubViewModel: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+        self.matchupsHubViewModel = matchupsHubViewModel
+        self.allLivePlayersViewModel = allLivePlayersViewModel
         setupObservation()
         
         // NEW: Subscribe to injury loading state changes
@@ -234,9 +238,9 @@ final class OpponentIntelligenceViewModel {
         // Small delay for UI update
         try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         
-        // Also refresh AllLivePlayersViewModel to ensure injury alerts use fresh data
+        // 🔥 PHASE 3 DI: Use injected AllLivePlayersViewModel
         DebugPrint(mode: .opponentIntel, "Manual refresh - also refreshing AllLivePlayersViewModel")
-        await AllLivePlayersViewModel.shared.refresh()
+        await allLivePlayersViewModel.refresh()
         
         // Now do the main intelligence refresh with fresh data
         await loadOpponentIntelligence()
@@ -267,8 +271,8 @@ final class OpponentIntelligenceViewModel {
             // Clear intelligence cache IMMEDIATELY
             intelligenceService.clearCache()
             
-            // Also clear AllLivePlayersViewModel cache
-            await AllLivePlayersViewModel.shared.refresh()
+            // 🔥 PHASE 3 DI: Use injected AllLivePlayersViewModel
+            await allLivePlayersViewModel.refresh()
             
             // Force matchups hub to do a fresh load (not using cached data)
             DebugPrint(mode: .opponentIntel, "Forcing MatchupsHubViewModel refresh...")

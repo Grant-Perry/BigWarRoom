@@ -19,7 +19,8 @@ struct FantasyMatchupsList: View {
                     NavigationLink(destination: FantasyMatchupDetailView(
                         matchup: matchup,
                         fantasyViewModel: fantasyViewModel,
-                        leagueName: fantasyViewModel.selectedLeague?.league.name ?? "League"
+                        leagueName: fantasyViewModel.selectedLeague?.league.name ?? "League",
+                        livePlayersViewModel: AllLivePlayersViewModel.shared
                     )) {
                         FantasyMatchupCard(matchup: matchup)
                     }

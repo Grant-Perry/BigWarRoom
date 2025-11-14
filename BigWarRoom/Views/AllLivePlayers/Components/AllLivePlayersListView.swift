@@ -13,6 +13,9 @@ struct AllLivePlayersListView: View {
     @Binding var animatedPlayers: [String]
     let onPlayerTap: (UnifiedMatchup) -> Void // 🔥 DEPRECATED: Will be removed
     
+    // 🔥 PHASE 3 DI: Add watchService parameter
+    let watchService: PlayerWatchService
+    
     var body: some View {
         ScrollView {
             // 🔥 FIXED: Use stable ID and reset animations when sort changes
@@ -23,7 +26,8 @@ struct AllLivePlayersListView: View {
                         playerEntry: playerEntry,
                         animateIn: shouldAnimatePlayer(playerEntry.id),
                         onTap: nil, // No card-level tap - use individual buttons instead
-                        viewModel: allLLivePlayersViewModel
+                        viewModel: allLLivePlayersViewModel,
+                        watchService: watchService // 🔥 PHASE 3 DI: Pass watchService
                     )
                     .onAppear {
                         handlePlayerAppearance(playerEntry)
@@ -79,12 +83,5 @@ struct AllLivePlayersListView: View {
     }
 }
 
-#Preview {
-    NavigationView {
-        AllLivePlayersListView(
-            allLLivePlayersViewModel: AllLivePlayersViewModel.shared,
-            animatedPlayers: .constant([]),
-            onPlayerTap: { _ in }
-        )
-    }
-}
+// 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
+// TODO: Create preview mock instances or use PreviewContainer pattern

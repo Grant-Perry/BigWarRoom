@@ -19,53 +19,79 @@ struct FantasyPlayerCard: View {
     let teamIndex: Int?
     let isBench: Bool
     
-    @State private var viewModel = FantasyPlayerViewModel()
+    @State private var viewModel: FantasyPlayerViewModel?
     @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
     @State private var showingPlayerDetail = false
     
+    // 🔥 SIMPLIFIED: Just take the essentials, create ViewModel in onAppear
+    init(
+        player: FantasyPlayer,
+        fantasyViewModel: FantasyViewModel,
+        matchup: FantasyMatchup?,
+        teamIndex: Int?,
+        isBench: Bool
+    ) {
+        self.player = player
+        self.fantasyViewModel = fantasyViewModel
+        self.matchup = matchup
+        self.teamIndex = teamIndex
+        self.isBench = isBench
+    }
+
     var body: some View {
         VStack {
-            ZStack(alignment: .topLeading) {
-                // 🔥 UNIFIED: Use existing UnifiedPlayerCardBackground with live status
-                UnifiedPlayerCardBackground(
-                    configuration: .fantasy(
-                        team: NFLTeam.team(for: player.team ?? ""),
-                        jerseyNumber: player.jerseyNumber,
-                        cornerRadius: 15,
-                        showBorder: true,
-                        isLive: viewModel.isPlayerLive(player)
+            if let vm = viewModel {
+                ZStack(alignment: .topLeading) {
+                    UnifiedPlayerCardBackground(
+                        configuration: .fantasy(
+                            team: NFLTeam.team(for: player.team ?? ""),
+                            jerseyNumber: player.jerseyNumber,
+                            cornerRadius: 15,
+                            showBorder: true,
+                            isLive: vm.isPlayerLive(player)
+                        )
                     )
-                )
-                
-                // 🔥 FIX: Team logo overlay behind player content (like WatchedPlayersSheet)
-                HStack {
-                    Spacer()
-                    VStack {
-                        if let team = NFLTeam.team(for: player.team ?? "") {
-                            TeamAssetManager.shared.logoOrFallback(for: team.id)
-                                .frame(width: 90, height: 90)
-                                .opacity(viewModel.isPlayerLive(player) ? 0.4 : 0.25)
-                                .offset(x: 10, y: 10)
-                                .zIndex(0)
-                        }
+                    
+                    HStack {
                         Spacer()
+                        VStack {
+                            if let team = NFLTeam.team(for: player.team ?? "") {
+                                TeamAssetManager.shared.logoOrFallback(for: team.id)
+                                    .frame(width: 90, height: 90)
+                                    .opacity(vm.isPlayerLive(player) ? 0.4 : 0.25)
+                                    .offset(x: 10, y: 10)
+                                    .zIndex(0)
+                            }
+                            Spacer()
+                        }
                     }
+                    .padding(.top, 20)
+                    .padding(.trailing, 15)
+                    
+                    buildMainContent(vm: vm)
                 }
-                .padding(.top, 20)
-                .padding(.trailing, 15)
-                
-                // 🔥 SIMPLIFIED: Reuse existing content components but cleaned up
-                buildMainContent()
+                .frame(height: vm.cardHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 15))
+                .onTapGesture {
+                    showingPlayerDetail = true
+                }
+            } else {
+                ProgressView()
+                    .frame(height: 125)
             }
-            .frame(height: viewModel.cardHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .onTapGesture {
-                showingPlayerDetail = true
-            }
-            .onAppear {
-                viewModel.configurePlayer(player)
+        }
+        .onAppear {
+            // 🔥 CREATE ViewModel with .shared dependencies
+            if viewModel == nil {
+                viewModel = FantasyPlayerViewModel(
+                    livePlayersViewModel: AllLivePlayersViewModel.shared,
+                    playerDirectory: PlayerDirectoryStore.shared,
+                    nflGameDataService: NFLGameDataService.shared,
+                    nflWeekService: NFLWeekService.shared
+                )
+                viewModel?.configurePlayer(player)
             }
         }
         .sheet(isPresented: $showingPlayerDetail) {
@@ -79,12 +105,12 @@ struct FantasyPlayerCard: View {
     // MARK: - Simplified Content Builder
     
     @ViewBuilder
-    private func buildMainContent() -> some View {
+    private func buildMainContent(vm: FantasyPlayerViewModel) -> some View {
         // Main content stack - reuse existing FantasyPlayerCardMainContentView
         FantasyPlayerCardMainContentView(
             player: player,
-            isPlayerLive: viewModel.isPlayerLive(player),
-            glowIntensity: viewModel.glowIntensity,
+            isPlayerLive: vm.isPlayerLive(player),
+            glowIntensity: vm.glowIntensity,
             onScoreTap: {
                 showingScoreBreakdown = true
             },
@@ -94,14 +120,14 @@ struct FantasyPlayerCard: View {
         // Player name and position - reuse existing component
         FantasyPlayerCardNamePositionView(
             player: player,
-            positionalRanking: viewModel.getPositionalRanking(
+            positionalRanking: vm.getPositionalRanking(
                 for: player, 
                 in: matchup, 
                 teamIndex: teamIndex, 
                 isBench: isBench, 
                 fantasyViewModel: fantasyViewModel
             ),
-            teamColor: viewModel.teamColor
+            teamColor: vm.teamColor
         )
         
         // Watch toggle button
@@ -113,8 +139,8 @@ struct FantasyPlayerCard: View {
         // Stats section  
         FantasyPlayerCardStatsView(
             player: player,
-            statLine: viewModel.formatPlayerStatBreakdown(for: player),
-            teamColor: viewModel.teamColor
+            statLine: vm.formatPlayerStatBreakdown(for: player),
+            teamColor: vm.teamColor
         )
     }
     
@@ -146,7 +172,7 @@ struct FantasyPlayerCard: View {
     @ViewBuilder
     private func buildPlayerDetailSheet() -> some View {
         NavigationView {
-            if let sleeperPlayer = viewModel.getSleeperPlayerData(for: player) {
+            if let sleeperPlayer = viewModel?.getSleeperPlayerData(for: player) {
                 PlayerStatsCardView(
                     player: sleeperPlayer,
                     team: NFLTeam.team(for: player.team ?? "")
@@ -219,12 +245,12 @@ struct FantasyPlayerCard: View {
     // MARK: - Score Breakdown Methods
     
     private func createScoreBreakdown() -> PlayerScoreBreakdown? {
-        guard let sleeperPlayer = viewModel.getSleeperPlayerData(for: player) else {
+        guard let vm = viewModel,
+              let sleeperPlayer = vm.getSleeperPlayerData(for: player) else {
             return nil
         }
         
-        let livePlayersViewModel = AllLivePlayersViewModel.shared
-        guard let stats = livePlayersViewModel.playerStats[sleeperPlayer.playerID],
+        guard let stats = vm.livePlayersViewModel.playerStats[sleeperPlayer.playerID],
               !stats.isEmpty else {
             return nil
         }

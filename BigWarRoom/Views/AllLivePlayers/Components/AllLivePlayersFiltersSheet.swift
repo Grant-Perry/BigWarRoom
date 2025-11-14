@@ -217,7 +217,5 @@ private struct FilterChip: View {
     }
 }
 
-#Preview("All Live Players Filters Sheet") {
-    AllLivePlayersFiltersSheet(allLivePlayersViewModel: AllLivePlayersViewModel.shared)
-        .preferredColorScheme(.dark)
-}
+// 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
+// TODO: Create preview mock instances or use PreviewContainer pattern

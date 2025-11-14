@@ -57,7 +57,8 @@ struct ChoppedBenchSection: View {
                                 isStarter: false,
                                 parentViewModel: parentViewModel,
                                 onPlayerTap: onPlayerTap,
-                                compact: true
+                                compact: true,
+                                watchService: PlayerWatchService.shared
                             )
                         }
                     }

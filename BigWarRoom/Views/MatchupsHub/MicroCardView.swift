@@ -111,10 +111,7 @@ struct MicroCardView: View {
             }
         }
         .sheet(isPresented: $showingLineupRX) {
-            // 🔥 FIX: Use if-let to prevent multiple instantiations
-            if showingLineupRX {
-                LineupRXView(matchup: matchup)
-            }
+            LineupRXView(matchup: matchup)
         }
     }
     

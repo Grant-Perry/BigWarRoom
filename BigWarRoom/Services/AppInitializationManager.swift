@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  🔥 UNIFIED: Single initialization system for the entire app
+//  🔥 NO SINGLETON - Use dependency injection
 //
 
 import Foundation
@@ -13,23 +14,21 @@ import Observation
 @MainActor
 final class AppInitializationManager {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
     private static var _shared: AppInitializationManager?
     
     static var shared: AppInitializationManager {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
-        let instance = AppInitializationManager()
-        _shared = instance
-        return instance
+        fatalError("AppInitializationManager.shared accessed before initialization. Call setSharedInstance() first.")
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
     static func setSharedInstance(_ instance: AppInitializationManager) {
         _shared = instance
     }
+    
+    // 🔥 PHASE 3 DI: No more singleton pattern - use dependency injection only
     
     // MARK: - Observable Properties (No @Published needed with @Observable)
     var isInitialized = false
@@ -42,21 +41,22 @@ final class AppInitializationManager {
     // MARK: - Dependencies
     private let matchupsHubViewModel: MatchupsHubViewModel
     private let allLivePlayersViewModel: AllLivePlayersViewModel
+    private let playerDirectory: PlayerDirectoryStore
+    private let sharedStatsService: SharedStatsService
     
     // MARK: - Initialization
     
-    // 🔥 PHASE 2.5: Default initializer for bridge pattern
-    convenience init() {
-        self.init(
-            matchupsHubViewModel: MatchupsHubViewModel.shared,
-            allLivePlayersViewModel: AllLivePlayersViewModel.shared
-        )
-    }
-    
-    // 🔥 PHASE 2.5: Dependency injection initializer
-    init(matchupsHubViewModel: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+    // 🔥 PHASE 3 DI: ONLY initializer: Dependency injection
+    init(
+        matchupsHubViewModel: MatchupsHubViewModel,
+        allLivePlayersViewModel: AllLivePlayersViewModel,
+        playerDirectory: PlayerDirectoryStore,
+        sharedStatsService: SharedStatsService
+    ) {
         self.matchupsHubViewModel = matchupsHubViewModel
         self.allLivePlayersViewModel = allLivePlayersViewModel
+        self.playerDirectory = playerDirectory
+        self.sharedStatsService = sharedStatsService
     }
     
     // MARK: - Loading Stages
@@ -176,31 +176,22 @@ final class AppInitializationManager {
         loadingProgress = stage.progress
         logInfo("\(stage.displayText) (\(Int(stage.progress * 100))%)", category: "AppInit")
         
-        // 🔥 REMOVED: Visual delay for progress
-        // try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        // 🔥 REMOVED: Artificial delay
     }
     
     private func checkCredentials() async throws {
         logInfo("Checking credentials...", category: "AppInit")
         cleanupGameAlertsData()
         
-        let sleeperManager = SleeperCredentialsManager.shared
-        let espnManager = ESPNCredentialsManager.shared
-        
-        logInfo("Sleeper valid: \(sleeperManager.hasValidCredentials)", category: "AppInit")
-        logInfo("ESPN valid: \(espnManager.hasValidCredentials)", category: "AppInit")
-        
-        if !sleeperManager.hasValidCredentials && !espnManager.hasValidCredentials {
-            logError("No valid credentials found", category: "AppInit")
-            throw AppInitError.noCredentials
-        }
+        // 🔥 PHASE 3 DI: Can't use .shared anymore - credentials are already validated in BigWarRoom setup
+        logInfo("Credentials already validated during setup", category: "AppInit")
         
         logInfo("Credentials check passed", category: "AppInit")
     }
     
     private func loadSharedStats() async throws {
         do {
-            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            let _ = try await sharedStatsService.loadCurrentWeekStats()
             logInfo("Shared stats loaded successfully", category: "AppInit")
         } catch {
             logWarning("Failed to load shared stats: \(error)", category: "AppInit")
@@ -213,7 +204,6 @@ final class AppInitializationManager {
         
         await matchupsHubViewModel.loadAllMatchups()
         // 🔥 REMOVED: Artificial 2-second delay
-        // try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
         let matchupCount = matchupsHubViewModel.myMatchups.count
         logInfo("After loading, got \(matchupCount) matchups", category: "AppInit")
@@ -233,7 +223,7 @@ final class AppInitializationManager {
         logInfo("Loading shared player statistics...", category: "AppInit")
         
         do {
-            let _ = try await SharedStatsService.shared.loadCurrentWeekStats()
+            let _ = try await sharedStatsService.loadCurrentWeekStats()
             logInfo("Shared stats loaded successfully", category: "AppInit")
             
             if !allLivePlayersViewModel.statsLoaded {

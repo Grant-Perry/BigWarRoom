@@ -240,7 +240,12 @@ struct WatchedPlayerCard: View {
     let watchedPlayer: WatchedPlayer
     
     @State private var watchService = PlayerWatchService.shared
-    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel()
+    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel(
+        livePlayersViewModel: AllLivePlayersViewModel.shared,
+        playerDirectory: PlayerDirectoryStore.shared,
+        nflGameDataService: NFLGameDataService.shared,
+        nflWeekService: NFLWeekService.shared
+    )
     @State private var playerDirectory = PlayerDirectoryStore.shared
     
     // 🔥 NEW: State for player stats sheet

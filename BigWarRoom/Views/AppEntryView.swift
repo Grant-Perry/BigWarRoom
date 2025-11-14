@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Entry point that handles loading screen and navigation based on user credentials
+//  🔥 PHASE 3 DI: Updated to create and pass dependencies properly
 //
 
 import SwiftUI
@@ -47,6 +48,11 @@ struct BigWarRoomModified: View {
     @State private var matchupsHub = MatchupsHubViewModel.shared
     @State private var selectedTab: Int
     
+    // 🔥 PHASE 3 DI: Create shared instances at app level to pass down
+    @State private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
+    @State private var playerWatchService = PlayerWatchService.shared
+    @State private var weekManager = WeekSelectionManager.shared
+    
     init(startOnSettings: Bool) {
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
     }
@@ -81,19 +87,12 @@ struct BigWarRoomModified: View {
                 .tag(2)
                 
                 // All Live Players Tab
-                Group {
-                    if let allLivePlayersVM = AllLivePlayersViewModel.shared as AllLivePlayersViewModel?,
-                       let watchService = PlayerWatchService.shared as PlayerWatchService?,
-                       let weekManager = WeekSelectionManager.shared as WeekSelectionManager? {
-                        AllLivePlayersView(
-                            allLivePlayersViewModel: allLivePlayersVM,
-                            watchService: watchService,
-                            weekManager: weekManager
-                        )
-                    } else {
-                        Text("Loading services...")
-                    }
-                }
+                // 🔥 PHASE 3 DI: Pass dependencies instead of using .shared
+                AllLivePlayersView(
+                    allLivePlayersViewModel: allLivePlayersViewModel,
+                    watchService: playerWatchService,
+                    weekManager: weekManager
+                )
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("Live Players")

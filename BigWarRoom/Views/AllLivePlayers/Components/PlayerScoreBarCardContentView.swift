@@ -15,12 +15,34 @@ struct PlayerScoreBarCardContentView: View {
     let playerScoreColor: Color
     
     @Bindable var viewModel: AllLivePlayersViewModel
-    @State private var watchService = PlayerWatchService.shared
-    @State private var playerDirectory = PlayerDirectoryStore.shared // 🔥 PHASE 2.5: Use @State for @Observable
+    // 🔥 PHASE 3 DI: Accept services as parameters
+    let watchService: PlayerWatchService
+    let playerDirectory: PlayerDirectoryStore
     
     @State private var showingScoreBreakdown = false
     @State private var isLoadingOverlayVisible = false
     
+    // 🔥 PHASE 3 DI: Initializer accepts all dependencies
+    init(
+        playerEntry: AllLivePlayersViewModel.LivePlayerEntry,
+        scoreBarWidth: Double,
+        cardHeight: Double,
+        formattedPlayerName: String,
+        playerScoreColor: Color,
+        viewModel: AllLivePlayersViewModel,
+        watchService: PlayerWatchService,
+        playerDirectory: PlayerDirectoryStore
+    ) {
+        self.playerEntry = playerEntry
+        self.scoreBarWidth = scoreBarWidth
+        self.cardHeight = cardHeight
+        self.formattedPlayerName = formattedPlayerName
+        self.playerScoreColor = playerScoreColor
+        self.viewModel = viewModel
+        self.watchService = watchService
+        self.playerDirectory = playerDirectory
+    }
+
     var body: some View {
         ZStack(alignment: .leading) {
             // 🔥 NEW: Jersey number as bottom layer - before any other content
@@ -260,9 +282,9 @@ struct PlayerScoreBarCardContentView: View {
         await MainActor.run { isLoadingOverlayVisible = true }
         
         // Ensure stats are available on-demand
-        if !AllLivePlayersViewModel.shared.statsLoaded {
-            // IMPORTANT: Load using the singleton since ScoreBreakdown/StatsFacade reads from the shared store
-            await AllLivePlayersViewModel.shared.loadAllPlayers()
+        // 🔥 PHASE 3 DI: Use injected viewModel instead of .shared
+        if !viewModel.statsLoaded {
+            await viewModel.loadAllPlayers()
         }
         
         // Hide overlay and present the breakdown sheet
@@ -278,6 +300,7 @@ struct PlayerScoreBarCardContentView: View {
         let shortName = playerEntry.player.shortName.lowercased()
         let team = playerEntry.player.team?.lowercased()
         
+        // 🔥 PHASE 3 DI: Use injected playerDirectory
         let result = playerDirectory.players.values.first { sleeperPlayer in
             sleeperPlayer.fullName.lowercased() == playerName ||
             (sleeperPlayer.shortName.lowercased() == shortName &&
@@ -350,8 +373,8 @@ struct PlayerScoreBarCardContentView: View {
     
     /// Get jersey number for the player from SleeperPlayer data
     private func getJerseyNumber() -> String? {
-        // Try to find SleeperPlayer by ID first (most reliable)
-        if let sleeperPlayer = PlayerDirectoryStore.shared.player(for: playerEntry.player.id) {
+        // 🔥 PHASE 3 DI: Use injected playerDirectory
+        if let sleeperPlayer = playerDirectory.player(for: playerEntry.player.id) {
             return sleeperPlayer.number?.description
         }
         
@@ -408,9 +431,16 @@ struct PlayerScoreBarCardContentView: View {
 struct ScoreBreakdownLoaderView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
-    @State private var viewModel = AllLivePlayersViewModel.shared
+    // 🔥 PHASE 3 DI: viewModel should be passed in, not using .shared
+    @State private var viewModel: AllLivePlayersViewModel
     @State private var isReady = false
     
+    // 🔥 PHASE 3 DI: Add initializer
+    init(playerEntry: AllLivePlayersViewModel.LivePlayerEntry, viewModel: AllLivePlayersViewModel) {
+        self.playerEntry = playerEntry
+        self._viewModel = State(initialValue: viewModel)
+    }
+
     var body: some View {
         ZStack {
             if isReady {

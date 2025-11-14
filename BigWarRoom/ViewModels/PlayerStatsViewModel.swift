@@ -6,6 +6,8 @@
 //  
 //  🔧 BLANK SHEET FIX: Added comprehensive loading states and progressive loading messages
 //  to eliminate the 4-6 second blank screen that occurred when opening player stats sheets.
+//  🔥 PHASE 3 DI: Converted to use dependency injection
+//
 
 import Foundation
 import SwiftUI
@@ -29,10 +31,10 @@ final class PlayerStatsViewModel {
     var depthChartData: [String: DepthChartData] = [:]
     var fantasyAnalysisData: FantasyAnalysisData?
     
-    // MARK: - Dependencies
+    // MARK: - Dependencies (injected)
     
-    private let livePlayersViewModel = AllLivePlayersViewModel.shared
-    private let playerDirectory = PlayerDirectoryStore.shared
+    private let livePlayersViewModel: AllLivePlayersViewModel // 🔥 PHASE 3: Now injected
+    private let playerDirectory: PlayerDirectoryStore // 🔥 PHASE 3: Now injected
     
     // MARK: - Current Player
     
@@ -41,6 +43,14 @@ final class PlayerStatsViewModel {
     // 🔧 BLANK SHEET FIX: Added task management to properly handle cancellation
     // when user closes sheet before loading completes
     private var loadingTask: Task<Void, Never>?
+    
+    // MARK: - Initialization
+    
+    // 🔥 PHASE 3 DI: Dependency injection initializer
+    init(livePlayersViewModel: AllLivePlayersViewModel, playerDirectory: PlayerDirectoryStore) {
+        self.livePlayersViewModel = livePlayersViewModel
+        self.playerDirectory = playerDirectory
+    }
     
     // MARK: - Public Methods
     
