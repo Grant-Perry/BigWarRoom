@@ -5,6 +5,7 @@
 //  💊 Fetches weekly player projections from Sleeper API
 //  Endpoint: GET /v1/projections/nfl/{season_type}/{season}/{week}
 //  Returns: pts_ppr, pts_half_ppr, pts_std + raw stat projections
+//  🔥 NO SINGLETON - Instance-based for proper memory management
 //
 
 import Foundation
@@ -12,7 +13,7 @@ import Foundation
 @MainActor
 @Observable
 final class SleeperProjectionsService {
-    static let shared = SleeperProjectionsService()
+    // 🔥 REMOVED: static let shared = SleeperProjectionsService()
     
     // MARK: - Cache
     
@@ -24,6 +25,16 @@ final class SleeperProjectionsService {
     
     /// Cache duration: 1 hour (projections don't change frequently)
     private let cacheDuration: TimeInterval = 3600
+    
+    // MARK: - Initialization
+    
+    init() {
+        DebugPrint(mode: .sleeperAPI, "📊 PROJECTIONS: New instance created")
+    }
+    
+    deinit {
+        DebugPrint(mode: .sleeperAPI, "📊 PROJECTIONS: Instance deallocated (cache freed) ✅")
+    }
     
     // MARK: - Models
     
@@ -225,4 +236,3 @@ final class SleeperProjectionsService {
         }
     }
 }
-

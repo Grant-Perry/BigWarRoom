@@ -220,8 +220,8 @@ enum DebugConfig {
     /// - `.globalRefresh` - Only global refresh logs
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
-	/// Current: Waiver wire debugging enabled
-    static var activeMode: DebugMode =  [.waivers]
+	/// Current: Waiver wire and LineupRX debugging enabled
+    static var activeMode: DebugMode = [.waivers, .lineupRX]
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

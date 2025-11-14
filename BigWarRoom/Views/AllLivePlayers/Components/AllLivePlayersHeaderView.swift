@@ -165,6 +165,8 @@ struct AllLivePlayersHeaderView: View {
                     .foregroundColor(.white)
                     .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 1)
                     .animation(.easeInOut(duration: 0.25), value: totalPoints)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
                 if shouldShowDelta {
                     HStack(spacing: 6) {
                         Image(systemName: sessionDeltaPoints >= 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
@@ -173,6 +175,8 @@ struct AllLivePlayersHeaderView: View {
                         Text(deltaFormatted)
                             .font(.system(size: 15, weight: .semibold, design: .monospaced))
                             .foregroundColor(sessionDeltaPoints >= 0 ? .gpGreen : .gpRedPink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                     }
                     .transition(.opacity)
                 }

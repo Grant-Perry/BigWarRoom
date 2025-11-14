@@ -1,11 +1,17 @@
 import Foundation
 
 /// Service for determining which players are available (not rostered) in a league
+/// 🔥 NO SINGLETON - Instance-based for proper dependency management
 actor AvailablePlayersService {
     
-    static let shared = AvailablePlayersService()
+    // 🔥 REMOVED: static let shared = AvailablePlayersService()
     
-    private init() {}
+    // 🔥 NEW: Dependency injection for projections service
+    private let projectionsService: SleeperProjectionsService
+    
+    init(projectionsService: SleeperProjectionsService) {
+        self.projectionsService = projectionsService
+    }
     
     /// Get available players for a specific position in a league
     /// - Parameters:
@@ -82,8 +88,9 @@ actor AvailablePlayersService {
             position: position
         )
         
-        // Fetch projections
-        let projections = try await SleeperProjectionsService.shared.fetchProjections(
+        // Fetch projections using injected service
+        // 🔥 CHANGED: Use injected instance instead of .shared
+        let projections = try await projectionsService.fetchProjections(
             week: week,
             year: year
         )

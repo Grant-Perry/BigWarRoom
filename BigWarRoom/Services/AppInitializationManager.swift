@@ -176,8 +176,8 @@ final class AppInitializationManager {
         loadingProgress = stage.progress
         logInfo("\(stage.displayText) (\(Int(stage.progress * 100))%)", category: "AppInit")
         
-        // Visual delay for progress
-        try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        // 🔥 REMOVED: Visual delay for progress
+        // try await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
     }
     
     private func checkCredentials() async throws {
@@ -212,7 +212,8 @@ final class AppInitializationManager {
         logInfo("Loading leagues through Mission Control...", category: "AppInit")
         
         await matchupsHubViewModel.loadAllMatchups()
-        try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+        // 🔥 REMOVED: Artificial 2-second delay
+        // try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
         
         let matchupCount = matchupsHubViewModel.myMatchups.count
         logInfo("After loading, got \(matchupCount) matchups", category: "AppInit")

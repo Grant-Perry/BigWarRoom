@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  💊 Optimizes fantasy lineups using projections and constraint satisfaction
+//  🔥 NO SINGLETON - Owned by views via @State for proper memory management
 //
 
 import Foundation
@@ -10,7 +11,13 @@ import Foundation
 @MainActor
 @Observable
 final class LineupOptimizerService {
-    static let shared = LineupOptimizerService()
+    
+    // 🔥 NO MORE SINGLETON - Each view owns its own instance
+    // static let shared = LineupOptimizerService() ← REMOVED
+    
+    // 🔥 NEW: Own instances of dependent services for proper lifecycle management
+    private let projectionsService = SleeperProjectionsService()
+    private let availablePlayersService: AvailablePlayersService
     
     // MARK: - Models
     
@@ -23,7 +30,7 @@ final class LineupOptimizerService {
         let changes: [LineupChange]
         let moveChains: [MoveChain]
         let playerProjections: [String: Double]
-        let currentRoster: [FantasyPlayer] // 🔥 NEW: Full current roster for bye week checking
+        let currentRoster: [FantasyPlayer]
     }
     
     struct LineupChange {
@@ -89,6 +96,18 @@ final class LineupOptimizerService {
         let projectedPoints: Double
     }
     
+    // MARK: - Initialization
+    
+    init() {
+        // 🔥 NEW: Initialize availablePlayersService with projectionsService dependency
+        self.availablePlayersService = AvailablePlayersService(projectionsService: projectionsService)
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: New instance created (view-owned)")
+    }
+    
+    deinit {
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Instance deallocated (memory freed) ✅")
+    }
+    
     // MARK: - Lineup Optimization
     
     func optimizeLineup(
@@ -107,15 +126,14 @@ final class LineupOptimizerService {
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Team: \(myTeam.ownerName), Roster: \(myTeam.roster.count) players")
         
         // 🔥 NEW: Log ALL roster players BEFORE optimization
-        print("💊 OPTIMIZER: FULL ROSTER DUMP:")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: FULL ROSTER DUMP:")
         for player in myTeam.roster {
             let name = player.fullName
             let pos = player.position
             let starterStr = player.isStarter ? "STARTER" : "BENCH"
             let slotStr = player.lineupSlot ?? "nil"
             let sleeperStr = player.sleeperID ?? "nil"
-            let line = "💊 OPTIMIZER:    - " + name + " (" + pos + ") | " + starterStr + " | Slot: " + slotStr + " | SID: " + sleeperStr
-            print(line)
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    - \(name) (\(pos)) | \(starterStr) | Slot: \(slotStr) | SID: \(sleeperStr)")
         }
         
         // Fetch projections
@@ -123,7 +141,8 @@ final class LineupOptimizerService {
         
         let projections: [String: SleeperProjectionsService.SleeperProjection]
         do {
-            projections = try await SleeperProjectionsService.shared.fetchProjections(
+            // 🔥 CHANGED: Use instance instead of .shared
+            projections = try await projectionsService.fetchProjections(
                 week: week,
                 year: year
             )
@@ -241,7 +260,8 @@ final class LineupOptimizerService {
         var recommendations: [WaiverRecommendation] = []
         
         // Fetch projections first
-        let projections = try await SleeperProjectionsService.shared.fetchProjections(
+        // 🔥 CHANGED: Use instance instead of .shared
+        let projections = try await projectionsService.fetchProjections(
             week: week,
             year: year
         )
@@ -250,7 +270,8 @@ final class LineupOptimizerService {
         let positions = ["QB", "RB", "WR", "TE"]
         
         for position in positions {
-            let topAvailable = try await AvailablePlayersService.shared.getTopAvailablePlayers(
+            // 🔥 CHANGED: Use instance instead of .shared
+            let topAvailable = try await availablePlayersService.getTopAvailablePlayers(
                 for: matchup,
                 position: position,
                 week: week,
@@ -443,14 +464,10 @@ final class LineupOptimizerService {
         }
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Starting optimization with \(availablePlayers.count) players")
-        print("💊 OPTIMIZER: Top 5 projected players:")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top 5 projected players:")
         for (index, player) in availablePlayers.prefix(5).enumerated() {
             let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-            let name = player.fullName
-            let pos = player.position
-            let projStr = String(format: "%.1f", proj)
-            let line = "💊 OPTIMIZER:    " + String(index + 1) + ". " + name + " (" + pos + ") - " + projStr + " pts"
-            print(line)
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
         }
         
         // Fill standard positions first (QB, RB, WR, TE, K, DEF, D/ST)
@@ -481,14 +498,10 @@ final class LineupOptimizerService {
         }
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: After standard positions, \(availablePlayers.count) players remain")
-        print("💊 OPTIMIZER: Top remaining players:")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top remaining players:")
         for (index, player) in availablePlayers.prefix(5).enumerated() {
             let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-            let name = player.fullName
-            let pos = player.position
-            let projStr = String(format: "%.1f", proj)
-            let line = "💊 OPTIMIZER:    " + String(index + 1) + ". " + name + " (" + pos + ") - " + projStr + " pts"
-            print(line)
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
         }
         
         // Fill SUPER_FLEX positions (QB/RB/WR/TE)
@@ -595,14 +608,10 @@ final class LineupOptimizerService {
         optimalLineup["BENCH"] = availablePlayers
         
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Optimization complete. Bench: \(availablePlayers.count) players")
-        print("💊 OPTIMIZER: Benched players with projections:")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Benched players with projections:")
         for player in availablePlayers.prefix(10) {
             let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-            let name = player.fullName
-            let pos = player.position
-            let projStr = String(format: "%.1f", proj)
-            let line = "💊 OPTIMIZER:    🪑 " + name + " (" + pos + ") - " + projStr + " pts"
-            print(line)
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    🪑 \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
         }
         
         return optimalLineup
@@ -639,7 +648,7 @@ final class LineupOptimizerService {
         let starters = roster.filter { $0.isStarter }
         
         DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: Found \(starters.count) starters out of \(roster.count) total players")
-        print("💊 OPTIMIZER: Current starters (\(starters.count)):")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Current starters (\(starters.count)):")
         
         // 🔥 FIX: Detect WR/TE flex slots
         var detectedWRTEFlex = false
@@ -648,10 +657,7 @@ final class LineupOptimizerService {
             if let slot = player.lineupSlot {
                 let posKey = slot.uppercased()
                 let playerPos = player.position.uppercased()
-                let name = player.fullName
-                
-                let line = "💊 OPTIMIZER:    - " + name + " (" + playerPos + ") in slot: " + posKey
-                print(line)
+                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    - \(player.fullName) (\(playerPos)) in slot: \(posKey)")
             }
         }
         

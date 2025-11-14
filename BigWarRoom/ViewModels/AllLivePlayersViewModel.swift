@@ -12,12 +12,6 @@ import Observation
 @MainActor
 @Observable
 final class AllLivePlayersViewModel {
-    // MARK: - Shared Instance (DEPRECATED - for bridge compatibility only)
-    @MainActor
-    static let shared: AllLivePlayersViewModel = {
-        return AllLivePlayersViewModel(matchupsHubViewModel: MatchupsHubViewModel.shared)
-    }()
-    
     // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
     var allPlayers: [LivePlayerEntry] = []
     var filteredPlayers: [LivePlayerEntry] = []
@@ -73,12 +67,6 @@ final class AllLivePlayersViewModel {
         self.matchupsHubViewModel = matchupsHubViewModel
         // setupObservation()  // 🔥 DISABLED: Creates race condition with 15-second timer, causes throttle to block all API calls
         setupAutoRefresh()
-    }
-    
-    // MARK: - Bridge compatibility initializer (DEPRECATED)
-    @MainActor
-    private static func createSharedInstance() -> AllLivePlayersViewModel {
-        return AllLivePlayersViewModel(matchupsHubViewModel: MatchupsHubViewModel.shared)
     }
     
     // MARK: - Cleanup

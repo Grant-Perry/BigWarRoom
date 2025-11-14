@@ -114,20 +114,21 @@ struct PlayerScoreBarCardContentView: View {
                             Button(action: {
                                 Task { await presentScoreBreakdown() }
                             }) {
-                                HStack(spacing: 8) {
+                                HStack(spacing: 4) {
                                     Text(playerEntry.currentScoreString)
                                         .font(.callout)
                                         .fontWeight(.bold)
                                         .foregroundColor(playerScoreColor)
                                         .lineLimit(1)
-                                        .minimumScaleFactor(0.6)
+                                        .minimumScaleFactor(0.3)
                                     
                                     Text("pts")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
-                                        .minimumScaleFactor(0.6)
+                                        .minimumScaleFactor(0.3)
                                 }
+                                .fixedSize(horizontal: true, vertical: false)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(

@@ -190,12 +190,16 @@ extension MatchupsHubViewModel {
     
     /// Calculate real individual player score using Sleeper stats and league scoring settings
     private func calculateRealPlayerScore(playerID: String, leagueID: String) -> Double {
-        // Get player stats from AllLivePlayersViewModel's cached stats
+        // 🔥 FIX: Use SharedStatsService instead of AllLivePlayersViewModel's cache
         let currentWeek = WeekSelectionManager.shared.selectedWeek
-        let playerStats = AllLivePlayersViewModel.shared.playerStats[playerID] ?? [:]
+        let currentYear = SeasonYearManager.shared.selectedYear
         
-        // If no stats available, return 0 (game hasn't happened yet)
-        guard !playerStats.isEmpty else {
+        // Get player stats from SharedStatsService (same source as LeagueMatchupProvider)
+        guard let playerStats = SharedStatsService.shared.getCachedPlayerStats(
+            playerID: playerID,
+            week: currentWeek,
+            year: currentYear
+        ), !playerStats.isEmpty else {
             return 0.0
         }
         

@@ -194,10 +194,8 @@ struct LoadingScreen: View {
             purpleWave = 1.5
         }
         
-        // 🔥 CHANGED: After splash animation, start loading essential data
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            startEssentialDataLoading()
-        }
+        // 🔥 REMOVED FORCED DELAY: Start loading immediately after animations begin
+        startEssentialDataLoading()
     }
     
     /// 🔥 NEW: Load essential data before showing main app

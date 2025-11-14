@@ -18,6 +18,9 @@ struct LineupRXView: View {
     @State private var showingWeekPicker = false
     @State private var currentWeek: Int = WeekSelectionManager.shared.selectedWeek
     
+    // 🔥 NEW: View owns its own optimizer instance - NO SINGLETON
+    @State private var optimizer = LineupOptimizerService()
+    
     // Performance caches
     @State private var sleeperPlayerCache: [String: SleeperPlayer] = [:]
     @State private var matchupInfoCache: [String: MatchupInfo] = [:]
@@ -457,7 +460,8 @@ struct LineupRXView: View {
             
             let scoringFormat = "ppr"
             
-            let result = try await LineupOptimizerService.shared.optimizeLineup(
+            // 🔥 CHANGED: Use instance optimizer instead of .shared
+            let result = try await optimizer.optimizeLineup(
                 for: matchup,
                 week: week,
                 year: year,
@@ -466,7 +470,8 @@ struct LineupRXView: View {
             
             optimizationResult = result
             
-            let waiver = try await LineupOptimizerService.shared.getWaiverRecommendations(
+            // 🔥 CHANGED: Use instance optimizer instead of .shared
+            let waiver = try await optimizer.getWaiverRecommendations(
                 for: matchup,
                 week: week,
                 year: year,
