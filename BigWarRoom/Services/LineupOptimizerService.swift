@@ -45,6 +45,17 @@ final class LineupOptimizerService {
         var reason: String {
             return "Projected +\(String(format: "%.1f", improvement)) pts"
         }
+        
+        // 🔥 NEW: Check if this change meets the minimum improvement threshold
+        var meetsThreshold: Bool {
+            return improvement >= LineupOptimizerService.minimumImprovementThreshold
+        }
+        
+        // 🔥 NEW: Calculate improvement percentage
+        var improvementPercentage: Double {
+            guard projectedPointsOut > 0 else { return 100.0 }
+            return (improvement / projectedPointsOut) * 100.0
+        }
     }
     
     struct MoveChain {
@@ -222,6 +233,12 @@ final class LineupOptimizerService {
             projections: playerProjections
         )
         
+        // 🔥 FIX: Calculate improvement based on ACTUAL recommended changes (after filtering)
+        // This ensures improvement matches what's actually being recommended to the user
+        let actualImprovement = changes.reduce(0.0) { $0 + $1.improvement }
+        
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Raw improvement: \(improvement), Actual improvement after filtering: \(actualImprovement)")
+        
         // Identify benched players
         let startedPlayerIDs = Set(optimalLineup.values.flatMap { $0 }.compactMap { $0.sleeperID })
         let benchedPlayers = myTeam.roster.filter { player in
@@ -236,7 +253,7 @@ final class LineupOptimizerService {
             benchedPlayers: benchedPlayers,
             projectedPoints: projectedPoints,
             currentPoints: currentPoints,
-            improvement: improvement,
+            improvement: actualImprovement,
             changes: changes,
             moveChains: changes.map { $0.moveChain },
             playerProjections: playerProjections,
@@ -456,18 +473,54 @@ final class LineupOptimizerService {
         var optimalLineup: [String: [FantasyPlayer]] = [:]
         var availablePlayers = roster
         
-        // Sort players by projected points (descending)
+        // 🔥 CRITICAL: Lock all FINAL players in their current positions FIRST
+        var lockedPlayers: [FantasyPlayer] = []
+        var lockedPlayerIDs = Set<String>()
+        
+        for player in roster {
+            if isPlayerGameFinal(player) {
+                lockedPlayers.append(player)
+                lockedPlayerIDs.insert(player.id)
+                DebugPrint(mode: .lineupRX, "🔒 LOCKED PLAYER: \(player.fullName) in \(player.lineupSlot ?? "?") - game is FINAL")
+                
+                // If they're a starter, add them to optimal lineup in their current slot
+                if player.isStarter, let slot = player.lineupSlot {
+                    let normalizedSlot = slot.uppercased()
+                    if optimalLineup[normalizedSlot] == nil {
+                        optimalLineup[normalizedSlot] = []
+                    }
+                    optimalLineup[normalizedSlot]?.append(player)
+                    DebugPrint(mode: .lineupRX, "   → Keeping \(player.fullName) in \(normalizedSlot) (locked)")
+                } else {
+                    // If they're on bench, lock them there
+                    if optimalLineup["BENCH"] == nil {
+                        optimalLineup["BENCH"] = []
+                    }
+                    optimalLineup["BENCH"]?.append(player)
+                    DebugPrint(mode: .lineupRX, "   → Keeping \(player.fullName) on BENCH (locked)")
+                }
+            }
+        }
+        
+        // Remove locked players from available pool
+        availablePlayers.removeAll { lockedPlayerIDs.contains($0.id) }
+        
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: \(lockedPlayers.count) players locked, \(availablePlayers.count) players available to optimize")
+        
+        // Sort available players by projected points (descending)
         availablePlayers.sort { player1, player2 in
             let proj1 = player1.sleeperID.flatMap { projections[$0] } ?? 0
             let proj2 = player2.sleeperID.flatMap { projections[$0] } ?? 0
             return proj1 > proj2
         }
         
-        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Starting optimization with \(availablePlayers.count) players")
-        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top 5 projected players:")
-        for (index, player) in availablePlayers.prefix(5).enumerated() {
-            let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Starting optimization with \(availablePlayers.count) available players")
+        if !availablePlayers.isEmpty {
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top 5 available players:")
+            for (index, player) in availablePlayers.prefix(5).enumerated() {
+                let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
+                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
+            }
         }
         
         // Fill standard positions first (QB, RB, WR, TE, K, DEF, D/ST)
@@ -476,12 +529,21 @@ final class LineupOptimizerService {
         for position in standardPositions {
             guard let count = requirements[position], count > 0 else { continue }
             
+            // Check how many slots are already filled by locked players
+            let lockedInPosition = optimalLineup[position]?.count ?? 0
+            let slotsNeeded = count - lockedInPosition
+            
+            guard slotsNeeded > 0 else {
+                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: \(position) fully occupied by \(lockedInPosition) locked player(s)")
+                continue
+            }
+            
             var filled = 0
             var playersForPosition: [FantasyPlayer] = []
             
-            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(count) \(position) slot(s)")
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Filling \(slotsNeeded) \(position) slot(s) (\(lockedInPosition) already locked)")
             
-            for player in availablePlayers where player.position == position && filled < count {
+            for player in availablePlayers where player.position == position && filled < slotsNeeded {
                 let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
                 playersForPosition.append(player)
                 filled += 1
@@ -489,19 +551,17 @@ final class LineupOptimizerService {
             }
             
             if !playersForPosition.isEmpty {
-                optimalLineup[position] = playersForPosition
+                if optimalLineup[position] == nil {
+                    optimalLineup[position] = playersForPosition
+                } else {
+                    optimalLineup[position]?.append(contentsOf: playersForPosition)
+                }
+                
                 // Remove assigned players from available pool
                 availablePlayers.removeAll { player in
                     playersForPosition.contains(where: { $0.id == player.id })
                 }
             }
-        }
-        
-        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: After standard positions, \(availablePlayers.count) players remain")
-        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Top remaining players:")
-        for (index, player) in availablePlayers.prefix(5).enumerated() {
-            let proj = player.sleeperID.flatMap { projections[$0] } ?? 0
-            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    \(index + 1). \(player.fullName) (\(player.position)) - \(String(format: "%.1f", proj)) pts")
         }
         
         // Fill SUPER_FLEX positions (QB/RB/WR/TE)
@@ -625,10 +685,18 @@ final class LineupOptimizerService {
         
         for (position, players) in lineup where position != "BENCH" {
             for player in players {
-                if let sleeperID = player.sleeperID,
-                   let projection = projections[sleeperID] {
-                    total += projection
+                let points: Double
+                
+                // 🔥 FIX: Use actual points for finished games, projections for upcoming games
+                if isPlayerGameFinal(player), let actualPoints = player.currentPoints {
+                    points = actualPoints
+                } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
+                    points = projection
+                } else {
+                    continue
                 }
+                
+                total += points
             }
         }
         
@@ -650,29 +718,26 @@ final class LineupOptimizerService {
         DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: Found \(starters.count) starters out of \(roster.count) total players")
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Current starters (\(starters.count)):")
         
-        // 🔥 FIX: Detect WR/TE flex slots
-        var detectedWRTEFlex = false
-        
+        // Sum points for starters - use ACTUAL points for finished games, PROJECTIONS for upcoming games
         for player in starters {
-            if let slot = player.lineupSlot {
-                let posKey = slot.uppercased()
-                let playerPos = player.position.uppercased()
-                DebugPrint(mode: .lineupRX, "💊 OPTIMIZER:    - \(player.fullName) (\(playerPos)) in slot: \(posKey)")
-            }
-        }
-        
-        // Sum projected points for starters
-        for player in starters {
-            if let sleeperID = player.sleeperID,
-               let projection = projections[sleeperID] {
-                total += projection
-                DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - \(String(format: "%.1f", projection)) pts")
+            let points: Double
+            
+            // 🔥 FIX: Use actual points for finished games, projections for upcoming games
+            if isPlayerGameFinal(player), let actualPoints = player.currentPoints {
+                points = actualPoints
+                DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - \(String(format: "%.1f", points)) pts [ACTUAL]")
+            } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
+                points = projection
+                DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - \(String(format: "%.1f", points)) pts [PROJECTED]")
             } else {
-                DebugPrint(mode: .lineupRX, "⚠️ CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - No projection data")
+                DebugPrint(mode: .lineupRX, "⚠️ CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - No points data")
+                continue
             }
+            
+            total += points
         }
         
-        DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: Total projected = \(String(format: "%.1f", total)) pts")
+        DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: Total = \(String(format: "%.1f", total)) pts")
         
         return total
     }
@@ -717,11 +782,26 @@ final class LineupOptimizerService {
         DebugPrint(mode: .lineupRX, "🔍 Current starter IDs: \(currentStarterIDs.count)")
         DebugPrint(mode: .lineupRX, "🔍 Optimal starter IDs: \(optimalStarterIDs.count)")
         
+        // 🔥 CRITICAL: Build list of ALL players whose games are FINAL (locked - can't be moved)
+        var lockedPlayerIDs = Set<String>()
+        for player in currentRoster {
+            if isPlayerGameFinal(player) {
+                lockedPlayerIDs.insert(player.id)
+                DebugPrint(mode: .lineupRX, "🔒 LOCKED: \(player.fullName) - game is FINAL, cannot be moved")
+            }
+        }
+        
         var playersToBench: [FantasyPlayer] = []
         var playersToStart: [FantasyPlayer] = []
         
         for starter in currentStarters {
             if !optimalStarterIDs.contains(starter.id) {
+                // 🔥 Skip if player is locked (game FINAL)
+                if lockedPlayerIDs.contains(starter.id) {
+                    DebugPrint(mode: .lineupRX, "⚠️ SKIPPING BENCH: \(starter.fullName) - locked (game FINAL)")
+                    continue
+                }
+                
                 playersToBench.append(starter)
                 let proj = starter.sleeperID.flatMap { projections[$0] } ?? 0
                 DebugPrint(mode: .lineupRX, "🎯 BENCH: \(starter.fullName) (\(String(format: "%.1f", proj)) pts)")
@@ -730,6 +810,12 @@ final class LineupOptimizerService {
         
         for bench in benchPlayers {
             if optimalStarterIDs.contains(bench.id) {
+                // 🔥 Skip if player is locked (game FINAL)
+                if lockedPlayerIDs.contains(bench.id) {
+                    DebugPrint(mode: .lineupRX, "⚠️ SKIPPING START: \(bench.fullName) - locked (game FINAL)")
+                    continue
+                }
+                
                 playersToStart.append(bench)
                 let proj = bench.sleeperID.flatMap { projections[$0] } ?? 0
                 DebugPrint(mode: .lineupRX, "🎯 START: \(bench.fullName) (\(String(format: "%.1f", proj)) pts)")
@@ -760,8 +846,23 @@ final class LineupOptimizerService {
                        benchedPlayer.position == playerToStart.position
             }
             
+            // 🔥 DOUBLE CHECK: Even though we filtered above, verify playerOut isn't locked
+            // (This is extra safety in case logic changes)
+            if let playerOut = playerOut, lockedPlayerIDs.contains(playerOut.id) {
+                DebugPrint(mode: .lineupRX, "⚠️ SKIPPING SWAP: \(playerOut.fullName) is locked (game FINAL)")
+                continue
+            }
+            
             let playerOutProj = playerOut?.sleeperID.flatMap { projections[$0] } ?? 0
             let improvement = playerProj - playerOutProj
+            
+            // 🔥 NEW: Check if improvement meets minimum threshold (percentage-based)
+            let improvementPercentage = playerOutProj > 0 ? (improvement / playerOutProj) : 0.0
+            
+            if improvementPercentage < Self.minimumImprovementThreshold {
+                DebugPrint(mode: .lineupRX, "⚠️ SKIPPING LOW-VALUE SWAP: \(playerToStart.fullName) → \(playerOut?.fullName ?? "?") (+\(String(format: "%.1f", improvement)) pts / \(String(format: "%.1f%%", improvementPercentage * 100))) - below threshold (\(String(format: "%.0f%%", Self.minimumImprovementThreshold * 100)))")
+                continue
+            }
             
             var steps: [MoveStep] = []
             
@@ -805,14 +906,59 @@ final class LineupOptimizerService {
             
             changes.append(change)
             
-            DebugPrint(mode: .lineupRX, "✅ Created change: \(playerOut?.fullName ?? "Empty") → \(playerToStart.fullName) at \(targetSlot) (+\(String(format: "%.1f", improvement)) pts)")
+            DebugPrint(mode: .lineupRX, "✅ Created change: \(playerOut?.fullName ?? "Empty") → \(playerToStart.fullName) at \(targetSlot) (+\(String(format: "%.1f", improvement)) pts / \(String(format: "%.1f", improvementPercentage))%)")
         }
         
         changes.sort { $0.improvement > $1.improvement }
         
-        DebugPrint(mode: .lineupRX, "🎯 Generated \(changes.count) lineup changes")
+        DebugPrint(mode: .lineupRX, "🎯 Generated \(changes.count) lineup changes (after threshold filtering)")
         
         return changes
+    }
+    
+    /// 🔥 NEW: Check if a player's game status is FINAL (already played - can't be moved)
+    private func isPlayerGameFinal(_ player: FantasyPlayer) -> Bool {
+        guard let team = player.team else {
+            DebugPrint(mode: .lineupRX, "⚠️ FINAL CHECK: \(player.fullName) has no team info")
+            return false
+        }
+        
+        DebugPrint(mode: .lineupRX, "🔍 FINAL CHECK for \(player.fullName) (\(team))")
+        
+        // 🔥 PRIORITY: Check player's own gameStatus first (most direct)
+        if let gameStatus = player.gameStatus {
+            let status = gameStatus.status.lowercased()
+            DebugPrint(mode: .lineupRX, "   → Player gameStatus.status: '\(status)'")
+            DebugPrint(mode: .lineupRX, "   → Player gameStatus.timeString: '\(gameStatus.timeString)'")
+            
+            // Check if status indicates game is finished
+            if status == "postgame" || status == "final" || status == "post" || status.contains("final") {
+                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via player.gameStatus: \(player.fullName) - LOCKED!")
+                return true
+            }
+            
+            // Also check timeString as fallback
+            if gameStatus.timeString.uppercased().contains("FINAL") {
+                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via timeString: \(player.fullName) - LOCKED!")
+                return true
+            }
+        }
+        
+        // Fallback: Check NFLGameDataService
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            let gameStatus = gameInfo.gameStatus.lowercased()
+            DebugPrint(mode: .lineupRX, "   → NFLGameDataService status: '\(gameStatus)'")
+            
+            if gameStatus.contains("final") || gameStatus == "f" || gameStatus.contains("finished") {
+                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via NFLGameDataService: \(player.fullName) - LOCKED!")
+                return true
+            }
+        } else {
+            DebugPrint(mode: .lineupRX, "   ⚠️ No NFLGameDataService info found for \(team)")
+        }
+        
+        DebugPrint(mode: .lineupRX, "   ✅ Game not final - player can be moved")
+        return false
     }
 
 
@@ -933,4 +1079,16 @@ final class LineupOptimizerService {
             }
         }
     }
+    
+    // 🔥 NEW: Minimum improvement threshold - only suggest changes with meaningful impact
+    // Uses user's saved preference from Settings (default 10%)
+    static var minimumImprovementThreshold: Double {
+        let percentageThreshold = UserDefaults.standard.lineupOptimizationThreshold
+        // Convert percentage to decimal (10% = 0.10)
+        return percentageThreshold / 100.0
+    }
+    
+    // 🔥 DEPRECATED: Old static threshold - now using user preference
+    // static let minimumImprovementThreshold: Double = 1.0 // At least 1.0 points improvement
+    // static let minimumImprovementPercentage: Double = 10.0 // Or at least 10% improvement
 }

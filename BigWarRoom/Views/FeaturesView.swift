@@ -14,167 +14,202 @@ struct FeaturesView: View {
         FeatureData(
             icon: "target", iconColor: .gpPostBot,
             title: "Mission Control",
-            description: "Track matchups across your Sleeper and ESPN leagues. View scores, projections, and win probabilities with color-coded borders and live updates.",
-            badge: "LIVE"
+            description: "Central hub displaying all your matchups across Sleeper and ESPN leagues. Shows current scores, projections, win probability, and color-coded borders (green winning, red losing). Tap any matchup to view details or launch Lineup RX.",
+            badge: nil
         ),
         FeatureData(
-            icon: "cross.case.fill", iconColor: .red,
-            title: "Injury Status Tracking",
-            description: "Monitor your players who are injured, on BYE, or questionable across all leagues. Shows which leagues are affected and provides navigation to make lineup changes.",
-            badge: "HELPFUL"
+            icon: "pills.fill", iconColor: .purple,
+            title: "Lineup RX",
+            description: "AI-powered lineup optimizer that analyzes your roster and suggests bench/start changes based on projections, opponent rank, and game time. Also provides waiver wire recommendations showing who to drop and multiple add options with projected point improvements.",
+            badge: "AI"
         ),
         FeatureData(
-            icon: "exclamationmark.triangle.fill", iconColor: .orange,
-            title: "Strategic Recommendations",
-            description: "Generates suggestions for lineup changes based on current matchup data. Analyzes opponent performance and game situations to provide actionable recommendations.",
-            badge: "SUGGESTIONS"
-        ),
-        FeatureData(
-            icon: "target", iconColor: .purple,
-            title: "Opponent Analysis",
-            description: "Visual overview of how your matchups are progressing. Shows score differentials, remaining players, and identifies which opponent players are performing well.",
-            badge: "ANALYSIS"
-        ),
-        FeatureData(
-            icon: "scale.3d", iconColor: .yellow,
-            title: "Cross-League Conflict Detection",
-            description: "Identifies when you own a player in one league but face them in another. Helps you understand the impact of player performance across multiple leagues.",
-            badge: "DETECTION"
-        ),
-        FeatureData(
-            icon: "person.2.fill", iconColor: .blue,
-            title: "Opponent Player Database",
-            description: "View all players on opponent rosters across your leagues. Filter by position and performance to track players that might impact your matchups.",
-            badge: "DATABASE"
+            icon: "arrow.left.arrow.right", iconColor: .blue,
+            title: "Start/Sit Analyzer",
+            description: "Compare two players side-by-side with stats, projections, opponent matchup info, and performance trends. Search or paste player names to see who has the better matchup.",
+            badge: nil
         ),
         FeatureData(
             icon: "chart.bar.fill", iconColor: .gpGreen,
-            title: "All Rostered Players",
-            description: "Track every player across all your leagues with live scoring, performance tiers, position filtering, and search. Sort by score, position, name, or team.",
-            badge: "COMPREHENSIVE"
+            title: "All Live Players",
+            description: "View every rostered player across all your leagues with live scoring updates. Filter by active only, position, search by player name (in your league or entire NFL), sort by score/name/team. Shows performance tiers and which leagues each player is in.",
+            badge: nil
         ),
         FeatureData(
             icon: "calendar.circle.fill", iconColor: .blue,
-            title: "NFL Schedule Integration",
-            description: "View NFL schedule with live scores, game status, team logos, and betting lines. See which of your players are in active games.",
+            title: "NFL Schedule",
+            description: "View the full NFL schedule for any week with live scores, game status, team logos, and betting lines. Shows which teams are in active games and final scores for completed games. Tap a game to see team rosters and depth charts.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "person.text.rectangle.fill", iconColor: .cyan,
+            title: "Player Stats Pages",
+            description: "Detailed player profiles showing live game stats, season stats, injury status, team depth chart position, leagues where rostered (and rostered against), and fantasy analysis. Tap any player throughout the app to view their page.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "list.bullet.indent", iconColor: .green,
+            title: "Team Depth Charts",
+            description: "View NFL team depth charts for any position (QB, RB, WR, TE, K, DEF). Shows depth order, jersey numbers, injury status, and current PPR scoring. Tap players to view their full stats.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "person.2.fill", iconColor: .orange,
+            title: "Opponent Intelligence",
+            description: "Detailed view of your opponent's roster showing all their players, current scores, and projections. Filter by position to see who they're starting and who's on their bench.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "cross.case.fill", iconColor: .red,
+            title: "Injury Tracking",
+            description: "Lists all injured, questionable, or bye-week players across your leagues. Shows injury status (Out, Questionable, Doubtful), which leagues are affected, and lets you tap to view that league's roster.",
             badge: nil
         ),
         FeatureData(
             icon: "eye.fill", iconColor: .gpOrange,
-            title: "Player Watch System",
-            description: "Watch and track specific players across all leagues with live score updates and performance notifications.",
-            badge: "TRACKING"
+            title: "Player Watch",
+            description: "Add any player to your watch list to track them across all leagues with live score updates. Useful for monitoring waiver targets or players you face in multiple leagues.",
+            badge: nil
         ),
         FeatureData(
             icon: "magnifyingglass.circle.fill", iconColor: .gpBlue,
             title: "Player Search",
-            description: "Search all NFL players or just your rostered players with name matching, position filtering, and results from the player database.",
-            badge: "SEARCH"
+            description: "Search all NFL players or filter to just your rostered players. Shows player photos, teams, positions, and lets you tap to view full stats and depth chart info.",
+            badge: nil
         ),
         FeatureData(
-            icon: "circle.hexagongrid.fill", iconColor: .cyan,
-            title: "Centralized Loading System",
-            description: "Loading screens with progress indicators that change color from red to green. Data loads upfront for quick tab switching.",
-            badge: "EFFICIENT"
+            icon: "shield.lefthalf.filled", iconColor: .yellow,
+            title: "OPRK (Opponent Rank)",
+            description: "Displays opponent defense rankings against each position (1-32). Shows which matchups favor your players. Green = good matchup (1-10), yellow = neutral (11-20), red = tough (21+).",
+            badge: nil
         ),
         FeatureData(
-            icon: "arrow.clockwise.circle.fill", iconColor: .gpGreen,
-            title: "Refresh Timers",
-            description: "Countdown timers show when data will refresh next. Color changes from green when fresh to red when updates are due.",
-            badge: "VISUAL"
+            icon: "clock.fill", iconColor: .cyan,
+            title: "Game Times",
+            description: "Shows kickoff times for player matchups throughout the app. Helps you know which games are coming up and when players lock.",
+            badge: nil
         ),
         FeatureData(
-            icon: "percent", iconColor: .gpGreen,
-            title: "Win Probability Display",
-            description: "Shows win percentage estimates on matchup cards with color coding for quick assessment of matchup status.",
-            badge: "PROBABILITY"
+            icon: "exclamationmark.triangle.fill", iconColor: .orange,
+            title: "Bye Week Alerts",
+            description: "Identifies players on bye in your starting lineup and shows them in a dedicated alert section. Helps you avoid starting players who won't play.",
+            badge: nil
         ),
         FeatureData(
-            icon: "person.2.fill", iconColor: .orange,
+            icon: "list.number", iconColor: .gpGreen,
+            title: "Move Instructions",
+            description: "Step-by-step guide showing exactly how to implement recommended lineup changes. Lists each bench/start action in order with player names and positions.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "checkmark.square.fill", iconColor: .green,
+            title: "Optimal Lineup Display",
+            description: "Visual representation of what your lineup should look like after applying all recommended changes. Shows projected points for each position slot.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "scale.3d", iconColor: .purple,
+            title: "Cross-League Conflicts",
+            description: "Detects when you own a player in one league but face them as an opponent in another. Shows the player, leagues involved, and scoring impact.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "building.columns.fill", iconColor: .gpBlue,
+            title: "Team Rosters",
+            description: "View rosters for any NFL team. Shows all players by position with depth chart order, injuries, and stats. Tap any player to see their full profile.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "gauge.with.dots.needle.bottom.50percent", iconColor: .gpGreen,
+            title: "Projected Points",
+            description: "Displays fantasy point projections for all players based on current week matchups. Used throughout the app for lineup optimization and player comparisons.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "percent", iconColor: .cyan,
+            title: "Win Probability",
+            description: "Shows estimated win percentage on each matchup card. Color-coded green for likely wins, red for likely losses. Updates as games progress.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "arrow.up.arrow.down.circle.fill", iconColor: .blue,
+            title: "Bench/Start Recommendations",
+            description: "Visual indicators throughout Lineup RX showing which players to bench (red down arrow) and which to start (green up arrow). Based on projections and matchup analysis.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "square.stack.3d.up.fill", iconColor: .purple,
+            title: "Waiver Wire Targets",
+            description: "Grouped by player to drop, shows multiple waiver wire add options for each. Displays projected point improvement, opponent rank, and reasoning for each recommendation.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "number.circle.fill", iconColor: .cyan,
+            title: "Week Selector",
+            description: "Global week picker that lets you change which NFL week you're viewing. Works across all tabs - Mission Control, Schedule, Live Players, and Lineup RX.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "arrow.triangle.2.circlepath", iconColor: .gpGreen,
+            title: "Auto-Refresh Timers",
+            description: "Countdown timers showing when data will refresh. Color changes from green (fresh) to red (stale). Tap to manually refresh at any time.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "link.circle.fill", iconColor: .gpBlue,
+            title: "External App Links",
+            description: "Direct links to launch Sleeper app or ESPN website from any matchup card. Opens the specific league for quick lineup changes.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "icloud.fill", iconColor: .gray,
+            title: "Multi-Platform Support",
+            description: "Connect both ESPN and Sleeper accounts. View all leagues in one place with unified interface, regardless of platform.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "sportscourt.fill", iconColor: .orange,
+            title: "Team Logos",
+            description: "NFL team logos displayed throughout the app for visual identification. Shows team branding on player cards, matchup info, and roster views.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "house.fill", iconColor: .green,
+            title: "Home/Away Indicators",
+            description: "Shows whether players are home or away with 'vs' or '@' notation. Helps assess matchup context for lineup decisions.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "person.2.fill", iconColor: .blue,
             title: "War Room",
-            description: "Draft preparation and league management tools. Research players, track draft picks, and manage roster strategy.",
+            description: "Draft preparation hub with player rankings, mock draft tools, and keeper league management. Access draft boards and strategy guides.",
             badge: nil
         ),
         FeatureData(
             icon: "list.bullet.clipboard", iconColor: .cyan,
             title: "Interactive Draft Board",
-            description: "Visual draft tracking with player rankings, position needs, and real-time pick updates for following draft progress.",
+            description: "Live draft tracking showing picks in real-time. Filter by position, view team needs, and track your draft strategy as picks are made.",
             badge: nil
         ),
         FeatureData(
-            icon: "clock.fill", iconColor: .red,
-            title: "Live Draft Picks",
-            description: "Real-time draft pick notifications and updates. Track selections as they happen across your leagues.",
-            badge: "LIVE"
-        ),
-        FeatureData(
-            icon: "textformat.size", iconColor: .blue,
-            title: "Responsive Text Scaling",
-            description: "Text automatically scales to fit available space with line limits and minimum scale factors to prevent cutoff issues.",
-            badge: "RESPONSIVE"
-        ),
-        FeatureData(
-            icon: "keyboard.fill", iconColor: .gray,
-            title: "Keyboard Handling",
-            description: "Search bars stay properly positioned when keyboard appears, with auto-focus and proper safe area handling.",
-            badge: "UX"
-        ),
-        FeatureData(
-            icon: "link.circle.fill", iconColor: .gpBlue,
-            title: "External App Integration",
-            description: "Direct links to launch Sleeper app or ESPN website for making lineup changes. Integrates with your existing fantasy workflow.",
-            badge: "INTEGRATION"
-        ),
-        FeatureData(
-            icon: "icloud.fill", iconColor: .gray,
-            title: "Multi-Platform Support",
-            description: "Works with both ESPN and Sleeper platforms. Combines data from multiple leagues in a unified interface.",
-            badge: "UNIVERSAL"
-        ),
-        FeatureData(
-            icon: "server.rack", iconColor: .green,
-            title: "Centralized Data Management",
-            description: "Single interface for all fantasy data with caching, background updates, and coordinated loading across app features.",
-            badge: "ORGANIZED"
-        ),
-        FeatureData(
             icon: "bell.fill", iconColor: .yellow,
-            title: "Status Notifications",
-            description: "Visual indicators for scoring plays, injury updates, and lineup changes. Contextual badges and alerts keep you informed.",
-            badge: "NOTIFICATIONS"
+            title: "Status Badges",
+            description: "Visual indicators throughout the app showing player status (injured, bye, playing, locked). Color-coded for quick recognition.",
+            badge: nil
+        ),
+        FeatureData(
+            icon: "circle.hexagongrid.fill", iconColor: .cyan,
+            title: "Loading Screens",
+            description: "Progress indicators with color transitions (red to green) during data loading. Shows loading status and prevents blank screens.",
+            badge: nil
         )
     ]
     
     // MARK: - Badge Color Dictionary (replaces massive switch statement)
     private let badgeColors: [String: Color] = [
-        "NEW": .gpGreen,
+        "AI": .purple,
         "LIVE": .red,
-        "SMART": .purple,
-        "AUTO": .blue,
-        "UNIVERSAL": .orange,
-        "CRITICAL": .red,
-        "ENHANCED": .gpGreen,
-        "POWERFUL": .gpBlue,
-        "SMOOTH": .cyan,
-        "VISUAL": .gpOrange,
-        "IMPROVED": .gpGreen,
-        "POLISHED": .blue,
-        "UX": .purple,
-        "INTEGRATION": .gpBlue,
-        "ARCHITECTURE": .green,
-        "HELPFUL": .gpPostBot,
-        "SUGGESTIONS": .gpPostBot,
-        "ANALYSIS": .gpPostBot,
-        "DETECTION": .gpPostBot,
-        "DATABASE": .gpPostBot,
-        "COMPREHENSIVE": .gpPostBot,
-        "TRACKING": .gpPostBot,
-        "SEARCH": .gpPostBot,
-        "EFFICIENT": .gpPostBot,
-        "PROBABILITY": .gpPostBot,
-        "RESPONSIVE": .gpPostBot,
-        "ORGANIZED": .gpPostBot,
-        "NOTIFICATIONS": .gpPostBot
+        "NEW": .gpGreen
     ]
     
     var body: some View {
@@ -224,10 +259,17 @@ struct FeaturesView: View {
                 Spacer()
             }
             
-            Text("Your complete fantasy football command center")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(.white.opacity(0.8))
-                .padding(.leading, 40)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Complete feature reference")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+                
+                Text("Version: \(AppConstants.getVersion())")
+				  .font(.system(size: 12, weight: .regular))
+				  .italic()
+				  .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(.leading, 40)
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)

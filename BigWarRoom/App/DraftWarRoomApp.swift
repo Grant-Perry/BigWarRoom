@@ -200,9 +200,21 @@ struct SpinningOrbsLoadingScreen: View {
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(loadingProgress >= 1.0 ? .green.opacity(0.8) : .white.opacity(0.8))
                         .opacity(textOpacity)
+
+				   Spacer()
+
+					  // 🔥 VERSION TEXT - FINALLY IN THE RIGHT PLACE
+                    Text("Version: \(AppConstants.getVersion())")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .opacity(textOpacity)
+                        .padding(.top, 20)
+
+                    Text("Copyright © \(String(Calendar.current.component(.year, from: Date()))) Cre8vPlanet Studios. All rights reserved.")
+					  .font(.system(size: 10, weight: .regular))
+                        .foregroundColor(.white.opacity(0.7))
+                        .opacity(textOpacity)
                         .padding(.bottom, 40)
-                    
-                    Spacer()
                 }
             }
             .padding(.horizontal, 20)
@@ -400,6 +412,12 @@ struct MainTabView: View {
                 }
                 .tag(4)
             }
+            .environment(NFLGameDataService.shared)
+            .environment(NFLWeekService.shared)
+            .environment(AllLivePlayersViewModel.shared)
+            .environment(PlayerDirectoryStore.shared)
+            .environment(MatchupsHubViewModel.shared)
+            .environment(PlayerWatchService.shared)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
                 selectedTab = 4
             }
@@ -428,7 +446,7 @@ struct AppVersionOverlay: View {
             HStack {
                 Spacer()
                 Text("Version: \(AppConstants.getVersion())")
-                    .font(.system(size: 12, weight: .medium, design: .default))
+                    .font(.system(size: 10, weight: .medium, design: .default))
                     .foregroundColor(.white)
                     .padding(.trailing, 31)
                     .padding(.bottom, 8)

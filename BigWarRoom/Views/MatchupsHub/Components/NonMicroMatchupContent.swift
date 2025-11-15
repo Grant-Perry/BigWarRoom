@@ -20,6 +20,9 @@ struct NonMicroMatchupContent: View {
     // 💊 RX button callback
     var onRXTap: (() -> Void)? = nil
     
+    // 💊 RX: Optimization status
+    var isLineupOptimized: Bool = false
+    
     private var isLiveGame: Bool {
         return matchup.isLive
     }
@@ -50,10 +53,10 @@ struct NonMicroMatchupContent: View {
                 }
                 
                 // VS separator
-                Text("VS")
-                    .font(.system(size: dualViewMode ? 10 : 8, weight: .black))
-                    .foregroundColor(.white.opacity(0.6))
-                    .frame(width: dualViewMode ? 24 : 20)
+//                Text("VS")
+//                    .font(.system(size: dualViewMode ? 10 : 8, weight: .black))
+//                    .foregroundColor(.white.opacity(0.6))
+//                    .frame(width: dualViewMode ? 24 : 20)
                 
                 // Away team on RIGHT
                 if let awayTeam = getAwayTeam() {
@@ -76,9 +79,13 @@ struct NonMicroMatchupContent: View {
                     scoreDelta: matchup.scoreDifferential,
                     isWinning: isWinning,
                     matchup: matchup,
-                    onRXTap: onRXTap
+                    onRXTap: onRXTap,
+                    isLineupOptimized: isLineupOptimized
                 )
             }
+            
+            // 🔥 FIXED: Add Spacer to fill remaining height
+            Spacer(minLength: 0)
         }
     }
     

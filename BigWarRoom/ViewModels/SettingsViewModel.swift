@@ -18,6 +18,9 @@ final class SettingsViewModel {
     var isTestingConnection: Bool = false
     var showEliminatedChoppedLeagues: Bool = false
     
+    // 💊 RX: Lineup optimization improvement threshold (persistent)
+    var lineupOptimizationThreshold: Double = 10.0 // 10% default, range 10-100%
+    
     // MARK: - Observable Properties (OnBoarding)
     var showingESPNSetup: Bool = false
     var showingSleeperSetup: Bool = false
@@ -97,6 +100,10 @@ final class SettingsViewModel {
         // Load show eliminated chopped leagues preference (default: false)
         showEliminatedChoppedLeagues = UserDefaults.standard.bool(forKey: "showEliminatedChoppedLeagues")
         
+        // 💊 RX: Load lineup optimization threshold (default: 10%)
+        let savedThreshold = UserDefaults.standard.double(forKey: "lineupOptimizationThreshold")
+        lineupOptimizationThreshold = savedThreshold > 0 ? savedThreshold : 10.0
+        
         // Set up observers for changes (using withObservationTracking if needed)
         Task {
             await observeChanges()
@@ -136,6 +143,19 @@ final class SettingsViewModel {
     func updateShowEliminatedChoppedLeagues(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "showEliminatedChoppedLeagues")
         NSLog("🔧 Show eliminated chopped leagues \(enabled ? "enabled" : "disabled")")
+    }
+    
+    // 💊 RX: Update lineup optimization threshold
+    func updateLineupOptimizationThreshold(_ threshold: Double) {
+        UserDefaults.standard.set(threshold, forKey: "lineupOptimizationThreshold")
+        NSLog("💊 RX: Lineup optimization threshold updated to \(Int(threshold))%")
+    }
+    
+    // 💊 RX: Reset threshold to default
+    func resetLineupOptimizationThreshold() {
+        lineupOptimizationThreshold = 10.0
+        UserDefaults.standard.set(10.0, forKey: "lineupOptimizationThreshold")
+        NSLog("💊 RX: Lineup optimization threshold reset to 10%")
     }
     
     // MARK: - OnBoarding Methods
@@ -394,5 +414,11 @@ extension UserDefaults {
     
     var showEliminatedChoppedLeagues: Bool {
         return bool(forKey: "showEliminatedChoppedLeagues")
+    }
+    
+    // 💊 RX: Lineup optimization threshold (default 10%)
+    var lineupOptimizationThreshold: Double {
+        let threshold = double(forKey: "lineupOptimizationThreshold")
+        return threshold > 0 ? threshold : 10.0
     }
 }

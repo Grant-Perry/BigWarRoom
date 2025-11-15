@@ -36,10 +36,20 @@ final class MatchupsHubViewModel {
     var autoRefreshEnabled = true
 
     // MARK: - Just Me Mode State (Persistent across refreshes)
-    var microModeEnabled = false // Changed from true to false - start with Just Me mode OFF
+    var microModeEnabled: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: "MatchupsHub_MicroModeEnabled")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "MatchupsHub_MicroModeEnabled")
+        }
+    }
     var expandedCardId: String? = nil
     var justMeModeBannerVisible = false // Keep this false - no banner needed
     
+    // MARK: - 💊 RX Optimization Status Tracking
+    var lineupOptimizationStatus: [String: Bool] = [:] // matchupID -> isOptimized
+
     // MARK: - Loading State Management
     var loadingStates: [String: LeagueLoadingState] = [:]
     var errorMessage: String? = nil

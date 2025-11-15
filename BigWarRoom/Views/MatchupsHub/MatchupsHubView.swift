@@ -32,10 +32,10 @@ struct MatchupsHubView: View {
     @State internal var poweredByExpanded = false
     
     // MARK: - Sorting States
-    @State internal var sortByWinning = false
+    @AppStorage("MatchupsHub_SortByWinning") internal var sortByWinning = false
     
     // MARK: - View Mode State
-    @State internal var dualViewMode = true
+    @AppStorage("MatchupsHub_DualViewMode") internal var dualViewMode = true
     
     // MARK: - Timer States (Following standard app pattern)
     @State internal var refreshCountdown: Double = Double(AppConstants.MatchupRefresh)

@@ -49,6 +49,7 @@ struct DepthChartPlayerRowImageView: View {
                     )
             )
         }
+        .frame(width: 38, height: 38)
     }
     
     // MARK: - Computed Properties (Data Only)

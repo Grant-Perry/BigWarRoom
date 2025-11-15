@@ -56,7 +56,7 @@ struct NonMicroTeamSection: View {
                         // Show team initials immediately while avatar loads
                         NonMicroTeamInitials(team: team, isWinning: isTeamWinning)
                     }
-                    .frame(width: dualViewMode ? 45 : 32, height: dualViewMode ? 45 : 32)
+                    .frame(width: dualViewMode ? 38 : 28, height: dualViewMode ? 38 : 28)
                     .clipShape(Circle())
                     .overlay(
                         Circle()
@@ -71,7 +71,7 @@ struct NonMicroTeamSection: View {
                     }
                 } else {
                     NonMicroTeamInitials(team: team, isWinning: isTeamWinning)
-                        .frame(width: dualViewMode ? 45 : 32, height: dualViewMode ? 45 : 32)
+                        .frame(width: dualViewMode ? 38 : 28, height: dualViewMode ? 38 : 28)
                         .overlay(
                             Circle()
                                 .stroke(
@@ -88,26 +88,30 @@ struct NonMicroTeamSection: View {
             
             // Team name
             Text(team.ownerName)
-                .font(.system(size: dualViewMode ? 13 : 11, weight: .bold))
+                .font(.system(size: dualViewMode ? 14 : 12, weight: .bold))
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
                 .lineLimit(1)
-                .frame(maxWidth: dualViewMode ? 60 : 50)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: dualViewMode ? 85 : 65)
             
             // Manager record (only show if available)
             if let record = team.record {
                 Text(record.displayString)
                     .font(.system(size: dualViewMode ? 12 : 11, weight: .medium))
                     .foregroundColor(.gray)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             
             // Score
             Text(team.currentScoreString)
-                .font(.system(size: dualViewMode ? 16 : 13, weight: .black, design: .rounded))
+                .font(.system(size: dualViewMode ? 18 : 14, weight: .black, design: .rounded))
                 .foregroundColor(isTeamWinning ? .gpGreen : .gpRedPink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .scaleEffect(scoreAnimation && isLiveGame ? 1.1 : 1.0)
             
             // 🔥 OLD: Record (only show in Dual view AND only if not empty - Sleeper only)
-            // REMOVED - now always showing above
         }
         .frame(maxWidth: .infinity)
     }

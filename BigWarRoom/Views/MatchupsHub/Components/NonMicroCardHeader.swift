@@ -12,6 +12,7 @@ struct NonMicroCardHeader: View {
     let matchup: UnifiedMatchup
     let dualViewMode: Bool
     let onRXTap: (() -> Void)?  // 💊 RX button callback
+    let isLineupOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
         HStack {
@@ -47,11 +48,16 @@ struct NonMicroCardHeader: View {
                         .padding(6)
                         .background(
                             Circle()
-                                .fill(Color.gpRedPink)
+                                .fill(buttonBackgroundColor)
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
             }
         }
+    }
+    
+    // 💊 RX: Dynamic button color based on optimization status
+    private var buttonBackgroundColor: Color {
+        return isLineupOptimized ? .gpGreen : .gpRedPink
     }
 }

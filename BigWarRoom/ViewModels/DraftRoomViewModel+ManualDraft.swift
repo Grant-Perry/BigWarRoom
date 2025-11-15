@@ -38,7 +38,8 @@ extension DraftRoomViewModel {
                     taxiSlots: nil,
                     leagueType: nil,
                     isChopped: nil,
-                    type: nil
+                    type: nil,
+                    waiverBudget: nil  // Manual draft - no FAAB yet
                 ),
                 scoringSettings: nil,
                 rosterPositions: nil

@@ -20,4 +20,69 @@ extension MatchupsHubViewModel {
     internal func getCurrentYear() -> String {
         return String(Calendar.current.component(.year, from: Date()))
     }
+    
+    // MARK: - 💊 RX Optimization Status Helpers
+    
+    /// Check if a lineup is optimized (no recommended changes)
+    func checkLineupOptimization(for matchup: UnifiedMatchup) async {
+        // Skip optimization check for chopped leagues or eliminated matchups
+        guard !matchup.isChoppedLeague, !matchup.isMyManagerEliminated else {
+            lineupOptimizationStatus[matchup.id] = true // Treat as "optimized" to show green
+            return
+        }
+        
+        // Skip if no team data
+        guard matchup.myTeam != nil else {
+            lineupOptimizationStatus[matchup.id] = false
+            return
+        }
+        
+        let week = getCurrentWeek()
+        let year = getCurrentYear()
+        
+        do {
+            // Create optimizer instance (view-owned, no singleton)
+            let optimizer = LineupOptimizerService()
+            
+            // Run optimization
+            let result = try await optimizer.optimizeLineup(
+                for: matchup,
+                week: week,
+                year: year,
+                scoringFormat: "ppr"
+            )
+            
+            // Lineup is optimized if there are NO recommended changes
+            let isOptimized = result.changes.isEmpty
+            
+            DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: \(matchup.league.league.name) - Optimized: \(isOptimized) (\(result.changes.count) changes)")
+            
+            lineupOptimizationStatus[matchup.id] = isOptimized
+            
+        } catch {
+            DebugPrint(mode: .lineupRX, "❌ OPTIMIZER: Failed to check optimization for \(matchup.league.league.name) - \(error.localizedDescription)")
+            // On error, assume not optimized
+            lineupOptimizationStatus[matchup.id] = false
+        }
+    }
+    
+    /// Get optimization status for a matchup (cached)
+    func isLineupOptimized(for matchup: UnifiedMatchup) -> Bool {
+        return lineupOptimizationStatus[matchup.id] ?? false
+    }
+    
+    /// Refresh optimization status for all matchups
+    func refreshAllOptimizationStatuses() async {
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Refreshing optimization status for all matchups...")
+        
+        await withTaskGroup(of: Void.self) { group in
+            for matchup in myMatchups {
+                group.addTask {
+                    await self.checkLineupOptimization(for: matchup)
+                }
+            }
+        }
+        
+        DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: Optimization status refresh complete")
+    }
 }

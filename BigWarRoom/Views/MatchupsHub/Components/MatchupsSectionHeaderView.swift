@@ -40,11 +40,6 @@ struct MatchupsSectionHeaderView: View {
     
     var body: some View {
         HStack {
-            CollapseButton(
-                isExpanded: poweredByExpanded,
-                onToggle: onPoweredByToggle
-            )
-            
             // #GoodNav: Clickable control toggles
             ControlTogglesRow(
                 sortByWinning: sortByWinning,
@@ -123,27 +118,11 @@ struct MatchupsSectionHeaderView: View {
             .scaleEffect(0.8)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
+        .padding(.top, 8)
     }
 }
 
 // MARK: - Supporting Components
-
-/// Collapse/expand button for powered by section
-private struct CollapseButton: View {
-    let isExpanded: Bool
-    let onToggle: () -> Void
-    
-    var body: some View {
-        Button(action: onToggle) {
-            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 20, height: 20)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
 
 /// #GoodNav: Row containing all clickable control toggles
 private struct ControlTogglesRow: View {

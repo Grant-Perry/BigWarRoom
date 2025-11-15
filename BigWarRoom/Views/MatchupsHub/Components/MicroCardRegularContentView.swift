@@ -15,6 +15,7 @@ struct MicroCardRegularContentView: View {
     let percentage: String
     let record: String?  // Add record parameter
     let onRXTap: (() -> Void)?  // 💊 RX button callback
+    let isLineupOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
         VStack(spacing: 6) {
@@ -29,21 +30,21 @@ struct MicroCardRegularContentView: View {
                         .fill(scoreColor.opacity(0.6))
                         .overlay(
                             Text(String(managerName.prefix(2)).uppercased())
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 8, weight: .bold))
                                 .foregroundColor(.white)
                         )
                 }
-                .frame(width: 36, height: 36)
+                .frame(width: 24, height: 24)
                 .clipShape(Circle())
             } else {
                 Circle()
                     .fill(scoreColor.opacity(0.6))
                     .overlay(
                         Text(String(managerName.prefix(2)).uppercased())
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 8, weight: .bold))
                             .foregroundColor(.white)
                     )
-                    .frame(width: 36, height: 36)
+                    .frame(width: 24, height: 24)
             }
             
             // Manager name
@@ -53,9 +54,9 @@ struct MicroCardRegularContentView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             
-            // Manager record
+            // Manager record (without "Record:" prefix)
             if let record = record {
-                Text("Record: \(record)")
+                Text(record)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray.opacity(0.8))
                     .lineLimit(1)
@@ -63,7 +64,7 @@ struct MicroCardRegularContentView: View {
             
             // 💊 RX Button - above score/percentage
             if let onRXTap = onRXTap {
-                MicroCardRXButton(onTap: onRXTap)
+                MicroCardRXButton(onTap: onRXTap, isOptimized: isLineupOptimized)
                     .padding(.top, 2)
             }
             
@@ -86,12 +87,13 @@ struct MicroCardRegularContentView: View {
 // MARK: - RX Button Component for Micro Cards
 struct MicroCardRXButton: View {
     let onTap: () -> Void
+    let isOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 3) {
                 Text("⚕️")
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                 Text("RX")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.white)
@@ -100,13 +102,18 @@ struct MicroCardRXButton: View {
             .padding(.vertical, 3)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.gpBlue.opacity(0.2))
+                    .fill(buttonBackgroundColor.opacity(0.2))
                     .overlay(
                         RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.gpBlue, lineWidth: 1)
+                            .stroke(buttonBackgroundColor, lineWidth: 1)
                     )
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // 💊 RX: Dynamic button color based on optimization status
+    private var buttonBackgroundColor: Color {
+        return isOptimized ? .gpGreen : .gpRedPink
     }
 }

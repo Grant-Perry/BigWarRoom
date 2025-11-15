@@ -27,9 +27,10 @@ struct MatchupsHubMatchupsSectionView: View {
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
     
     var body: some View {
-        VStack(spacing: 35) { //  space between sections
+        VStack(spacing: 12) {
             MatchupsSectionHeaderView(
                 poweredByExpanded: poweredByExpanded,
                 sortByWinning: sortByWinning,
@@ -43,12 +44,7 @@ struct MatchupsHubMatchupsSectionView: View {
                 onRefreshTapped: onRefreshTapped
             )
             
-            // Powered by branding (keep existing functionality)
-            if poweredByExpanded {
-                PoweredByBrandingView()
-            }
-            
-            // Matchup cards grid - tight to the Advanced section
+            // Matchup cards grid - tight spacing
             MatchupCardsGridView(
                 sortedMatchups: sortedMatchups,
                 microMode: microMode,
@@ -58,7 +54,8 @@ struct MatchupsHubMatchupsSectionView: View {
                 // onShowDetail: onShowDetail,
                 onMicroCardTap: onMicroCardTap,
                 onExpandedCardDismiss: onExpandedCardDismiss,
-                getWinningStatus: getWinningStatus
+                getWinningStatus: getWinningStatus,
+                getOptimizationStatus: getOptimizationStatus
             )
         }
     }

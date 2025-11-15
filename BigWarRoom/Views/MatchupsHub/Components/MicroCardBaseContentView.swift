@@ -34,6 +34,9 @@ struct MicroCardBaseContentView: View {
     // 💊 RX button callback
     let onRXTap: (() -> Void)?
     
+    // 💊 RX: Optimization status
+    let isLineupOptimized: Bool
+    
     var body: some View {
         VStack(spacing: 8) {
             // League name
@@ -59,7 +62,8 @@ struct MicroCardBaseContentView: View {
                     scoreColor: scoreColor,
                     percentage: percentage,
                     record: matchup.myTeam?.record?.displayString,
-                    onRXTap: onRXTap
+                    onRXTap: onRXTap,
+                    isLineupOptimized: isLineupOptimized
                 )
             }
         }

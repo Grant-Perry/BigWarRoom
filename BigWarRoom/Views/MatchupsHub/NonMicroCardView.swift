@@ -16,6 +16,9 @@ struct NonMicroCardView: View {
     // Accept dualViewMode parameter to make cards more compact in Single view
     var dualViewMode: Bool = true
     
+    // 💊 RX: Optimization status
+    let isLineupOptimized: Bool
+    
     @State private var cardScale: CGFloat = 1.0
     @State private var scoreAnimation: Bool = false
     @State private var glowIntensity: Double = 0.0
@@ -41,16 +44,17 @@ struct NonMicroCardView: View {
                     scoreAnimation: scoreAnimation,
                     isGamesFinished: false, // 🔥 SIMPLIFIED: Always false, no celebration logic
                     celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
-                    onRXTap: { showingLineupRX = true }
+                    onRXTap: { showingLineupRX = true },
+                    isLineupOptimized: isLineupOptimized
                 )
             }
         }
 	   // MARK: master frame dimensions for matchup cards
         .frame(
-            width: dualViewMode ? 200 : 380,  // 🔥 WIDER: Increased from 180 to 220 (dual), 350 to 380 (single)
-            height: dualViewMode ? 160 : 120
+            width: dualViewMode ? 170 : 340,
+            height: 190
         )
-        .fixedSize()
+        .fixedSize(horizontal: true, vertical: true)
         .scaleEffect(cardScale)
         .onAppear {
             if matchup.isLive {

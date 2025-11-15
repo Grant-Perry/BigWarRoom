@@ -345,7 +345,9 @@ extension FantasyViewModel {
             currentScore: score,
             projectedScore: score * 1.05,
             roster: fantasyPlayers,
-            rosterID: espnTeam.id
+            rosterID: espnTeam.id,
+            faabTotal: nil,  // 🔥 NEW: ESPN doesn't use FAAB
+            faabUsed: nil    // 🔥 NEW: ESPN doesn't use FAAB
         )
     }
     

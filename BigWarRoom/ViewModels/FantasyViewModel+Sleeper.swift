@@ -17,11 +17,12 @@ extension FantasyViewModel {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             
-            // 🔥 UPDATED: Decode the full SleeperLeague to get proper scoring settings
-            let sleeperLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            // 🔥 UPDATED: Decode the full SleeperLeague and store it
+            let fullLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            sleeperLeague = fullLeague  // 🔥 STORE THE FULL LEAGUE
             
             // Store in local property for backward compatibility
-            if let scoringSettings = sleeperLeague.scoringSettings {
+            if let scoringSettings = fullLeague.scoringSettings {
                 var convertedSettings: [String: Any] = [:]
                 for (key, value) in scoringSettings {
                     convertedSettings[key] = value
@@ -32,7 +33,7 @@ extension FantasyViewModel {
                 
                 // 🔥 FIX: Register the scoring settings with ScoringSettingsManager
                 ScoringSettingsManager.shared.registerSleeperScoringSettings(
-                    from: sleeperLeague, 
+                    from: fullLeague, 
                     leagueID: leagueID
                 )
                 
@@ -344,6 +345,24 @@ extension FantasyViewModel {
             return nil
         }()
         
+        // 🔥 NEW: Get FAAB data from roster and league settings - SAME LOGIC AS LeagueMatchupProvider
+        let faabTotal: Int? = sleeperLeague?.settings?.waiverBudget
+        
+        let faabUsed: Int? = {
+            // Get FAAB already spent from roster
+            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }) {
+                // Try root level first
+                if let used = roster.waiversBudgetUsed {
+                    return used
+                }
+                // Fallback to settings object
+                if let settings = roster.settings, let used = settings.waiver_budget_used {
+                    return used
+                }
+            }
+            return nil
+        }()
+        
         return FantasyTeam(
             id: String(matchupResponse.rosterID),
             name: finalManagerName,
@@ -353,7 +372,9 @@ extension FantasyViewModel {
             currentScore: matchupResponse.points,
             projectedScore: matchupResponse.projectedPoints,
             roster: fantasyPlayers,
-            rosterID: matchupResponse.rosterID
+            rosterID: matchupResponse.rosterID,
+            faabTotal: faabTotal,  // 🔥 NEW: FAAB budget
+            faabUsed: faabUsed     // 🔥 NEW: FAAB spent
         )
     }
     

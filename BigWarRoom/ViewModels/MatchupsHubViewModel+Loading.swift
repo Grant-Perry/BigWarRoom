@@ -323,6 +323,9 @@ extension MatchupsHubViewModel {
             // Sort final matchups by priority (live games first, then by league importance)
             self.myMatchups.sort { $0.priority > $1.priority }
         }
+        
+        // 💊 RX: Check optimization status for all matchups after loading
+        await refreshAllOptimizationStatuses()
     }
     
     // MARK: - Loading State Management

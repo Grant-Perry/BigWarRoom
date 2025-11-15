@@ -72,11 +72,12 @@ final class FantasyViewModel {
     
     // MARK: -> Sleeper Data Storage
     var sleeperLeagueSettings: [String: Any]? = nil
+    var sleeperLeague: SleeperLeague?  // 🔥 NEW: Store full Sleeper league for FAAB and other settings
+    var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record and FAAB lookup
     var playerStats: [String: [String: Double]] = [:]
     var rosterIDToManagerID: [Int: String] = [:]
     var userIDs: [String: String] = [:]
     var userAvatars: [String: URL] = [:]
-    var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record lookup
     
     // MARK: -> Picker Options
     let availableWeeks = Array(1...18)

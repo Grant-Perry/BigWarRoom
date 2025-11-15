@@ -18,6 +18,9 @@ struct MatchupCardViewBuilder: View {
     
     // 🔥 NEW: Accept dualViewMode parameter to make cards compact in Single view
     var dualViewMode: Bool = true
+    
+    // 💊 RX: Optimization status
+    let isLineupOptimized: Bool
 
     var body: some View {
         Group {
@@ -71,7 +74,8 @@ struct MatchupCardViewBuilder: View {
                 isEliminated: cardProperties.isEliminated,
                 eliminationWeek: cardProperties.eliminationWeek,
                 matchup: matchup,
-                isWinning: isWinning
+                isWinning: isWinning,
+                isLineupOptimized: isLineupOptimized
             )
         }
         .buttonStyle(CardPressButtonStyle()) // Same button style as NonMicroCardView
@@ -96,7 +100,8 @@ struct MatchupCardViewBuilder: View {
                 isWinning: isWinning,
                 // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
                 // onTap: { },
-                dualViewMode: dualViewMode
+                dualViewMode: dualViewMode,
+                isLineupOptimized: isLineupOptimized
             )
         }
         .buttonStyle(CardPressButtonStyle()) // 🔥 NEW: Custom button style with immediate feedback
@@ -210,18 +215,18 @@ struct MatchupCardViewBuilder: View {
     
     private func calculateWinPercentageString() -> String {
         if matchup.isChoppedLeague {
-            guard let teamRanking = matchup.myTeamRanking else { return "0%" }
-            return "\(Int(teamRanking.survivalProbability * 100))%"
+            guard let teamRanking = matchup.myTeamRanking else { return "0% win" }
+            return "\(Int(teamRanking.survivalProbability * 100))% win"
         }
         
         guard let myScore = matchup.myTeam?.currentScore,
-              let opponentScore = matchup.opponentTeam?.currentScore else { return "50%" }
+              let opponentScore = matchup.opponentTeam?.currentScore else { return "50% win" }
         
         let totalScore = myScore + opponentScore
-        if totalScore == 0 { return "50%" }
+        if totalScore == 0 { return "50% win" }
         
         let percentage = (myScore / totalScore) * 100.0
-        return "\(Int(percentage))%"
+        return "\(Int(percentage))% win"
     }
 
     private func isMatchupLive() -> Bool {

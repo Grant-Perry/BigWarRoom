@@ -16,11 +16,17 @@ struct NonMicroCardContent: View {
     let isGamesFinished: Bool
     let celebrationBorderPulse: Bool
     let onRXTap: (() -> Void)?
+    let isLineupOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
-        VStack(spacing: dualViewMode ? 8 : 4) {
+        VStack(spacing: dualViewMode ? 6 : 4) {
             // Compact header with league and status
-            NonMicroCardHeader(matchup: matchup, dualViewMode: dualViewMode, onRXTap: onRXTap)
+            NonMicroCardHeader(
+                matchup: matchup,
+                dualViewMode: dualViewMode,
+                onRXTap: onRXTap,
+                isLineupOptimized: isLineupOptimized
+            )
             
             // Main content
             if matchup.isChoppedLeague {
@@ -31,15 +37,14 @@ struct NonMicroCardContent: View {
                     isWinning: isWinning,
                     dualViewMode: dualViewMode,
                     scoreAnimation: scoreAnimation,
-                    onRXTap: nil  // 💊 No longer needed in bottom section
+                    onRXTap: dualViewMode ? nil : onRXTap,
+                    isLineupOptimized: isLineupOptimized
                 )
             }
-            
-            // 🔥 FIXED: Add Spacer to ensure content fills the fixed height
-            Spacer(minLength: 0)
         }
+        .frame(maxHeight: .infinity)
         .padding(.horizontal, 12)
-        .padding(.vertical, dualViewMode ? 14 : 8)
+        .padding(.vertical, dualViewMode ? 10 : 8)
         .background(NonMicroCardBackground(matchup: matchup, backgroundColors: backgroundColors))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(

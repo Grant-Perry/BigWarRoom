@@ -93,7 +93,8 @@ extension MatchupsHubView {
                     matchupsHubViewModel.expandedCardId = nil
                 }
             },
-            getWinningStatus: matchupsHubViewModel.getWinningStatusForMatchup
+            getWinningStatus: matchupsHubViewModel.getWinningStatusForMatchup,
+            getOptimizationStatus: matchupsHubViewModel.isLineupOptimized
         )
     }
     

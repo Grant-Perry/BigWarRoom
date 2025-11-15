@@ -755,7 +755,8 @@ struct TeamFilteredMatchupsView: View {
                     onMicroCardTap: { cardId in
                         expandedCardId = (expandedCardId == cardId) ? nil : cardId
                     },
-                    dualViewMode: true // Use dual view mode for 2-column layout
+                    dualViewMode: true, // Use dual view mode for 2-column layout
+                    isLineupOptimized: false // 💊 RX: Always false for filtered views (not supported)
                 )
             }
         }

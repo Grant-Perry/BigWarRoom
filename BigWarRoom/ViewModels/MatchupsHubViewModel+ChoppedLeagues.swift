@@ -135,7 +135,9 @@ extension MatchupsHubViewModel {
                 currentScore: realTeamScore,
                 projectedScore: projectedScore,
                 roster: starterRoster, // Now includes actual starter players!
-                rosterID: rosterID
+                rosterID: rosterID,
+                faabTotal: nil,  // Chopped leagues - FAAB not applicable for rankings
+                faabUsed: nil    // Chopped leagues - FAAB not applicable for rankings
             )
             
             if hasAnyPlayers {

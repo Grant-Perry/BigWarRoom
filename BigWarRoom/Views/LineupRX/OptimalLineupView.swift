@@ -14,6 +14,40 @@ struct OptimalLineupView: View {
     
     @State private var isExpanded: Bool = true
     
+    // Calculate active and bench totals
+    private var activeTotal: Double {
+        var total: Double = 0
+        let activePositions = ["QB", "RB", "WR", "WR/TE", "TE", "FLEX", "SUPERFLEX", "SUPER_FLEX", "WRRB_FLEX", "REC_FLEX", "D/ST", "DEF", "K"]
+        
+        for position in activePositions {
+            if let players = result.optimalLineup[position] {
+                for player in players {
+                    if let sleeperID = player.sleeperID,
+                       let projection = result.playerProjections[sleeperID] {
+                        total += projection
+                    }
+                }
+            }
+        }
+        
+        return total
+    }
+    
+    private var benchTotal: Double {
+        var total: Double = 0
+        
+        if let benchPlayers = result.optimalLineup["BENCH"] {
+            for player in benchPlayers {
+                if let sleeperID = player.sleeperID,
+                   let projection = result.playerProjections[sleeperID] {
+                    total += projection
+                }
+            }
+        }
+        
+        return total
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             // Collapsible header
@@ -63,6 +97,34 @@ struct OptimalLineupView: View {
                     }
                 }
                 
+                // Active Total
+                HStack {
+                    Text("Active Total:")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Text(String(format: "%.1f", activeTotal))
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundColor(.gpGreen)
+                    
+                    Text("pts")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.gpGreen.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gpGreen.opacity(0.3), lineWidth: 1)
+                        )
+                )
+                .padding(.vertical, 8)
+                
                 if let benchPlayers = result.optimalLineup["BENCH"], !benchPlayers.isEmpty {
                     BenchGroupView(
                         players: benchPlayers,
@@ -71,6 +133,34 @@ struct OptimalLineupView: View {
                         projections: result.playerProjections
                     )
                     .id("bench")
+                    
+                    // Bench Total
+                    HStack {
+                        Text("Bench Total:")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Spacer()
+                        
+                        Text(String(format: "%.1f", benchTotal))
+                            .font(.system(size: 18, weight: .black))
+                            .foregroundColor(.gray)
+                        
+                        Text("pts")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.gray.opacity(0.6))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.gray.opacity(0.15))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                            )
+                    )
+                    .padding(.top, 8)
                 }
             }
         }
@@ -94,14 +184,41 @@ struct PositionGroupView: View {
     let sleeperPlayerCache: [String: SleeperPlayer]
     let changeInfoCache: [String: (isChanged: Bool, improvement: Double?)]
     
+    // Format position name for display
+    private var formattedPosition: String {
+        let withoutUnderscore = position.replacingOccurrences(of: "_", with: " ")
+        
+        // Handle flex positions with pipes
+        switch withoutUnderscore.uppercased() {
+        case "WRRB FLEX":
+            return "WR|RB Flex"
+        case "REC FLEX", "WRTE FLEX", "WR/TE":
+            return "WR|TE Flex"
+        case "RBWRTE FLEX":
+            return "RB|WR|TE Flex"
+        case "SUPER FLEX", "SUPERFLEX":
+            return "Super Flex"
+        default:
+            return withoutUnderscore
+        }
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(position)
+            Text(formattedPosition)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundColor(.gpGreen)
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-                .padding(.bottom, 2)
+                .foregroundColor(.gpYellow)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.gpGreen.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(Color.gpGreen.opacity(0.3), lineWidth: 1)
+                        )
+                )
             
             LazyVStack(spacing: 4) {
                 ForEach(players.indices, id: \.self) { idx in
@@ -143,9 +260,17 @@ struct BenchGroupView: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.gray.opacity(0.6))
             }
-            .padding(.horizontal, 10)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color.gray.opacity(0.15))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                    )
+            )
             
             LazyVStack(spacing: 4) {
                 ForEach(players.indices, id: \.self) { idx in

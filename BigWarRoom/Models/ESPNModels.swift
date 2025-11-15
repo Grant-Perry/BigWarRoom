@@ -122,7 +122,8 @@ struct ESPNLeague: Codable, Identifiable {
                 taxiSlots: nil,
                 leagueType: nil,
                 isChopped: nil,
-                type: nil  // Add the type field - ESPN leagues are regular (type 0)
+                type: nil,  // Add the type field - ESPN leagues are regular (type 0)
+                waiverBudget: nil  // ESPN FAAB - not implemented yet, leave nil for now
             ),
             scoringSettings: nil, // Could be converted if needed
             rosterPositions: settings?.rosterSettings?.lineupSlots?.compactMap { slot in

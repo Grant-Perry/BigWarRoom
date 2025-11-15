@@ -235,6 +235,67 @@ struct AppSettingsView: View {
                             }
                     }
                     
+                    // 💊 RX: Lineup Optimization Threshold
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "cross.case.fill")
+                                .foregroundColor(.gpGreen)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Lineup RX Threshold")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                
+                                Text("Only suggest moves with \(Int(viewModel.lineupOptimizationThreshold))%+ improvement")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            // Reset button
+                            Button(action: {
+                                viewModel.resetLineupOptimizationThreshold()
+                            }) {
+                                Text("Reset")
+                                    .font(.caption)
+                                    .foregroundColor(.gpBlue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gpBlue.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .opacity(viewModel.lineupOptimizationThreshold == 10.0 ? 0.5 : 1.0)
+                            .disabled(viewModel.lineupOptimizationThreshold == 10.0)
+                        }
+                        
+                        // Slider with percentage labels
+                        VStack(spacing: 8) {
+                            Slider(value: $viewModel.lineupOptimizationThreshold, in: 10...100, step: 5)
+                                .tint(.gpGreen)
+                                .onChange(of: viewModel.lineupOptimizationThreshold) { _, newValue in
+                                    viewModel.updateLineupOptimizationThreshold(newValue)
+                                }
+                            
+                            HStack {
+                                Text("10%")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("50%")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("100%")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 28)
+                    }
+                    .padding(.vertical, 8)
+                    
                     // NFL Week Override
                     NavigationLink {
                         NFLWeekSettingsView()

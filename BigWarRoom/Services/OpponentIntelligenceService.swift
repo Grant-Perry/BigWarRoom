@@ -485,7 +485,9 @@ final class OpponentIntelligenceService {
             currentScore: myTeam.currentScore! + abs(myRanking.pointsFromSafety), // The cutoff score
             projectedScore: nil,
             roster: [],
-            rosterID: nil
+            rosterID: nil,
+            faabTotal: nil,  // Virtual team - no FAAB
+            faabUsed: nil    // Virtual team - no FAAB
         )
         
         // Calculate threat level based on how far behind cutoff

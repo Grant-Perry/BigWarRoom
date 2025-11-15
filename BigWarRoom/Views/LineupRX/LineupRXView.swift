@@ -11,8 +11,11 @@ struct LineupRXView: View {
     let matchup: UnifiedMatchup
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(MatchupsHubViewModel.self) private var matchupsHub
     @State private var isInitialLoad = true // 🔥 NEW: Track first load vs refresh
     @State private var isLoading = false // 🔥 CHANGED: Don't start as true
+    @State private var isRefreshing = false // 🔥 NEW: Track refresh state
+    @State private var currentMatchup: UnifiedMatchup
     @State private var optimizationResult: LineupOptimizerService.OptimizationResult?
     @State private var waiverRecommendations: [LineupOptimizerService.WaiverRecommendation] = []
     @State private var errorMessage: String?
@@ -30,6 +33,11 @@ struct LineupRXView: View {
     @State private var gameTimeCache: [String: String] = [:]
     @State private var alertsCache: [PlayerAlert] = []
     
+    init(matchup: UnifiedMatchup) {
+        self.matchup = matchup
+        self._currentMatchup = State(initialValue: matchup)
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -41,53 +49,53 @@ struct LineupRXView: View {
                     .ignoresSafeArea(.all)
                 
                 ScrollView {
-                    LazyVStack(spacing: 20, pinnedViews: []) {
-                        // Header
-                        headerSection
-                        
-                        if let error = errorMessage {
-                            errorView(error)
-                        } else if optimizationResult == nil && isInitialLoad {
-                            // 🔥 SKELETON SCREEN: Show immediately on first load
-                            skeletonLoadingView
-                        } else {
-                            // Content sections - ALL EXTERNAL VIEWS NOW
-                            if let result = optimizationResult {
-                                CurrentLineupAnalysisView(result: result)
-                                    .id("analysis")
-                                
-                                if !result.changes.isEmpty {
-                                    RecommendedChangesView(
+                    LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
+                        // 🔥 STICKY HEADER: Wrap in Section to make it stick at top
+                        Section(header: stickyHeaderSection) {
+                            if let error = errorMessage {
+                                errorView(error)
+                            } else if optimizationResult == nil && isInitialLoad {
+                                // 🔥 SKELETON SCREEN: Show immediately on first load
+                                skeletonLoadingView
+                            } else {
+                                // Content sections - ALL EXTERNAL VIEWS NOW
+                                if let result = optimizationResult {
+                                    CurrentLineupAnalysisView(result: result)
+                                        .id("analysis")
+                                    
+                                    if !result.changes.isEmpty {
+                                        RecommendedChangesView(
+                                            result: result,
+                                            sleeperPlayerCache: sleeperPlayerCache,
+                                            matchupInfoCache: matchupInfoCache,
+                                            gameTimeCache: gameTimeCache
+                                        )
+                                        .id("changes")
+                                        
+                                        MoveInstructionsView(result: result)
+                                            .id("instructions")
+                                    }
+                                    
+                                    ByeWeekAlertsView(alerts: alertsCache)
+                                        .id("bye")
+                                    
+                                    if !waiverRecommendations.isEmpty {
+                                        WaiverWireView(
+                                            groupedWaivers: groupedWaivers,
+                                            sleeperPlayerCache: sleeperPlayerCache,
+                                            matchupInfoCache: matchupInfoCache,
+                                            gameTimeCache: gameTimeCache
+                                        )
+                                        .id("waiver")
+                                    }
+                                    
+                                    OptimalLineupView(
                                         result: result,
                                         sleeperPlayerCache: sleeperPlayerCache,
-                                        matchupInfoCache: matchupInfoCache,
-                                        gameTimeCache: gameTimeCache
+                                        changeInfoCache: changeInfoCache
                                     )
-                                    .id("changes")
-                                    
-                                    MoveInstructionsView(result: result)
-                                        .id("instructions")
+                                    .id("optimal")
                                 }
-                                
-                                ByeWeekAlertsView(alerts: alertsCache)
-                                    .id("bye")
-                                
-                                if !waiverRecommendations.isEmpty {
-                                    WaiverWireView(
-                                        groupedWaivers: groupedWaivers,
-                                        sleeperPlayerCache: sleeperPlayerCache,
-                                        matchupInfoCache: matchupInfoCache,
-                                        gameTimeCache: gameTimeCache
-                                    )
-                                    .id("waiver")
-                                }
-                                
-                                OptimalLineupView(
-                                    result: result,
-                                    sleeperPlayerCache: sleeperPlayerCache,
-                                    changeInfoCache: changeInfoCache
-                                )
-                                .id("optimal")
                             }
                         }
                     }
@@ -95,26 +103,7 @@ struct LineupRXView: View {
                 }
                 .scrollIndicators(.visible)
             }
-            .navigationTitle("Lineup RX")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        Task {
-                            await loadData()
-                        }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.gpBlue)
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .onAppear {
                 currentWeek = WeekSelectionManager.shared.selectedWeek
                 Task {
@@ -140,6 +129,143 @@ struct LineupRXView: View {
     
     // MARK: - Header Section
     
+    // 🔥 COMPACT STICKY HEADER: All controls in one tight section
+    private var stickyHeaderSection: some View {
+        VStack(spacing: 10) {
+            // Top row: Close | League Name + Logo | Week | Refresh
+            HStack(spacing: 12) {
+                // Close button
+                Button(action: {
+                    // 💊 RX: Refresh optimization status for this matchup when closing
+                    Task {
+                        await MatchupsHubViewModel.shared.checkLineupOptimization(for: matchup)
+                    }
+                    dismiss()
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Close")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.white.opacity(0.9))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.15))
+                    )
+                }
+                
+                // League name with logo
+                HStack(spacing: 8) {
+                    if currentMatchup.league.source == .espn {
+                        AppConstants.espnLogo
+                            .frame(width: 20, height: 20)
+                    } else {
+                        AppConstants.sleeperLogo
+                            .frame(width: 20, height: 20)
+                    }
+                    
+                    Text(currentMatchup.league.league.name)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Week picker
+                Button(action: {
+                    showingWeekPicker = true
+                }) {
+                    HStack(spacing: 4) {
+                        Text("WEEK \(currentWeek)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.gpBlue)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.gpBlue)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.gpBlue.opacity(0.2))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.gpBlue.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                
+                // Refresh button with loading state
+                Button(action: {
+                    Task {
+                        await refreshData()
+                    }
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.gpBlue)
+                        .padding(6)
+                        .background(
+                            Circle()
+                                .fill(Color.gpBlue.opacity(0.2))
+                        )
+                        .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                        .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                }
+                .disabled(isRefreshing)
+            }
+            
+            // Bottom row: Team info (compact)
+            if let myTeam = currentMatchup.myTeam {
+                HStack(spacing: 10) {
+                    if let avatarURL = myTeam.avatarURL {
+                        AsyncImage(url: avatarURL) { phase in
+                            if let image = phase.image {
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                            } else {
+                                Circle()
+                                    .fill(Color.gpBlue.opacity(0.3))
+                            }
+                        }
+                        .frame(width: 32, height: 32)
+                        .clipShape(Circle())
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(myTeam.ownerName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                        
+                        if let record = myTeam.record?.displayString {
+                            Text("Record: \(record)")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    
+                    Spacer()
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.85))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gpBlue.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    // MARK: - OLD Header Section (kept for reference, can be deleted)
     private var headerSection: some View {
         VStack(spacing: 12) {
             HStack {
@@ -325,7 +451,7 @@ struct LineupRXView: View {
     
     private func populateCaches(result: LineupOptimizerService.OptimizationResult) {
         // Populate sleeper player cache for roster players
-        if let myTeam = matchup.myTeam {
+        if let myTeam = currentMatchup.myTeam {
             for player in myTeam.roster {
                 if let sleeperID = player.sleeperID,
                    let sleeperPlayer = PlayerDirectoryStore.shared.player(for: sleeperID) {
@@ -344,7 +470,7 @@ struct LineupRXView: View {
         }
         
         // Populate matchup info cache
-        if let myTeam = matchup.myTeam {
+        if let myTeam = currentMatchup.myTeam {
             for player in myTeam.roster {
                 guard let team = player.team else { continue }
                 let cacheKey = "\(team)_\(player.position)"
@@ -382,7 +508,7 @@ struct LineupRXView: View {
     }
     
     private func getByeWeekAndInjuryAlerts() -> [PlayerAlert] {
-        guard let myTeam = matchup.myTeam else { return [] }
+        guard let myTeam = currentMatchup.myTeam else { return [] }
         
         var alerts: [PlayerAlert] = []
         
@@ -482,6 +608,28 @@ struct LineupRXView: View {
     
     // MARK: - Data Loading
     
+    // 🔥 NEW: Refresh data from API then re-optimize
+    private func refreshData() async {
+        isRefreshing = true
+        defer { isRefreshing = false }
+        
+        // First, refresh the matchup data from the API
+        print("🔄 Refreshing matchup data from API...")
+        await matchupsHub.refreshMatchups()
+        
+        // Find the updated matchup
+        if let updatedMatchup = matchupsHub.myMatchups.first(where: { m in
+            m.league.league.leagueID == currentMatchup.league.league.leagueID &&
+            m.myTeam?.id == currentMatchup.myTeam?.id
+        }) {
+            print("✅ Found updated matchup with \(updatedMatchup.myTeam?.roster.count ?? 0) players")
+            currentMatchup = updatedMatchup
+        }
+        
+        // Then reload the optimization with fresh data
+        await loadData()
+    }
+    
     private func loadData() async {
         // 🔥 DON'T show loading spinner - use skeleton instead
         errorMessage = nil
@@ -496,7 +644,7 @@ struct LineupRXView: View {
             let week = WeekSelectionManager.shared.selectedWeek
             let year = SeasonYearManager.shared.selectedYear
             
-            guard let myTeam = matchup.myTeam else {
+            guard let myTeam = currentMatchup.myTeam else {
                 throw LineupRXError.noTeamData
             }
             
@@ -504,7 +652,7 @@ struct LineupRXView: View {
             
             // 🔥 FAST PATH: Load lineup optimization
             let result = try await optimizer.optimizeLineup(
-                for: matchup,
+                for: currentMatchup,
                 week: week,
                 year: year,
                 scoringFormat: scoringFormat
@@ -520,7 +668,7 @@ struct LineupRXView: View {
             Task.detached(priority: .userInitiated) { @MainActor in
                 do {
                     let waiver = try await self.optimizer.getWaiverRecommendations(
-                        for: self.matchup,
+                        for: self.currentMatchup,
                         week: week,
                         year: year,
                         limit: 5,

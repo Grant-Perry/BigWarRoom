@@ -36,6 +36,7 @@ final class LeagueMatchupProvider {
     
     // MARK: -> Sleeper State
     private var sleeperLeagueSettings: [String: Any]?
+    private var sleeperLeague: SleeperLeague?  // 🔥 NEW: Store full league for FAAB and other settings
     private var playerStats: [String: [String: Double]] = [:]
     private var rosterIDToManagerID: [Int: String] = [:]
     private var userIDs: [String: String] = [:]
@@ -534,7 +535,9 @@ final class LeagueMatchupProvider {
             currentScore: score,
             projectedScore: score * 1.05,
             roster: fantasyPlayers,
-            rosterID: espnTeam.id
+            rosterID: espnTeam.id,
+            faabTotal: nil,  // 🔥 NEW: ESPN doesn't use FAAB
+            faabUsed: nil    // 🔥 NEW: ESPN doesn't use FAAB
         )
     }
     
@@ -552,6 +555,12 @@ final class LeagueMatchupProvider {
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
+            
+            // 🔥 FIXED: Decode and store the FULL SleeperLeague object
+            let fullLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            sleeperLeague = fullLeague
+            
+            // Also keep the scoring settings dictionary for backward compatibility
             if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                let settings = json["scoring_settings"] as? [String: Any] {
                 sleeperLeagueSettings = settings
@@ -868,6 +877,24 @@ final class LeagueMatchupProvider {
             return nil
         }()
         
+        // 🔥 NEW: Get FAAB data from roster and league settings
+        let faabTotal: Int? = sleeperLeague?.settings?.waiverBudget
+        
+        let faabUsed: Int? = {
+            // Get FAAB already spent from roster
+            if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }) {
+                // Try root level first
+                if let used = roster.waiversBudgetUsed {
+                    return used
+                }
+                // Fallback to settings object
+                if let settings = roster.settings, let used = settings.waiver_budget_used {
+                    return used
+                }
+            }
+            return nil
+        }()
+        
         return FantasyTeam(
             id: String(matchupResponse.rosterID),
             name: managerName,
@@ -877,7 +904,9 @@ final class LeagueMatchupProvider {
             currentScore: matchupResponse.points,
             projectedScore: matchupResponse.projectedPoints,
             roster: fantasyPlayers,
-            rosterID: matchupResponse.rosterID
+            rosterID: matchupResponse.rosterID,
+            faabTotal: faabTotal,
+            faabUsed: faabUsed
         )
     }
     

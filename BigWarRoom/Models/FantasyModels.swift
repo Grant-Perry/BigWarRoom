@@ -93,6 +93,16 @@ struct FantasyTeam: Identifiable, Codable {
     let roster: [FantasyPlayer]
     let rosterID: Int?
     
+    // 🔥 NEW: FAAB (Free Agent Acquisition Budget) properties
+    let faabTotal: Int?        // Total FAAB budget from league settings (e.g., $100)
+    let faabUsed: Int?         // Amount already spent from roster settings
+    
+    /// Remaining FAAB budget (calculated)
+    var faabRemaining: Int? {
+        guard let total = faabTotal, let used = faabUsed else { return nil }
+        return max(0, total - used)  // Never negative
+    }
+    
     /// Team avatar URL - FIXED to handle both avatar IDs and full URLs
     var avatarURL: URL? {
         guard let avatar = avatar else { return nil }

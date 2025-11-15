@@ -110,6 +110,7 @@ struct SleeperLeagueSettings: Codable {
     let leagueType: String?
     let isChopped: Bool?
     let type: Int?  // 🔥 THE KEY FIELD: 0=Redraft, 1=Keeper, 2=Dynasty, 3=Guillotine/Chopped
+    let waiverBudget: Int?  // 🔥 NEW: Total FAAB budget (default $100)
     
     /// Detect if this is a Chopped/elimination league - CENTRALIZED METHOD
     var isChoppedLeague: Bool {
@@ -149,6 +150,7 @@ struct SleeperLeagueSettings: Codable {
         case leagueType = "league_type"
         case isChopped = "is_chopped"
         case type = "type"  // 🔥 Add the type field
+        case waiverBudget = "waiver_budget"  // 🔥 NEW: FAAB total budget
     }
 }
 

@@ -200,7 +200,9 @@ struct HistoricalEliminationCard: View {
         currentScore: 87.4,
         projectedScore: 95.2,
         roster: [],
-        rosterID: 1
+        rosterID: 1,
+        faabTotal: nil,  // Mock data - no FAAB
+        faabUsed: nil    // Mock data - no FAAB
     )
     
     let mockRanking = FantasyTeamRanking(

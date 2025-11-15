@@ -24,31 +24,21 @@ struct MatchupsHubHeroHeaderView: View {
     let onRefreshTapped: () -> Void
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             MissionControlHeaderView(
                 lastUpdateTime: lastUpdateTime,
                 timeAgoString: timeAgoString,
                 connectedLeaguesCount: connectedLeaguesCount,
                 winningCount: winningCount,
-                losingCount: losingCount
-            )
-            
-            // #GoodNav: Week picker with Intelligence-style icons
-            MatchupsStatsOverviewView(
-                matchupsCount: matchupsCount,
-                selectedWeek: selectedWeek,
-                connectedLeaguesCount: connectedLeaguesCount,
-                winningCount: winningCount,
                 losingCount: losingCount,
+                selectedWeek: selectedWeek,
                 onWeekPickerTapped: onWeekPickerTapped,
-                onFiltersToggle: onFiltersToggle,
                 onWatchedPlayersToggle: onWatchedPlayersToggle,
-                onRefreshTapped: onRefreshTapped,
-                watchedPlayersCount: 0 // Will be handled by watchService internally
+                onRefreshTapped: onRefreshTapped
             )
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
-        .padding(.bottom, 16)
+        .padding(.bottom, 8)
     }
 }

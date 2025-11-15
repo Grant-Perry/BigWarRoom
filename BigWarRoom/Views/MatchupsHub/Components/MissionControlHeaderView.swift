@@ -15,27 +15,75 @@ struct MissionControlHeaderView: View {
     let winningCount: Int
     let losingCount: Int
     
+    // NEW: Week picker and action callbacks
+    let selectedWeek: Int
+    let onWeekPickerTapped: () -> Void
+    let onWatchedPlayersToggle: () -> Void
+    let onRefreshTapped: () -> Void
+    
+    // 🔥 USE .shared internally
+    private var watchService: PlayerWatchService { PlayerWatchService.shared }
+    
+    // Detect screen size
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var isCompactScreen: Bool {
+        UIScreen.main.bounds.width <= 390 // iPhone 14 Pro and smaller
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .center, spacing: isCompactScreen ? 8 : 12) {
             // Mission Control title with leagues indicator
-            HStack(spacing: 0) {
-                Text("Mission Control")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(.white)
-                    .notificationBadge(count: connectedLeaguesCount, xOffset: 24, yOffset: -8) // Fixed parameters
-                
-                Spacer()
-            }
+            Text("Mission Control")
+                .font(.system(size: isCompactScreen ? 24 : 28, weight: .semibold))
+                .foregroundColor(.white)
+                .notificationBadge(count: connectedLeaguesCount, xOffset: isCompactScreen ? 20 : 24, yOffset: -8)
+                .minimumScaleFactor(0.8)
+                .lineLimit(1)
             
-            // Last Update
-            if let timeAgoString {
-                Text("Last Update: \(timeAgoString)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-            } else {
-                Text("Ready to load your battles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
+            Spacer(minLength: 4)
+            
+            // Right side controls: eyeball, refresh, week picker
+            HStack(spacing: isCompactScreen ? 8 : 12) {
+                // Watched players button with badge
+                Button(action: onWatchedPlayersToggle) {
+                    Image(systemName: "eye.circle.fill")
+                        .font(.system(size: isCompactScreen ? 20 : 22))
+                        .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
+                        .notificationBadge(count: watchService.watchCount)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Refresh button
+                Button(action: onRefreshTapped) {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.system(size: isCompactScreen ? 20 : 22))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                // Week picker - more compact on small screens
+                Button(action: onWeekPickerTapped) {
+                    HStack(spacing: 4) {
+                        Text("WEEK \(selectedWeek)")
+                            .font(.system(size: isCompactScreen ? 14 : 16, weight: .semibold))
+                            .foregroundColor(.blue)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: isCompactScreen ? 10 : 12, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, isCompactScreen ? 10 : 12)
+                    .padding(.vertical, isCompactScreen ? 5 : 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

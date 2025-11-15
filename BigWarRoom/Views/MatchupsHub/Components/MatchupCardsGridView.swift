@@ -18,6 +18,7 @@ struct MatchupCardsGridView: View {
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
     
     var body: some View {
         Group {
@@ -27,10 +28,10 @@ struct MatchupCardsGridView: View {
             } else {
                 // 🔥 NUCLEAR REBUILD: Simple, bulletproof grid
                 if microMode {
-                    // Micro cards - 4 columns
+                    // Micro cards - 4 columns with more top padding
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4),
-                        spacing: 50 // Micro cards keep 50pt spacing
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
+                        spacing: 44
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
                             MatchupCardViewBuilder(
@@ -39,18 +40,20 @@ struct MatchupCardsGridView: View {
                                 expandedCardId: expandedCardId,
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
-                                dualViewMode: dualViewMode
+                                dualViewMode: dualViewMode,
+                                isLineupOptimized: getOptimizationStatus(matchup)
                             )
                         }
                     }
+                    .padding(.top, 20)
                 } else if dualViewMode {
                     // 🔥 BULLETPROOF: Dead simple 2-column grid
                     LazyVGrid(
                         columns: [
-                            GridItem(.flexible(), spacing: 16),
-                            GridItem(.flexible(), spacing: 16)
+                            GridItem(.flexible(), spacing: 20),
+                            GridItem(.flexible(), spacing: 20)
                         ],
-                        spacing: 70  // 🔥 INCREASED: Max spacing for NonMicro dual view
+                        spacing: 40
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
                             MatchupCardViewBuilder(
@@ -59,7 +62,8 @@ struct MatchupCardsGridView: View {
                                 expandedCardId: expandedCardId,
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
-                                dualViewMode: true
+                                dualViewMode: true,
+                                isLineupOptimized: getOptimizationStatus(matchup)
                             )
                         }
                     }
@@ -67,7 +71,7 @@ struct MatchupCardsGridView: View {
                     // Single column view
                     LazyVGrid(
                         columns: [GridItem(.flexible())],
-                        spacing: 76 // Spacing between Matchup cards on Mission Control
+                        spacing: 40
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
                             MatchupCardViewBuilder(
@@ -76,7 +80,8 @@ struct MatchupCardsGridView: View {
                                 expandedCardId: expandedCardId,
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
-                                dualViewMode: false
+                                dualViewMode: false,
+                                isLineupOptimized: getOptimizationStatus(matchup)
                             )
                         }
                     }
@@ -94,7 +99,8 @@ struct MatchupCardsGridView: View {
                 getWinningStatus: getWinningStatus,
                 // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
                 // onShowDetail: onShowDetail,
-                onDismiss: onExpandedCardDismiss
+                onDismiss: onExpandedCardDismiss,
+                getOptimizationStatus: getOptimizationStatus
             )
         )
     }
@@ -108,6 +114,7 @@ struct ExpandedCardOverlayView: View {
     // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
     // let onShowDetail: (UnifiedMatchup) -> Void
     let onDismiss: () -> Void
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
     
     var body: some View {
         if let expandedId = expandedCardId,
@@ -127,7 +134,8 @@ struct ExpandedCardOverlayView: View {
                     isWinning: getWinningStatus(expandedMatchup),
                     // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
                     // onTap: { },
-                    dualViewMode: true
+                    dualViewMode: true,
+                    isLineupOptimized: getOptimizationStatus(expandedMatchup)
                 )
             }
             .buttonStyle(PlainButtonStyle())

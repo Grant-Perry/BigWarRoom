@@ -152,6 +152,8 @@ struct AllLivePlayersView: View {
             }
             watchService.updateWatchedPlayerScores(allOpponentPlayers)
         }
+        // 🔥 NEW: Provide AllLivePlayersViewModel to navigation environment
+        .environment(allLivePlayersViewModel)
     }
     
     // MARK: - Content View Selection (Reverted to Working Logic)

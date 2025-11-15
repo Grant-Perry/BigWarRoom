@@ -517,7 +517,9 @@ final class FantasyMatchupListViewModel {
                 currentScore: teamData.2,
                 projectedScore: teamData.2 + Double.random(in: -10...10),
                 roster: [],
-                rosterID: index + 1
+                rosterID: index + 1,
+                faabTotal: nil,  // Mock data - no FAAB
+                faabUsed: nil    // Mock data - no FAAB
             )
         }
     }

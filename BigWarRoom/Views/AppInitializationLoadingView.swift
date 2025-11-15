@@ -121,7 +121,7 @@ struct AppInitializationLoadingView: View {
                     Spacer()
                     
                     Text("Version: \(AppConstants.getVersion())")
-                        .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundColor(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)

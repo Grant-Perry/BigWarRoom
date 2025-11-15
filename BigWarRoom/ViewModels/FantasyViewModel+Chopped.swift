@@ -176,7 +176,9 @@ extension FantasyViewModel {
                     currentScore: teamScore,
                     projectedScore: teamProjected,
                     roster: [],
-                    rosterID: matchup.rosterID
+                    rosterID: matchup.rosterID,
+                    faabTotal: nil,  // Chopped leagues - FAAB handled separately if needed
+                    faabUsed: nil    // Chopped leagues - FAAB handled separately if needed
                 )
                 
                 if hasAnyPlayers {

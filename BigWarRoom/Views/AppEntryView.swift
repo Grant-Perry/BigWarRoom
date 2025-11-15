@@ -122,7 +122,7 @@ struct BigWarRoomModified: View {
                 HStack {
                     Spacer()
                     Text("Version: \(AppConstants.getVersion())")
-                        .font(.system(size: 12, weight: .medium, design: .default))
+                        .font(.system(size: 10, weight: .medium, design: .default))
                         .foregroundColor(.white)
                         .padding(.trailing, 31)
                         .padding(.bottom, 8)

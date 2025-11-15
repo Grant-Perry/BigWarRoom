@@ -47,13 +47,7 @@ struct MoreTabView: View {
             subtitle: "NFL team depth charts",
             destination: .teamRosters
         ),
-        MenuItem(
-            icon: "shield.fill",
-            iconColor: .orange,
-            title: "War Room",
-            subtitle: "Draft preparation and strategy",
-            destination: .warRoom
-        ),
+
         MenuItem(
             icon: "brain.head.profile",
             iconColor: .purple,
@@ -62,37 +56,51 @@ struct MoreTabView: View {
             destination: .aiPicks
         ),
         MenuItem(
-            icon: "list.clipboard.fill",
-            iconColor: .cyan,
-            title: "Draft Board",
-            subtitle: "Track draft picks and rankings",
-            destination: .draftBoard
-        ),
-        MenuItem(
             icon: "chart.line.uptrend.xyaxis.circle.fill",
             iconColor: .yellow,
-            title: "Betting Odds Test",
+            title: "Betting Odds - SOON",
             subtitle: "Test The Odds API integration",
             destination: .bettingOddsTest
         ),
+		MenuItem(
+		 icon: "shield.fill",
+		 iconColor: .orange,
+		 title: "War Room - DEPRECATED",
+		 subtitle: "Draft preparation and strategy",
+		 destination: .warRoom
+		),
         MenuItem(
             icon: "clock.fill",
             iconColor: .red,
-            title: "Live Picks",
+            title: "Live Picks - DEPRECATED",
             subtitle: "Real-time draft tracking",
             destination: .livePicks
         ),
+		MenuItem(
+		 icon: "list.clipboard.fill",
+		 iconColor: .cyan,
+		 title: "Draft Board - DEPRECATED",
+		 subtitle: "Track draft picks and rankings",
+		 destination: .draftBoard
+		),
+		MenuItem(
+		 icon: "list.clipboard.fill",
+		 iconColor: .cyan,
+		 title: "Draft Board - DEPRECATED",
+		 subtitle: "Track draft picks and rankings",
+		 destination: .draftBoard
+		),
         MenuItem(
             icon: "person.crop.circle.fill",
             iconColor: .gpGreen,
-            title: "My Roster",
+			title: "My Roster - DEPRECATED",
             subtitle: "Your fantasy team analysis",
             destination: .myRoster
         ),
         MenuItem(
             icon: "sportscourt.fill",
             iconColor: .gpBlue,
-            title: "Fantasy",
+			title: "Fantasy - DEPRECATED",
             subtitle: "League matchups and lineups",
             destination: .fantasy
         )

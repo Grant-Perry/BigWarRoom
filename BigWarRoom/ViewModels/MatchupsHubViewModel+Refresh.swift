@@ -291,6 +291,9 @@ extension MatchupsHubViewModel {
                 self.lastUpdateTime = Date()
             }
         }
+        
+        // 💊 RX: Refresh optimization status after background refresh
+        await refreshAllOptimizationStatuses()
     }
     
     /// Background version for specific week

@@ -31,6 +31,9 @@ struct MicroCardView: View {
     let matchup: UnifiedMatchup
     let isWinning: Bool
     
+    // 💊 RX: Optimization status
+    let isLineupOptimized: Bool
+    
     @State private var pulseOpacity: Double = 0.3
     @State private var glowIntensity: Double = 0.0
     @State private var eliminatedPulse: Bool = false
@@ -56,7 +59,8 @@ struct MicroCardView: View {
         isEliminated: Bool = false,
         eliminationWeek: Int? = nil,
         matchup: UnifiedMatchup,
-        isWinning: Bool
+        isWinning: Bool,
+        isLineupOptimized: Bool = false
     ) {
         self.leagueName = leagueName
         self.avatarURL = avatarURL
@@ -75,6 +79,7 @@ struct MicroCardView: View {
         self.eliminationWeek = eliminationWeek
         self.matchup = matchup
         self.isWinning = isWinning
+        self.isLineupOptimized = isLineupOptimized
     }
     
     var body: some View {
@@ -100,8 +105,11 @@ struct MicroCardView: View {
             celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
             matchup: matchup,
             isWinning: isWinning,
-            onRXTap: isEliminated ? nil : { showingLineupRX = true }
+            onRXTap: isEliminated ? nil : { showingLineupRX = true },
+            isLineupOptimized: isLineupOptimized
         )
+        .frame(width: 85, height: 160)
+        .fixedSize()
         .onAppear {
             if shouldPulse {
                 startPulseAnimation()
