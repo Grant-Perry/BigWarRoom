@@ -40,7 +40,7 @@ final class AllLivePlayersViewModel {
     // MARK: - UI State
     var sortHighToLow = true
     var sortingMethod: SortingMethod = .score
-    var showActiveOnly: Bool = true  // Gp.: Default to Active Only YES
+    var showActiveOnly: Bool = true // 🔥 DEFAULT: Show only active players on initial load
     var shouldResetAnimations = false
     var sortChangeID = UUID()
     var lastUpdateTime = Date()
@@ -201,6 +201,10 @@ extension AllLivePlayersViewModel {
         // 🔥 NEW: Activity tracking for recent sort
         var lastActivityTime: Date?
         var previousScore: Double?
+        
+        // 🔥 REMOVED: These are now on FantasyPlayer model itself!
+        // Access via: playerEntry.player.injuryStatus
+        // Access via: playerEntry.player.jerseyNumber
 
         var scoreBarWidth: Double {
             let minBarWidth: Double = 0.08

@@ -221,7 +221,7 @@ struct PlayerScoreBarCardContentView: View {
                         .offset(x: -35) // 🔥 NEW: Move player left to clip off shoulder
                     
                     // 🔥 INJURY BADGE: RIGHT SHOULDER of player - positioned relative to player image
-                    if let injuryStatus = getSleeperPlayerData()?.injuryStatus, !injuryStatus.isEmpty {
+                    if let injuryStatus = playerEntry.player.injuryStatus, !injuryStatus.isEmpty {
                         InjuryStatusBadgeView(injuryStatus: injuryStatus)
                             .scaleEffect(0.8)
                             .offset(x: 25, y: 5) // RIGHT SHOULDER: Same position as test badge
@@ -371,14 +371,9 @@ struct PlayerScoreBarCardContentView: View {
     
     // MARK: - 🔥 NEW: Jersey Number Helper Methods
     
-    /// Get jersey number for the player from SleeperPlayer data
+    /// Get jersey number for the player - now uses model property directly
     private func getJerseyNumber() -> String? {
-        // 🔥 PHASE 3 DI: Use injected playerDirectory
-        if let sleeperPlayer = playerDirectory.player(for: playerEntry.player.id) {
-            return sleeperPlayer.number?.description
-        }
-        
-        // Fallback to existing jerseyNumber property
+        // 🔥 MODEL-BASED: Jersey number already on the model! ✅
         return playerEntry.player.jerseyNumber
     }
     

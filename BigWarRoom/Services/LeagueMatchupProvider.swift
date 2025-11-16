@@ -443,13 +443,13 @@ final class LeagueMatchupProvider {
         var fantasyPlayers: [FantasyPlayer] = []
         
         if let roster = espnTeam.roster {
-            DebugPrint(mode: .lineupRX, "🔍 ESPN ROSTER DEBUG for team \(espnTeam.id):")
+            // DebugPrint(mode: .lineupRX, "🔍 ESPN ROSTER DEBUG for team \(espnTeam.id):")
             fantasyPlayers = roster.entries.map { entry in
                 let player = entry.playerPoolEntry.player
                 let slotId = entry.lineupSlotId
                 let isActive = LineupSlots.isActiveSlot(slotId)
                 
-                DebugPrint(mode: .lineupRX, "  Player: \(player.fullName.firstName ?? "") \(player.fullName.lastName ?? "") | Slot: \(slotId) (\(positionString(slotId))) | isStarter: \(isActive)")
+                // DebugPrint(mode: .lineupRX, "  Player: \(player.fullName.firstName ?? "") \(player.fullName.lastName ?? "") | Slot: \(slotId) (\(positionString(slotId))) | isStarter: \(isActive)")
                 
                 let weeklyScore = player.stats.first { stat in
                     stat.scoringPeriodId == week && stat.statSourceId == 0
@@ -477,6 +477,9 @@ final class LeagueMatchupProvider {
                 // 🔥 CRITICAL FIX: Use player's ACTUAL position from Sleeper, not slot position
                 let actualPosition = sleeperPlayer?.position ?? positionString(entry.lineupSlotId)
                 
+                // 🔥 MODEL-BASED ENRICHMENT: Get injury status from looked-up Sleeper player
+                let injuryStatus = sleeperPlayer?.injuryStatus
+                
                 return FantasyPlayer(
                     id: String(player.id),
                     sleeperID: sleeperID,
@@ -490,7 +493,8 @@ final class LeagueMatchupProvider {
                     projectedPoints: weeklyScore * 1.1,
                     gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
                     isStarter: LineupSlots.isActiveSlot(entry.lineupSlotId),
-                    lineupSlot: positionString(entry.lineupSlotId)
+                    lineupSlot: positionString(entry.lineupSlotId),
+                    injuryStatus: injuryStatus  // 🔥 NEW: Pass injury status from looked-up Sleeper player
                 )
             }
         }
@@ -833,7 +837,8 @@ final class LeagueMatchupProvider {
                         projectedPoints: playerScore * 1.1,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: playerTeam),
                         isStarter: isStarter,
-                        lineupSlot: lineupSlot
+                        lineupSlot: lineupSlot,
+                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 NEW: Pass injury status from Sleeper data
                     )
                     
                     fantasyPlayers.append(fantasyPlayer)

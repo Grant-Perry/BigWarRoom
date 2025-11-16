@@ -366,7 +366,8 @@ final class ChoppedTeamRosterViewModel {
                         projectedPoints: nil,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: true,
-                        lineupSlot: sleeperPlayer.position
+                        lineupSlot: sleeperPlayer.position,
+                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED
                     )
                     starters.append(fantasyPlayer)
                 }
@@ -393,7 +394,8 @@ final class ChoppedTeamRosterViewModel {
                         projectedPoints: nil,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: false,
-                        lineupSlot: sleeperPlayer.position
+                        lineupSlot: sleeperPlayer.position,
+                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED
                     )
                     bench.append(fantasyPlayer)
                 }

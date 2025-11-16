@@ -18,7 +18,6 @@ struct NonMicroCardView: View {
     
     // 💊 RX: Optimization status
     let isLineupOptimized: Bool
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     @State private var cardScale: CGFloat = 1.0
     @State private var scoreAnimation: Bool = false
@@ -46,8 +45,7 @@ struct NonMicroCardView: View {
                     isGamesFinished: false, // 🔥 SIMPLIFIED: Always false, no celebration logic
                     celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
                     onRXTap: { showingLineupRX = true },
-                    isLineupOptimized: isLineupOptimized,
-                    rxStatus: rxStatus
+                    isLineupOptimized: isLineupOptimized
                 )
             }
         }

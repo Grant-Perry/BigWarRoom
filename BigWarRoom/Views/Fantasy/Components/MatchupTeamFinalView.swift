@@ -264,19 +264,20 @@ struct MatchupTeamFinalView: View {
 
 #Preview {
     let mockPlayer = FantasyPlayer(
-        id: "test",
-        sleeperID: "test", 
+        id: "mock1",
+        sleeperID: nil,
         espnID: nil,
-        firstName: "Terry",
-        lastName: "McLaurin",
+        firstName: "Mock",
+        lastName: "Player",
         position: "WR",
-        team: "WAS",
-        jerseyNumber: "17",
-        currentPoints: 12.4,
-        projectedPoints: 14.2,
-        gameStatus: GameStatus(status: "final"),
+        team: "KC",
+        jerseyNumber: "1",
+        currentPoints: 0,
+        projectedPoints: 0,
+        gameStatus: nil,
         isStarter: true,
-        lineupSlot: "WR"
+        lineupSlot: "WR",
+        injuryStatus: nil  // 🔥 MODEL-BASED: Mock has no injury
     )
     
     VStack(spacing: 20) {

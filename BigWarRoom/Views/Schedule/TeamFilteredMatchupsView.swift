@@ -756,8 +756,7 @@ struct TeamFilteredMatchupsView: View {
                         expandedCardId = (expandedCardId == cardId) ? nil : cardId
                     },
                     dualViewMode: true, // Use dual view mode for 2-column layout
-                    isLineupOptimized: false, // 💊 RX: Always false for filtered views (not supported)
-                    rxStatus: .critical  // 💊 RX: Always critical for filtered views
+                    isLineupOptimized: false // 💊 RX: Always false for filtered views (not supported)
                 )
             }
         }

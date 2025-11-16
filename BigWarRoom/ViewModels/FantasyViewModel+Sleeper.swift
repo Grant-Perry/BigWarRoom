@@ -298,7 +298,8 @@ extension FantasyViewModel {
                         projectedPoints: playerProjected,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: isStarter,
-                        lineupSlot: sleeperPlayer.position
+                        lineupSlot: sleeperPlayer.position,
+                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED: From SleeperPlayer
                     )
                     
                     fantasyPlayers.append(fantasyPlayer)

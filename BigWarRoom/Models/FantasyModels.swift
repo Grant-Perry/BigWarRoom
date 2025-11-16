@@ -215,6 +215,75 @@ struct FantasyPlayer: Identifiable, Codable {
     let isStarter: Bool
     let lineupSlot: String?
     
+    // 🔥 MODEL-BASED ENRICHMENT: Injury status from API data (defaults to nil)
+    let injuryStatus: String?  // "Out", "Questionable", "Doubtful", "ProbableToPlay", "IR", etc.
+    
+    // 🔥 CONVENIENCE: Memberwise initializer with default for injuryStatus
+    init(
+        id: String,
+        sleeperID: String? = nil,
+        espnID: String? = nil,
+        firstName: String? = nil,
+        lastName: String? = nil,
+        position: String,
+        team: String? = nil,
+        jerseyNumber: String? = nil,
+        currentPoints: Double? = nil,
+        projectedPoints: Double? = nil,
+        gameStatus: GameStatus? = nil,
+        isStarter: Bool,
+        lineupSlot: String? = nil,
+        injuryStatus: String? = nil  // Default to nil for backward compatibility
+    ) {
+        self.id = id
+        self.sleeperID = sleeperID
+        self.espnID = espnID
+        self.firstName = firstName
+        self.lastName = lastName
+        self.position = position
+        self.team = team
+        self.jerseyNumber = jerseyNumber
+        self.currentPoints = currentPoints
+        self.projectedPoints = projectedPoints
+        self.gameStatus = gameStatus
+        self.isStarter = isStarter
+        self.lineupSlot = lineupSlot
+        self.injuryStatus = injuryStatus
+    }
+
+    // MARK: -> COMPUTED PROPERTIES FOR LIGHTWEIGHT CHECKS
+    
+    /// Check if player's game has finished this week
+    var hasPlayedThisWeek: Bool {
+        guard let team = self.team else { return false }
+        
+        // Check NFLGameDataService for game status
+        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+            let status = gameInfo.gameStatus.lowercased()
+            return status.contains("final") || 
+                   status == "f" || 
+                   status.contains("finished") ||
+                   status == "postgame" ||
+                   status == "post"
+        }
+        
+        return false
+    }
+    
+    /// Check if player's team is on bye this week
+    var isOnBye: Bool {
+        guard let team = self.team else { return false }
+        
+        // Check NFLGameDataService - if no game info exists, might be bye
+        let hasGameInfo = NFLGameDataService.shared.getGameInfo(for: team) != nil
+        return !hasGameInfo
+    }
+    
+    /// Check if player is currently in an active (not finished) game
+    var isInActiveGame: Bool {
+        return !hasPlayedThisWeek && !isOnBye && isLive
+    }
+    
     // MARK: -> CENTRALIZED LIVE DETECTION - CLEAN & RELIABLE 🔥
     
     /// Single source of truth for live status using NFLGameDataService
@@ -739,7 +808,8 @@ struct NFLTeamColors {
         switch team.uppercased() {
         case "DAL": return .gray
         case "NYG": return .red
-        case "PHI": return .gray        case "WSH": return .yellow
+        case "PHI": return .gray
+        case "WSH": return .yellow
         case "CHI": return .orange
         case "DET": return .gray
         case "GB": return .yellow

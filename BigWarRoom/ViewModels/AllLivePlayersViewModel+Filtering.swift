@@ -149,7 +149,8 @@ extension AllLivePlayersViewModel {
                         projectedPoints: 0.0,
                         gameStatus: nil,
                         isStarter: false,
-                        lineupSlot: nil
+                        lineupSlot: nil,
+                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED: From SleeperPlayer
                     )
                     
                     guard let templateMatchup = allPlayers.first?.matchup else { 
@@ -167,8 +168,8 @@ extension AllLivePlayersViewModel {
                         percentageOfTop: 0.0,
                         matchup: templateMatchup,
                         performanceTier: .average,
-                        lastActivityTime: nil, // 🔥 NEW: No activity for search results
-                        previousScore: nil // 🔥 NEW: No previous score for search results
+                        lastActivityTime: nil,
+                        previousScore: nil
                     )
                 }
             }
@@ -183,7 +184,8 @@ extension AllLivePlayersViewModel {
             // Step 2: Active-only filter (SIMPLIFIED)
             if showActiveOnly {
                 players = players.filter { player in
-                    return isPlayerInLiveGame(player.player)
+                    // 🔥 MODEL-BASED CP: Use isInActiveGame for lightweight live detection
+                    return player.player.isInActiveGame
                 }
             }
         }
@@ -227,8 +229,8 @@ extension AllLivePlayersViewModel {
                 percentageOfTop: percentage,
                 matchup: entry.matchup,
                 performanceTier: tier,
-                lastActivityTime: entry.lastActivityTime, // 🔥 NEW: Preserve activity time
-                previousScore: entry.previousScore // 🔥 NEW: Preserve previous score
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.previousScore
             )
         }
 

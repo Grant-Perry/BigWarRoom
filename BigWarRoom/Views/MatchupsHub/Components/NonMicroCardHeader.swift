@@ -9,30 +9,17 @@ import SwiftUI
 
 /// Header component for non-micro cards
 struct NonMicroCardHeader: View {
-    let league: UnifiedLeagueManager.LeagueWrapper
+    let matchup: UnifiedMatchup
+    let dualViewMode: Bool
     let onRXTap: (() -> Void)?  // 💊 RX button callback
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state optimization status
-    
-    // Backward compatibility init
-    init(matchup: UnifiedMatchup, dualViewMode: Bool, onRXTap: (() -> Void)?, isLineupOptimized: Bool, rxStatus: LineupRXStatus = .critical) {
-        self.league = matchup.league
-        self.onRXTap = onRXTap
-        self.rxStatus = rxStatus
-    }
-    
-    // New 3-state init
-    init(league: UnifiedLeagueManager.LeagueWrapper, onRXTap: (() -> Void)?, rxStatus: LineupRXStatus) {
-        self.league = league
-        self.onRXTap = onRXTap
-        self.rxStatus = rxStatus
-    }
+    let isLineupOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
         HStack {
             // League name with platform logo
             HStack(spacing: 6) {
                 Group {
-                    switch league.source {
+                    switch matchup.league.source {
                     case .espn:
                         AppConstants.espnLogo
                             .scaleEffect(0.4)
@@ -43,8 +30,8 @@ struct NonMicroCardHeader: View {
                 }
                 .frame(width: 16, height: 16)
                 
-                Text("\(league.league.name)")
-                    .font(.system(size: 22, weight: .bold))
+                Text("\(matchup.league.league.name)")
+                    .font(.system(size: dualViewMode ? 18 : 22, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
@@ -53,50 +40,27 @@ struct NonMicroCardHeader: View {
             Spacer()
             
             // 💊 RX indicator - replaces LIVE
-            if !league.isChoppedLeague, let onRXTap = onRXTap {
+            if !matchup.isChoppedLeague, let onRXTap = onRXTap {
                 Button(action: onRXTap) {
-                    Image("LineupRX")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 18, height: 18)
-                        .foregroundColor(.white)
-                        .padding(3)
-                        .background(
-                            Circle()
-                                .fill(rxButtonGradient)
-                        )
+                    ZStack {
+                        Circle()
+                            .fill(buttonBackgroundColor)
+                            .frame(width: 22, height: 22)
+                        
+                        Image("LineupRX")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(.white)
+                    }
                 }
                 .buttonStyle(PlainButtonStyle())
             }
         }
     }
     
-    // 💊 RX: Dynamic button color based on 3-state optimization status
-    private var rxButtonColor: Color {
-        return rxStatus.color
-    }
-    
-    // 💊 RX: Dynamic gradient based on 3-state optimization status
-    private var rxButtonGradient: LinearGradient {
-        switch rxStatus {
-        case .optimized:
-            return LinearGradient(
-                colors: [.gpGreen, .green],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .warning:
-            return LinearGradient(
-                colors: [.gpYellow, .yellow],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        case .critical:
-            return LinearGradient(
-                colors: [.gpRedPink, .red],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+    // 💊 RX: Dynamic button color based on optimization status
+    private var buttonBackgroundColor: Color {
+        return isLineupOptimized ? .gpGreen : .gpRedPink
     }
 }

@@ -16,7 +16,6 @@ struct MicroCardRegularContentView: View {
     let record: String?  // Add record parameter
     let onRXTap: (() -> Void)?  // 💊 RX button callback
     let isLineupOptimized: Bool  // 💊 RX: Optimization status
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     var body: some View {
         VStack(spacing: 6) {
@@ -65,7 +64,7 @@ struct MicroCardRegularContentView: View {
             
             // 💊 RX Button - above score/percentage
             if let onRXTap = onRXTap {
-                MicroCardRXButton(onTap: onRXTap, rxStatus: rxStatus)
+                MicroCardRXButton(onTap: onRXTap, isOptimized: isLineupOptimized)
                     .padding(.top, 2)
             }
             
@@ -88,26 +87,17 @@ struct MicroCardRegularContentView: View {
 // MARK: - RX Button Component for Micro Cards
 struct MicroCardRXButton: View {
     let onTap: () -> Void
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state optimization status
-    
-    // Backward compatibility init
-    init(onTap: @escaping () -> Void, isOptimized: Bool) {
-        self.onTap = onTap
-        self.rxStatus = isOptimized ? .optimized : .critical
-    }
-    
-    // New 3-state init
-    init(onTap: @escaping () -> Void, rxStatus: LineupRXStatus) {
-        self.onTap = onTap
-        self.rxStatus = rxStatus
-    }
+    let isOptimized: Bool  // 💊 RX: Optimization status
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 3) {
-                Text("⚕")
-                    .font(.system(size: 12))
-                Text("RX")
+                Image("LineupRX")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 12, height: 12)
+                    .foregroundColor(.white)
+                Text("Rx")
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.white)
             }
@@ -125,8 +115,8 @@ struct MicroCardRXButton: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    // 💊 RX: Dynamic button color based on 3-state optimization status
+    // 💊 RX: Dynamic button color based on optimization status
     private var buttonBackgroundColor: Color {
-        return rxStatus.color
+        return isOptimized ? .gpGreen : .gpRedPink
     }
 }

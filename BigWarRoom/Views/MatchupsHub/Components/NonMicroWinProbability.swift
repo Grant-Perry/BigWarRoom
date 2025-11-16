@@ -14,26 +14,16 @@ struct NonMicroWinProbability: View {
     let isWinning: Bool
     let matchup: UnifiedMatchup?
     let onRXTap: (() -> Void)?  // 💊 RX button callback
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state optimization status
+    let isLineupOptimized: Bool  // 💊 RX: Optimization status
     
-    // Backward compatibility init
+    // Default initializer for backward compatibility
     init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil, onRXTap: (() -> Void)? = nil, isLineupOptimized: Bool = false) {
         self.winProb = winProb
         self.scoreDelta = scoreDelta
         self.isWinning = isWinning
         self.matchup = matchup
         self.onRXTap = onRXTap
-        self.rxStatus = isLineupOptimized ? .optimized : .critical
-    }
-    
-    // New 3-state init
-    init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil, onRXTap: (() -> Void)? = nil, rxStatus: LineupRXStatus) {
-        self.winProb = winProb
-        self.scoreDelta = scoreDelta
-        self.isWinning = isWinning
-        self.matchup = matchup
-        self.onRXTap = onRXTap
-        self.rxStatus = rxStatus
+        self.isLineupOptimized = isLineupOptimized
     }
     
     var body: some View {
@@ -86,9 +76,12 @@ struct NonMicroWinProbability: View {
                     if let onRXTap = onRXTap {
                         Button(action: onRXTap) {
                             HStack(spacing: 4) {
-                                Text("⚕️")
-                                    .font(.system(size: 14))
-                                Text("RX")
+                                Image("LineupRX")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 14, height: 14)
+                                    .foregroundColor(.white)
+                                Text("Rx")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(.white)
                             }
@@ -153,9 +146,9 @@ struct NonMicroWinProbability: View {
     
     // MARK: - Helper Functions
     
-    // 💊 RX: Dynamic button color based on 3-state optimization status
+    // 💊 RX: Dynamic button color based on optimization status
     private var rxButtonColor: Color {
-        return rxStatus.color
+        return isLineupOptimized ? .gpGreen : .gpRedPink
     }
     
     /// Calculate score percentages using reliable score-based method (same as MatchupCardViewBuilder)

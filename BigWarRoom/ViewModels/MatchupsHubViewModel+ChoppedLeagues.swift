@@ -179,9 +179,10 @@ extension MatchupsHubViewModel {
                 jerseyNumber: playerInfo?.number?.description,
                 currentPoints: actualPlayerScore, // REAL score, not fake average!
                 projectedPoints: actualPlayerScore * 1.05,
-                gameStatus: nil,
+                gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: playerInfo?.team),
                 isStarter: true, // Mark as starter so they show in All Live Players!
-                lineupSlot: playerInfo?.position
+                lineupSlot: playerInfo?.position,
+                injuryStatus: playerInfo?.injuryStatus  // 🔥 MODEL-BASED: From player data
             )
             
             return player

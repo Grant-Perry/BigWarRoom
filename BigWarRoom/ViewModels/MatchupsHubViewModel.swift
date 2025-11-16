@@ -48,7 +48,7 @@ final class MatchupsHubViewModel {
     var justMeModeBannerVisible = false // Keep this false - no banner needed
     
     // MARK: - 💊 RX Optimization Status Tracking
-    var lineupOptimizationStatus: [String: LineupRXStatus] = [:] // matchupID -> RX status
+    var lineupOptimizationStatus: [String: Bool] = [:] // matchupID -> isOptimized
 
     // MARK: - Loading State Management
     var loadingStates: [String: LeagueLoadingState] = [:]
@@ -264,7 +264,8 @@ final class MatchupsHubViewModel {
             guard let myTeam = matchup.myTeam else { return false }
             let starters = myTeam.roster.filter { $0.isStarter }
             return starters.contains { player in
-                isPlayerInLiveGame(player)
+                // 🔥 MODEL-BASED CP: Use isInActiveGame for lightweight live detection
+                player.isInActiveGame
             }
         }.count
     }
@@ -348,22 +349,6 @@ final class MatchupsHubViewModel {
             let isWinning = myScore > opponentScore
             return isWinning ? .gpGreen : .gpRedPink
         }
-    }
-    
-    /// Check if player is in live game
-    private func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        guard let gameStatus = player.gameStatus else { return false }
-        let timeString = gameStatus.timeString.lowercased()
-        
-        let quarterPatterns = ["1st ", "2nd ", "3rd ", "4th ", "ot ", "overtime"]
-        for pattern in quarterPatterns {
-            if timeString.contains(pattern) && timeString.contains(":") {
-                return true
-            }
-        }
-        
-        let liveStatusIndicators = ["live", "halftime", "half", "end 1st", "end 2nd", "end 3rd", "end 4th"]
-        return liveStatusIndicators.contains { timeString.contains($0) }
     }
     
     /// Format relative time
@@ -682,26 +667,5 @@ enum LoadingStatus {
         case .completed: return "✅"
         case .failed: return "❌"
         }
-    }
-}
-
-// MARK: - LineupRX Status
-
-/// 💊 RX: 3-state lineup optimization status
-enum LineupRXStatus {
-    case critical      // Red: Lineup changes needed OR active BYE players
-    case warning       // Yellow: No lineup issues, but waiver suggestions available
-    case optimized     // Green: Fully optimized
-    
-    var color: Color {
-        switch self {
-        case .critical: return .gpRedPink
-        case .warning: return .gpYellow
-        case .optimized: return .gpGreen
-        }
-    }
-    
-    var isOptimized: Bool {
-        return self == .optimized
     }
 }

@@ -36,46 +36,11 @@ extension AllLivePlayersViewModel {
     
     // MARK: - Live Game Detection
     
+    // 🔥 DEPRECATED: This function is no longer needed - use player.isInActiveGame instead
+    // Keeping for backward compatibility during migration
     internal func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        guard let team = player.team else {
-            return false
-        }
-        
-        let cacheKey = team.uppercased()
-        
-        // Check cache first to avoid repeated API calls
-        if let cachedResult = liveGameCache[cacheKey],
-           let cacheTime = liveGameCacheTimestamp,
-           Date().timeIntervalSince(cacheTime) < liveGameCacheExpiration {
-            return cachedResult
-        }
-
-        // Determine if game is actually LIVE right now
-        var isLive = false
-
-        // Primary source: NFLGameDataService
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
-            // Only consider live if status is "in" AND it's marked as live
-            isLive = gameInfo.gameStatus.lowercased() == "in" && gameInfo.isLive
-
-            // Additional safety: Ensure scores are actually updating (not stuck at 0-0)
-            if isLive && gameInfo.homeScore == 0 && gameInfo.awayScore == 0 {
-                // Still allow it - game could be 0-0 but actively playing
-            }
-        } else {
-            // Fallback: Player's game status
-            if let playerGameStatus = player.gameStatus?.status {
-                isLive = playerGameStatus.lowercased() == "in"
-            }
-        }
-        
-        // Cache the result to prevent repeated lookups
-        var cache = liveGameCache
-        cache[cacheKey] = isLive
-        liveGameCache = cache
-        liveGameCacheTimestamp = Date()
-
-        return isLive
+        // 🔥 MODEL-BASED CP: Delegate to the model's computed property
+        return player.isInActiveGame
     }
     
     // MARK: - Cache Management

@@ -478,7 +478,8 @@ final class LineupOptimizerService {
         var lockedPlayerIDs = Set<String>()
         
         for player in roster {
-            if isPlayerGameFinal(player) {
+            // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek instead of helper function
+            if player.hasPlayedThisWeek {
                 lockedPlayers.append(player)
                 lockedPlayerIDs.insert(player.id)
                 DebugPrint(mode: .lineupRX, "🔒 LOCKED PLAYER: \(player.fullName) in \(player.lineupSlot ?? "?") - game is FINAL")
@@ -687,8 +688,8 @@ final class LineupOptimizerService {
             for player in players {
                 let points: Double
                 
-                // 🔥 FIX: Use actual points for finished games, projections for upcoming games
-                if isPlayerGameFinal(player), let actualPoints = player.currentPoints {
+                // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek for finished games
+                if player.hasPlayedThisWeek, let actualPoints = player.currentPoints {
                     points = actualPoints
                 } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
                     points = projection
@@ -722,8 +723,8 @@ final class LineupOptimizerService {
         for player in starters {
             let points: Double
             
-            // 🔥 FIX: Use actual points for finished games, projections for upcoming games
-            if isPlayerGameFinal(player), let actualPoints = player.currentPoints {
+            // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek for finished games
+            if player.hasPlayedThisWeek, let actualPoints = player.currentPoints {
                 points = actualPoints
                 DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - \(String(format: "%.1f", points)) pts [ACTUAL]")
             } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
@@ -785,7 +786,7 @@ final class LineupOptimizerService {
         // 🔥 CRITICAL: Build list of ALL players whose games are FINAL (locked - can't be moved)
         var lockedPlayerIDs = Set<String>()
         for player in currentRoster {
-            if isPlayerGameFinal(player) {
+            if player.hasPlayedThisWeek {
                 lockedPlayerIDs.insert(player.id)
                 DebugPrint(mode: .lineupRX, "🔒 LOCKED: \(player.fullName) - game is FINAL, cannot be moved")
             }
@@ -917,51 +918,6 @@ final class LineupOptimizerService {
     }
     
     /// 🔥 NEW: Check if a player's game status is FINAL (already played - can't be moved)
-    private func isPlayerGameFinal(_ player: FantasyPlayer) -> Bool {
-        guard let team = player.team else {
-            DebugPrint(mode: .lineupRX, "⚠️ FINAL CHECK: \(player.fullName) has no team info")
-            return false
-        }
-        
-        DebugPrint(mode: .lineupRX, "🔍 FINAL CHECK for \(player.fullName) (\(team))")
-        
-        // 🔥 PRIORITY: Check player's own gameStatus first (most direct)
-        if let gameStatus = player.gameStatus {
-            let status = gameStatus.status.lowercased()
-            DebugPrint(mode: .lineupRX, "   → Player gameStatus.status: '\(status)'")
-            DebugPrint(mode: .lineupRX, "   → Player gameStatus.timeString: '\(gameStatus.timeString)'")
-            
-            // Check if status indicates game is finished
-            if status == "postgame" || status == "final" || status == "post" || status.contains("final") {
-                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via player.gameStatus: \(player.fullName) - LOCKED!")
-                return true
-            }
-            
-            // Also check timeString as fallback
-            if gameStatus.timeString.uppercased().contains("FINAL") {
-                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via timeString: \(player.fullName) - LOCKED!")
-                return true
-            }
-        }
-        
-        // Fallback: Check NFLGameDataService
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
-            let gameStatus = gameInfo.gameStatus.lowercased()
-            DebugPrint(mode: .lineupRX, "   → NFLGameDataService status: '\(gameStatus)'")
-            
-            if gameStatus.contains("final") || gameStatus == "f" || gameStatus.contains("finished") {
-                DebugPrint(mode: .lineupRX, "   🏁 FINAL DETECTED via NFLGameDataService: \(player.fullName) - LOCKED!")
-                return true
-            }
-        } else {
-            DebugPrint(mode: .lineupRX, "   ⚠️ No NFLGameDataService info found for \(team)")
-        }
-        
-        DebugPrint(mode: .lineupRX, "   ✅ Game not final - player can be moved")
-        return false
-    }
-
-
     
     /// Find what slot a player should go to in the optimal lineup
     private func findTargetSlot(for player: FantasyPlayer, in optimalLineup: [String: [FantasyPlayer]]) -> String {

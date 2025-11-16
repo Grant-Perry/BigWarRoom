@@ -10,15 +10,9 @@ import Foundation
 // MARK: - FantasyPlayer Extensions
 
 extension FantasyPlayer {
-    /// Get formatted injury status string from PlayerDirectoryStore
-    /// Replaces 4+ duplicate getInjuryStatus() implementations across views
-    var injuryStatus: String? {
-        // Get Sleeper player data from PlayerDirectoryStore
-        guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: self.id) else {
-            return nil
-        }
-        return sleeperPlayer.injuryStatus?.lowercased().capitalized
-    }
+    // 🔥 REMOVED: injuryStatus is now a stored property on the model itself!
+    // Access directly via: player.injuryStatus
+    // This eliminates the O(n) lookup that was happening here
 }
 
 // MARK: - SleeperPlayer Extensions

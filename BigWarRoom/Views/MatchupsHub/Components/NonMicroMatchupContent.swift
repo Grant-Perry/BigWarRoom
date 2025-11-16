@@ -22,7 +22,6 @@ struct NonMicroMatchupContent: View {
     
     // 💊 RX: Optimization status
     var isLineupOptimized: Bool = false
-    var rxStatus: LineupRXStatus = .critical  // 💊 RX: 3-state status
     
     private var isLiveGame: Bool {
         return matchup.isLive
@@ -81,7 +80,7 @@ struct NonMicroMatchupContent: View {
                     isWinning: isWinning,
                     matchup: matchup,
                     onRXTap: onRXTap,
-                    rxStatus: rxStatus
+                    isLineupOptimized: isLineupOptimized
                 )
             }
             

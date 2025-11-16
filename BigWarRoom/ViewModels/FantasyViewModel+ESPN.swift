@@ -295,7 +295,8 @@ extension FantasyViewModel {
                     projectedPoints: weeklyScore * 1.1,
                     gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
                     isStarter: [0, 2, 3, 4, 5, 6, 23, 16, 17].contains(entry.lineupSlotId),
-                    lineupSlot: positionString(entry.lineupSlotId)
+                    lineupSlot: positionString(entry.lineupSlotId),
+                    injuryStatus: nil  // 🔥 TODO: Get from ESPN if available
                 )
             }
         }

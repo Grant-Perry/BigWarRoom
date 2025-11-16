@@ -260,14 +260,15 @@ struct PlayerStatsHeaderView: View {
             espnID: player.espnID,
             firstName: player.firstName,
             lastName: player.lastName,
-            position: player.position ?? "UNK",
+            position: player.position ?? "UNKNOWN",
             team: player.team,
             jerseyNumber: player.number?.description,
-            currentPoints: getPPRPoints(),
-            projectedPoints: 0.0,
+            currentPoints: 0,
+            projectedPoints: 0,
             gameStatus: nil,
-            isStarter: false, // Default to false for individual player view
-            lineupSlot: nil
+            isStarter: false,
+            lineupSlot: nil,
+            injuryStatus: player.injuryStatus  // 🔥 MODEL-BASED: From SleeperPlayer
         )
         
         return OpponentPlayer(

@@ -21,7 +21,6 @@ struct MatchupCardViewBuilder: View {
     
     // 💊 RX: Optimization status
     let isLineupOptimized: Bool
-    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
 
     var body: some View {
         Group {
@@ -76,8 +75,7 @@ struct MatchupCardViewBuilder: View {
                 eliminationWeek: cardProperties.eliminationWeek,
                 matchup: matchup,
                 isWinning: isWinning,
-                isLineupOptimized: isLineupOptimized,
-                rxStatus: rxStatus
+                isLineupOptimized: isLineupOptimized
             )
         }
         .buttonStyle(CardPressButtonStyle()) // Same button style as NonMicroCardView
@@ -103,8 +101,7 @@ struct MatchupCardViewBuilder: View {
                 // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
                 // onTap: { },
                 dualViewMode: dualViewMode,
-                isLineupOptimized: isLineupOptimized,
-                rxStatus: rxStatus
+                isLineupOptimized: isLineupOptimized
             )
         }
         .buttonStyle(CardPressButtonStyle()) // 🔥 NEW: Custom button style with immediate feedback
