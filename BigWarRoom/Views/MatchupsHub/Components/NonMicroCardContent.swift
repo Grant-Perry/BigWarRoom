@@ -17,6 +17,7 @@ struct NonMicroCardContent: View {
     let celebrationBorderPulse: Bool
     let onRXTap: (() -> Void)?
     let isLineupOptimized: Bool  // 💊 RX: Optimization status
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     var body: some View {
         VStack(spacing: dualViewMode ? 6 : 4) {
@@ -25,7 +26,8 @@ struct NonMicroCardContent: View {
                 matchup: matchup,
                 dualViewMode: dualViewMode,
                 onRXTap: onRXTap,
-                isLineupOptimized: isLineupOptimized
+                isLineupOptimized: isLineupOptimized,
+                rxStatus: rxStatus
             )
             
             // Main content
@@ -38,7 +40,8 @@ struct NonMicroCardContent: View {
                     dualViewMode: dualViewMode,
                     scoreAnimation: scoreAnimation,
                     onRXTap: dualViewMode ? nil : onRXTap,
-                    isLineupOptimized: isLineupOptimized
+                    isLineupOptimized: isLineupOptimized,
+                    rxStatus: rxStatus
                 )
             }
         }

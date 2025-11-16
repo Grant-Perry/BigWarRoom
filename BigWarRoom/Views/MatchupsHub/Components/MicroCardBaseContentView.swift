@@ -36,6 +36,7 @@ struct MicroCardBaseContentView: View {
     
     // 💊 RX: Optimization status
     let isLineupOptimized: Bool
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     var body: some View {
         VStack(spacing: 8) {
@@ -63,7 +64,8 @@ struct MicroCardBaseContentView: View {
                     percentage: percentage,
                     record: matchup.myTeam?.record?.displayString,
                     onRXTap: onRXTap,
-                    isLineupOptimized: isLineupOptimized
+                    isLineupOptimized: isLineupOptimized,
+                    rxStatus: rxStatus
                 )
             }
         }

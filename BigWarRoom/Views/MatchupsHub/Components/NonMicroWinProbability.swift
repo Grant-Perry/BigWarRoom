@@ -14,16 +14,26 @@ struct NonMicroWinProbability: View {
     let isWinning: Bool
     let matchup: UnifiedMatchup?
     let onRXTap: (() -> Void)?  // 💊 RX button callback
-    let isLineupOptimized: Bool  // 💊 RX: Optimization status
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state optimization status
     
-    // Default initializer for backward compatibility
+    // Backward compatibility init
     init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil, onRXTap: (() -> Void)? = nil, isLineupOptimized: Bool = false) {
         self.winProb = winProb
         self.scoreDelta = scoreDelta
         self.isWinning = isWinning
         self.matchup = matchup
         self.onRXTap = onRXTap
-        self.isLineupOptimized = isLineupOptimized
+        self.rxStatus = isLineupOptimized ? .optimized : .critical
+    }
+    
+    // New 3-state init
+    init(winProb: Double, scoreDelta: Double? = nil, isWinning: Bool = false, matchup: UnifiedMatchup? = nil, onRXTap: (() -> Void)? = nil, rxStatus: LineupRXStatus) {
+        self.winProb = winProb
+        self.scoreDelta = scoreDelta
+        self.isWinning = isWinning
+        self.matchup = matchup
+        self.onRXTap = onRXTap
+        self.rxStatus = rxStatus
     }
     
     var body: some View {
@@ -143,9 +153,9 @@ struct NonMicroWinProbability: View {
     
     // MARK: - Helper Functions
     
-    // 💊 RX: Dynamic button color based on optimization status
+    // 💊 RX: Dynamic button color based on 3-state optimization status
     private var rxButtonColor: Color {
-        return isLineupOptimized ? .gpGreen : .gpRedPink
+        return rxStatus.color
     }
     
     /// Calculate score percentages using reliable score-based method (same as MatchupCardViewBuilder)

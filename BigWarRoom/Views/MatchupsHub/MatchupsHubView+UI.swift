@@ -94,7 +94,8 @@ extension MatchupsHubView {
                 }
             },
             getWinningStatus: matchupsHubViewModel.getWinningStatusForMatchup,
-            getOptimizationStatus: matchupsHubViewModel.isLineupOptimized
+            getOptimizationStatus: matchupsHubViewModel.isLineupOptimized,
+            getRXStatus: matchupsHubViewModel.getLineupRXStatus
         )
     }
     

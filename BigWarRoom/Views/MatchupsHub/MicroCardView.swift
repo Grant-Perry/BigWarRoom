@@ -33,6 +33,7 @@ struct MicroCardView: View {
     
     // 💊 RX: Optimization status
     let isLineupOptimized: Bool
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     @State private var pulseOpacity: Double = 0.3
     @State private var glowIntensity: Double = 0.0
@@ -60,7 +61,8 @@ struct MicroCardView: View {
         eliminationWeek: Int? = nil,
         matchup: UnifiedMatchup,
         isWinning: Bool,
-        isLineupOptimized: Bool = false
+        isLineupOptimized: Bool = false,
+        rxStatus: LineupRXStatus = .critical
     ) {
         self.leagueName = leagueName
         self.avatarURL = avatarURL
@@ -80,6 +82,7 @@ struct MicroCardView: View {
         self.matchup = matchup
         self.isWinning = isWinning
         self.isLineupOptimized = isLineupOptimized
+        self.rxStatus = rxStatus
     }
     
     var body: some View {
@@ -106,7 +109,8 @@ struct MicroCardView: View {
             matchup: matchup,
             isWinning: isWinning,
             onRXTap: isEliminated ? nil : { showingLineupRX = true },
-            isLineupOptimized: isLineupOptimized
+            isLineupOptimized: isLineupOptimized,
+            rxStatus: rxStatus
         )
         .frame(width: 85, height: 160)
         .fixedSize()

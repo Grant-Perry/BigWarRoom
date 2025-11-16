@@ -88,6 +88,16 @@ actor AvailablePlayersService {
             position: position
         )
         
+        // 🔥 FILTER OUT: Players whose games have already finished
+        var playersWithUpcomingGames: [SleeperPlayer] = []
+        for player in availablePlayers {
+            if !(await isPlayerGameFinal(player)) {
+                playersWithUpcomingGames.append(player)
+            }
+        }
+        
+        DebugPrint(mode: .waivers, "💊 Filtered from \(availablePlayers.count) to \(playersWithUpcomingGames.count) players with upcoming games")
+        
         // Fetch projections using injected service
         // 🔥 CHANGED: Use injected instance instead of .shared
         let projections = try await projectionsService.fetchProjections(
@@ -98,7 +108,7 @@ actor AvailablePlayersService {
         // Build list of (playerID, projectedPoints) tuples
         var playerProjectionsList: [(String, Double)] = []
         
-        for player in availablePlayers {
+        for player in playersWithUpcomingGames {
             guard let projection = projections[player.playerID] else { continue }
             
             let points: Double?
@@ -124,6 +134,40 @@ actor AvailablePlayersService {
             .prefix(limit)
         
         return Array(topPlayers)
+    }
+    
+    /// Check if a player's game has already finished (FINAL status)
+    private func isPlayerGameFinal(_ player: SleeperPlayer) async -> Bool {
+        guard let team = player.team else {
+            DebugPrint(mode: .waivers, "⚠️ \(player.fullName) has no team - excluding")
+            return true // Exclude players without teams
+        }
+        
+        // Check NFLGameDataService for game status (MainActor isolated)
+        let gameInfo = await MainActor.run {
+            NFLGameDataService.shared.getGameInfo(for: team)
+        }
+        
+        guard let gameInfo = gameInfo else {
+            DebugPrint(mode: .waivers, "⚠️ \(player.fullName) (\(team)) - NO GAME INFO - including in waivers")
+            return false // If no game info, include them (might be upcoming game)
+        }
+        
+        let gameStatus = gameInfo.gameStatus.lowercased()
+        DebugPrint(mode: .waivers, "🔍 \(player.fullName) (\(team)) - Game Status: '\(gameStatus)'")
+        
+        // Check for final status
+        let isFinal = gameStatus.contains("final") || 
+                      gameStatus == "f" || 
+                      gameStatus.contains("finished") ||
+                      gameStatus == "postgame" ||
+                      gameStatus == "post"  // 🔥 ADD: "post" status means game finished
+        
+        if isFinal {
+            DebugPrint(mode: .waivers, "🏁 \(player.fullName) (\(team)) game is FINAL - EXCLUDING from waivers")
+        }
+        
+        return isFinal
     }
     
     /// Get all rostered player information (both Sleeper IDs and ESPN IDs)

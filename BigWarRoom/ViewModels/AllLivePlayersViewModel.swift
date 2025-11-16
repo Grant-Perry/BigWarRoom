@@ -40,7 +40,7 @@ final class AllLivePlayersViewModel {
     // MARK: - UI State
     var sortHighToLow = true
     var sortingMethod: SortingMethod = .score
-    var showActiveOnly: Bool = false
+    var showActiveOnly: Bool = true  // Gp.: Default to Active Only YES
     var shouldResetAnimations = false
     var sortChangeID = UUID()
     var lastUpdateTime = Date()

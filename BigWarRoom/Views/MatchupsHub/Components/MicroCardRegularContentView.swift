@@ -16,6 +16,7 @@ struct MicroCardRegularContentView: View {
     let record: String?  // Add record parameter
     let onRXTap: (() -> Void)?  // 💊 RX button callback
     let isLineupOptimized: Bool  // 💊 RX: Optimization status
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state status
     
     var body: some View {
         VStack(spacing: 6) {
@@ -64,7 +65,7 @@ struct MicroCardRegularContentView: View {
             
             // 💊 RX Button - above score/percentage
             if let onRXTap = onRXTap {
-                MicroCardRXButton(onTap: onRXTap, isOptimized: isLineupOptimized)
+                MicroCardRXButton(onTap: onRXTap, rxStatus: rxStatus)
                     .padding(.top, 2)
             }
             
@@ -87,12 +88,24 @@ struct MicroCardRegularContentView: View {
 // MARK: - RX Button Component for Micro Cards
 struct MicroCardRXButton: View {
     let onTap: () -> Void
-    let isOptimized: Bool  // 💊 RX: Optimization status
+    let rxStatus: LineupRXStatus  // 💊 RX: 3-state optimization status
+    
+    // Backward compatibility init
+    init(onTap: @escaping () -> Void, isOptimized: Bool) {
+        self.onTap = onTap
+        self.rxStatus = isOptimized ? .optimized : .critical
+    }
+    
+    // New 3-state init
+    init(onTap: @escaping () -> Void, rxStatus: LineupRXStatus) {
+        self.onTap = onTap
+        self.rxStatus = rxStatus
+    }
     
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 3) {
-                Text("⚕️")
+                Text("⚕")
                     .font(.system(size: 12))
                 Text("RX")
                     .font(.system(size: 10, weight: .bold))
@@ -112,8 +125,8 @@ struct MicroCardRXButton: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    // 💊 RX: Dynamic button color based on optimization status
+    // 💊 RX: Dynamic button color based on 3-state optimization status
     private var buttonBackgroundColor: Color {
-        return isOptimized ? .gpGreen : .gpRedPink
+        return rxStatus.color
     }
 }

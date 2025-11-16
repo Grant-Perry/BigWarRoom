@@ -102,6 +102,9 @@ extension MatchupsHubViewModel {
             // Sort final matchups by priority
             self.myMatchups.sort { $0.priority > $1.priority }
         }
+        
+        // 💊 RX: Check optimization status for all matchups after loading (matches main loading flow)
+        await refreshAllOptimizationStatuses()
     }
     
     /// Load matchup for a single league for a specific week

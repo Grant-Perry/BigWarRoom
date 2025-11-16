@@ -18,7 +18,8 @@ struct MatchupCardsGridView: View {
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
-    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status (legacy)
+    let getRXStatus: (UnifiedMatchup) -> LineupRXStatus  // 💊 RX: Get 3-state status
     
     var body: some View {
         Group {
@@ -41,7 +42,8 @@ struct MatchupCardsGridView: View {
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
                                 dualViewMode: dualViewMode,
-                                isLineupOptimized: getOptimizationStatus(matchup)
+                                isLineupOptimized: getOptimizationStatus(matchup),
+                                rxStatus: getRXStatus(matchup)
                             )
                         }
                     }
@@ -63,7 +65,8 @@ struct MatchupCardsGridView: View {
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
                                 dualViewMode: true,
-                                isLineupOptimized: getOptimizationStatus(matchup)
+                                isLineupOptimized: getOptimizationStatus(matchup),
+                                rxStatus: getRXStatus(matchup)
                             )
                         }
                     }
@@ -81,7 +84,8 @@ struct MatchupCardsGridView: View {
                                 isWinning: getWinningStatus(matchup),
                                 onMicroCardTap: onMicroCardTap,
                                 dualViewMode: false,
-                                isLineupOptimized: getOptimizationStatus(matchup)
+                                isLineupOptimized: getOptimizationStatus(matchup),
+                                rxStatus: getRXStatus(matchup)
                             )
                         }
                     }
@@ -100,7 +104,8 @@ struct MatchupCardsGridView: View {
                 // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
                 // onShowDetail: onShowDetail,
                 onDismiss: onExpandedCardDismiss,
-                getOptimizationStatus: getOptimizationStatus
+                getOptimizationStatus: getOptimizationStatus,
+                getRXStatus: getRXStatus
             )
         )
     }
@@ -114,7 +119,8 @@ struct ExpandedCardOverlayView: View {
     // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
     // let onShowDetail: (UnifiedMatchup) -> Void
     let onDismiss: () -> Void
-    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status (legacy)
+    let getRXStatus: (UnifiedMatchup) -> LineupRXStatus  // 💊 RX: Get 3-state status
     
     var body: some View {
         if let expandedId = expandedCardId,
@@ -135,7 +141,8 @@ struct ExpandedCardOverlayView: View {
                     // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
                     // onTap: { },
                     dualViewMode: true,
-                    isLineupOptimized: getOptimizationStatus(expandedMatchup)
+                    isLineupOptimized: getOptimizationStatus(expandedMatchup),
+                    rxStatus: getRXStatus(expandedMatchup)
                 )
             }
             .buttonStyle(PlainButtonStyle())

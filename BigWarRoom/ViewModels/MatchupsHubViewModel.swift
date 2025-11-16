@@ -48,7 +48,7 @@ final class MatchupsHubViewModel {
     var justMeModeBannerVisible = false // Keep this false - no banner needed
     
     // MARK: - 💊 RX Optimization Status Tracking
-    var lineupOptimizationStatus: [String: Bool] = [:] // matchupID -> isOptimized
+    var lineupOptimizationStatus: [String: LineupRXStatus] = [:] // matchupID -> RX status
 
     // MARK: - Loading State Management
     var loadingStates: [String: LeagueLoadingState] = [:]
@@ -682,5 +682,26 @@ enum LoadingStatus {
         case .completed: return "✅"
         case .failed: return "❌"
         }
+    }
+}
+
+// MARK: - LineupRX Status
+
+/// 💊 RX: 3-state lineup optimization status
+enum LineupRXStatus {
+    case critical      // Red: Lineup changes needed OR active BYE players
+    case warning       // Yellow: No lineup issues, but waiver suggestions available
+    case optimized     // Green: Fully optimized
+    
+    var color: Color {
+        switch self {
+        case .critical: return .gpRedPink
+        case .warning: return .gpYellow
+        case .optimized: return .gpGreen
+        }
+    }
+    
+    var isOptimized: Bool {
+        return self == .optimized
     }
 }

@@ -143,10 +143,9 @@ extension MatchupsHubView {
     // MARK: - Week Selection Actions
     func onWeekSelected(_ week: Int) {
         Task {
+            // Gp.: Clear optimization cache when week changes to force recalculation
+            matchupsHubViewModel.clearOptimizationStatusCache()
             await matchupsHubViewModel.loadMatchupsForWeek(week)
-            // Week change means we need to reload, so reset the flag to allow reload on next appear if needed
-            // Actually, don't reset here - hasLoadedInitialData should only prevent reload when navigating back
-            // Week changes are handled by onChange, which calls this directly
         }
     }
     
