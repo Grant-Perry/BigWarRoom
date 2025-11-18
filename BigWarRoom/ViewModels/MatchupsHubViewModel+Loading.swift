@@ -347,8 +347,12 @@ extension MatchupsHubViewModel {
     
     /// Fetch NFL game data for live detection
     private func fetchNFLGameData() async {
-        let currentWeek = NFLWeekService.shared.currentWeek
+        // 🔥 CRITICAL FIX: Use WeekSelectionManager.selectedWeek (user's chosen week) instead of currentWeek
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
         let currentYear = Calendar.current.component(.year, from: Date())
-        NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, year: currentYear)
+        
+        DebugPrint(mode: .weekCheck, "📅 MatchupsHub: Fetching NFL game data for user-selected week \(selectedWeek)")
+        
+        NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear)
     }
 }

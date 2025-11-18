@@ -19,17 +19,30 @@ final class NFLScheduleViewModel {
     var selectedWeek: Int
     var selectedGame: ScheduleGame?
     var showingGameDetail = false
-    var selectedGameId: String? // For NavigationLink selection
+    var selectedGameId: String?
     
     // 🔥 PHASE 3 DI: Inject dependencies instead of using .shared
     private let gameDataService: NFLGameDataService
     private let weekService: NFLWeekService
     private var observationTask: Task<Void, Never>?
     
+    /// Teams on bye week for current schedule
+    var byeWeekTeams: [NFLTeam] {
+        let teams = NFLTeam.teamsOnBye(forGames: games)
+        DebugPrint(mode: .weekCheck, "📅 Bye Week Check: Week \(selectedWeek) has \(teams.count) bye teams: \(teams.map { $0.id }.joined(separator: ", "))")
+        DebugPrint(mode: .weekCheck, "📅 Games count: \(games.count), Teams playing: \(Set(games.flatMap { [$0.homeTeam, $0.awayTeam] }).sorted().joined(separator: ", "))")
+        return teams
+    }
+    
     init(gameDataService: NFLGameDataService, weekService: NFLWeekService) {
         self.gameDataService = gameDataService
         self.weekService = weekService
-        self.selectedWeek = weekService.currentWeek
+        
+        // 🔥 FIXED: Use WeekSelectionManager as SSOT instead of weekService.currentWeek
+        self.selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
+        DebugPrint(mode: .weekCheck, "📅 NFLScheduleViewModel.init: Initialized with week \(self.selectedWeek) from WeekSelectionManager.shared")
+        
         setupObservation()
         
         // Initial data load
@@ -78,17 +91,21 @@ final class NFLScheduleViewModel {
     
     /// Refresh schedule data for current week
     func refreshSchedule() {
+        DebugPrint(mode: .weekCheck, "📅 NFLScheduleViewModel.refreshSchedule: Fetching games for week \(selectedWeek)")
         gameDataService.fetchGameData(forWeek: selectedWeek, forceRefresh: true)
     }
     
     /// Change selected week and refresh data
     func selectWeek(_ week: Int) {
+        DebugPrint(mode: .weekCheck, "📅 NFLScheduleViewModel.selectWeek: Changing from week \(selectedWeek) to week \(week)")
         selectedWeek = week
         refreshSchedule()
     }
     
     /// Process raw game data into schedule format
     private func processGameData(_ gameData: [String: NFLGameInfo]) {
+        DebugPrint(mode: .weekCheck, "📅 NFLScheduleViewModel.processGameData: Processing \(gameData.count) game entries for week \(selectedWeek)")
+        
         var processedGames: [ScheduleGame] = []
         var seenGames = Set<String>()
         

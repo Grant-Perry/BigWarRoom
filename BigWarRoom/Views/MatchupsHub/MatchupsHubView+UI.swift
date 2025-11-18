@@ -124,9 +124,12 @@ extension MatchupsHubView {
     // MARK: - Sheet Views
     
     func buildMatchupDetailSheet(for matchup: UnifiedMatchup) -> some View {
-        // 🔥 FIXED: Don't filter from myMatchups - just pass the single matchup
-        // LeagueMatchupsTabView will fetch ALL league matchups automatically
-        return MatchupDetailSheetsView(matchup: matchup)
+        // 🔥 FIXED: Filter ALL matchups from the same league and pass them
+        let leagueMatchups = matchupsHubViewModel.myMatchups.filter { otherMatchup in
+            otherMatchup.league.id == matchup.league.id
+        }
+        
+        return MatchupDetailSheetsView(matchup: matchup, allLeagueMatchups: leagueMatchups)
     }
 
     func buildWeekPickerSheet() -> some View {

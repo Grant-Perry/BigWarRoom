@@ -105,10 +105,14 @@ struct NFLScheduleView: View {
         }
         // Sync with shared week manager
         .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
+            DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: WeekSelectionManager changed to week \(newWeek), updating view model")
             viewModel?.selectWeek(newWeek)
         }
         .onAppear {
             print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
+            
+            DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(WeekSelectionManager.shared.selectedWeek)")
+            
             // Sync initial week
             viewModel?.selectWeek(WeekSelectionManager.shared.selectedWeek)
             
@@ -280,6 +284,12 @@ struct NFLScheduleView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
+                }
+                
+                // BYE Week Section
+                if !viewModel.byeWeekTeams.isEmpty {
+                    ScheduleByeWeekSection(byeTeams: viewModel.byeWeekTeams)
+                        .padding(.top, 24)
                 }
             }
             .frame(maxWidth: .infinity)

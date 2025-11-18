@@ -35,8 +35,12 @@ extension AllLivePlayersViewModel {
         // Load game data in background if needed
         if showActive && NFLGameDataService.shared.gameData.isEmpty {
             Task { @MainActor in
-                let currentWeek = NFLWeekCalculator.getCurrentWeek()
-                NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, forceRefresh: false)
+                // 🔥 CRITICAL FIX: Use WeekSelectionManager.selectedWeek (user's chosen week) instead of getCurrentWeek
+                let selectedWeek = WeekSelectionManager.shared.selectedWeek
+                
+                DebugPrint(mode: .weekCheck, "📅 AllLivePlayers: Fetching NFL game data for user-selected week \(selectedWeek)")
+                
+                NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, forceRefresh: false)
             }
         }
     }

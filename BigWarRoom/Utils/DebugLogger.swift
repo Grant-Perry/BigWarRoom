@@ -182,7 +182,8 @@ struct DebugMode: OptionSet {
     static let oprk               	= DebugMode(rawValue: 1 << 14)  // 16384
     static let lineupRX           	= DebugMode(rawValue: 1 << 15)  // 32768
     static let liveUpdate2 		  	= DebugMode(rawValue: 1 << 16)  // 65536
-    static let waivers            	= DebugMode(rawValue: 1 << 17)  // 131072, next free bit!
+    static let waivers            	= DebugMode(rawValue: 1 << 17)  // 131072
+    static let weekCheck          	= DebugMode(rawValue: 1 << 18)  // 262144, next free bit!
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -205,7 +206,8 @@ struct DebugMode: OptionSet {
         .oprk,
         .lineupRX,
 		.liveUpdate2,
-        .waivers
+        .waivers,
+        .weekCheck
     ]
 }
 
@@ -220,8 +222,8 @@ enum DebugConfig {
     /// - `.globalRefresh` - Only global refresh logs
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
-	/// Current: Waiver wire and LineupRX debugging enabled
-    static var activeMode: DebugMode = [.waivers, .lineupRX]
+	/// Current: Week checking and waiver wire debugging enabled
+    static var activeMode: DebugMode = [.waivers, .weekCheck]
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

@@ -384,28 +384,44 @@ struct LeagueMatchupsTabView: View {
             return
         }
         
-        // ALWAYS fetch fresh data - don't trust existing matchups count
-        // Mission Control only has the user's matchups, we need ALL league matchups
+        // 🔥 FIXED: Create a NEW provider to fetch ALL matchups (not just user's matchup)
+        // Mission Control only stores the user's matchup, so we need to fetch fresh
         
         isLoadingAllMatchups = true
         
-        // Force a fresh fetch of ALL matchups for this league
-        await fantasyViewModel.fetchMatchups()
+        let currentWeek = NFLWeekService.shared.currentWeek
+        let currentYear = String(Calendar.current.component(.year, from: Date()))
         
-        // Give it a moment to complete the fetch
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        // Create isolated provider for this league
+        let provider = LeagueMatchupProvider(
+            league: selectedLeague,
+            week: currentWeek,
+            year: currentYear
+        )
         
-        await MainActor.run {
-            fetchedAllMatchups = fantasyViewModel.matchups
+        do {
+            // Fetch ALL matchups for this league
+            let allLeagueMatchups = try await provider.fetchMatchups()
             
-            // Update the selected index to point to the correct matchup
-            if let newIndex = fetchedAllMatchups.firstIndex(where: { $0.id == startingMatchup.id }) {
-                selectedIndex = newIndex
-            } else {
-                selectedIndex = 0 // Fallback to first matchup
+            await MainActor.run {
+                fetchedAllMatchups = allLeagueMatchups
+                
+                // Update the selected index to point to the correct matchup
+                if let newIndex = fetchedAllMatchups.firstIndex(where: { $0.id == startingMatchup.id }) {
+                    selectedIndex = newIndex
+                } else {
+                    selectedIndex = 0 // Fallback to first matchup
+                }
+                
+                isLoadingAllMatchups = false
             }
-            
-            isLoadingAllMatchups = false
+        } catch {
+            // Fallback to single matchup if fetch fails
+            await MainActor.run {
+                fetchedAllMatchups = [startingMatchup]
+                selectedIndex = 0
+                isLoadingAllMatchups = false
+            }
         }
     }
 }

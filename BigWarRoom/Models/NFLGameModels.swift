@@ -291,8 +291,13 @@ final class NFLGameDataService {
         let currentYear = year ?? AppConstants.currentSeasonYearInt
         let requestKey = "\(week)_\(currentYear)"
         
+        DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Called with week=\(week), year=\(currentYear), forceRefresh=\(forceRefresh)")
+        
         // Prevent duplicate requests
-        guard !pendingRequests.contains(requestKey) else { return }
+        guard !pendingRequests.contains(requestKey) else {
+            DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Request already pending for \(requestKey)")
+            return
+        }
         
         // Throttle requests to prevent spam
         if !forceRefresh, let lastRequest = lastRequestTimestamp,
@@ -355,6 +360,8 @@ final class NFLGameDataService {
     
     /// Process ESPN API response into game info
     private func processGameData(_ response: NFLScoreboardResponse) {
+        DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processing \(response.events.count) events from ESPN API")
+        
         var newGameData: [String: NFLGameInfo] = [:]
         for event in response.events {
             guard let competition = event.competitions.first else { continue }
@@ -415,6 +422,8 @@ final class NFLGameDataService {
         }
         
         gameData = newGameData
+        
+        DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processed \(newGameData.count) game entries, teams playing: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
     }
 
     /// Get game info with enhanced error handling
@@ -424,11 +433,15 @@ final class NFLGameDataService {
         
         // If no data and not currently loading, trigger a fetch
         if gameInfo == nil && !isLoading {
-            let currentWeek = NFLWeekCalculator.getCurrentWeek()
+            // 🔥 FIXED: Use WeekSelectionManager.selectedWeek (user's chosen week)
+            let selectedWeek = WeekSelectionManager.shared.selectedWeek
+            
+            DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.getGameInfo: No data for team \(normalizedTeam), fetching week \(selectedWeek)")
+            
             // Only fetch if we haven't recently requested
             if lastRequestTimestamp == nil || 
                Date().timeIntervalSince(lastRequestTimestamp!) > minimumRequestInterval {
-                fetchGameData(forWeek: currentWeek)
+                fetchGameData(forWeek: selectedWeek)
             }
         }
         

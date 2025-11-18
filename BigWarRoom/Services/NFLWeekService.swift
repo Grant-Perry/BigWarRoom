@@ -47,13 +47,13 @@ final class NFLWeekService {
     init(apiClient: SleeperAPIClient) {
         self.apiClient = apiClient
         
-        // Start with accurate calculation based on current date
+        // Start with simple fallback (don't try to be smart about Tuesday/Wednesday)
         currentYear = String(Calendar.current.component(.year, from: Date()))
-        currentWeek = Self.calculateCurrentWeek()
+        currentWeek = 1 // Default fallback if API hasn't loaded yet
         
-//        print("🗓️ NFLWeekService: Initialized with calculated week \(currentWeek), will verify with API...")
+        DebugPrint(mode: .weekCheck, "📅 NFLWeekService.init: Initialized with fallback week \(currentWeek), waiting for Sleeper API...")
         
-        // Fetch real data immediately to verify/correct
+        // Fetch real data immediately - Sleeper API is SSOT
         Task {
             await fetchCurrentNFLWeek()
             setupPeriodicUpdates()
@@ -61,57 +61,10 @@ final class NFLWeekService {
     }
     
     // MARK: -> Static Helper
-    /// Calculate current NFL week based on calendar date
-    /// NFL weeks run Thursday-Wednesday, with games typically starting Thursday
-    /// 2024 NFL Season started Thursday, September 5, 2024
+    /// Simple fallback calculation (no Tuesday/Wednesday logic - trust Sleeper API instead)
     private static func calculateCurrentWeek() -> Int {
-        let calendar = Calendar.current
-        let now = Date()
-        let currentYear = calendar.component(.year, from: now)
-        
-        // 2024 NFL Season: Week 1 started Thursday, September 5, 2024
-        // 2025 NFL Season: Week 1 starts Thursday, September 4, 2025
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.timeZone = TimeZone(identifier: "America/New_York")
-        
-        // Determine season start based on year
-        let seasonStartString: String
-        if currentYear == 2024 {
-            seasonStartString = "2024-09-05"  // Thursday, September 5, 2024
-        } else if currentYear == 2025 {
-            seasonStartString = "2025-09-04"  // Thursday, September 4, 2025
-        } else {
-            // For other years, assume first Thursday of September
-            seasonStartString = "\(currentYear)-09-05"
-        }
-        
-        guard let seasonStart = dateFormatter.date(from: seasonStartString) else {
-            return 1
-        }
-        
-        // Calculate weeks since season start
-        let daysSinceStart = calendar.dateComponents([.day], from: seasonStart, to: now).day ?? 0
-        
-        // Get current day of week (1=Sunday, 3=Tuesday, 5=Thursday)
-        let currentDayOfWeek = calendar.component(.weekday, from: now)
-        
-        // NFL "display week" logic:
-        // - Week games are Thu-Mon
-        // - On Tuesday, the "display week" advances to the NEXT week (for upcoming games)
-        // - So on Tue/Wed, we show the upcoming week, not the week that just finished
-        
-        let weeksSinceStart = daysSinceStart / 7
-        var calculatedWeek = weeksSinceStart + 1
-        
-        // If it's Tuesday (3) or Wednesday (4), advance to next week
-        // This matches Sleeper's "displayWeek" logic
-        if currentDayOfWeek == 3 || currentDayOfWeek == 4 {
-            calculatedWeek += 1
-        }
-        
-        // Cap at reasonable bounds (1-18)
-        return min(18, max(1, calculatedWeek))
+        // Just return a safe default - we'll get the real week from Sleeper API
+        return 1
     }
     
     // MARK: -> Public Methods
@@ -139,7 +92,7 @@ final class NFLWeekService {
         do {
             let nflState = try await apiClient.fetchNFLState()
             
-//            print("🗓️ NFLWeekService: API returned week \(nflState.displayWeek), season \(nflState.leagueSeason), type \(nflState.seasonType)")
+            DebugPrint(mode: .weekCheck, "📅 NFLWeekService.fetchCurrentNFLWeek: API returned week \(nflState.displayWeek), season \(nflState.leagueSeason), type \(nflState.seasonType)")
             
             // Update properties - @Observable will automatically notify observers
             currentWeek = nflState.displayWeek
@@ -147,10 +100,10 @@ final class NFLWeekService {
             seasonType = nflState.seasonType
             lastUpdated = Date()
             
-//            print("🗓️ NFLWeekService: Updated currentWeek to \(currentWeek)")
+            DebugPrint(mode: .weekCheck, "📅 NFLWeekService.fetchCurrentNFLWeek: Updated currentWeek to \(currentWeek)")
             
         } catch {
-//            print("🗓️ NFLWeekService: Error fetching NFL state - \(error.localizedDescription)")
+            DebugPrint(mode: .weekCheck, "📅 NFLWeekService.fetchCurrentNFLWeek: Error fetching NFL state - \(error.localizedDescription)")
             // Keep existing values on error
         }
         

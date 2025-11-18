@@ -40,13 +40,8 @@ struct MatchupDetailSheetsView: View {
 /// Sheet for chopped league details
 private struct ChoppedLeagueDetailSheet: View {
     let matchup: UnifiedMatchup
-    // 🏈 NAVIGATION FREEDOM: Remove dismiss - not needed for NavigationLink
-    // @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        // 🏈 NAVIGATION FREEDOM: Remove NavigationView wrapper - parent handles navigation
-        // BEFORE: NavigationView wrapper with Done button for sheet
-        // AFTER: Direct content view for NavigationLink navigation
         if let choppedSummary = matchup.choppedSummary {
             ChoppedLeaderboardView(
                 choppedSummary: choppedSummary,
@@ -63,77 +58,92 @@ private struct RegularMatchupDetailSheet: View {
     let allLeagueMatchups: [UnifiedMatchup]?
     
     var body: some View {
-        if let fantasyMatchup = matchup.fantasyMatchup {
-            let configuredViewModel = matchup.createConfiguredFantasyViewModel()
+        // 🔥 FIXED: Extract all FantasyMatchups from allLeagueMatchups
+        let allFantasyMatchups: [FantasyMatchup] = {
+            if let leagueMatchups = allLeagueMatchups {
+                return leagueMatchups.compactMap { $0.fantasyMatchup }
+            } else if let fantasyMatchup = matchup.fantasyMatchup {
+                return [fantasyMatchup]
+            } else {
+                return []
+            }
+        }()
+        
+        return Group {
+            if let fantasyMatchup = matchup.fantasyMatchup {
+                let configuredViewModel = matchup.createConfiguredFantasyViewModel()
+                
+                LeagueMatchupsTabView(
+                    allMatchups: allFantasyMatchups,
+                    startingMatchup: fantasyMatchup,
+                    leagueName: matchup.league.league.name,
+                    fantasyViewModel: configuredViewModel
+                )
+            } else {
+                matchupErrorView
+            }
+        }
+    }
+    
+    private var matchupErrorView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 50))
+                .foregroundColor(.orange)
             
-            // 🔥 SIMPLIFIED: Just pass the single matchup, let LeagueMatchupsTabView fetch the rest
-            LeagueMatchupsTabView(
-                allMatchups: [fantasyMatchup],  // Start with single matchup
-                startingMatchup: fantasyMatchup,
-                leagueName: matchup.league.league.name,
-                fantasyViewModel: configuredViewModel
-            )
-        } else {
-            // 🔥 FIXED: Show detailed error state when fantasyMatchup is nil
-            VStack(spacing: 20) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 50))
-                    .foregroundColor(.orange)
-                
-                Text("Matchup Not Available")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                VStack(spacing: 8) {
-                    Text("This \(matchup.league.source.rawValue.uppercased()) league matchup could not be loaded.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                    
-                    Text("League: \(matchup.league.league.name)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                        .background(Color.gray.opacity(0.2))
-                        .cornerRadius(8)
-                }
-                
-                VStack(spacing: 4) {
-                    Text("Possible causes:")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("• Week has no active matchups")
-                        Text("• Your team couldn't be identified")
-                        Text("• League is not properly configured")
-                    }
-                    .font(.caption2)
+            Text("Matchup Not Available")
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            VStack(spacing: 8) {
+                Text("This \(matchup.league.source.rawValue.uppercased()) league matchup could not be loaded.")
+                    .font(.body)
                     .foregroundColor(.secondary)
-                }
+                    .multilineTextAlignment(.center)
                 
-                Button("Go Back") {
-                    // Navigation back will be handled automatically
+                Text("League: \(matchup.league.league.name)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(8)
+            }
+            
+            VStack(spacing: 4) {
+                Text("Possible causes:")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("• Week has no active matchups")
+                    Text("• Your team couldn't be identified")
+                    Text("• League is not properly configured")
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 12)
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(8)
+                .font(.caption2)
+                .foregroundColor(.secondary)
             }
-            .padding(40)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.systemBackground))
-            .onAppear {
-                print("🚨 DEBUG: RegularMatchupDetailSheet - fantasyMatchup is nil!")
-                print("🚨 DEBUG: League: \(matchup.league.league.name) (\(matchup.league.source.rawValue))")
-                print("🚨 DEBUG: League ID: \(matchup.league.league.leagueID)")
-                print("🚨 DEBUG: Matchup ID: \(matchup.id)")
-                print("🚨 DEBUG: Is Chopped: \(matchup.isChoppedLeague)")
-                print("🚨 DEBUG: My Team ID: \(matchup.myIdentifiedTeamID ?? "nil")")
+            
+            Button("Go Back") {
+                // Navigation back will be handled automatically
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(8)
+        }
+        .padding(40)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+        .onAppear {
+            print("🚨 DEBUG: RegularMatchupDetailSheet - fantasyMatchup is nil!")
+            print("🚨 DEBUG: League: \(matchup.league.league.name) (\(matchup.league.source.rawValue))")
+            print("🚨 DEBUG: League ID: \(matchup.league.league.leagueID)")
+            print("🚨 DEBUG: Matchup ID: \(matchup.id)")
+            print("🚨 DEBUG: Is Chopped: \(matchup.isChoppedLeague)")
+            print("🚨 DEBUG: My Team ID: \(matchup.myIdentifiedTeamID ?? "nil")")
         }
     }
 }

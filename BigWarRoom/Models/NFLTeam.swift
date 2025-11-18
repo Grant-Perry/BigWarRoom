@@ -24,9 +24,16 @@ struct NFLTeam: Identifiable, Hashable {
         "\(city) \(name)"
     }
     
-    /// Logo asset name for bundled images
+    /// Logo asset name for bundled images (UPPERCASE to match asset naming)
     var logoAssetName: String {
-        "logo_\(id.lowercased())"
+        // 🔥 FIXED: All logos use uppercase team IDs with "logo_" prefix
+        // Handle special cases where team ID doesn't match asset name
+        switch id {
+        case "WAS":
+            return "logo_WSH"  // Washington uses WSH in assets
+        default:
+            return "logo_\(id.uppercased())"
+        }
     }
     
     /// Team colors as gradient
@@ -246,4 +253,25 @@ extension NFLTeam {
     static let teamLookup: [String: NFLTeam] = {
         Dictionary(uniqueKeysWithValues: allTeams.map { ($0.id, $0) })
     }()
+    
+    /// Get teams on BYE week from schedule games
+    /// - Parameter games: Array of ScheduleGame for the current week
+    /// - Returns: Array of NFLTeam objects that are on bye (not playing)
+    static func teamsOnBye(forGames games: [ScheduleGame]) -> [NFLTeam] {
+        // 🔥 FIXED: Normalize team codes to handle WAS/WSH and JAX/JAC mismatches
+        let teamsPlaying = Set(games.flatMap { [$0.homeTeam, $0.awayTeam] }.map { normalizeTeamCode($0) })
+        return allTeams.filter { !teamsPlaying.contains(normalizeTeamCode($0.id)) }
+    }
+    
+    /// Normalize team codes to handle ESPN/Sleeper mismatches
+    private static func normalizeTeamCode(_ code: String) -> String {
+        switch code.uppercased() {
+        case "WSH":
+            return "WAS"  // ESPN uses WSH, we use WAS
+        case "JAC":
+            return "JAX"  // Some sources use JAC, we use JAX
+        default:
+            return code.uppercased()
+        }
+    }
 }

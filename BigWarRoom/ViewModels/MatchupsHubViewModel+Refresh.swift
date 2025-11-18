@@ -238,6 +238,9 @@ extension MatchupsHubViewModel {
         do {
             // Step 0: Refresh NFL game data for the selected week (not just current)
             let currentYear = Calendar.current.component(.year, from: Date())
+            
+            DebugPrint(mode: .weekCheck, "📅 MatchupsHub.refreshInBackground: Using user-selected week \(selectedWeek)")
+            
             NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear, forceRefresh: true)
             
             // Step 1: Refresh available leagues quietly
