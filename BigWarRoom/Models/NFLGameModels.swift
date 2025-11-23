@@ -462,7 +462,9 @@ final class NFLGameDataService {
         let currentYear = year ?? AppConstants.currentSeasonYearInt
         let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
         Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            // Only refresh if we have live games
+            // 🔋 BATTERY FIX: Only refresh if app is active AND we have live games
+            guard AppLifecycleManager.shared.isActive else { return }
+            
             let hasLiveGames = self?.gameData.values.contains { $0.isLive } ?? false
             if hasLiveGames {
                 self?.fetchGameData(forWeek: week, year: currentYear, forceRefresh: true)

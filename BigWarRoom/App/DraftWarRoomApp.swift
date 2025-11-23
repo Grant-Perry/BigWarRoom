@@ -9,6 +9,9 @@ import SwiftUI
 
 @main
 struct DraftWarRoomApp: App {
+    // 🔋 BATTERY FIX: Monitor app lifecycle
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var lifecycleManager = AppLifecycleManager.shared
     
     init() {
         // 🔥 HYBRID APPROACH: Create all services with DI at app root, then set .shared
@@ -18,6 +21,10 @@ struct DraftWarRoomApp: App {
     var body: some Scene {
         WindowGroup {
             MainAppView()
+        }
+        // 🔋 BATTERY FIX: Update lifecycle manager when scene phase changes
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            lifecycleManager.updatePhase(newPhase)
         }
     }
     

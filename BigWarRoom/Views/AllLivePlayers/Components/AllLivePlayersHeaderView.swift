@@ -732,11 +732,12 @@ struct AllLivePlayersHeaderView: View {
         // Start the actual refresh timer (every 15 seconds)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !allLivePlayersViewModel.isLoading {
+                // 🔋 BATTERY FIX: Only refresh if app is active
+                if AppLifecycleManager.shared.isActive && !allLivePlayersViewModel.isLoading {
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
                 } else {
-                    DebugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(UIApplication.shared.applicationState == .active), loading=\(allLivePlayersViewModel.isLoading))")
+                    DebugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(AppLifecycleManager.shared.isActive), loading=\(allLivePlayersViewModel.isLoading))")
                 }
             }
         }
@@ -754,10 +755,13 @@ struct AllLivePlayersHeaderView: View {
     private func startCountdownTimer() {
         resetCountdown()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if refreshCountdown > 0 {
-                refreshCountdown -= 1
-            } else {
-                resetCountdown()
+            // 🔋 BATTERY FIX: Only countdown if app is active
+            if AppLifecycleManager.shared.isActive {
+                if refreshCountdown > 0 {
+                    refreshCountdown -= 1
+                } else {
+                    resetCountdown()
+                }
             }
         }
     }

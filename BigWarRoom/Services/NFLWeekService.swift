@@ -87,6 +87,11 @@ final class NFLWeekService {
     
     /// Fetch current NFL week from Sleeper API
     private func fetchCurrentNFLWeek() async {
+        // 🔋 BATTERY FIX: Skip if app is not active
+        guard AppLifecycleManager.shared.isActive else {
+            return
+        }
+        
         isLoading = true
         
         do {
@@ -115,7 +120,10 @@ final class NFLWeekService {
         updateTimer?.invalidate()
         updateTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
             Task { [weak self] in
-                await self?.fetchCurrentNFLWeek()
+                // 🔋 BATTERY FIX: Only update if app is active
+                if AppLifecycleManager.shared.isActive {
+                    await self?.fetchCurrentNFLWeek()
+                }
             }
         }
     }

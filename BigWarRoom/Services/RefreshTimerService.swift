@@ -73,7 +73,8 @@ final class RefreshTimerService {
         
         refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
             Task { @MainActor in
-                if UIApplication.shared.applicationState == .active {
+                // 🔋 BATTERY FIX: Only refresh if app is active
+                if AppLifecycleManager.shared.isActive {
                     await onRefresh()
                 }
             }
@@ -103,10 +104,13 @@ final class RefreshTimerService {
         
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             Task { @MainActor in
-                self.refreshCountdown -= 1.0
-                
-                if self.refreshCountdown <= 0 {
-                    self.refreshCountdown = self.refreshInterval
+                // 🔋 BATTERY FIX: Only countdown if app is active
+                if AppLifecycleManager.shared.isActive {
+                    self.refreshCountdown -= 1.0
+                    
+                    if self.refreshCountdown <= 0 {
+                        self.refreshCountdown = self.refreshInterval
+                    }
                 }
             }
         }

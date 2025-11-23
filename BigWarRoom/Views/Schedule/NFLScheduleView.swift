@@ -16,6 +16,9 @@ struct NFLScheduleView: View {
     @State private var selectedGame: ScheduleGame?
     @State private var navigationPath = NavigationPath()
     
+    // 🔥 NEW: Add UnifiedLeagueManager for bye week impact analysis
+    @State private var unifiedLeagueManager: UnifiedLeagueManager?
+    
     // 🔥 SIMPLIFIED: No params needed, use .shared internally
     init() {}
     
@@ -42,6 +45,13 @@ struct NFLScheduleView: View {
                         viewModel = NFLScheduleViewModel(
                             gameDataService: NFLGameDataService.shared,
                             weekService: NFLWeekService.shared
+                        )
+                        
+                        // 🔥 CREATE UnifiedLeagueManager with proper ESPN credentials
+                        unifiedLeagueManager = UnifiedLeagueManager(
+                            sleeperClient: SleeperAPIClient(),
+                            espnClient: ESPNAPIClient(credentialsManager: ESPNCredentialsManager.shared),
+                            espnCredentials: ESPNCredentialsManager.shared
                         )
                     }
             }
@@ -286,10 +296,14 @@ struct NFLScheduleView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 
-                // BYE Week Section
-                if !viewModel.byeWeekTeams.isEmpty {
-                    ScheduleByeWeekSection(byeTeams: viewModel.byeWeekTeams)
-                        .padding(.top, 24)
+                // BYE Week Section - 🔥 UPDATED: Pass dependencies for impact analysis
+                if !viewModel.byeWeekTeams.isEmpty, let manager = unifiedLeagueManager {
+                    ScheduleByeWeekSection(
+                        byeTeams: viewModel.byeWeekTeams,
+                        unifiedLeagueManager: manager,
+                        matchupsHubViewModel: matchupsHubViewModel
+                    )
+                    .padding(.top, 24)
                 }
             }
             .frame(maxWidth: .infinity)

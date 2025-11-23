@@ -10,6 +10,13 @@ import SwiftUI
 
 struct ScheduleByeWeekSection: View {
     let byeTeams: [NFLTeam]
+    let unifiedLeagueManager: UnifiedLeagueManager
+    let matchupsHubViewModel: MatchupsHubViewModel
+    
+    @State private var byeWeekImpacts: [String: ByeWeekImpact] = [:]
+    @State private var isLoadingImpacts = false
+    @State private var selectedImpact: (impact: ByeWeekImpact, team: NFLTeam)?
+    @State private var showingImpactSheet = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -24,6 +31,13 @@ struct ScheduleByeWeekSection: View {
                 Text("\(byeTeams.count) teams")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.6))
+                
+                // Loading indicator while analyzing impact
+                if isLoadingImpacts {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
+                }
             }
             .padding(.horizontal, 20)
             
@@ -35,45 +49,163 @@ struct ScheduleByeWeekSection: View {
                 GridItem(.flexible())
             ], spacing: 16) {
                 ForEach(byeTeams) { team in
-                    ScheduleByeTeamCell(team: team)
+                    ScheduleByeTeamCell(
+                        team: team,
+                        byeWeekImpact: byeWeekImpacts[team.id],
+                        isLoadingImpacts: isLoadingImpacts
+                    ) {
+                        // 🔥 ONLY open sheet if impact exists AND has problems
+                        if let impact = byeWeekImpacts[team.id], impact.hasProblem {
+                            selectedImpact = (impact, team)
+                            showingImpactSheet = true
+                        }
+                    }
                 }
             }
             .padding(.horizontal, 20)
         }
         .padding(.vertical, 16)
+        .task {
+            await analyzeByeWeekImpacts()
+        }
+        .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, _ in
+            Task {
+                await analyzeByeWeekImpacts()
+            }
+        }
+        .sheet(isPresented: $showingImpactSheet) {
+            if let selected = selectedImpact {
+                ByeWeekPlayerImpactSheet(
+                    impact: selected.impact,
+                    teamName: selected.team.fullName,
+                    teamCode: selected.team.id
+                )
+            }
+        }
+    }
+    
+    // MARK: - Analyze Bye Week Impacts
+    
+    private func analyzeByeWeekImpacts() async {
+        isLoadingImpacts = true
+        defer { isLoadingImpacts = false }
+        
+        var impacts: [String: ByeWeekImpact] = [:]
+        
+        for team in byeTeams {
+            let impact = await ByeWeekImpactService.shared.analyzeByeWeekImpact(
+                for: team.id,
+                week: WeekSelectionManager.shared.selectedWeek,
+                unifiedLeagueManager: unifiedLeagueManager,
+                matchupsHubViewModel: matchupsHubViewModel
+            )
+            
+            impacts[team.id] = impact
+        }
+        
+        byeWeekImpacts = impacts
     }
 }
 
 // MARK: -> Schedule Bye Team Cell
 struct ScheduleByeTeamCell: View {
     let team: NFLTeam
+    let byeWeekImpact: ByeWeekImpact?
+    let isLoadingImpacts: Bool
+    let onTap: () -> Void
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Team logo using TeamAssetManager (fetches from ESPN CDN)
-            TeamAssetManager.shared.logoOrFallback(for: team.id)
-                .frame(width: 50, height: 50)
-                .background(
-                    Circle()
-                        .fill(team.primaryColor.opacity(0.15))
-                        .frame(width: 60, height: 60)
-                )
-            
-            // Team name
-            Text(team.name)
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.white.opacity(0.8))
+        Button(action: {
+            // Only fire action if not loading and has problem
+            if !isLoadingImpacts, let impact = byeWeekImpact, impact.hasProblem {
+                onTap()
+            }
+        }) {
+            VStack(spacing: 8) {
+                // Team logo with badge overlay
+                ZStack(alignment: .topTrailing) {
+                    TeamAssetManager.shared.logoOrFallback(for: team.id)
+                        .frame(width: 50, height: 50)
+                        .background(
+                            Circle()
+                                .fill(team.primaryColor.opacity(0.15))
+                                .frame(width: 60, height: 60)
+                        )
+                    
+                    // Badge: Checkmark or X (only show after loading completes)
+                    if !isLoadingImpacts, let impact = byeWeekImpact {
+                        if impact.hasProblem {
+                            // RED X - Problem!
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.gpRedPink)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black)
+                                        .frame(width: 22, height: 22)
+                                )
+                                .offset(x: 4, y: -4)
+                        } else {
+                            // GREEN CHECKMARK - All clear!
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.green)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black)
+                                        .frame(width: 22, height: 22)
+                                )
+                                .offset(x: 4, y: -4)
+                        }
+                    }
+                }
+                
+                // Team name
+                Text(team.name)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(borderColor, lineWidth: borderWidth)
+                    )
+            )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(team.primaryColor.opacity(0.3), lineWidth: 1)
-                )
-        )
+        .buttonStyle(PlainButtonStyle())
+        // 🔥 FIX: Keep full color even when disabled - only dim while loading
+        .opacity(isLoadingImpacts ? 0.5 : 1.0)
+        .allowsHitTesting(!isLoadingImpacts && byeWeekImpact?.hasProblem == true)
+    }
+    
+    // MARK: - Helpers
+    
+    private var borderColor: Color {
+        if isLoadingImpacts {
+            return team.primaryColor.opacity(0.3)
+        }
+        
+        guard let impact = byeWeekImpact else {
+            return team.primaryColor.opacity(0.3)
+        }
+        
+        return impact.hasProblem ? Color.gpRedPink.opacity(0.5) : Color.green.opacity(0.3)
+    }
+    
+    private var borderWidth: CGFloat {
+        if isLoadingImpacts {
+            return 1
+        }
+        
+        guard let impact = byeWeekImpact else {
+            return 1
+        }
+        
+        return impact.hasProblem ? 2 : 1
     }
 }
 
@@ -87,10 +219,20 @@ struct ScheduleByeTeamCell: View {
         NFLTeam.team(for: "MIA")!
     ]
     
+    let mockUnifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: SleeperAPIClient(),
+        espnClient: ESPNAPIClient(credentialsManager: ESPNCredentialsManager.shared),
+        espnCredentials: ESPNCredentialsManager.shared
+    )
+    
     ZStack {
         Color.black.ignoresSafeArea()
         
-        ScheduleByeWeekSection(byeTeams: sampleTeams)
+        ScheduleByeWeekSection(
+            byeTeams: sampleTeams,
+            unifiedLeagueManager: mockUnifiedLeagueManager,
+            matchupsHubViewModel: MatchupsHubViewModel.shared
+        )
     }
     .preferredColorScheme(.dark)
 }

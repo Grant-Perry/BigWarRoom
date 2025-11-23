@@ -19,7 +19,8 @@ extension MatchupsHubViewModel {
         
         refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(AppConstants.MatchupRefresh), repeats: true) { _ in
             Task { @MainActor in
-                if UIApplication.shared.applicationState == .active && !self.isLoading {
+                // 🔋 BATTERY FIX: Only refresh if app is active
+                if AppLifecycleManager.shared.isActive && !self.isLoading {
                     await self.refreshMatchups()
                 }
             }
@@ -29,6 +30,12 @@ extension MatchupsHubViewModel {
     /// Refresh existing matchups without full reload
     /// 🔥 FIXED: Uses selected week instead of current week
     internal func refreshMatchups() async {
+        // 🔋 BATTERY FIX: Skip refresh if app is not active
+        guard AppLifecycleManager.shared.isActive else {
+            DebugPrint(mode: .globalRefresh, "REFRESH SKIPPED: App is not active (backgrounded)")
+            return
+        }
+        
         guard !myMatchups.isEmpty && !isLoading else {
             // 🔥 CRITICAL FIX: Load for selected week, not current week!
             let selectedWeek = WeekSelectionManager.shared.selectedWeek
