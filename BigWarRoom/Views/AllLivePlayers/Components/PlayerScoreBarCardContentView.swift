@@ -78,7 +78,7 @@ struct PlayerScoreBarCardContentView: View {
                 .offset(x: 37)
                 .scaleEffect(1.1)
                 
-                // Player info - moved to right side with swapped league banner and player name
+                // Player info - right side with dedicated space for league name
                 VStack(alignment: .trailing, spacing: 4) {
                     HStack(spacing: 6) {
                         Spacer()
@@ -91,12 +91,17 @@ struct PlayerScoreBarCardContentView: View {
                             .minimumScaleFactor(0.7)
                     }
                     
-                    HStack(spacing: 6) {
-                        Spacer()
+                    // League + position stack: league banner can wrap to 2 lines, badge stays neatly below it
+                    VStack(alignment: .trailing, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Spacer()
+                            PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
+                        }
                         
-                        // League banner and position badge on same line (swapped order)
-                        PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
-                        PlayerScoreBarCardPositionBadgeView(playerEntry: playerEntry)
+                        HStack {
+                            Spacer()
+                            PlayerScoreBarCardPositionBadgeView(playerEntry: playerEntry)
+                        }
                     }
                     
                     Spacer() // Push score to bottom of this section
@@ -263,10 +268,12 @@ struct PlayerScoreBarCardContentView: View {
                 isChopped: playerEntry.matchup.isChoppedLeague
             )
             
+            // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
             let breakdown = ScoreBreakdownFactory.createBreakdown(
                 for: playerEntry.player,
                 week: WeekSelectionManager.shared.selectedWeek,
-                leagueContext: leagueContext
+                leagueContext: leagueContext,
+                allLivePlayersViewModel: viewModel
             ).withLeagueName(playerEntry.leagueName)
             
             ScoreBreakdownView(breakdown: breakdown)
@@ -475,10 +482,12 @@ struct ScoreBreakdownLoaderView: View {
             isChopped: playerEntry.matchup.isChoppedLeague
         )
         
+        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: playerEntry.player,
             week: WeekSelectionManager.shared.selectedWeek,
-            leagueContext: leagueContext
+            leagueContext: leagueContext,
+            allLivePlayersViewModel: viewModel
         ).withLeagueName(playerEntry.leagueName)
         
         return ScoreBreakdownView(breakdown: breakdown)

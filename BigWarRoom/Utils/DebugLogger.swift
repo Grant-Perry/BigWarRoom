@@ -223,7 +223,7 @@ enum DebugConfig {
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
 	/// Current: Week checking and waiver wire debugging enabled
-    static var activeMode: DebugMode = [.waivers, .weekCheck]
+    static var activeMode: DebugMode = []
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

@@ -41,8 +41,9 @@ struct PlayerScoreBarCardLeagueBannerView: View {
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                // Allow longer league names to wrap instead of truncating
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
                 .multilineTextAlignment(.leading)
         }
         .padding(.horizontal, 6)

@@ -21,6 +21,9 @@ final class SettingsViewModel {
     // 💊 RX: Lineup optimization improvement threshold (persistent)
     var lineupOptimizationThreshold: Double = 10.0 // 10% default, range 10-100%
     
+    // 📱 Keep app active (prevent auto-lock)
+    var keepAppActive: Bool = true
+    
     // MARK: - Observable Properties (OnBoarding)
     var showingESPNSetup: Bool = false
     var showingSleeperSetup: Bool = false
@@ -104,6 +107,9 @@ final class SettingsViewModel {
         let savedThreshold = UserDefaults.standard.double(forKey: "lineupOptimizationThreshold")
         lineupOptimizationThreshold = savedThreshold > 0 ? savedThreshold : 10.0
         
+        // 📱 Load keep app active preference (default: true)
+        keepAppActive = UserDefaults.standard.object(forKey: "keepAppActive") as? Bool ?? true
+        
         // Set up observers for changes (using withObservationTracking if needed)
         Task {
             await observeChanges()
@@ -143,6 +149,12 @@ final class SettingsViewModel {
     func updateShowEliminatedChoppedLeagues(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "showEliminatedChoppedLeagues")
         NSLog("🔧 Show eliminated chopped leagues \(enabled ? "enabled" : "disabled")")
+    }
+    
+    // 📱 Update keep app active setting
+    func updateKeepAppActive(_ enabled: Bool) {
+        AppLifecycleManager.shared.updateKeepAppActiveSetting(enabled)
+        NSLog("📱 Keep app active \(enabled ? "enabled" : "disabled")")
     }
     
     // 💊 RX: Update lineup optimization threshold

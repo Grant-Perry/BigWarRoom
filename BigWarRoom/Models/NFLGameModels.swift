@@ -379,6 +379,12 @@ final class NFLGameDataService {
             let isCompleted = status.completed
             let isLive = gameStatus == "in"
             
+            // 🔥 ESPN EVENT ID - Debug print right before creating NFLGameInfo
+            DebugPrint(
+                mode: .espnAPI,
+                "ESPN EVENT ID: \(event.id) | \(awayTeam) @ \(homeTeam) | Status: \(gameStatus)"
+            )
+            
             // 🔥 DEBUG: Log raw ESPN data for problematic games
             if homeTeam == "IND" || homeTeam == "TEN" || homeTeam == "DAL" || homeTeam == "DEN" {
                 DebugPrint(mode: .nflData, limit: 2, """
@@ -406,6 +412,7 @@ final class NFLGameDataService {
                 fallbackFormatter2.dateFormat = "yyyy-MM-dd'T'HH:mmZ"
                 startDate = fallbackFormatter2.date(from: competition.date)
             }
+            
             let gameInfo = NFLGameInfo(
                 homeTeam: homeTeam,
                 awayTeam: awayTeam,

@@ -31,7 +31,8 @@ extension MatchupsHubViewModel {
     /// 🔥 FIXED: Uses selected week instead of current week
     internal func refreshMatchups() async {
         // 🔋 BATTERY FIX: Skip refresh if app is not active
-        guard AppLifecycleManager.shared.isActive else {
+        // 🔥 BUT: Allow if this is the first load (myMatchups is empty)
+        guard AppLifecycleManager.shared.isActive || myMatchups.isEmpty else {
             DebugPrint(mode: .globalRefresh, "REFRESH SKIPPED: App is not active (backgrounded)")
             return
         }

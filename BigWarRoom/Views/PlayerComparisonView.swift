@@ -180,6 +180,10 @@ struct PlayerComparisonView: View {
                 .foregroundColor(.white)
             }
         }
+        .onAppear {
+            // Restore last comparison so a relaunched app brings the user back where they left off
+            viewModel.restoreLastComparison()
+        }
     }
     
     // MARK: - Header Section

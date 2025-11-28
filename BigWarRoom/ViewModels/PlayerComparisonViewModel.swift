@@ -37,30 +37,40 @@ class PlayerComparisonViewModel {
         AppConstants.currentSeasonYear
     }
     
+    // MARK: - Persistence Keys
+    private let lastPlayer1IDKey = "StartSit_LastPlayer1ID"
+    private let lastPlayer2IDKey = "StartSit_LastPlayer2ID"
+    
     // MARK: - Player Selection
     
     func selectPlayer1(_ player: SleeperPlayer) {
         player1 = player
         comparisonPlayer1 = nil
         recommendation = nil
+        // Persist selection
+        UserDefaults.standard.set(player.playerID, forKey: lastPlayer1IDKey)
     }
     
     func selectPlayer2(_ player: SleeperPlayer) {
         player2 = player
         comparisonPlayer2 = nil
         recommendation = nil
+        // Persist selection
+        UserDefaults.standard.set(player.playerID, forKey: lastPlayer2IDKey)
     }
     
     func clearPlayer1() {
         player1 = nil
         comparisonPlayer1 = nil
         // Don't clear recommendation - let player 2 stay if they exist
+        UserDefaults.standard.removeObject(forKey: lastPlayer1IDKey)
     }
     
     func clearPlayer2() {
         player2 = nil
         comparisonPlayer2 = nil
         // Don't clear recommendation - let player 1 stay if they exist
+        UserDefaults.standard.removeObject(forKey: lastPlayer2IDKey)
     }
     
     func clearBoth() {
@@ -70,6 +80,25 @@ class PlayerComparisonViewModel {
         comparisonPlayer2 = nil
         recommendation = nil
         errorMessage = nil
+        UserDefaults.standard.removeObject(forKey: lastPlayer1IDKey)
+        UserDefaults.standard.removeObject(forKey: lastPlayer2IDKey)
+    }
+    
+    /// Restore last compared players from persisted IDs (if available)
+    func restoreLastComparison() {
+        let defaults = UserDefaults.standard
+        guard let id1 = defaults.string(forKey: lastPlayer1IDKey),
+              let id2 = defaults.string(forKey: lastPlayer2IDKey) else {
+            return
+        }
+        
+        let store = playerDirectory
+        if let p1 = store.players[id1] {
+            player1 = p1
+        }
+        if let p2 = store.players[id2] {
+            player2 = p2
+        }
     }
     
     // MARK: - Comparison Processing

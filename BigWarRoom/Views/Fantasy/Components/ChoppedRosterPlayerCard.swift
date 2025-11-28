@@ -567,11 +567,13 @@ struct ChoppedRosterPlayerCard: View {
         
         let localStatsProvider: LocalStatsProvider = viewModel.parentViewModel
         
+        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: viewModel.player,
             week: rosterWeek,
             localStatsProvider: localStatsProvider,
-            leagueContext: leagueContext
+            leagueContext: leagueContext,
+            allLivePlayersViewModel: AllLivePlayersViewModel.shared
         ).withLeagueName("Chopped League")
         
         return PlayerScoreBreakdown(

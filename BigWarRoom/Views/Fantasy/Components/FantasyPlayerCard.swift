@@ -267,11 +267,13 @@ struct FantasyPlayerCard: View {
             leagueName = selectedLeague.league.name
         }
         
+        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: player,
             week: selectedWeek,
             localStatsProvider: nil,
-            leagueContext: leagueContext
+            leagueContext: leagueContext,
+            allLivePlayersViewModel: vm.livePlayersViewModel
         )
         
         return leagueName != nil ? breakdown.withLeagueName(leagueName!) : breakdown

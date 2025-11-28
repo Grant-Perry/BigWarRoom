@@ -210,6 +210,31 @@ struct AppSettingsView: View {
                             .labelsHidden()
                     }
                     
+                    // Keep App Active Toggle
+                    HStack {
+                        Image(systemName: "iphone.slash")
+                            .foregroundColor(.gpGreen)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Keep App Active")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("Prevent auto-lock while using the app")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $viewModel.keepAppActive)
+                            .labelsHidden()
+                            .onChange(of: viewModel.keepAppActive) { _, newValue in
+                                viewModel.updateKeepAppActive(newValue)
+                            }
+                    }
+                    
                     // Show Eliminated Chopped Leagues Toggle
                     HStack {
                         Image(systemName: "eye.slash.fill")

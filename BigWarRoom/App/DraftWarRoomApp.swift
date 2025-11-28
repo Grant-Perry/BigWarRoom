@@ -359,16 +359,21 @@ extension Color {
 // MARK: - Unified Main Tab View
 struct MainTabView: View {
     @State private var draftRoomViewModel = DraftRoomViewModel()
-    @State private var selectedTab: Int
+    @AppStorage("MainTabView_SelectedTab") private var storedSelectedTab: Int = 0
     @State private var hasInitialized = false
     
+    let startOnSettings: Bool
+    
     init(startOnSettings: Bool = false) {
-        _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
+        self.startOnSettings = startOnSettings
     }
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            TabView(selection: $selectedTab) {
+            TabView(selection: Binding(
+                get: { storedSelectedTab },
+                set: { storedSelectedTab = $0 }
+            )) {
                 // MATCHUPS HUB - THE COMMAND CENTER
                 NavigationStack {
                     MatchupsHubView()
@@ -426,12 +431,17 @@ struct MainTabView: View {
             .environment(MatchupsHubViewModel.shared)
             .environment(PlayerWatchService.shared)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
-                selectedTab = 4
+                storedSelectedTab = 4
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
-                selectedTab = 0
+                storedSelectedTab = 0
             }
             .onAppear {
+                // 🔁 STATE RESTORE: If onboarding needed, switch to Settings. Otherwise, stay on persisted tab.
+                if startOnSettings && !hasInitialized {
+                    storedSelectedTab = 4
+                }
+                
                 if !hasInitialized {
                     hasInitialized = true
                     Task {
@@ -461,9 +471,4 @@ struct AppVersionOverlay: View {
         }
         .ignoresSafeArea(edges: .bottom)
     }
-}
-
-#Preview("MainTabView") {
-    MainTabView()
-        .preferredColorScheme(.dark)
 }

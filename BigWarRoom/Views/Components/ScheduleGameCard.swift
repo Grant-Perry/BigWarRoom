@@ -119,12 +119,16 @@ struct ScheduleGameCard: View {
                             Text(game.dayName.uppercased())
                                 .font(.system(size: 14, weight: .bold, design: .default))
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         }
                         
                         Text(game.startTime)
                             .font(.system(size: 20, weight: .bold, design: .default))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                             .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                     }
                 }

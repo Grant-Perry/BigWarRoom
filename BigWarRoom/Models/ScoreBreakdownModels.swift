@@ -122,7 +122,8 @@ struct ScoreBreakdownFactory {
         for player: FantasyPlayer,
         week: Int? = nil,
         localStatsProvider: LocalStatsProvider? = nil,
-        leagueContext: LeagueContext? = nil
+        leagueContext: LeagueContext? = nil,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil
     ) -> PlayerScoreBreakdown {
         
         // Get the week, defaulting to current selected week
@@ -134,10 +135,12 @@ struct ScoreBreakdownFactory {
             return createEmptyBreakdown(player: player, week: effectiveWeek)
         }
         
+        // 🔥 FIX: Pass AllLivePlayersViewModel to StatsFacade so it can check global stats
         guard let stats = StatsFacade.getPlayerStats(
             playerID: sleeperPlayer.playerID,
             week: effectiveWeek,
-            localStatsProvider: localStatsProvider
+            localStatsProvider: localStatsProvider,
+            allLivePlayersViewModel: allLivePlayersViewModel
         ) else {
             return createEmptyBreakdown(player: player, week: effectiveWeek)
         }

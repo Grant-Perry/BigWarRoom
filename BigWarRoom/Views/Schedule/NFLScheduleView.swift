@@ -281,11 +281,11 @@ struct NFLScheduleView: View {
                 ForEach(viewModel.games, id: \.id) { game in
                     // 🏈 NAVIGATION FREEDOM: Use NavigationLink instead of Button + sheet
                     NavigationLink(destination: TeamFilteredMatchupsView(
-                        awayTeam: game.awayTeam,
-                        homeTeam: game.homeTeam,
-                        matchupsHubViewModel: matchupsHubViewModel,
-                        gameData: game
-                    )) {
+                                    awayTeam: game.awayTeam,
+                                    homeTeam: game.homeTeam,
+                                    matchupsHubViewModel: matchupsHubViewModel,
+                                    gameData: game
+                                )) {
                         ScheduleGameCard(game: game) {
                             // NavigationLink handles navigation
                         }
@@ -297,19 +297,56 @@ struct NFLScheduleView: View {
                 }
                 
                 // BYE Week Section - 🔥 UPDATED: Pass dependencies for impact analysis
-                if !viewModel.byeWeekTeams.isEmpty, let manager = unifiedLeagueManager {
+                if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
                         matchupsHubViewModel: matchupsHubViewModel
                     )
                     .padding(.top, 24)
+                } else if viewModel.byeWeekTeams.isEmpty {
+                    noByeWeeksBanner
+                        .padding(.top, 24)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
+    }
+    
+    // MARK: -> No Bye Weeks Banner
+    private var noByeWeeksBanner: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.gpGreen)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("FULL SLATE - NO BYES")
+                        .font(.system(size: 14, weight: .black, design: .default))
+                        .foregroundColor(.white)
+                    
+                    Text("All 32 teams are active in Week \(WeekSelectionManager.shared.selectedWeek).")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.75))
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
+                    )
+            )
+        }
+        .padding(.horizontal, 20)
     }
 
     // MARK: - Helper function to get week start date

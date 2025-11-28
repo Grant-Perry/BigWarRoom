@@ -31,13 +31,35 @@ final class AppLifecycleManager {
     
     private var lastPhaseChange: Date = Date()
     
+    /// Should the app prevent auto-lock when active?
+    private var keepAppActiveEnabled: Bool = true
+    
     // MARK: - Initialization
     
     private init() {
+        // Load keep app active setting
+        keepAppActiveEnabled = UserDefaults.standard.object(forKey: "keepAppActive") as? Bool ?? true
+        
         logInfo("🔋 AppLifecycleManager initialized", category: "Lifecycle")
+        logInfo("📱 Keep App Active: \(keepAppActiveEnabled ? "ENABLED" : "DISABLED")", category: "Lifecycle")
+        
+        // Set initial idle timer state
+        updateIdleTimerState()
     }
     
     // MARK: - Public Methods
+    
+    /// Update the keep app active setting
+    /// Called from SettingsViewModel when user toggles the setting
+    func updateKeepAppActiveSetting(_ enabled: Bool) {
+        keepAppActiveEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "keepAppActive")
+        
+        logInfo("📱 Keep App Active setting changed to: \(enabled ? "ENABLED" : "DISABLED")", category: "Lifecycle")
+        
+        // Update idle timer immediately
+        updateIdleTimerState()
+    }
     
     /// Update the current scene phase
     /// Called from the app's root view when scenePhase changes
@@ -83,17 +105,37 @@ final class AppLifecycleManager {
         case (_, .background):
             // App went to background - pause everything
             logInfo("🔋 PAUSING all timers and updates (background)", category: "Lifecycle")
+            updateIdleTimerState()
             
         case (.background, .active):
             // App returned to foreground - resume everything
             logInfo("🔋 RESUMING all timers and updates (foreground)", category: "Lifecycle")
+            updateIdleTimerState()
             
         case (.inactive, .active):
             // Returned from inactive (e.g., Control Center closed)
             logInfo("🔋 App returned to active from inactive", category: "Lifecycle")
+            updateIdleTimerState()
             
         default:
             break
         }
+    }
+    
+    // MARK: - Idle Timer Management
+    
+    /// Updates the idle timer state based on app phase and user setting
+    private func updateIdleTimerState() {
+        let shouldDisableIdleTimer = isActive && keepAppActiveEnabled
+        
+        #if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = shouldDisableIdleTimer
+        
+        if shouldDisableIdleTimer {
+            logInfo("📱 Idle timer DISABLED - app will stay awake", category: "Lifecycle")
+        } else {
+            logInfo("📱 Idle timer ENABLED - normal auto-lock behavior", category: "Lifecycle")
+        }
+        #endif
     }
 }

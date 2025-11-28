@@ -25,8 +25,9 @@ extension MatchupsHubViewModel {
     
     /// Check if a lineup is optimized (no recommended changes)
     func checkLineupOptimization(for matchup: UnifiedMatchup) async {
-        // Skip optimization check for chopped leagues or eliminated matchups
-        guard !matchup.isChoppedLeague, !matchup.isMyManagerEliminated else {
+        // Skip optimization check only for eliminated matchups
+        // For Chopped leagues that are still alive, we *do* want to run LineupRX as a pure lineup optimizer
+        guard !matchup.isMyManagerEliminated else {
             lineupOptimizationStatus[matchup.id] = true // Treat as "optimized" to show green
             return
         }
