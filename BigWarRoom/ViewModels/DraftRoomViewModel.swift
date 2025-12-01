@@ -51,7 +51,7 @@ final class DraftRoomViewModel {
     // MARK: - Coordinators
     
     private let connectionCoordinator: DraftConnectionCoordinator
-    private let rosterCoordinator: DraftRosterCoordinator
+    private let rosterCoordinator: any DraftRosterCoordinator
     private let suggestionsCoordinator: DraftSuggestionsCoordinator
     
     // MARK: - Forwarded Published Properties (from coordinators)
@@ -180,7 +180,7 @@ final class DraftRoomViewModel {
     
     init(
         connectionCoordinator: DraftConnectionCoordinator? = nil,
-        rosterCoordinator: DraftRosterCoordinator? = nil,
+        rosterCoordinator: (any DraftRosterCoordinator)? = nil,
         suggestionsCoordinator: DraftSuggestionsCoordinator? = nil
     ) {
         // 🔥 FIX: Create coordinators with proper dependencies instead of using empty constructors
@@ -399,7 +399,7 @@ extension DraftRoomViewModel: DraftConnectionCoordinatorDelegate {
 // MARK: - DraftRosterCoordinatorDelegate
 
 extension DraftRoomViewModel: DraftRosterCoordinatorDelegate {
-    func rosterCoordinator(_ coordinator: DraftRosterCoordinator, didUpdateRoster roster: Roster) {
+    func rosterCoordinator(_ coordinator: any DraftRosterCoordinator, didUpdateRoster roster: Roster) {
         AppLogger.info("DraftRoomViewModel: Roster updated with \(totalPlayersInRoster(roster)) players", category: "DraftRoom")
         // Trigger suggestions refresh after roster update
         Task {
@@ -408,7 +408,7 @@ extension DraftRoomViewModel: DraftRosterCoordinatorDelegate {
         // 🔥 PHASE 3: No need for objectWillChange.send() with @Observable
     }
     
-    func rosterCoordinatorTeamCount(_ coordinator: DraftRosterCoordinator) -> Int {
+    func rosterCoordinatorTeamCount(_ coordinator: any DraftRosterCoordinator) -> Int {
         return currentDraftTeamCount
     }
     

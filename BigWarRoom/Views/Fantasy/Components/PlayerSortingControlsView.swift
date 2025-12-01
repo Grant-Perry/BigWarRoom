@@ -90,8 +90,8 @@ struct PlayerSortingControlsView: View {
 // MARK: - Preview
 
 #Preview {
-    @State var sortMethod: MatchupSortingMethod = .position
-    @State var sortHigh = false
+    @Previewable @State var sortMethod: MatchupSortingMethod = .position
+    @Previewable @State var sortHigh = false
     
     return VStack(spacing: 20) {
         PlayerSortingControlsView(

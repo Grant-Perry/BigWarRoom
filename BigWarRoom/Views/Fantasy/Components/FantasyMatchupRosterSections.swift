@@ -551,6 +551,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     let highToLow: Bool
     let selectedPosition: FantasyPosition
     let showActiveOnly: Bool
+    let showYetToPlayOnly: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -648,7 +649,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         
         // Step 2: Apply position filter
         if selectedPosition != .all {
-            let beforeCount = filteredPlayers.count
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
                 let filterPosition = selectedPosition.rawValue.uppercased()
@@ -664,7 +664,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         
         // Step 3: Apply active only filter
         if showActiveOnly {
-            let beforeCount = filteredPlayers.count
             filteredPlayers = filteredPlayers.filter { player in
                 // "Active" means player's team is currently in a LIVE game
                 guard let playerTeam = player.team else {
@@ -681,7 +680,17 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        // Step 4: Apply sorting
+        // Step 4: Apply "Yet to Play" filter
+        if showYetToPlayOnly {
+            filteredPlayers = filteredPlayers.filter { player in
+                GameStatusService.shared.isPlayerYetToPlay(
+                    playerTeam: player.team,
+                    currentPoints: player.currentPoints
+                )
+            }
+        }
+        
+        // Step 5: Apply sorting
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:
@@ -743,6 +752,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
     let highToLow: Bool
     let selectedPosition: FantasyPosition
     let showActiveOnly: Bool
+    let showYetToPlayOnly: Bool
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -831,7 +841,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
         
         // Step 2: Apply position filter
         if selectedPosition != .all {
-            let beforeCount = filteredPlayers.count
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
                 let filterPosition = selectedPosition.rawValue.uppercased()
@@ -847,7 +856,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
         
         // Step 3: Apply active only filter
         if showActiveOnly {
-            let beforeCount = filteredPlayers.count
             filteredPlayers = filteredPlayers.filter { player in
                 // "Active" means player's team is currently in a LIVE game
                 guard let playerTeam = player.team else { return false }
@@ -862,7 +870,17 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        // Step 4: Apply sorting
+        // Step 4: Apply "Yet to Play" filter
+        if showYetToPlayOnly {
+            filteredPlayers = filteredPlayers.filter { player in
+                GameStatusService.shared.isPlayerYetToPlay(
+                    playerTeam: player.team,
+                    currentPoints: player.currentPoints
+                )
+            }
+        }
+        
+        // Step 5: Apply sorting
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:

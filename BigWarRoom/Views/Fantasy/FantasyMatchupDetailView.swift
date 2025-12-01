@@ -30,6 +30,7 @@ struct FantasyMatchupDetailView: View {
     @State private var selectedPosition: FantasyPosition = .all
     @State private var showActiveOnly: Bool = false
     @State private var showRosteredOnly: Bool = false
+    @State private var showYetToPlayOnly: Bool = false
 
     // MARK: - Initializers
 
@@ -116,7 +117,9 @@ struct FantasyMatchupDetailView: View {
                 },
                 selectedPosition: $selectedPosition,
                 showActiveOnly: $showActiveOnly,
-                watchService: PlayerWatchService(weekManager: WeekSelectionManager.shared, allLivePlayersViewModel: livePlayersViewModel) // 🔥 PHASE 3 DI: Create instance
+                showYetToPlayOnly: $showYetToPlayOnly,
+                watchService: PlayerWatchService(weekManager: WeekSelectionManager.shared, allLivePlayersViewModel: livePlayersViewModel), // 🔥 PHASE 3 DI: Create instance
+                gameStatusService: GameStatusService.shared
             )
             .padding(.horizontal, 16)
             .padding(.top, 8)
@@ -154,7 +157,8 @@ struct FantasyMatchupDetailView: View {
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
                         selectedPosition: selectedPosition,
-                        showActiveOnly: showActiveOnly
+                        showActiveOnly: showActiveOnly,
+                        showYetToPlayOnly: showYetToPlayOnly
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
@@ -163,7 +167,8 @@ struct FantasyMatchupDetailView: View {
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
                         selectedPosition: selectedPosition,
-                        showActiveOnly: showActiveOnly
+                        showActiveOnly: showActiveOnly,
+                        showYetToPlayOnly: showYetToPlayOnly
                     )
                 } else {
                     // Fallback content when no view model is available

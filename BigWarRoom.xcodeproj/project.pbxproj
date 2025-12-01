@@ -287,7 +287,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.85.10;
+				MARKETING_VERSION = 8.80.05;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -323,7 +323,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.85.10;
+				MARKETING_VERSION = 8.80.05;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

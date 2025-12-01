@@ -19,7 +19,7 @@ extension AllLivePlayersViewModel {
         DebugPrint(mode: .liveUpdate2, "  - Has myTeamRanking: \(matchup.myTeamRanking != nil)")
 
         // Regular matchups - extract from MY team only
-        if let fantasyMatchup = matchup.fantasyMatchup {
+        if matchup.fantasyMatchup != nil {
             DebugPrint(mode: .liveUpdate2, "📊 REGULAR LEAGUE: \(matchup.league.league.name)")
             if let myTeam = matchup.myTeam {
                 let myStarters = myTeam.roster.filter { $0.isStarter }
@@ -62,9 +62,10 @@ extension AllLivePlayersViewModel {
             
             // 🔥 FILTER OUT ELIMINATED TEAMS: Skip chopped leagues where you have no real players
             let validPlayers = myTeamStarters.filter { player in
-                // Consider a player "valid" if they have a real name (not empty)
+                // Consider a player "valid" if they have a real name and non-empty, non-FLEX position
                 let hasValidName = !player.fullName.trimmingCharacters(in: .whitespaces).isEmpty
-                let hasValidPosition = player.position != nil && player.position != "FLEX"
+                let positionTrimmed = player.position.trimmingCharacters(in: .whitespaces)
+                let hasValidPosition = !positionTrimmed.isEmpty && positionTrimmed != "FLEX"
                 return hasValidName || hasValidPosition
             }
             

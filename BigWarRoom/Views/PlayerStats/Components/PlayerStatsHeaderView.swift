@@ -355,27 +355,4 @@ struct PlayerStatsHeaderView: View {
     }
 }
 
-#Preview {
-    let mockPlayerData = """
-    {
-        "player_id": "123",
-        "first_name": "Jared",
-        "last_name": "Goff",
-        "position": "QB",
-        "team": "DET",
-        "espn_id": "3046779",
-        "number": 16,
-        "age": 30,
-        "height": "76",
-        "weight": 217,
-        "years_exp": 9,
-        "college": "California"
-    }
-    """.data(using: .utf8)!
-    
-    let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
-    
-    // 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
-    // TODO: Create proper mock instances for preview
-    Text("Preview disabled - dependency injection required")
-}
+

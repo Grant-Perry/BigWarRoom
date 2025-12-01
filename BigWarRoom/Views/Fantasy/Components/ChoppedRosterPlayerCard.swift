@@ -553,8 +553,8 @@ struct ChoppedRosterPlayerCard: View {
     // MARK: - Score Breakdown Methods (keeping existing implementation)
     
     private func createScoreBreakdown() -> PlayerScoreBreakdown? {
-        guard let sleeperPlayer = viewModel.sleeperPlayer else { return nil }
-        
+        guard viewModel.sleeperPlayer != nil else { return nil }
+
         let rosterWeek = viewModel.getCurrentWeek()
         let authoritativeScore = viewModel.actualPoints ?? 0.0
         

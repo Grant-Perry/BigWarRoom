@@ -100,11 +100,11 @@ struct ThreatMatrixCard: View {
 				  }
 			   }
 
-				  // Opponent name - Handle chopped leagues
+           // Opponent manager name (who I'm facing) – highlight in gpBluePitch
            if let opponentTeam = intelligence.opponentTeam {
                Text(opponentTeam.ownerName)
-                   .font(.system(size: 16, weight: .semibold))
-                   .foregroundColor(.white)
+                   .font(.system(size: 14, weight: .semibold))
+                   .foregroundColor(.gpBluePitch)
                    .lineLimit(1)
            } else {
                Text("ELIMINATION THREAT")

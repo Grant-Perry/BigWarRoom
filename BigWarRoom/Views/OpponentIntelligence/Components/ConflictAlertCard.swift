@@ -120,10 +120,20 @@ struct ConflictAlertCard: View {
                             .foregroundColor(.red)
                         
                         ForEach(conflict.opponentLeagues.prefix(2)) { league in
-                            Text(league.name)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.red.opacity(0.8))
-                                .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(league.name)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.red.opacity(0.8))
+                                    .lineLimit(1)
+                                
+                                // Manager I'm facing in this league, in gpBluePitch
+                                if let managerName = league.opponentName, !managerName.isEmpty {
+                                    Text(managerName)
+                                        .font(.system(size: 9, weight: .semibold))
+                                        .foregroundColor(.gpBluePitch)
+                                        .lineLimit(1)
+                                }
+                            }
                         }
                     }
                 }

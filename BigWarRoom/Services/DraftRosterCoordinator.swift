@@ -421,6 +421,6 @@ final class DefaultDraftRosterCoordinator: DraftRosterCoordinator {
 
 @MainActor
 protocol DraftRosterCoordinatorDelegate: AnyObject {
-    func rosterCoordinator(_ coordinator: DraftRosterCoordinator, didUpdateRoster roster: Roster)
-    func rosterCoordinatorTeamCount(_ coordinator: DraftRosterCoordinator) -> Int
+    func rosterCoordinator(_ coordinator: any DraftRosterCoordinator, didUpdateRoster roster: Roster)
+    func rosterCoordinatorTeamCount(_ coordinator: any DraftRosterCoordinator) -> Int
 }

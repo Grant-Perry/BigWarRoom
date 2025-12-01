@@ -26,6 +26,7 @@ struct FantasyDetailHeaderView: View {
     // NEW: Bound filter states (connected to parent)
     @Binding var selectedPosition: FantasyPosition
     @Binding var showActiveOnly: Bool
+    @Binding var showYetToPlayOnly: Bool
     @FocusState private var isSearchFocused: Bool
     
     // 👁️ NEW: Watched Players Sheet state
@@ -49,6 +50,7 @@ struct FantasyDetailHeaderView: View {
         onSortDirectionChanged: @escaping () -> Void,
         selectedPosition: Binding<FantasyPosition>,
         showActiveOnly: Binding<Bool>,
+        showYetToPlayOnly: Binding<Bool>,
         watchService: PlayerWatchService,
         gameStatusService: GameStatusService? = nil
     ) {
@@ -63,6 +65,7 @@ struct FantasyDetailHeaderView: View {
         self.onSortDirectionChanged = onSortDirectionChanged
         self._selectedPosition = selectedPosition
         self._showActiveOnly = showActiveOnly
+        self._showYetToPlayOnly = showYetToPlayOnly
         self._watchService = State(initialValue: watchService)
         self.gameStatusService = gameStatusService
     }
@@ -477,7 +480,33 @@ struct FantasyDetailHeaderView: View {
             .buttonStyle(PlainButtonStyle())
             
             Spacer()
+            
+            // Yet to Play toggle
+            Button(action: {
+                showYetToPlayOnly.toggle()
+            }) {
+                VStack(spacing: 2) {
+                    Text(showYetToPlayOnly ? "Only" : "All")
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundColor(showYetToPlayOnly ? .gpYellow : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    
+                    Text("Yet to Play")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+                // Keep width stable so header card doesn't grow/shrink when text changes
+                .frame(width: 72)
+            }
+            .buttonStyle(PlainButtonStyle())
         }
+        // Lock row height so toggles don't cause subtle vertical size changes
+        .frame(height: 52)
         .padding(.horizontal, 20)
         .padding(.top, 16)
         .padding(.bottom, 8)
