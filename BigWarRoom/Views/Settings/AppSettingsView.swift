@@ -13,6 +13,9 @@ struct AppSettingsView: View {
     @State private var connectionSuccessMessage = ""
     @State private var nflWeekService = NFLWeekService.shared
     
+    // 🎨 WOODY'S REDESIGN TOGGLE
+    @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
+    
     var body: some View {
         NavigationView {
             List {
@@ -258,6 +261,28 @@ struct AppSettingsView: View {
                             .onChange(of: viewModel.showEliminatedChoppedLeagues) { _, newValue in
                                 viewModel.updateShowEliminatedChoppedLeagues(newValue)
                             }
+                    }
+                    
+                    // 🎯 MODERN SPORTS APP DESIGN TOGGLE
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(.gpYellow)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Modern Player Card Design")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("Thin, horizontal layout inspired by ESPN/Sleeper")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $useRedesignedCards)
+                            .labelsHidden()
                     }
                     
                     // 💊 RX: Lineup Optimization Threshold

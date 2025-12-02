@@ -22,6 +22,9 @@ struct PlayerScoreBarCardView: View {
     @State private var cardOffset: Double = 50.0
     @State private var cardOpacity: Double = 0.0
     
+    // 🎨 WOODY'S REDESIGN TOGGLE
+    @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
+    
     private let maxScoreBarWidth: Double = 120.0 // Maximum width in points
     private let cardHeight: Double = 110.0 // Increased card height to accommodate stats at bottom (was 95.0)
     private let scoreBarHeight: Double = 20.0 // Shorter score bar (was 23.3)
@@ -87,16 +90,33 @@ struct PlayerScoreBarCardView: View {
     
     // 🔥 DEATH TO SHEETS: Extract card content to reusable computed property
     private var cardContent: some View {
-        PlayerScoreBarCardContentView(
-            playerEntry: playerEntry,
-            scoreBarWidth: scoreBarWidth,
-            cardHeight: cardHeight,
-            formattedPlayerName: formattedPlayerName,
-            playerScoreColor: playerScoreColor,
-            viewModel: viewModel,
-            watchService: watchService,
-            playerDirectory: viewModel.playerDirectory // 🔥 PHASE 3 DI: Pass playerDirectory from viewModel
-        )
+        Group {
+            if useRedesignedCards {
+                // 🎯 MODERN SPORTS APP DESIGN - Inspired by ESPN, Sleeper, Nike Run Club
+                PlayerScoreBarCardContentView_Modern(
+                    playerEntry: playerEntry,
+                    scoreBarWidth: scoreBarWidth,
+                    cardHeight: 70, // Thin card for modern design
+                    formattedPlayerName: formattedPlayerName,
+                    playerScoreColor: playerScoreColor,
+                    viewModel: viewModel,
+                    watchService: watchService,
+                    playerDirectory: viewModel.playerDirectory
+                )
+            } else {
+                // Original design
+                PlayerScoreBarCardContentView(
+                    playerEntry: playerEntry,
+                    scoreBarWidth: scoreBarWidth,
+                    cardHeight: cardHeight,
+                    formattedPlayerName: formattedPlayerName,
+                    playerScoreColor: playerScoreColor,
+                    viewModel: viewModel,
+                    watchService: watchService,
+                    playerDirectory: viewModel.playerDirectory
+                )
+            }
+        }
     }
     
     // MARK: - Computed Properties (DATA ONLY - No Views)

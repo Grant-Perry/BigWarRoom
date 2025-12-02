@@ -85,39 +85,36 @@ struct PlayerScoreBarCardContentView: View {
                         
                         // Player name moved to top (no position badge here)
                         Text(formattedPlayerName)
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.primary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .minimumScaleFactor(0.75)
+							.padding(.top, 15)
                     }
                     
-                    // League + matchup delta + position
-                    VStack(alignment: .trailing, spacing: 2) {
-                        HStack(spacing: 6) {
-                            Spacer()
-                            
-                            // League banner with matchup delta stacked beneath
-                            VStack(alignment: .trailing, spacing: 1) {
-                                PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
-                                
-                                if let matchupText = matchupDeltaText {
-                                    Text(matchupText)
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(matchupDeltaColor)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.8)
-                                        .fixedSize(horizontal: true, vertical: false)
-                                        .offset(y: -5) // tuck under league name
-                                }
-                            }
+                    // League banner
+                    HStack(spacing: 6) {
+                        Spacer()
+                        PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
+                    }
+                    
+                    // Matchup delta + Position badge row
+                    HStack(spacing: 6) {
+                        Spacer()
+                        
+                        // Matchup delta on leading side of position
+                        if let matchupText = matchupDeltaText {
+                            Text(matchupText)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(matchupDeltaColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .fixedSize(horizontal: true, vertical: false)
                         }
                         
-                        // Position badge aligned to the right of league/delta
-                        HStack {
-                            Spacer()
-                            PlayerScoreBarCardPositionBadgeView(playerEntry: playerEntry)
-                        }
+                        PlayerScoreBarCardPositionBadgeView(playerEntry: playerEntry)
                     }
+                    .offset(y: -1)
                     
                     Spacer() // Push score to bottom of this section
                     
@@ -157,19 +154,18 @@ struct PlayerScoreBarCardContentView: View {
                                 Task { await presentScoreBreakdown() }
                             }) {
                                 VStack(spacing: 2) {
-                                    HStack(spacing: 4) {
-                                        Text(playerEntry.currentScoreString)
-                                            .font(.callout)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(playerScoreColor)
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.3)
-                                        
-                                        Text("pts")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.3)
+                                HStack(spacing: 4) {
+                                    Text(playerEntry.currentScoreString)
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(playerScoreColor)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.9)
+
+                                    Text("pts")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.3)
                                     }
                                     
                                     // Per‑player delta since last update, small and gpGreen
