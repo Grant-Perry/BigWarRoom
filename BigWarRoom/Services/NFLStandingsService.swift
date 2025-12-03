@@ -119,7 +119,7 @@ final class NFLStandingsService {
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration,
            !teamRecords.isEmpty {
-            print("🏈 Using cached team records")
+            DebugPrint(mode: .espnAPI, "🏈 Using cached team records")
             return
         }
         
@@ -134,7 +134,7 @@ final class NFLStandingsService {
                 self.errorMessage = nil
             }
             
-            print("🏈 Fetching NFL team records from ESPN API...")
+            DebugPrint(mode: .espnAPI, "🏈 Fetching NFL team records from ESPN API...")
             
             // Fetch records for all teams simultaneously using async/await
             await withTaskGroup(of: (String, NFLTeamRecord?).self) { group in
@@ -157,9 +157,9 @@ final class NFLStandingsService {
                     self.teamRecords = newTeamRecords
                     self.cacheTimestamp = Date()
                     
-                    print("🏈 Successfully fetched \(newTeamRecords.count) team records")
+                    DebugPrint(mode: .espnAPI, "🏈 Successfully fetched \(newTeamRecords.count) team records")
                     for record in newTeamRecords.values.sorted(by: { $0.teamCode < $1.teamCode }) {
-                        print("🏈 \(record.teamCode): \(record.displayRecord)")
+                        DebugPrint(mode: .espnAPI, "🏈 \(record.teamCode): \(record.displayRecord)")
                     }
                 }
             }
@@ -178,7 +178,7 @@ final class NFLStandingsService {
             let record = processTeamRecord(response, teamCode: teamCode)
             return (teamCode, record)
         } catch {
-            print("🏈 Error fetching record for \(teamCode): \(error)")
+            DebugPrint(mode: .espnAPI, "🏈 Error fetching record for \(teamCode): \(error)")
             return (teamCode, nil)
         }
     }
@@ -187,7 +187,7 @@ final class NFLStandingsService {
     private func processTeamRecord(_ response: NFLTeamRecordResponse, teamCode: String) -> NFLTeamRecord? {
         // Find the "total" record type
         guard let totalRecord = response.team.record.items.first(where: { $0.type == "total" }) else {
-            print("🏈 No total record found for \(teamCode)")
+            DebugPrint(mode: .espnAPI, "🏈 No total record found for \(teamCode)")
             return nil
         }
         

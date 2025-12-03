@@ -136,11 +136,11 @@ final class FantasyViewModel {
                 // Check if WeekSelectionManager's selectedWeek changed
                 let currentWeek = weekManager.selectedWeek
                 if currentWeek != lastObservedWeek {
-                    print("📊 FantasyViewModel \(instanceID): Week changed to \(currentWeek), refreshing data...")
+                    DebugPrint(mode: .weekCheck, "📊 FantasyViewModel \(instanceID): Week changed to \(currentWeek), refreshing data...")
                     
                     // Prevent cascading refreshes
                     guard !isRefreshing else {
-                        print("📊 FantasyViewModel \(instanceID): Skipping refresh - already refreshing")
+                        DebugPrint(mode: .weekCheck, "📊 FantasyViewModel \(instanceID): Skipping refresh - already refreshing")
                         lastObservedWeek = currentWeek
                         try? await Task.sleep(for: .seconds(1))
                         continue
@@ -352,29 +352,29 @@ final class FantasyViewModel {
     
     /// Convert ESPN scoring settings to format usable by ScoreBreakdownFactory
     func getESPNScoringSettings() -> [String: Double]? {
-        print("🐛 DEBUG: getESPNScoringSettings called")
+        DebugPrint(mode: .espnAPI, "🐛 DEBUG: getESPNScoringSettings called")
         
         // 🔥 FIX: If currentESPNLeague is nil, try to fetch it from the selected league
         if currentESPNLeague == nil, let league = selectedLeague, league.source == .espn {
-            print("🐛 DEBUG: currentESPNLeague is nil, attempting to fetch ESPN league data")
+            DebugPrint(mode: .espnAPI, "🐛 DEBUG: currentESPNLeague is nil, attempting to fetch ESPN league data")
             Task {
                 do {
                     let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
                     await MainActor.run {
                         self.currentESPNLeague = espnLeague
-                        print("🐛 DEBUG: Successfully fetched and stored ESPN league data")
+                        DebugPrint(mode: .espnAPI, "🐛 DEBUG: Successfully fetched and stored ESPN league data")
                     }
                 } catch {
-                    print("🐛 DEBUG: Failed to fetch ESPN league data: \(error)")
+                    DebugPrint(mode: .espnAPI, "🐛 DEBUG: Failed to fetch ESPN league data: \(error)")
                 }
             }
             // For now, return nil since the fetch is async
-            print("🐛 DEBUG: Initiated async fetch, returning nil for now")
+            DebugPrint(mode: .espnAPI, "🐛 DEBUG: Initiated async fetch, returning nil for now")
             return nil
         }
         
         guard let espnLeague = currentESPNLeague else {
-            print("🐛 DEBUG: No currentESPNLeague - selectedLeague: \(selectedLeague?.source.rawValue ?? "nil")")
+            DebugPrint(mode: .espnAPI, "🐛 DEBUG: No currentESPNLeague - selectedLeague: \(selectedLeague?.source.rawValue ?? "nil")")
             return nil
         }
         

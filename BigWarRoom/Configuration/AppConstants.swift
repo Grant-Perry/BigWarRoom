@@ -124,7 +124,7 @@ struct AppConstants {
         for key in keysToRemove {
             if let data = UserDefaults.standard.data(forKey: key) {
                 totalSizeFreed += data.count
-                print("🚨 CLEANUP: Removing corrupted UserDefaults key: \(key) (\(data.count) bytes)")
+                DebugPrint(mode: .general, "🚨 CLEANUP: Removing corrupted UserDefaults key: \(key) (\(data.count) bytes)")
                 UserDefaults.standard.removeObject(forKey: key)
             }
         }
@@ -135,9 +135,9 @@ struct AppConstants {
         if totalSizeFreed > 0 {
             let sizeKB = Double(totalSizeFreed) / 1024.0
             let sizeMB = sizeKB / 1024.0
-            print("🚨 CLEANUP: UserDefaults cleanup complete - freed \(String(format: "%.2f", sizeMB)) MB")
+            DebugPrint(mode: .general, "🚨 CLEANUP: UserDefaults cleanup complete - freed \(String(format: "%.2f", sizeMB)) MB")
         } else {
-            print("🚨 CLEANUP: No corrupted UserDefaults data found")
+            DebugPrint(mode: .general, "🚨 CLEANUP: No corrupted UserDefaults data found")
         }
     }
 

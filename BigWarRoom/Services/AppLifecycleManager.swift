@@ -40,8 +40,8 @@ final class AppLifecycleManager {
         // Load keep app active setting
         keepAppActiveEnabled = UserDefaults.standard.object(forKey: "keepAppActive") as? Bool ?? true
         
-        logInfo("🔋 AppLifecycleManager initialized", category: "Lifecycle")
-        logInfo("📱 Keep App Active: \(keepAppActiveEnabled ? "ENABLED" : "DISABLED")", category: "Lifecycle")
+        DebugPrint(mode: .lifecycle, "🔋 AppLifecycleManager initialized")
+        DebugPrint(mode: .lifecycle, "📱 Keep App Active: \(keepAppActiveEnabled ? "ENABLED" : "DISABLED")")
         
         // Set initial idle timer state
         updateIdleTimerState()
@@ -55,7 +55,7 @@ final class AppLifecycleManager {
         keepAppActiveEnabled = enabled
         UserDefaults.standard.set(enabled, forKey: "keepAppActive")
         
-        logInfo("📱 Keep App Active setting changed to: \(enabled ? "ENABLED" : "DISABLED")", category: "Lifecycle")
+        DebugPrint(mode: .lifecycle, "📱 Keep App Active setting changed to: \(enabled ? "ENABLED" : "DISABLED")")
         
         // Update idle timer immediately
         updateIdleTimerState()
@@ -84,7 +84,7 @@ final class AppLifecycleManager {
         let oldState = phaseDescription(oldPhase)
         let newState = phaseDescription(newPhase)
         
-        logInfo("🔋 App lifecycle changed: \(oldState) → \(newState)", category: "Lifecycle")
+        DebugPrint(mode: .lifecycle, "🔋 App lifecycle changed: \(oldState) → \(newState)")
     }
     
     private func phaseDescription(_ phase: ScenePhase) -> String {
@@ -104,17 +104,17 @@ final class AppLifecycleManager {
         switch (oldPhase, newPhase) {
         case (_, .background):
             // App went to background - pause everything
-            logInfo("🔋 PAUSING all timers and updates (background)", category: "Lifecycle")
+            DebugPrint(mode: .lifecycle, "🔋 PAUSING all timers and updates (background)")
             updateIdleTimerState()
             
         case (.background, .active):
             // App returned to foreground - resume everything
-            logInfo("🔋 RESUMING all timers and updates (foreground)", category: "Lifecycle")
+            DebugPrint(mode: .lifecycle, "🔋 RESUMING all timers and updates (foreground)")
             updateIdleTimerState()
             
         case (.inactive, .active):
             // Returned from inactive (e.g., Control Center closed)
-            logInfo("🔋 App returned to active from inactive", category: "Lifecycle")
+            DebugPrint(mode: .lifecycle, "🔋 App returned to active from inactive")
             updateIdleTimerState()
             
         default:
@@ -132,9 +132,9 @@ final class AppLifecycleManager {
         UIApplication.shared.isIdleTimerDisabled = shouldDisableIdleTimer
         
         if shouldDisableIdleTimer {
-            logInfo("📱 Idle timer DISABLED - app will stay awake", category: "Lifecycle")
+            DebugPrint(mode: .lifecycle, "📱 Idle timer DISABLED - app will stay awake")
         } else {
-            logInfo("📱 Idle timer ENABLED - normal auto-lock behavior", category: "Lifecycle")
+            DebugPrint(mode: .lifecycle, "📱 Idle timer ENABLED - normal auto-lock behavior")
         }
         #endif
     }

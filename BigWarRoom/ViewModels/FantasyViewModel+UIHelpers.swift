@@ -52,10 +52,10 @@ extension FantasyViewModel {
                             if player.fullName.contains("Daniel Jones") {
                                 if let staleScore = player.currentPoints,
                                    abs(freshPlayer.currentPoints ?? 0.0 - staleScore) > 0.01 {
-                                    print("🎯 FANTASY CORRECTED SCORE: \(player.fullName)")
-                                    print("   Stale Score: \(staleScore)")
-                                    print("   Fresh Score: \(freshPlayer.currentPoints ?? 0.0)")
-                                    print("   Using fresh score from cached matchup")
+                                    DebugPrint(mode: .espnAPI, "🎯 FANTASY CORRECTED SCORE: \(player.fullName)")
+                                    DebugPrint(mode: .espnAPI, "   Stale Score: \(staleScore)")
+                                    DebugPrint(mode: .espnAPI, "   Fresh Score: \(freshPlayer.currentPoints ?? 0.0)")
+                                    DebugPrint(mode: .espnAPI, "   Using fresh score from cached matchup")
                                 }
                             }
                             
@@ -71,10 +71,10 @@ extension FantasyViewModel {
                 
                 // 🔥 DEBUG: Log when we're using calculated vs cached scores
                 if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
-                    print("🎯 SLEEPER CORRECTED SCORE: \(player.fullName)")
-                    print("   Cached Score: \(cachedScore)")
-                    print("   Calculated Score: \(calculatedScore)")
-                    print("   Using calculated score from cached provider")
+                    DebugPrint(mode: .sleeperAPI, "🎯 SLEEPER CORRECTED SCORE: \(player.fullName)")
+                    DebugPrint(mode: .sleeperAPI, "   Cached Score: \(cachedScore)")
+                    DebugPrint(mode: .sleeperAPI, "   Calculated Score: \(calculatedScore)")
+                    DebugPrint(mode: .sleeperAPI, "   Using calculated score from cached provider")
                 }
                 
                 return calculatedScore

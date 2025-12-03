@@ -75,9 +75,9 @@ enum AppLogger {
 }
 
 /// Convenience global functions for cleaner syntax
-func logDebug(_ message: String, category: String = "Debug") {
-    AppLogger.debug(message, category: category)
-}
+//func logDebug(_ message: String, category: String = "Debug") {
+//    AppLogger.debug(message, category: category)
+//}
 
 func logInfo(_ message: String, category: String = "Info") {
     AppLogger.info(message, category: category)

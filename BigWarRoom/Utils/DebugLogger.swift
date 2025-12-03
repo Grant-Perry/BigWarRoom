@@ -184,6 +184,8 @@ struct DebugMode: OptionSet {
     static let liveUpdate2 		  	= DebugMode(rawValue: 1 << 16)  // 65536
     static let waivers            	= DebugMode(rawValue: 1 << 17)  // 131072
     static let weekCheck          	= DebugMode(rawValue: 1 << 18)  // 262144, next free bit!
+    static let lifecycle          	= DebugMode(rawValue: 1 << 19)
+    static let general          	= DebugMode(rawValue: 1 << 20)
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
