@@ -40,7 +40,8 @@ final class AllLivePlayersViewModel {
     // MARK: - UI State
     var sortHighToLow = true
     var sortingMethod: SortingMethod = .score
-    var showActiveOnly: Bool = true // 🔥 DEFAULT: Show only active players on initial load
+    var showActiveOnly: Bool = true // 🔥 SMART DEFAULT: Will be set to false if no live games on initial load
+    var hasAppliedInitialActiveOnlyDefault = false // 🔥 Track if we've applied smart default
     var shouldResetAnimations = false
     var sortChangeID = UUID()
     var lastUpdateTime = Date()

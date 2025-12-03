@@ -162,6 +162,8 @@ struct UnifiedDraftSelectionCard: View {
             return .green.opacity(0.2)
         case .inSeason:
             return .blue.opacity(0.2)
+        case .postSeason:
+            return .purple.opacity(0.2)
         case .complete:
             return .gray.opacity(0.2)
         }
@@ -175,6 +177,8 @@ struct UnifiedDraftSelectionCard: View {
             return .green
         case .inSeason:
             return .blue
+        case .postSeason:
+            return .purple
         case .complete:
             return .gray
         }

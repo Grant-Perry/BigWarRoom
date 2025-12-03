@@ -55,7 +55,7 @@ struct CurrentLineupAnalysisView: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.gpRedPink)
                         
-                        Text("You have players on BYE in your active lineup! They will score 0.0 points.")
+                        Text("You have rostered players on BYE in your active lineup! They will score 0.0 points.")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white)
                     }

@@ -15,8 +15,7 @@ struct ScheduleByeWeekSection: View {
     
     @State private var byeWeekImpacts: [String: ByeWeekImpact] = [:]
     @State private var isLoadingImpacts = false
-    @State private var selectedImpact: (impact: ByeWeekImpact, team: NFLTeam)?
-    @State private var showingImpactSheet = false
+    @State private var selectedImpactItem: ByeWeekImpactItem?  // 🔥 FIX: Use Identifiable item for sheet
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -56,13 +55,48 @@ struct ScheduleByeWeekSection: View {
                     ) {
                         // 🔥 ONLY open sheet if impact exists AND has problems
                         if let impact = byeWeekImpacts[team.id], impact.hasProblem {
-                            selectedImpact = (impact, team)
-                            showingImpactSheet = true
+                            selectedImpactItem = ByeWeekImpactItem(impact: impact, team: team)
                         }
                     }
                 }
             }
             .padding(.horizontal, 20)
+            
+            // Legend explanation
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 16) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.green)
+                        Text("No rostered players affected")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.gpRedPink)
+                        Text("You have rostered players on BYE")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                }
+                
+                HStack(spacing: 3) {
+                    Text("Tap teams with")
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gpRedPink)
+                    Text("to see affected matchups")
+                }
+                .font(.system(size: 10, weight: .regular))
+                .foregroundColor(.white.opacity(0.55))
+                .italic()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
         }
         .padding(.vertical, 16)
         .task {
@@ -73,14 +107,12 @@ struct ScheduleByeWeekSection: View {
                 await analyzeByeWeekImpacts()
             }
         }
-        .sheet(isPresented: $showingImpactSheet) {
-            if let selected = selectedImpact {
-                ByeWeekPlayerImpactSheet(
-                    impact: selected.impact,
-                    teamName: selected.team.fullName,
-                    teamCode: selected.team.id
-                )
-            }
+        .sheet(item: $selectedImpactItem) { item in
+            ByeWeekPlayerImpactSheet(
+                impact: item.impact,
+                teamName: item.team.fullName,
+                teamCode: item.team.id
+            )
         }
     }
     
@@ -207,6 +239,13 @@ struct ScheduleByeTeamCell: View {
         
         return impact.hasProblem ? 2 : 1
     }
+}
+
+// MARK: - Identifiable wrapper for sheet presentation
+struct ByeWeekImpactItem: Identifiable {
+    let id = UUID()
+    let impact: ByeWeekImpact
+    let team: NFLTeam
 }
 
 #Preview("Schedule Bye Week Section") {

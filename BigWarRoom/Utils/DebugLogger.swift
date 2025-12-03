@@ -11,7 +11,7 @@ enum DebugLogger {
     private static let isDebugEnabled = false
 
     /// Specific debug categories - can be toggled independently
-    private static let debugCategories: Set<DebugCategory> = [.fantasy] // just add the DebugCategory you want to add .api or many [.api, .scoring, .ui]
+    private static let debugCategories: Set<DebugCategory> = [] // just add the DebugCategory you want to add .api or many [.api, .scoring, .ui]
 
     // MARK: - Debug Categories
     enum DebugCategory: String, CaseIterable {
@@ -222,7 +222,7 @@ enum DebugConfig {
     /// - `.globalRefresh` - Only global refresh logs
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
-	/// Current: Week checking and waiver wire debugging enabled
+	/// Current: Disabled (set to [] for production)
     static var activeMode: DebugMode = []
 
     /// Reset all iteration counters (useful for testing)

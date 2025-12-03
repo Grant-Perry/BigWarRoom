@@ -81,14 +81,14 @@ struct AllLivePlayersView: View {
 //            speed: 0.8,
 //            baseColors: [.gpBlue, .gpGreen, .purple]
 //        )
-        .navigationTitle("All Rostered Players")
+        .navigationTitle(allLivePlayersViewModel.showActiveOnly ? "All Rostered Players - LIVE" : "All Rostered Players")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                Text("All Rostered Players")
+                Text(allLivePlayersViewModel.showActiveOnly ? "All Rostered Players - LIVE" : "All Rostered Players")
                     .font(.headline)
                     .foregroundColor(.primary)
-                    .notificationBadge(count: allLivePlayersViewModel.filteredPlayers.count, xOffset: 28, yOffset: -8)
+                    .notificationBadge(count: allLivePlayersViewModel.filteredPlayers.count, xOffset: allLivePlayersViewModel.showActiveOnly ? 55 : 28, yOffset: -8)
             }
         }
         .refreshable {

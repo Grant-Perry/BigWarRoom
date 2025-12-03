@@ -169,11 +169,27 @@ struct NFLScheduleView: View {
                 
                 Spacer()
                 
-                // Week picker - now uses Mission Control's WeekPickerView
+                // Week picker - styled like Live Players
                 Button(action: { showingWeekPicker = true }) {
-                    Text("Week \(WeekSelectionManager.shared.selectedWeek)")
-                        .font(.subheadline)
-                        .foregroundColor(.gpPostBot)
+                    HStack(spacing: 6) {
+                        Text("WEEK \(WeekSelectionManager.shared.selectedWeek)")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.blue)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.blue.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
+                            )
+                    )
                 }
                 .buttonStyle(PlainButtonStyle())
             }

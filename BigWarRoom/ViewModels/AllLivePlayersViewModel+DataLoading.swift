@@ -55,6 +55,19 @@ extension AllLivePlayersViewModel {
             dataState = allPlayers.isEmpty ? .empty : .loaded
             isLoading = false
             
+            // 🔥 SMART DEFAULT: On initial load, check if there are live games
+            // If no live games (e.g., Wednesday), default Active Only to NO
+            if !hasAppliedInitialActiveOnlyDefault {
+                hasAppliedInitialActiveOnlyDefault = true
+                if !hasAnyLiveGames {
+                    DebugPrint(mode: .liveUpdates, "📅 SMART DEFAULT: No live games detected - setting Active Only to NO")
+                    showActiveOnly = false
+                    applyPositionFilter() // Re-apply filters with new setting
+                } else {
+                    DebugPrint(mode: .liveUpdates, "🏈 SMART DEFAULT: Live games detected - keeping Active Only YES")
+                }
+            }
+            
         } catch {
             errorMessage = "Failed to load players: \(error.localizedDescription)"
             dataState = .error(error.localizedDescription)

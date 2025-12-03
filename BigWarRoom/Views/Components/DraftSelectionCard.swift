@@ -18,6 +18,7 @@ struct DraftSelectionCard: View {
         case .drafting: return .green
         case .preDraft: return .orange
         case .inSeason: return .blue
+        case .postSeason: return .purple
         case .complete: return .gray
         }
     }
@@ -27,6 +28,7 @@ struct DraftSelectionCard: View {
         case .drafting: return "🔴"
         case .preDraft: return "⏰"
         case .inSeason: return "🏈"
+        case .postSeason: return "🏆"
         case .complete: return "✅"
         }
     }

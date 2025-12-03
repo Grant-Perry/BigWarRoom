@@ -26,20 +26,32 @@ struct FeaturesView: View {
         FeatureData(
             icon: "arrow.left.arrow.right", iconColor: .blue,
             title: "Start/Sit Analyzer",
-            description: "Compare two players side-by-side with stats, projections, opponent matchup info, and performance trends. Search or paste player names to see who has the better matchup.",
+            description: "Compare two players side-by-side with detailed stats, projections, opponent matchup info, and performance trends. Search or paste player names to see who has the better matchup. Shows OPRK rankings, injury status, and game times for informed decisions.",
             badge: nil
         ),
         FeatureData(
             icon: "chart.bar.fill", iconColor: .gpGreen,
             title: "All Live Players",
-            description: "View every rostered player across all your leagues with live scoring updates. Filter by active only, position, search by player name (in your league or entire NFL), sort by score/name/team. Shows performance tiers and which leagues each player is in.",
-            badge: nil
+            description: "View every rostered player across all your leagues with live scoring. Shows score deltas (points gained since last update), matchup differentials (+/- vs opponent), and performance tiers. Smart default: automatically shows all players on non-game days, active only during games.",
+            badge: "NEW"
+        ),
+        FeatureData(
+            icon: "rectangle.stack.fill", iconColor: .cyan,
+            title: "Modern Player Cards",
+            description: "Optional redesigned player cards with a sleek horizontal layout. Toggle in Settings → Modern Player Card Design. Features floating badges for game status, matchup delta, and injury info with ultra-minimal aesthetics.",
+            badge: "NEW"
         ),
         FeatureData(
             icon: "calendar.circle.fill", iconColor: .blue,
             title: "NFL Schedule",
-            description: "View the full NFL schedule for any week with live scores, game status, team logos, and betting lines. Shows which teams are in active games and final scores for completed games. Tap a game to see team rosters and depth charts.",
+            description: "View the full NFL schedule for any week with live scores, game status, team logos, and records. Shows which teams are in active games and final scores for completed games. Tap a game to see team rosters and depth charts.",
             badge: nil
+        ),
+        FeatureData(
+            icon: "bed.double.fill", iconColor: .orange,
+            title: "BYE Week Roster Alerts",
+            description: "Schedule tab shows teams on BYE with visual indicators for your rostered players. Green checkmark = no rostered players affected. Red X = you have rostered players on that team who need attention. Quickly identify lineup holes.",
+            badge: "NEW"
         ),
         FeatureData(
             icon: "person.text.rectangle.fill", iconColor: .cyan,
@@ -56,8 +68,14 @@ struct FeaturesView: View {
         FeatureData(
             icon: "person.2.fill", iconColor: .orange,
             title: "Opponent Intelligence",
-            description: "Detailed view of your opponent's roster showing all their players, current scores, and projections. Filter by position to see who they're starting and who's on their bench.",
+            description: "Detailed view of your opponent's roster showing all their players, current scores, and projections. Threat Matrix shows opponent manager names in blue. Cross-League Conflicts highlights players you own that opponents also roster.",
             badge: nil
+        ),
+        FeatureData(
+            icon: "clock.badge.checkmark.fill", iconColor: .gpYellow,
+            title: "Yet to Play Filter",
+            description: "In matchup details, toggle 'All | Only Yet to Play' to filter rosters to just players who haven't started. Uses real game status data - players with 0 points in finished games are correctly excluded.",
+            badge: "NEW"
         ),
         FeatureData(
             icon: "cross.case.fill", iconColor: .red,
@@ -91,8 +109,8 @@ struct FeaturesView: View {
         ),
         FeatureData(
             icon: "exclamationmark.triangle.fill", iconColor: .orange,
-            title: "Bye Week Alerts",
-            description: "Identifies players on bye in your starting lineup and shows them in a dedicated alert section. Helps you avoid starting players who won't play.",
+            title: "Lineup Bye Week Alerts",
+            description: "Identifies players on bye in your starting lineup and shows them in a dedicated alert section within Lineup RX. Helps you avoid starting players who won't play this week.",
             badge: nil
         ),
         FeatureData(

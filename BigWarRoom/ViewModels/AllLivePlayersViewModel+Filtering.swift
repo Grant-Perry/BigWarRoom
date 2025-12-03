@@ -254,9 +254,22 @@ extension AllLivePlayersViewModel {
                 players.sorted { positionPriority($0.position) > positionPriority($1.position) }
             
         case .score:
+            // Sort by score, with position order as secondary sort (tiebreaker)
             sortedPlayers = sortHighToLow ?
-                players.sorted { $0.currentScore > $1.currentScore } :
-                players.sorted { $0.currentScore < $1.currentScore }
+                players.sorted { player1, player2 in
+                    if player1.currentScore != player2.currentScore {
+                        return player1.currentScore > player2.currentScore
+                    }
+                    // Secondary sort by position priority when scores are equal
+                    return positionPriority(player1.position) < positionPriority(player2.position)
+                } :
+                players.sorted { player1, player2 in
+                    if player1.currentScore != player2.currentScore {
+                        return player1.currentScore < player2.currentScore
+                    }
+                    // Secondary sort by position priority when scores are equal
+                    return positionPriority(player1.position) < positionPriority(player2.position)
+                }
 
         case .name:
             // Simplified name sorting - no special handling
@@ -311,15 +324,17 @@ extension AllLivePlayersViewModel {
     }
 
     private func positionPriority(_ position: String) -> Int {
+        // Order: QB, RB, WR, TE, Flex, Super Flex, D/ST, K
         switch position.uppercased() {
         case "QB": return 1
         case "RB": return 2
         case "WR": return 3
         case "TE": return 4
-        case "FLEX": return 5
-        case "DEF", "DST": return 6
-        case "K": return 7
-        default: return 8
+        case "FLEX", "W/R/T": return 5
+        case "SUPERFLEX", "SUPER FLEX", "SF", "Q/W/R/T": return 6
+        case "DEF", "DST", "D/ST": return 7
+        case "K": return 8
+        default: return 9
         }
     }
     

@@ -15,10 +15,29 @@ struct ByeWeekPlayerImpactSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Color.black.ignoresSafeArea()
+        ZStack {
+            // Background
+            Color.black.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Custom header bar (no NavigationStack needed for sheet)
+                HStack {
+                    Text("Bye Week \(WeekSelectionManager.shared.selectedWeek) Impact")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -33,25 +52,6 @@ struct ByeWeekPlayerImpactSheet: View {
                         }
                     }
                     .padding()
-                }
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationBarBackButtonHidden(true)  // 🔥 HIDE the back button
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Text("Bye Week Impact")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(.white.opacity(0.6))
-                    }
                 }
             }
         }

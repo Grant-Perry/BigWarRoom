@@ -81,6 +81,7 @@ enum SleeperLeagueStatus: String, Codable, CaseIterable {
     case preDraft = "pre_draft"
     case drafting = "drafting"
     case inSeason = "in_season"
+    case postSeason = "post_season"  // 🔥 FIX: Added missing status from Sleeper API
     case complete = "complete"
     
     var isActive: Bool {
@@ -92,6 +93,7 @@ enum SleeperLeagueStatus: String, Codable, CaseIterable {
         case .preDraft: return "Pre-Draft"
         case .drafting: return "Drafting"
         case .inSeason: return "In Season"
+        case .postSeason: return "Post Season"
         case .complete: return "Complete"
         }
     }

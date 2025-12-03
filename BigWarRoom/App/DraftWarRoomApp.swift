@@ -280,19 +280,23 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadCredentials() async {
+        // Just a brief pause - credentials are already loaded in setupServicesWithDI()
         try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
     private func loadLeagues() async {
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // Brief pause - leagues will be loaded by loadMatchups()
+        try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
     private func loadMatchups() async {
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // 🔥 FIX: Actually load matchups (this also loads leagues internally)
+        await MatchupsHubViewModel.shared.loadAllMatchups()
     }
     
     private func loadPlayers() async {
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        // Brief pause - players are extracted from matchups
+        try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
     private func completeLoading() {
