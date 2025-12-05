@@ -15,9 +15,8 @@ struct MissionControlHeaderView: View {
     let winningCount: Int
     let losingCount: Int
     
-    // NEW: Week picker and action callbacks
-    let selectedWeek: Int
-    let onWeekPickerTapped: () -> Void
+    // NEW: Week picker binding and action callbacks
+    @Binding var showingWeekPicker: Bool
     let onWatchedPlayersToggle: () -> Void
     let onRefreshTapped: () -> Void
     
@@ -61,33 +60,17 @@ struct MissionControlHeaderView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                // Week picker - compact to prevent text wrapping
-                Button(action: onWeekPickerTapped) {
-                    HStack(spacing: 3) {
-                        Text("WEEK")
-                            .font(.system(size: isCompactScreen ? 10 : 12, weight: .semibold))
-                            .foregroundColor(.blue)
-                        Text("\(selectedWeek)")
-                            .font(.system(size: isCompactScreen ? 14 : 16, weight: .bold))
-                            .foregroundColor(.blue)
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: isCompactScreen ? 8 : 10, weight: .semibold))
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.horizontal, isCompactScreen ? 8 : 10)
-                    .padding(.vertical, isCompactScreen ? 4 : 5)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-                            )
-                    )
-                    .fixedSize(horizontal: true, vertical: false) // Prevent wrapping
-                }
-                .buttonStyle(PlainButtonStyle())
+                // Week picker - using TheWeekPicker component
+                TheWeekPicker(
+                    showingWeekPicker: $showingWeekPicker,
+                    labelFontSize: isCompactScreen ? 9 : 10,
+                    weekNumberFontSize: isCompactScreen ? 14 : 16,
+                    chevronSize: isCompactScreen ? 8 : 10,
+                    cornerRadius: 10,
+                    horizontalPadding: isCompactScreen ? 8 : 10,
+                    verticalPadding: isCompactScreen ? 4 : 5,
+                    yearFontSize: 7
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

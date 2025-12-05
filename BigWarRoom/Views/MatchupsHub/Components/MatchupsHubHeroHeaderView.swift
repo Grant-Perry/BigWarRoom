@@ -10,13 +10,12 @@ import SwiftUI
 /// #GoodNav Template: Hero header section for MatchupsHub
 struct MatchupsHubHeroHeaderView: View {
     let matchupsCount: Int
-    let selectedWeek: Int
     let connectedLeaguesCount: Int
     let winningCount: Int
     let losingCount: Int
     let lastUpdateTime: Date?
     let timeAgoString: String?
-    let onWeekPickerTapped: () -> Void
+    @Binding var showingWeekPicker: Bool
     
     // #GoodNav: Intelligence-style actions
     let onFiltersToggle: () -> Void
@@ -31,8 +30,7 @@ struct MatchupsHubHeroHeaderView: View {
                 connectedLeaguesCount: connectedLeaguesCount,
                 winningCount: winningCount,
                 losingCount: losingCount,
-                selectedWeek: selectedWeek,
-                onWeekPickerTapped: onWeekPickerTapped,
+                showingWeekPicker: $showingWeekPicker,
                 onWatchedPlayersToggle: onWatchedPlayersToggle,
                 onRefreshTapped: onRefreshTapped
             )

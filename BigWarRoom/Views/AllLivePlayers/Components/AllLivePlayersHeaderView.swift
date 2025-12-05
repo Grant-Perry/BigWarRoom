@@ -129,29 +129,17 @@ struct AllLivePlayersHeaderView: View {
     // #GoodNav: Week picker with icons (matching template)
     private var weekPickerWithIconsRow: some View {
         HStack {
-            // WEEK picker (left side) 
-            Button(action: { showingWeekPicker = true }) {
-                HStack(spacing: 6) {
-                    Text("WEEK \(weekManager.selectedWeek)")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.blue)
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.blue)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-                        )
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
+            // WEEK picker (left side) - using TheWeekPicker component
+            TheWeekPicker(
+                showingWeekPicker: $showingWeekPicker,
+                labelFontSize: 10,
+                weekNumberFontSize: 18,
+                chevronSize: 10,
+                cornerRadius: 12,
+                horizontalPadding: 12,
+                verticalPadding: 6,
+                yearFontSize: 8
+            )
             
             Spacer()
             

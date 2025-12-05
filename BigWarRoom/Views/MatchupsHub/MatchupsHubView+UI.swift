@@ -38,13 +38,12 @@ extension MatchupsHubView {
         
         return MatchupsHubHeroHeaderView(
             matchupsCount: matchupsHubViewModel.myMatchups.count,
-            selectedWeek: weekManager.selectedWeek,
             connectedLeaguesCount: matchupsHubViewModel.connectedLeaguesCount,
             winningCount: winningCount,
             losingCount: losingCount,
             lastUpdateTime: matchupsHubViewModel.lastUpdateTime,
             timeAgoString: matchupsHubViewModel.timeAgo(matchupsHubViewModel.lastUpdateTime),
-            onWeekPickerTapped: showWeekPicker,
+            showingWeekPicker: $showingWeekPicker,
             // #GoodNav: Intelligence-style actions
             onFiltersToggle: {
                 // TODO: Add filters functionality for Mission Control
