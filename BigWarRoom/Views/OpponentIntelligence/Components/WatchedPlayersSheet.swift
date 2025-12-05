@@ -14,7 +14,7 @@ struct WatchedPlayersSheet: View {
     @Environment(\.editMode) private var editMode
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 // BG8 background
                 Image("BG8")
@@ -51,6 +51,13 @@ struct WatchedPlayersSheet: View {
             }
             .navigationTitle("Watched Players")
             .navigationBarTitleDisplayMode(.inline)
+            // 🔥 FIX: Handle player navigation at NavigationStack level (outside List)
+            .navigationDestination(for: SleeperPlayer.self) { player in
+                PlayerStatsCardView(
+                    player: player,
+                    team: NFLTeam.team(for: player.team ?? "")
+                )
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     HStack {
@@ -247,9 +254,6 @@ struct WatchedPlayerCard: View {
         nflWeekService: NFLWeekService.shared
     )
     @State private var playerDirectory = PlayerDirectoryStore.shared
-    
-    // 🔥 NAVIGATION: State for player stats navigation (converted from sheet)
-    @State private var navigateToPlayerStats = false
     
     // Computed properties to break up complex ViewBuilder
     private var sleeperPlayerData: SleeperPlayer? {
@@ -587,43 +591,20 @@ struct WatchedPlayerCard: View {
     }
     
     private var playerImageWithNavigation: some View {
-        Button(action: {
-            // 🔥 NAVIGATION: Trigger navigation instead of sheet
-            navigateToPlayerStats = true
-        }) {
-            playerImageView
-        }
-        .buttonStyle(PlainButtonStyle())
-        .zIndex(2)
-        .offset(x: -1)
-        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
-        .navigationDestination(isPresented: $navigateToPlayerStats) {
+        Group {
+            // 🔥 FIX: Use NavigationLink(value:) instead of navigationDestination inside lazy container
             if let sleeperPlayer = sleeperPlayerData {
-                PlayerStatsCardView(
-                    player: sleeperPlayer,
-                    team: NFLTeam.team(for: watchedPlayer.team ?? "")
-                )
-            } else {
-                // 🔥 SIMPLIFIED FALLBACK: Show error message instead of trying to create SleeperPlayer
-                VStack(spacing: 20) {
-                    Image(systemName: "person.crop.circle.badge.questionmark")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray)
-                    
-                    Text("Player Not Found")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Unable to load detailed stats for \(watchedPlayer.playerName)")
-                        .font(.body)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                NavigationLink(value: sleeperPlayer) {
+                    playerImageView
                 }
-                .padding()
-                .navigationTitle("Player Stats")
-                .navigationBarTitleDisplayMode(.inline)
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // No navigation available without player data
+                playerImageView
             }
         }
+        .zIndex(2)
+        .offset(x: -1)
     }
     
     private var positionBadgeOverlay: some View {

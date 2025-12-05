@@ -373,7 +373,17 @@ final class MatchupsHubViewModel {
 }
 
 /// Unified matchup model combining all league types
-struct UnifiedMatchup: Identifiable {
+struct UnifiedMatchup: Identifiable, Hashable {
+    // MARK: - Hashable conformance
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+    
+    static func == (lhs: UnifiedMatchup, rhs: UnifiedMatchup) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    // MARK: - Properties
     let id: String
     let league: UnifiedLeagueManager.LeagueWrapper
     let fantasyMatchup: FantasyMatchup?

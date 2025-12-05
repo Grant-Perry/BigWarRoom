@@ -51,11 +51,6 @@ extension MatchupsHubView {
             },
             onWatchedPlayersToggle: {
                 showingWatchedPlayers = true
-            },
-            onRefreshTapped: {
-                Task {
-                    await handlePullToRefresh()
-                }
             }
         )
     }

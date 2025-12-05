@@ -39,10 +39,10 @@ struct NonMicroCardHeader: View {
             
             Spacer()
             
-            // 💊 RX indicator - replaces LIVE
+            // 💊 RX indicator - NavigationLink to LineupRX
             // 🔥 CHANGE: Allow RX for Chopped leagues as well, but still hide it if I'm eliminated
-            if !matchup.isMyManagerEliminated, let onRXTap = onRXTap {
-                Button(action: onRXTap) {
+            if !matchup.isMyManagerEliminated, onRXTap != nil {
+                NavigationLink(value: matchup) {
                     ZStack {
                         Circle()
                             .fill(buttonBackgroundColor)

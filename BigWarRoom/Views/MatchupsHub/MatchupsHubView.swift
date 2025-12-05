@@ -108,6 +108,10 @@ struct MatchupsHubView: View {
         .refreshable {
             await handlePullToRefresh()
         }
+        // 🔥 FIX: Handle LineupRX navigation at this level (outside lazy containers)
+        .navigationDestination(for: UnifiedMatchup.self) { matchup in
+            LineupRXView(matchup: matchup)
+        }
         .sheet(isPresented: $showingSettings) {
             AppSettingsView()
         }

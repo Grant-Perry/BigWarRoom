@@ -23,7 +23,6 @@ struct FantasyPlayerCard: View {
     @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
-    @State private var navigateToPlayerDetail = false
     
     // 🔥 SIMPLIFIED: Just take the essentials, create ViewModel in onAppear
     init(
@@ -74,8 +73,14 @@ struct FantasyPlayerCard: View {
                 }
                 .frame(height: vm.cardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 15))
-                .onTapGesture {
-                    navigateToPlayerDetail = true
+                // 🔥 FIX: Use overlay with NavigationLink to avoid navigationDestination inside lazy container
+                .overlay {
+                    if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
+                        NavigationLink(value: sleeperPlayer) {
+                            Color.clear
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
             } else {
                 ProgressView()
@@ -92,17 +97,6 @@ struct FantasyPlayerCard: View {
                     nflWeekService: NFLWeekService.shared
                 )
                 viewModel?.configurePlayer(player)
-            }
-        }
-        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
-        .navigationDestination(isPresented: $navigateToPlayerDetail) {
-            if let sleeperPlayer = viewModel?.getSleeperPlayerData(for: player) {
-                PlayerStatsCardView(
-                    player: sleeperPlayer,
-                    team: NFLTeam.team(for: player.team ?? "")
-                )
-            } else {
-                PlayerDetailFallbackView(player: player)
             }
         }
         .sheet(isPresented: $showingScoreBreakdown) {

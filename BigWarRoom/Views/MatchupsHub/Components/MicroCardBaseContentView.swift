@@ -63,7 +63,8 @@ struct MicroCardBaseContentView: View {
                     percentage: percentage,
                     record: matchup.myTeam?.record?.displayString,
                     onRXTap: onRXTap,
-                    isLineupOptimized: isLineupOptimized
+                    isLineupOptimized: isLineupOptimized,
+                    matchup: matchup
                 )
             }
         }

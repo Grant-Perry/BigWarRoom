@@ -52,9 +52,15 @@ struct BigWarRoomModified: View {
     @State private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
     @State private var playerWatchService = PlayerWatchService.shared
     @State private var weekManager = WeekSelectionManager.shared
+    @State private var smartRefreshManager = SmartRefreshManager.shared
     
     init(startOnSettings: Bool) {
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
+    }
+    
+    /// Dynamic tab label based on live game status
+    private var livePlayersTabLabel: String {
+        SmartRefreshManager.shared.hasLiveGames ? "LIVE Players" : "Rost Players"
     }
     
     var body: some View {
@@ -95,7 +101,7 @@ struct BigWarRoomModified: View {
                 )
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
-                    Text("Live Players")
+                    Text("Rost Players")
                 }
                 .tag(3)
                 
@@ -107,8 +113,14 @@ struct BigWarRoomModified: View {
                     }
                     .tag(4)
             }
+            .id("tabview-\(SmartRefreshManager.shared.hasLiveGames)")
+            .tint(SmartRefreshManager.shared.hasLiveGames ? .gpGreen : .blue)
             .padding(.horizontal, 16)
             .preferredColorScheme(.dark)
+            .onAppear {
+                smartRefreshManager.calculateOptimalRefresh()
+                DebugPrint(mode: .globalRefresh, "📺 TAB LABEL: hasLiveGames=\(smartRefreshManager.hasLiveGames), label=\(livePlayersTabLabel)")
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
                 selectedTab = 4
             }

@@ -7,14 +7,47 @@
 
 import SwiftUI
 
+// 🔥 NAVIGATION VALUE: Used for type-safe navigation from lazy containers
+struct PlayerNavigationValue: Hashable {
+    let sleeperPlayer: SleeperPlayer?
+    let playerFullName: String
+    let teamAbbrev: String?
+    
+    init(sleeperPlayer: SleeperPlayer?, playerName: String, team: String?) {
+        self.sleeperPlayer = sleeperPlayer
+        self.playerFullName = playerName
+        self.teamAbbrev = team
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(playerFullName)
+        hasher.combine(teamAbbrev)
+    }
+    
+    static func == (lhs: PlayerNavigationValue, rhs: PlayerNavigationValue) -> Bool {
+        lhs.playerFullName == rhs.playerFullName && lhs.teamAbbrev == rhs.teamAbbrev
+    }
+}
+
 struct PlayerScoreBarCardPlayerImageView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
-    // 🔥 NAVIGATION: State for player detail navigation (converted from sheet)
-    @State private var navigateToPlayerDetail = false
     // 🔥 PHASE 3 DI: PlayerDirectory removed - not used in this view
     
     var body: some View {
+        // 🔥 FIX: Use NavigationLink(value:) instead of navigationDestination inside lazy container
+        NavigationLink(value: PlayerNavigationValue(
+            sleeperPlayer: getSleeperPlayerData(),
+            playerName: playerEntry.player.fullName,
+            team: playerEntry.player.team
+        )) {
+            playerImageContent
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    // Extracted image content to separate computed property
+    private var playerImageContent: some View {
         ZStack {
             // Main player image or team logo
             Group {
@@ -113,20 +146,6 @@ struct PlayerScoreBarCardPlayerImageView: View {
                     }
                     Spacer()
                 }
-            }
-        }
-        .onTapGesture {
-            navigateToPlayerDetail = true
-        }
-        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
-        .navigationDestination(isPresented: $navigateToPlayerDetail) {
-            if let sleeperPlayer = getSleeperPlayerData() {
-                PlayerStatsCardView(
-                    player: sleeperPlayer,
-                    team: NFLTeam.team(for: playerEntry.player.team ?? "")
-                )
-            } else {
-                PlayerDetailFallbackView(player: playerEntry.player)
             }
         }
     }

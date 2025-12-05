@@ -60,7 +60,7 @@ struct AllLivePlayersHeaderView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 8) {
             // #GoodNav: Header with WEEK + icons (like Mission Control/Intelligence)
             weekPickerWithIconsRow
             
@@ -129,21 +129,21 @@ struct AllLivePlayersHeaderView: View {
     // #GoodNav: Week picker with icons (matching template)
     private var weekPickerWithIconsRow: some View {
         HStack {
-            // WEEK picker (left side) - using TheWeekPicker component
+            // WEEK picker (leading) - using TheWeekPicker component
             TheWeekPicker(
                 showingWeekPicker: $showingWeekPicker,
-                labelFontSize: 10,
-                weekNumberFontSize: 18,
-                chevronSize: 10,
+                labelFontSize: 16,
+                weekNumberFontSize: 22,
+                chevronSize: 12,
                 cornerRadius: 12,
-                horizontalPadding: 12,
-                verticalPadding: 6,
-                yearFontSize: 8
+                horizontalPadding: 14,
+                verticalPadding: 8,
+                yearFontSize: 9
             )
             
             Spacer()
             
-            // 🔥 NEW: HERO PILL (label + big number)
+            // 🔥 TOTAL BOX (trailing position)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Total")
                     .font(.system(size: 12, weight: .semibold))
@@ -211,38 +211,6 @@ struct AllLivePlayersHeaderView: View {
                         .transition(.opacity)
                         .padding(.bottom, -20)
                 }
-            }
-            
-            Spacer()
-            
-            // Icons (right side)
-            HStack(spacing: 12) {
-                // Filters button
-                Button(action: { showingFilters = true }) {
-                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Watched players button
-                Button(action: { showingWatchedPlayers = true }) {
-                    Image(systemName: "eye.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
-                        .notificationBadge(count: watchService.watchCount)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Refresh button
-                Button(action: { 
-                    Task { await performManualRefresh() }
-                }) {
-                    Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(PlainButtonStyle())
             }
         }
     }
@@ -354,6 +322,27 @@ struct AllLivePlayersHeaderView: View {
                         }
                     }
                     .buttonStyle(PlainButtonStyle())
+                    
+                    Spacer()
+                    
+                    // Watched players button
+                    Button(action: { showingWatchedPlayers = true }) {
+                        VStack(spacing: 2) {
+                            Image(systemName: "eye.fill")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(watchService.watchCount > 0 ? .gpOrange : .white)
+                            
+                            Text("Watch")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .notificationBadge(count: watchService.watchCount, xOffset: 8, yOffset: -5)
                     
                     Spacer()
                     

@@ -18,7 +18,6 @@ struct MissionControlHeaderView: View {
     // NEW: Week picker binding and action callbacks
     @Binding var showingWeekPicker: Bool
     let onWatchedPlayersToggle: () -> Void
-    let onRefreshTapped: () -> Void
     
     // 🔥 USE .shared internally
     private var watchService: PlayerWatchService { PlayerWatchService.shared }
@@ -41,7 +40,7 @@ struct MissionControlHeaderView: View {
             
             Spacer(minLength: 4)
             
-            // Right side controls: eyeball, refresh, week picker
+            // Right side controls: eyeball, week picker
             HStack(spacing: isCompactScreen ? 8 : 12) {
                 // Watched players button with badge
                 Button(action: onWatchedPlayersToggle) {
@@ -52,24 +51,16 @@ struct MissionControlHeaderView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                // Refresh button
-                Button(action: onRefreshTapped) {
-                    Image(systemName: "arrow.clockwise.circle.fill")
-                        .font(.system(size: isCompactScreen ? 20 : 22))
-                        .foregroundColor(.white)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
                 // Week picker - using TheWeekPicker component
                 TheWeekPicker(
                     showingWeekPicker: $showingWeekPicker,
-                    labelFontSize: isCompactScreen ? 9 : 10,
-                    weekNumberFontSize: isCompactScreen ? 14 : 16,
-                    chevronSize: isCompactScreen ? 8 : 10,
-                    cornerRadius: 10,
-                    horizontalPadding: isCompactScreen ? 8 : 10,
-                    verticalPadding: isCompactScreen ? 4 : 5,
-                    yearFontSize: 7
+                    labelFontSize: isCompactScreen ? 10 : 11,
+                    weekNumberFontSize: isCompactScreen ? 16 : 18,
+                    chevronSize: isCompactScreen ? 9 : 10,
+                    cornerRadius: 12,
+                    horizontalPadding: isCompactScreen ? 10 : 12,
+                    verticalPadding: isCompactScreen ? 5 : 6,
+                    yearFontSize: 8
                 )
             }
         }

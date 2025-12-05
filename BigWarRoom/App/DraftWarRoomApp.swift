@@ -408,13 +408,13 @@ struct MainTabView: View {
                 }
                 .tag(2)
                 
-                // ALL LIVE PLAYERS TAB
+                // ALL LIVE PLAYERS TAB - Dynamic label based on live game status
                 NavigationStack {
                     AllLivePlayersView()
                 }
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
-                    Text("Live Players")
+                    Text(SmartRefreshManager.shared.hasLiveGames ? "LIVE Players" : "Rost Players")
                 }
                 .tag(3)
                 
@@ -428,12 +428,17 @@ struct MainTabView: View {
                 }
                 .tag(4)
             }
+            .id("tabview-\(SmartRefreshManager.shared.hasLiveGames)")
+            .tint(SmartRefreshManager.shared.hasLiveGames ? .gpGreen : .blue)
             .environment(NFLGameDataService.shared)
             .environment(NFLWeekService.shared)
             .environment(AllLivePlayersViewModel.shared)
             .environment(PlayerDirectoryStore.shared)
             .environment(MatchupsHubViewModel.shared)
             .environment(PlayerWatchService.shared)
+            .onAppear {
+                SmartRefreshManager.shared.calculateOptimalRefresh()
+            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToWarRoom"))) { _ in
                 storedSelectedTab = 4
             }

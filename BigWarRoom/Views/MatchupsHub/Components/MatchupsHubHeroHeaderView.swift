@@ -20,7 +20,6 @@ struct MatchupsHubHeroHeaderView: View {
     // #GoodNav: Intelligence-style actions
     let onFiltersToggle: () -> Void
     let onWatchedPlayersToggle: () -> Void
-    let onRefreshTapped: () -> Void
     
     var body: some View {
         VStack(spacing: 8) {
@@ -31,8 +30,7 @@ struct MatchupsHubHeroHeaderView: View {
                 winningCount: winningCount,
                 losingCount: losingCount,
                 showingWeekPicker: $showingWeekPicker,
-                onWatchedPlayersToggle: onWatchedPlayersToggle,
-                onRefreshTapped: onRefreshTapped
+                onWatchedPlayersToggle: onWatchedPlayersToggle
             )
         }
         .padding(.horizontal, 20)

@@ -88,12 +88,12 @@ struct MoveInstructionsView: View {
     
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 16)
-            .fill(Color.black.opacity(0.6))
+            .fill(Color.black.opacity(0.85))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.gpRedPink, lineWidth: 2)
             )
-            .shadow(color: Color.gpRedPink.opacity(0.6), radius: 8, x: 0, y: 0)
+            .shadow(color: Color.gpRedPink.opacity(0.4), radius: 6, x: 0, y: 0)
     }
 }
 

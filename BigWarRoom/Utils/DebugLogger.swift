@@ -225,7 +225,7 @@ enum DebugConfig {
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
 	/// Current: Disabled (set to [] for production)
-   static var activeMode: DebugMode = [.navigation]
+   static var activeMode: DebugMode = []
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

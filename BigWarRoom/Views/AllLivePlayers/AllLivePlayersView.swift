@@ -94,6 +94,26 @@ struct AllLivePlayersView: View {
         .refreshable {
             await performRefresh()
         }
+        // 🔥 FIX: Handle player navigation from lazy containers at this level (outside LazyVStack)
+        .navigationDestination(for: PlayerNavigationValue.self) { navValue in
+            if let sleeperPlayer = navValue.sleeperPlayer {
+                PlayerStatsCardView(
+                    player: sleeperPlayer,
+                    team: NFLTeam.team(for: navValue.teamAbbrev ?? "")
+                )
+            } else {
+                // Fallback view when no Sleeper player data available
+                Text("Player details unavailable")
+                    .foregroundColor(.secondary)
+            }
+        }
+        // 🔥 ALSO: Handle direct SleeperPlayer navigation (from depth chart, etc.)
+        .navigationDestination(for: SleeperPlayer.self) { player in
+            PlayerStatsCardView(
+                player: player,
+                team: NFLTeam.team(for: player.team ?? "")
+            )
+        }
         .keyboardAdaptive() // Custom modifier to handle keyboard properly
         .onAppear {
             // 🔥 FIXED: Ensure matchups are loaded first, then load players

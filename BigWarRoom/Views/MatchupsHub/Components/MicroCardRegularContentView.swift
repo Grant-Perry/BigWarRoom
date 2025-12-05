@@ -16,6 +16,7 @@ struct MicroCardRegularContentView: View {
     let record: String?  // Add record parameter
     let onRXTap: (() -> Void)?  // 💊 RX button callback
     let isLineupOptimized: Bool  // 💊 RX: Optimization status
+    let matchup: UnifiedMatchup  // 💊 RX: For NavigationLink
     
     var body: some View {
         VStack(spacing: 6) {
@@ -62,10 +63,32 @@ struct MicroCardRegularContentView: View {
                     .lineLimit(1)
             }
             
-            // 💊 RX Button - above score/percentage
-            if let onRXTap = onRXTap {
-                MicroCardRXButton(onTap: onRXTap, isOptimized: isLineupOptimized)
-                    .padding(.top, 2)
+            // 💊 RX Badge - above score/percentage - NavigationLink to LineupRX
+            if onRXTap != nil {
+                NavigationLink(value: matchup) {
+                    HStack(spacing: 3) {
+                        Image("LineupRX")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 12, height: 12)
+                            .foregroundColor(.white)
+                        Text("Rx")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isLineupOptimized ? Color.gpGreen.opacity(0.2) : Color.gpRedPink.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(isLineupOptimized ? Color.gpGreen : Color.gpRedPink, lineWidth: 1)
+                            )
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.top, 2)
             }
             
             // Score + Percentage

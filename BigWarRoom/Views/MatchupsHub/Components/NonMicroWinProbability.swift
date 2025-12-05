@@ -70,11 +70,11 @@ struct NonMicroWinProbability: View {
                 
                 Spacer()
                 
-                // 💊 RX Button and Score delta in center
+                // 💊 RX Badge and Score delta in center
                 VStack(spacing: 4) {
-                    // RX Button above delta
-                    if let onRXTap = onRXTap {
-                        Button(action: onRXTap) {
+                    // RX Badge above delta - NavigationLink to LineupRX
+                    if onRXTap != nil, let matchup = matchup {
+                        NavigationLink(value: matchup) {
                             HStack(spacing: 4) {
                                 Image("LineupRX")
                                     .resizable()

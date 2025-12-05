@@ -26,6 +26,7 @@ final class SmartRefreshManager {
     private(set) var currentRefreshInterval: TimeInterval = TimeInterval(AppConstants.MatchupRefresh)
     private(set) var shouldShowCountdownTimer: Bool = true
     private(set) var refreshReason: String = "Default"
+    private(set) var hasLiveGames: Bool = false
     
     // MARK: - Constants
     private let fastRefreshInterval: TimeInterval = TimeInterval(AppConstants.MatchupRefresh) // 15s for live games
@@ -36,6 +37,10 @@ final class SmartRefreshManager {
     // MARK: - Init
     private init() {
         self.nflGameDataService = NFLGameDataService.shared
+        // Calculate initial state
+        Task { @MainActor in
+            calculateOptimalRefresh()
+        }
     }
     
     // For testing/injection
@@ -55,6 +60,7 @@ final class SmartRefreshManager {
         if isNoGameDay(weekday: weekday, date: now) {
             currentRefreshInterval = dormantRefreshInterval
             shouldShowCountdownTimer = false
+            hasLiveGames = false
             refreshReason = "No games today (Tue/Wed)"
             DebugPrint(mode: .globalRefresh, "🔋 SMART REFRESH: No-game day - 1 hour interval, timer hidden")
             return
@@ -67,30 +73,35 @@ final class SmartRefreshManager {
         case .liveGamesPlaying:
             currentRefreshInterval = fastRefreshInterval
             shouldShowCountdownTimer = true
+            hasLiveGames = true
             refreshReason = "Live games in progress"
             DebugPrint(mode: .globalRefresh, "🔥 SMART REFRESH: Live games - \(Int(fastRefreshInterval))s interval")
             
         case .gamesStartingSoon:
             currentRefreshInterval = mediumRefreshInterval
             shouldShowCountdownTimer = true
+            hasLiveGames = false
             refreshReason = "Games starting soon"
             DebugPrint(mode: .globalRefresh, "⏰ SMART REFRESH: Games starting soon - 1 min interval")
             
         case .gamesScheduledToday:
             currentRefreshInterval = slowRefreshInterval
             shouldShowCountdownTimer = true
+            hasLiveGames = false
             refreshReason = "Games scheduled today"
             DebugPrint(mode: .globalRefresh, "📅 SMART REFRESH: Games scheduled - 15 min interval")
             
         case .allGamesFinished:
             currentRefreshInterval = dormantRefreshInterval
             shouldShowCountdownTimer = false
+            hasLiveGames = false
             refreshReason = "All games finished"
             DebugPrint(mode: .globalRefresh, "✅ SMART REFRESH: All games finished - 1 hour interval, timer hidden")
             
         case .noGamesToday:
             currentRefreshInterval = dormantRefreshInterval
             shouldShowCountdownTimer = false
+            hasLiveGames = false
             refreshReason = "No games today"
             DebugPrint(mode: .globalRefresh, "😴 SMART REFRESH: No games today - 1 hour interval, timer hidden")
         }
