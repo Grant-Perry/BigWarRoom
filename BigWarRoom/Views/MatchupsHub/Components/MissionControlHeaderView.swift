@@ -61,19 +61,22 @@ struct MissionControlHeaderView: View {
                 }
                 .buttonStyle(PlainButtonStyle())
                 
-                // Week picker - more compact on small screens
+                // Week picker - compact to prevent text wrapping
                 Button(action: onWeekPickerTapped) {
-                    HStack(spacing: 4) {
-                        Text("WEEK \(selectedWeek)")
-                            .font(.system(size: isCompactScreen ? 14 : 16, weight: .semibold))
+                    HStack(spacing: 3) {
+                        Text("WEEK")
+                            .font(.system(size: isCompactScreen ? 10 : 12, weight: .semibold))
+                            .foregroundColor(.blue)
+                        Text("\(selectedWeek)")
+                            .font(.system(size: isCompactScreen ? 14 : 16, weight: .bold))
                             .foregroundColor(.blue)
                         
                         Image(systemName: "chevron.down")
-                            .font(.system(size: isCompactScreen ? 10 : 12, weight: .semibold))
+                            .font(.system(size: isCompactScreen ? 8 : 10, weight: .semibold))
                             .foregroundColor(.blue)
                     }
-                    .padding(.horizontal, isCompactScreen ? 10 : 12)
-                    .padding(.vertical, isCompactScreen ? 5 : 6)
+                    .padding(.horizontal, isCompactScreen ? 8 : 10)
+                    .padding(.vertical, isCompactScreen ? 4 : 5)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.blue.opacity(0.2))
@@ -82,6 +85,7 @@ struct MissionControlHeaderView: View {
                                     .stroke(Color.blue.opacity(0.5), lineWidth: 1)
                             )
                     )
+                    .fixedSize(horizontal: true, vertical: false) // Prevent wrapping
                 }
                 .buttonStyle(PlainButtonStyle())
             }

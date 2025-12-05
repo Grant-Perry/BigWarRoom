@@ -277,6 +277,48 @@ extension AllLivePlayersViewModel {
     }
 }
 
+// MARK: - Delta Management
+extension AllLivePlayersViewModel {
+    /// Resets all player previousScore to current score, clearing all per-player deltas
+    func resetAllPlayerDeltas() {
+        // Update allPlayers with previousScore set to currentScore
+        allPlayers = allPlayers.map { entry in
+            LivePlayerEntry(
+                id: entry.id,
+                player: entry.player,
+                leagueName: entry.leagueName,
+                leagueSource: entry.leagueSource,
+                currentScore: entry.currentScore,
+                projectedScore: entry.projectedScore,
+                isStarter: entry.isStarter,
+                percentageOfTop: entry.percentageOfTop,
+                matchup: entry.matchup,
+                performanceTier: entry.performanceTier,
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.currentScore  // Reset to current score
+            )
+        }
+        
+        // Also update filteredPlayers
+        filteredPlayers = filteredPlayers.map { entry in
+            LivePlayerEntry(
+                id: entry.id,
+                player: entry.player,
+                leagueName: entry.leagueName,
+                leagueSource: entry.leagueSource,
+                currentScore: entry.currentScore,
+                projectedScore: entry.projectedScore,
+                isStarter: entry.isStarter,
+                percentageOfTop: entry.percentageOfTop,
+                matchup: entry.matchup,
+                performanceTier: entry.performanceTier,
+                lastActivityTime: entry.lastActivityTime,
+                previousScore: entry.currentScore  // Reset to current score
+            )
+        }
+    }
+}
+
 // MARK: - State Helpers
 extension AllLivePlayersViewModel {
     var isInitialState: Bool {

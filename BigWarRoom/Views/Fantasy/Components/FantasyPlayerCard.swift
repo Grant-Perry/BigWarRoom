@@ -23,7 +23,7 @@ struct FantasyPlayerCard: View {
     @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
-    @State private var showingPlayerDetail = false
+    @State private var navigateToPlayerDetail = false
     
     // 🔥 SIMPLIFIED: Just take the essentials, create ViewModel in onAppear
     init(
@@ -75,7 +75,7 @@ struct FantasyPlayerCard: View {
                 .frame(height: vm.cardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 15))
                 .onTapGesture {
-                    showingPlayerDetail = true
+                    navigateToPlayerDetail = true
                 }
             } else {
                 ProgressView()
@@ -94,8 +94,16 @@ struct FantasyPlayerCard: View {
                 viewModel?.configurePlayer(player)
             }
         }
-        .sheet(isPresented: $showingPlayerDetail) {
-            buildPlayerDetailSheet()
+        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
+        .navigationDestination(isPresented: $navigateToPlayerDetail) {
+            if let sleeperPlayer = viewModel?.getSleeperPlayerData(for: player) {
+                PlayerStatsCardView(
+                    player: sleeperPlayer,
+                    team: NFLTeam.team(for: player.team ?? "")
+                )
+            } else {
+                PlayerDetailFallbackView(player: player)
+            }
         }
         .sheet(isPresented: $showingScoreBreakdown) {
             buildScoreBreakdownSheet()
@@ -166,20 +174,6 @@ struct FantasyPlayerCard: View {
                 .padding(.trailing, 8)
             }
             Spacer()
-        }
-    }
-    
-    @ViewBuilder
-    private func buildPlayerDetailSheet() -> some View {
-        NavigationView {
-            if let sleeperPlayer = viewModel?.getSleeperPlayerData(for: player) {
-                PlayerStatsCardView(
-                    player: sleeperPlayer,
-                    team: NFLTeam.team(for: player.team ?? "")
-                )
-            } else {
-                PlayerDetailFallbackView(player: player)
-            }
         }
     }
     

@@ -10,8 +10,8 @@ import SwiftUI
 struct PlayerScoreBarCardPlayerImageView: View {
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
-    // 🔥 NEW: State for player detail sheet
-    @State private var showingPlayerDetail = false
+    // 🔥 NAVIGATION: State for player detail navigation (converted from sheet)
+    @State private var navigateToPlayerDetail = false
     // 🔥 PHASE 3 DI: PlayerDirectory removed - not used in this view
     
     var body: some View {
@@ -116,18 +116,17 @@ struct PlayerScoreBarCardPlayerImageView: View {
             }
         }
         .onTapGesture {
-            showingPlayerDetail = true
+            navigateToPlayerDetail = true
         }
-        .sheet(isPresented: $showingPlayerDetail) {
-            NavigationView {
-                if let sleeperPlayer = getSleeperPlayerData() {
-                    PlayerStatsCardView(
-                        player: sleeperPlayer,
-                        team: NFLTeam.team(for: playerEntry.player.team ?? "")
-                    )
-                } else {
-                    PlayerDetailFallbackView(player: playerEntry.player)
-                }
+        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
+        .navigationDestination(isPresented: $navigateToPlayerDetail) {
+            if let sleeperPlayer = getSleeperPlayerData() {
+                PlayerStatsCardView(
+                    player: sleeperPlayer,
+                    team: NFLTeam.team(for: playerEntry.player.team ?? "")
+                )
+            } else {
+                PlayerDetailFallbackView(player: playerEntry.player)
             }
         }
     }

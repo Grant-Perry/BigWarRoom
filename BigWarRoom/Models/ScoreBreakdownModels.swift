@@ -754,14 +754,13 @@ struct ScoreBreakdownFactory {
         
         var items: [ScoreBreakdownItem] = []
         var scoringSettings: [String: Double] = [:]
-        var confidenceLevel = "Estimated"
+        // Note: confidenceLevel tracking removed - was never used
         
         // Try to get actual league scoring settings
         if let context = leagueContext {
             // Priority 1 - Use customScoringSettings if provided (regardless of league type)
             if let customScoring = context.customScoringSettings, !customScoring.isEmpty {
                 scoringSettings = customScoring
-                confidenceLevel = context.isChopped ? "Custom Chopped League Rules" : "Direct League Rules"
             }
             // Priority 2 - Try ScoringSettingsManager as fallback
             else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(
@@ -769,14 +768,12 @@ struct ScoreBreakdownFactory {
                 source: context.source
             ) {
                 scoringSettings = leagueScoring
-                confidenceLevel = "League Rules (\(context.source == .espn ? "ESPN" : "SLEEPER"))"
             }
         }
         
         // Fallback to standard scoring if no league settings found
         if scoringSettings.isEmpty {
             scoringSettings = getEstimatedSleeperScoring()
-            confidenceLevel = "Standard PPR Estimates"
         }
         
         // Create breakdown items for all relevant stats

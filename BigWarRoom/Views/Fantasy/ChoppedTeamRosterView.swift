@@ -37,9 +37,9 @@ struct ChoppedTeamRosterView: View {
     @State private var sortingMethod: MatchupSortingMethod = .position
     @State private var sortHighToLow = false
     
-    // Player stats sheet
+    // Player stats navigation (converted from sheet)
     @State private var selectedPlayer: SleeperPlayer?
-    @State private var showStats = false
+    @State private var navigateToPlayerStats = false
     
     // MARK: - Initialization
     
@@ -100,7 +100,8 @@ struct ChoppedTeamRosterView: View {
         .task {
             await viewModel.loadTeamRoster()
         }
-        .sheet(isPresented: $showStats) {
+        // 🔥 NAVIGATION: Use navigationDestination instead of sheet to keep tab bar visible
+        .navigationDestination(isPresented: $navigateToPlayerStats) {
             if let player = selectedPlayer {
                 PlayerStatsCardView(
                     player: player,
@@ -114,6 +115,6 @@ struct ChoppedTeamRosterView: View {
     
     private func handlePlayerTap(_ player: SleeperPlayer) {
         selectedPlayer = player
-        showStats = true
+        navigateToPlayerStats = true
     }
 }

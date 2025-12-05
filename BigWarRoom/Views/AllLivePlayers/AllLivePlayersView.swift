@@ -96,16 +96,22 @@ struct AllLivePlayersView: View {
         }
         .keyboardAdaptive() // Custom modifier to handle keyboard properly
         .onAppear {
-            // 🔥 REVERTED: Back to simple, working logic
+            // 🔥 FIXED: Ensure matchups are loaded first, then load players
             let hasData = !allLivePlayersViewModel.allPlayers.isEmpty
+            let hasMatchups = !allLivePlayersViewModel.matchupsHubViewModel.myMatchups.isEmpty
             
-            DebugPrint(mode: .liveUpdates, "👁️ LIVE PLAYERS ONAPPEAR: hasData = \(hasData)")
+            DebugPrint(mode: .liveUpdates, "👁️ LIVE PLAYERS ONAPPEAR: hasData=\(hasData), hasMatchups=\(hasMatchups)")
             
-            // Simple rule: If we don't have data, load it
+            // If we don't have data, load it (matchups first, then players)
             if !hasData && !hasPerformedInitialLoad {
-                DebugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Starting data load")
+                DebugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Starting full data load")
                 hasPerformedInitialLoad = true
                 Task {
+                    // 🔥 FIXED: Load matchups first if needed (ensures player data is complete)
+                    if !hasMatchups {
+                        DebugPrint(mode: .liveUpdates, "📥 LIVE PLAYERS: Loading matchups first...")
+                        await allLivePlayersViewModel.matchupsHubViewModel.loadAllMatchups()
+                    }
                     await allLivePlayersViewModel.loadAllPlayers()
                 }
             } else {
@@ -301,12 +307,15 @@ struct AllLivePlayersView: View {
         }
     }
     
-    /// Perform pull-to-refresh - always allow manual refresh
+    /// Perform pull-to-refresh - FULL refresh like app startup
     private func performRefresh() async {
-        print("🔄 PULL-TO-REFRESH: User initiated manual refresh")
-        // 🔥 FIX: Don't call loadAllMatchups() - it shows "Loading Leagues" overlay
-        // Just refresh the player data directly
+        DebugPrint(mode: .liveUpdates, "🔄 PTR on LIVE PLAYERS: Starting full refresh")
+        
+        // 🔥 FIXED: Do full refresh like app startup (matchups + players)
+        await allLivePlayersViewModel.matchupsHubViewModel.performManualRefresh()
         await allLivePlayersViewModel.loadAllPlayers()
+        
+        DebugPrint(mode: .liveUpdates, "✅ PTR on LIVE PLAYERS: Complete")
     }
     
     /// Load initial data with proper task management - ONLY run when needed

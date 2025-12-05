@@ -17,11 +17,25 @@ extension MatchupsHubViewModel {
         
         guard autoRefreshEnabled else { return }
         
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: TimeInterval(AppConstants.MatchupRefresh), repeats: true) { _ in
+        // 🔋 SMART REFRESH: Calculate optimal interval based on game status
+        SmartRefreshManager.shared.calculateOptimalRefresh()
+        let interval = SmartRefreshManager.shared.currentRefreshInterval
+        
+        DebugPrint(mode: .globalRefresh, "⏱️ AUTO REFRESH: Setting up with \(Int(interval))s interval")
+        
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             Task { @MainActor in
                 // 🔋 BATTERY FIX: Only refresh if app is active
                 if AppLifecycleManager.shared.isActive && !self.isLoading {
+                    // Recalculate optimal interval each refresh cycle
+                    SmartRefreshManager.shared.calculateOptimalRefresh()
                     await self.refreshMatchups()
+                    
+                    // Reschedule with new interval if it changed
+                    let newInterval = SmartRefreshManager.shared.currentRefreshInterval
+                    if abs(newInterval - interval) > 1.0 {
+                        self.setupAutoRefresh() // Reschedule with new interval
+                    }
                 }
             }
         }
@@ -176,9 +190,9 @@ extension MatchupsHubViewModel {
     
     // MARK: - Manual Refresh
     
-    /// Manual refresh trigger - BACKGROUND REFRESH (no loading screen)
+    /// Manual refresh trigger (PTR) - Does FULL refresh like app startup
+    /// 🔥 FIXED: Now does the same full loadAllMatchups() that app startup does
     internal func performManualRefresh() async {
-        // 🔥 FIX: Don't show loading screen for manual refresh - keep user on Mission Control
         guard !isLoading else { 
             DebugPrint(mode: .globalRefresh, "MANUAL REFRESH BLOCKED: Already loading")
             return 
@@ -192,34 +206,40 @@ extension MatchupsHubViewModel {
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
         guard timeSinceLastUpdate >= 2.0 else {
             DebugPrint(mode: .globalRefresh, "MANUAL REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 2s)")
-            isUpdating = false // 🔥 Clear updating flag when throttled
+            isUpdating = false
             return
         }
         
-        DebugPrint(mode: .globalRefresh, "MANUAL REFRESH START: Proceeding with manual refresh")
+        DebugPrint(mode: .globalRefresh, "🔄 MANUAL REFRESH (PTR): Starting FULL refresh like app startup")
         
         // 🔥 PRESERVE Just Me Mode state during refresh
         let wasMicroModeEnabled = microModeEnabled
         let preservedExpandedCardId = expandedCardId
-        let wasBannerVisible = justMeModeBannerVisible // NEW: Preserve banner state
+        let wasBannerVisible = justMeModeBannerVisible
         
         // Clear loading guards before starting fresh refresh
         loadingLock.lock()
         currentlyLoadingLeagues.removeAll()
         loadingLock.unlock()
         
-        // BACKGROUND REFRESH: Update data without showing loading screen
-        await refreshMatchupsInBackground()
+        // 🔥 FULL REFRESH: Same as app startup - not just background refresh
+        await performLoadAllMatchups()
         
         // 🔥 RESTORE Just Me Mode state after refresh
         await MainActor.run {
             microModeEnabled = wasMicroModeEnabled
             expandedCardId = preservedExpandedCardId
-            justMeModeBannerVisible = wasBannerVisible // NEW: Restore banner state
+            justMeModeBannerVisible = wasBannerVisible
         }
         
-        // 🔥 NEW: Clear updating flag when complete
+        // 🔥 SMART REFRESH: Recalculate optimal interval after manual refresh
+        SmartRefreshManager.shared.scheduleNextRefresh()
+        setupAutoRefresh() // Reschedule timer with new optimal interval
+        
+        // 🔥 Clear updating flag when complete
         isUpdating = false
+        
+        DebugPrint(mode: .globalRefresh, "✅ MANUAL REFRESH (PTR): Complete")
     }
     
     /// Background refresh that doesn't disrupt the UI

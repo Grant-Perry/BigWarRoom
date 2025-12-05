@@ -105,16 +105,16 @@ struct PlayerScoreBarCardView: View {
                 )
             } else {
                 // Original design
-                PlayerScoreBarCardContentView(
-                    playerEntry: playerEntry,
-                    scoreBarWidth: scoreBarWidth,
-                    cardHeight: cardHeight,
-                    formattedPlayerName: formattedPlayerName,
-                    playerScoreColor: playerScoreColor,
-                    viewModel: viewModel,
-                    watchService: watchService,
+        PlayerScoreBarCardContentView(
+            playerEntry: playerEntry,
+            scoreBarWidth: scoreBarWidth,
+            cardHeight: cardHeight,
+            formattedPlayerName: formattedPlayerName,
+            playerScoreColor: playerScoreColor,
+            viewModel: viewModel,
+            watchService: watchService,
                     playerDirectory: viewModel.playerDirectory
-                )
+        )
             }
         }
     }

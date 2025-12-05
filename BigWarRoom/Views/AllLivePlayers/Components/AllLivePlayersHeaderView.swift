@@ -194,9 +194,10 @@ struct AllLivePlayersHeaderView: View {
             )
             .scaleEffect(1.0 + (shouldShowDelta ? 0.0 : 0.0))
             .onLongPressGesture(minimumDuration: 0.5) {
-                // Reset the delta baseline to current total
+                // Long press: Reset BOTH total delta AND all player deltas
                 baselineTotalPoints = totalPoints
                 sessionDeltaPoints = 0
+                allLivePlayersViewModel.resetAllPlayerDeltas()  // 🔥 Also reset per-player deltas
                 #if canImport(UIKit)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 #endif
@@ -402,68 +403,71 @@ struct AllLivePlayersHeaderView: View {
                 }
                 
                 // Timer dial with sweep animation, number swipe, and external glow
-                ZStack {
-                    // 🔥 External glow layers (multiple for depth)
-                    ForEach(0..<3) { index in
-                        Circle()
-                            .fill(timerColor.opacity(0.15 - Double(index) * 0.05))
-                            .frame(width: 45 + CGFloat(index * 8), height: 45 + CGFloat(index * 8))
-                            .blur(radius: CGFloat(4 + index * 3))
-                            .animation(.easeInOut(duration: 0.8), value: timerColor)
-                            .scaleEffect(refreshCountdown < 3 ? 1.1 : 1.0)
-                            .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: refreshCountdown < 3)
-                    }
-                    
+                // 🔋 SMART REFRESH: Only show timer when we're actively refreshing
+                if SmartRefreshManager.shared.shouldShowCountdownTimer {
                     ZStack {
-                        // Background circle
-                        Circle()
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
-                            .frame(width: 32, height: 32)
-                        
-                        // 🔥 Circular sweep progress
-                        Circle()
-                            .trim(from: 0, to: timerProgress)
-                            .stroke(
-                                AngularGradient(
-                                    colors: [timerColor, timerColor.opacity(0.6), timerColor],
-                                    center: .center,
-                                    startAngle: .degrees(-90),
-                                    endAngle: .degrees(270)
-                                ),
-                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
-                            )
-                            .frame(width: 32, height: 32)
-                            .rotationEffect(.degrees(-90))
-                            .animation(.easeInOut(duration: 0.5), value: timerProgress)
-                        
-                        // Center fill
-                        Circle()
-                            .fill(timerColor.opacity(0.15))
-                            .frame(width: 27, height: 27)
-                            .animation(.easeInOut(duration: 0.3), value: timerColor)
-                        
-                        // 🔥 Timer text with swipe animation
-                        ZStack {
-                            Text("\(Int(refreshCountdown))")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                                .shadow(color: timerColor.opacity(0.8), radius: 2, x: 0, y: 1)
+                        // 🔥 External glow layers (multiple for depth)
+                        ForEach(0..<3) { index in
+                            Circle()
+                                .fill(timerColor.opacity(0.15 - Double(index) * 0.05))
+                                .frame(width: 45 + CGFloat(index * 8), height: 45 + CGFloat(index * 8))
+                                .blur(radius: CGFloat(4 + index * 3))
+                                .animation(.easeInOut(duration: 0.8), value: timerColor)
                                 .scaleEffect(refreshCountdown < 3 ? 1.1 : 1.0)
-                                .id("live-timer-\(Int(refreshCountdown))") // 🔥 Unique ID for transition
-                                .transition(
-                                    .asymmetric(
-                                        insertion: AnyTransition.move(edge: .leading)
-                                            .combined(with: .scale(scale: 0.8))
-                                            .combined(with: .opacity),
-                                        removal: AnyTransition.move(edge: .trailing)
-                                            .combined(with: .scale(scale: 1.2))
-                                            .combined(with: .opacity)
-                                    )
-                                )
+                                .animation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true), value: refreshCountdown < 3)
                         }
-                        .frame(width: 14, height: 14) // Fixed frame to prevent layout shifts
-                        .clipped()
-                        .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: Int(refreshCountdown))
+                        
+                        ZStack {
+                            // Background circle
+                            Circle()
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 2.5)
+                                .frame(width: 32, height: 32)
+                            
+                            // 🔥 Circular sweep progress
+                            Circle()
+                                .trim(from: 0, to: timerProgress)
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [timerColor, timerColor.opacity(0.6), timerColor],
+                                        center: .center,
+                                        startAngle: .degrees(-90),
+                                        endAngle: .degrees(270)
+                                    ),
+                                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                                )
+                                .frame(width: 32, height: 32)
+                                .rotationEffect(.degrees(-90))
+                                .animation(.easeInOut(duration: 0.5), value: timerProgress)
+                            
+                            // Center fill
+                            Circle()
+                                .fill(timerColor.opacity(0.15))
+                                .frame(width: 27, height: 27)
+                                .animation(.easeInOut(duration: 0.3), value: timerColor)
+                            
+                            // 🔥 Timer text with swipe animation
+                            ZStack {
+                                Text("\(Int(refreshCountdown))")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .shadow(color: timerColor.opacity(0.8), radius: 2, x: 0, y: 1)
+                                    .scaleEffect(refreshCountdown < 3 ? 1.1 : 1.0)
+                                    .id("live-timer-\(Int(refreshCountdown))") // 🔥 Unique ID for transition
+                                    .transition(
+                                        .asymmetric(
+                                            insertion: AnyTransition.move(edge: .leading)
+                                                .combined(with: .scale(scale: 0.8))
+                                                .combined(with: .opacity),
+                                            removal: AnyTransition.move(edge: .trailing)
+                                                .combined(with: .scale(scale: 1.2))
+                                                .combined(with: .opacity)
+                                        )
+                                    )
+                            }
+                            .frame(width: 14, height: 14) // Fixed frame to prevent layout shifts
+                            .clipped()
+                            .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: Int(refreshCountdown))
+                        }
                     }
                 }
             }
@@ -643,7 +647,7 @@ struct AllLivePlayersHeaderView: View {
     }
     
     private var timerColor: Color {
-        let progress = refreshCountdown / Double(AppConstants.MatchupRefresh)
+        let progress = refreshCountdown / SmartRefreshManager.shared.currentRefreshInterval
         
         if progress > 0.66 {
             return .gpGreen
@@ -656,7 +660,7 @@ struct AllLivePlayersHeaderView: View {
     
     // 🔥 NEW: Timer progress for scaling effect
     private var timerProgress: Double {
-        let progress = refreshCountdown / Double(AppConstants.MatchupRefresh)
+        let progress = refreshCountdown / SmartRefreshManager.shared.currentRefreshInterval
         return 0.3 + (progress * 0.7) // Scale from 30% to 100%
     }
     
@@ -724,16 +728,19 @@ struct AllLivePlayersHeaderView: View {
             stableManager = manager
         }
         
-        // 🔥 ENABLED: Restore AllLivePlayersView auto-refresh timer to fix live updates
-        // This timer was previously disabled causing the missing automatic refresh issue
+        // 🔋 SMART REFRESH: Calculate optimal refresh interval
+        SmartRefreshManager.shared.calculateOptimalRefresh()
+        let interval = SmartRefreshManager.shared.currentRefreshInterval
         
-        DebugPrint(mode: .liveUpdates, "🎬 TIMER SETUP: Starting 15-second auto-refresh timer")
+        DebugPrint(mode: .liveUpdates, "🎬 TIMER SETUP: Starting \(Int(interval))-second auto-refresh timer")
         
-        // Start the actual refresh timer (every 15 seconds)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: Double(AppConstants.MatchupRefresh), repeats: true) { _ in
+        // Start the actual refresh timer with smart interval
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             Task { @MainActor in
                 // 🔋 BATTERY FIX: Only refresh if app is active
                 if AppLifecycleManager.shared.isActive && !allLivePlayersViewModel.isLoading {
+                    // Recalculate optimal interval
+                    SmartRefreshManager.shared.calculateOptimalRefresh()
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
                 } else {
@@ -742,8 +749,10 @@ struct AllLivePlayersHeaderView: View {
             }
         }
         
-        // Keep the visual countdown timer only (every 1 second)
-        startCountdownTimer()
+        // Keep the visual countdown timer only (every 1 second) - if we should show it
+        if SmartRefreshManager.shared.shouldShowCountdownTimer {
+            startCountdownTimer()
+        }
     }
     
     private func stopGlobalRefreshCycle() {
@@ -772,7 +781,8 @@ struct AllLivePlayersHeaderView: View {
     }
     
     private func resetCountdown() {
-        refreshCountdown = Double(AppConstants.MatchupRefresh)
+        // 🔋 SMART REFRESH: Use optimal interval
+        refreshCountdown = SmartRefreshManager.shared.currentRefreshInterval
     }
 
     private func resetDeltaBaseline() {

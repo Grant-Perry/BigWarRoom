@@ -78,123 +78,68 @@ struct PlayerScoreBarCardContentView: View {
                 .offset(x: 37)
                 .scaleEffect(1.1)
                 
-                // Player info - right side with dedicated space for league name
+                // Points section - right side, vertically centered
                 VStack(alignment: .trailing, spacing: 4) {
-                    HStack(spacing: 6) {
+                    Spacer()
+                    
+                    // Points delta + Points box + Position badge
+                    HStack(spacing: 4) {
                         Spacer()
                         
-                        // Player name moved to top (no position badge here)
-                        Text(formattedPlayerName)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-							.padding(.top, 15)
-                    }
-                    
-                    // League banner
-                    HStack(spacing: 6) {
-                        Spacer()
-                        PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
-                    }
-                    
-                    // Matchup delta + Position badge row
-                    HStack(spacing: 6) {
-                        Spacer()
-                        
-                        // Matchup delta on leading side of position
-                        if let matchupText = matchupDeltaText {
-                            Text(matchupText)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(matchupDeltaColor)
+                        // Per-player score delta (in pill)
+                        if let deltaText = scoreDeltaText, let deltaValue = scoreDeltaValue {
+                            Text(deltaText)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(deltaValue >= 0 ? .gpGreen : .gpRedPink)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                                 .fixedSize(horizontal: true, vertical: false)
-                        }
-                        
-                        PlayerScoreBarCardPositionBadgeView(playerEntry: playerEntry)
-                    }
-                    .offset(y: -1)
-                    
-                    Spacer() // Push score to bottom of this section
-                    
-                    // Score info and watch button row
-                    HStack(spacing: 8) {
-                        // Watch toggle button
-                        Button(action: toggleWatch) {
-                            Image(systemName: isWatching ? "eye.fill" : "eye")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(isWatching ? .gpOrange : .gray)
-                                .frame(width: 24, height: 24)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
                                 .background(
-                                    Circle()
-                                        .fill(isWatching ? Color.gpOrange.opacity(0.2) : Color.gray.opacity(0.1))
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .offset(y: -20) // Smaller offset to align with points without disappearing
-                        
-                        // 🔥 NEW: Load Matchup button
-                        NavigationLink(destination: MatchupDetailSheetsView(matchup: playerEntry.matchup)) {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.blue)
-                                .frame(width: 24, height: 24)
-                                .background(
-                                    Circle()
-                                        .fill(Color.blue.opacity(0.2))
-                                )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .offset(y: -20)
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            // 🔥 FIXED: Make score clickable with background like before
-                            Button(action: {
-                                Task { await presentScoreBreakdown() }
-                            }) {
-                                VStack(spacing: 2) {
-                                HStack(spacing: 4) {
-                                    Text(playerEntry.currentScoreString)
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundColor(playerScoreColor)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.9)
-
-                                    Text("pts")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.3)
-                                    }
-                                    
-                                    // Per‑player delta since last update, small and gpGreen
-                                    if let deltaText = scoreDeltaText {
-                                        Text(deltaText)
-                                            .font(.system(size: 9, weight: .semibold))
-                                            .foregroundColor(.gpGreen)
-                                            .lineLimit(1)
-                                            .minimumScaleFactor(0.5)
-                                    }
-                                }
-                                .fixedSize(horizontal: true, vertical: false)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .fill(playerScoreColor.opacity(0.4))
+                                    Capsule()
+                                        .fill((deltaValue >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.2))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 6)
-                                                .stroke(playerScoreColor.opacity(0.6), lineWidth: 1)
+                                            Capsule()
+                                                .stroke((deltaValue >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.5), lineWidth: 1)
                                         )
                                 )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .offset(y: -20)
                         }
+                        
+                        // Points box
+                        Button(action: {
+                            Task { await presentScoreBreakdown() }
+                        }) {
+                            HStack(spacing: 4) {
+                                Text(playerEntry.currentScoreString)
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(playerScoreColor)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
+
+                                Text("pts")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.3)
+                            }
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(playerScoreColor.opacity(0.4))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(playerScoreColor.opacity(0.6), lineWidth: 1)
+                                    )
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
+                    
+                    Spacer()
                 }
-                .frame(maxHeight: .infinity, alignment: .top)
+                .frame(maxHeight: .infinity)
                 
                 Spacer()
             }
@@ -206,25 +151,6 @@ struct PlayerScoreBarCardContentView: View {
                     scoreBarWidth: scoreBarWidth
                 )
             )
-            
-            // 🔥 SIMPLIFIED: Basic stats section - only show if player has points
-            if playerEntry.currentScore > 0 {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Text(simpleStatsDisplay)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 6)
-                }
-            }
             
             // NOW overlay the player image on top - unconstrained!
             HStack {
@@ -263,6 +189,64 @@ struct PlayerScoreBarCardContentView: View {
         }
         .frame(height: cardHeight) // Apply the card height constraint
         .clipShape(RoundedRectangle(cornerRadius: 12)) // Restore clipping
+        // Watch button overlay (bottom left corner)
+        .overlay(alignment: .bottomLeading) {
+            Button(action: toggleWatch) {
+                Image(systemName: isWatching ? "eye.fill" : "eye")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(isWatching ? .gpOrange : .white.opacity(0.7))
+                    .frame(width: 20, height: 20)
+                    .background(
+                        Circle()
+                            .fill(isWatching ? Color.gpOrange.opacity(0.3) : Color.black.opacity(0.5))
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.leading, 8)
+            .padding(.bottom, 8)
+        }
+        // LARGE player name + position overlay at TOP
+        .overlay(alignment: .top) {
+            HStack(spacing: 6) {
+                Spacer()
+                Text(formattedPlayerName)
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                
+                // Small position badge next to name
+                Text(playerEntry.position)
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(positionColor)
+                    )
+            }
+            .padding(.top, 6)
+            .padding(.trailing, 10)
+            .padding(.leading, 140) // Start after matchup section
+        }
+        // League banner overlay at BOTTOM
+        .overlay(alignment: .bottomTrailing) {
+            HStack(spacing: 6) {
+                PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
+                
+                // League delta after league name
+                if let matchupText = matchupDeltaText {
+                    Text(matchupText)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(matchupDeltaColor)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
+            .padding(.trailing, 10)
+            .padding(.bottom, 6)
+        }
         
         // Inline loading overlay (not a sheet)
         .overlay {
@@ -325,27 +309,47 @@ struct PlayerScoreBarCardContentView: View {
     
     // MARK: - Per-player and matchup deltas
     
-    /// Delta between current score and previousScore (last update), formatted with sign.
+    /// Delta between current score and previousScore (last update), no +/- sign (color indicates direction)
     private var scoreDeltaText: String? {
         guard let previous = playerEntry.previousScore else { return nil }
         let diff = playerEntry.currentScore - previous
         // Ignore tiny noise
         guard abs(diff) > 0.01 else { return nil }
         
-        let formatted = String(format: diff > 0 ? "+%.2f" : "%.2f", diff)
-        return formatted
+        // No +/- sign - color indicates positive/negative
+        return String(format: "%.2f", abs(diff))
     }
     
-    /// My team vs opponent score differential for this matchup (nil for chopped leagues)
+    /// Raw delta value for color logic
+    private var scoreDeltaValue: Double? {
+        guard let previous = playerEntry.previousScore else { return nil }
+        let diff = playerEntry.currentScore - previous
+        guard abs(diff) > 0.01 else { return nil }
+        return diff
+    }
+    
+    /// My team vs opponent score differential for this matchup (nil for chopped leagues), no +/- sign
     private var matchupDeltaText: String? {
         guard let diff = playerEntry.matchup.scoreDifferential else { return nil }
-        let formatted = String(format: diff > 0 ? "+%.1f" : "%.1f", diff)
-        return formatted
+        // No +/- sign - color indicates winning/losing
+        return String(format: "%.1f", abs(diff))
     }
     
     private var matchupDeltaColor: Color {
         guard let diff = playerEntry.matchup.scoreDifferential else { return .secondary }
         return diff >= 0 ? .gpGreen : .gpRedPink
+    }
+    
+    private var positionColor: Color {
+        switch playerEntry.position.uppercased() {
+        case "QB": return .red
+        case "RB": return .blue
+        case "WR": return .green
+        case "TE": return .orange
+        case "K": return .yellow
+        case "D/ST", "DEF": return .purple
+        default: return .gray
+        }
     }
     
     // 🔥 NEW: Get Sleeper player data for injury status - REMOVED DEBUG
@@ -411,18 +415,6 @@ struct PlayerScoreBarCardContentView: View {
     // MARK: - 🔥 SIMPLIFIED: Basic stats display like NonMicroCardView approach
     
     /// Simple stats display - just show basic info from the playerEntry itself
-    private var simpleStatsDisplay: String {
-        // 🔥 SIMPLE: Just show position and score info, no complex stat matching
-        let position = playerEntry.position
-        let score = playerEntry.currentScore
-        
-        if score > 0 {
-            return "\(position) • \(String(format: "%.1f", score)) pts"
-        } else {
-            return "\(position) • No stats yet"
-        }
-    }
-    
     // MARK: - 🔥 NEW: Jersey Number Helper Methods
     
     /// Get jersey number for the player - now uses model property directly

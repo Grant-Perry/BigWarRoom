@@ -108,11 +108,11 @@ struct ScheduleByeWeekSection: View {
             }
         }
         .sheet(item: $selectedImpactItem) { item in
-            ByeWeekPlayerImpactSheet(
+                ByeWeekPlayerImpactSheet(
                 impact: item.impact,
                 teamName: item.team.fullName,
                 teamCode: item.team.id
-            )
+                )
         }
     }
     

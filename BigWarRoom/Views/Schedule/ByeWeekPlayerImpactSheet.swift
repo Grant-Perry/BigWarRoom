@@ -15,9 +15,9 @@ struct ByeWeekPlayerImpactSheet: View {
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        ZStack {
-            // Background
-            Color.black.ignoresSafeArea()
+            ZStack {
+                // Background
+                Color.black.ignoresSafeArea()
             
             VStack(spacing: 0) {
                 // Custom header bar (no NavigationStack needed for sheet)
