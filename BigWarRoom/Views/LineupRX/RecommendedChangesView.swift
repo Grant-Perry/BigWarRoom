@@ -13,7 +13,7 @@ struct RecommendedChangesView: View {
     let matchupInfoCache: [String: LineupRXView.MatchupInfo]
     let gameTimeCache: [String: String]
     
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -53,9 +53,10 @@ struct RecommendedChangesView: View {
                 .fill(Color.black.opacity(0.6))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.gpGreen.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.gpRedPink, lineWidth: 2)
                 )
         )
+        .shadow(color: Color.gpRedPink.opacity(0.6), radius: 8, x: 0, y: 0)
     }
 }
 
@@ -164,31 +165,12 @@ struct PlayerComparisonRow: View {
                     .frame(width: 20)
             }
             
-            // Player headshot - optimized
-            if let url = sleeperPlayer?.headshotURL {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    case .failure, .empty:
-                        Circle().fill(Color.gray.opacity(0.3))
-                    @unknown default:
-                        Circle().fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(labelColor.opacity(0.5), lineWidth: 2)
-                )
-            } else {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 40, height: 40)
-            }
+            // Player headshot - CLICKABLE to player stats
+            ClickablePlayerImage(
+                sleeperPlayer: sleeperPlayer,
+                size: 40,
+                borderColor: labelColor
+            )
             
             // Player info
             VStack(alignment: .leading, spacing: 4) {

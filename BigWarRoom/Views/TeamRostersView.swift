@@ -90,59 +90,11 @@ struct TeamRostersView: View {
         .padding(.horizontal, 20)
     }
     
-    // 🔥 NEW: Week header section
+    // 🔥 NEW: Week header section - using reusable TheWeekPicker
     private var weekHeaderSection: some View {
         HStack {
             Spacer()
-            
-            Button(action: {
-                showingWeekPicker = true
-            }) {
-                HStack(spacing: 8) {
-                    Text("Week")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                    
-                    Text("\(weekManager.selectedWeek)")
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                    
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.gpGreen.opacity(0.3),
-                                    Color.blue.opacity(0.3)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.gpGreen.opacity(0.6),
-                                            Color.blue.opacity(0.6)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
-                        )
-                        .shadow(color: .gpGreen.opacity(0.2), radius: 8, x: 0, y: 4)
-                )
-            }
-            
+            TheWeekPicker(showingWeekPicker: $showingWeekPicker)
             Spacer()
         }
         .padding(.horizontal, 20)

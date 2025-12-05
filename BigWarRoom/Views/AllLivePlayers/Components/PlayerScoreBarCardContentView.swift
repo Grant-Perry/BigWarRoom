@@ -233,9 +233,11 @@ struct PlayerScoreBarCardContentView: View {
         // League banner overlay at BOTTOM
         .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 6) {
+                // League banner with max width to leave room for delta
                 PlayerScoreBarCardLeagueBannerView(playerEntry: playerEntry)
+                    .frame(maxWidth: 160) // Cap width so delta always fits
                 
-                // League delta after league name
+                // League delta ALWAYS shows
                 if let matchupText = matchupDeltaText {
                     Text(matchupText)
                         .font(.system(size: 11, weight: .bold))
@@ -328,16 +330,42 @@ struct PlayerScoreBarCardContentView: View {
         return diff
     }
     
-    /// My team vs opponent score differential for this matchup (nil for chopped leagues), no +/- sign
+    /// My team vs opponent score differential, OR delta from cutoff for Chopped leagues
     private var matchupDeltaText: String? {
-        guard let diff = playerEntry.matchup.scoreDifferential else { return nil }
-        // No +/- sign - color indicates winning/losing
-        return String(format: "%.1f", abs(diff))
+        // Regular matchup - show score differential
+        if let diff = playerEntry.matchup.scoreDifferential {
+            return String(format: "%.1f", abs(diff))
+        }
+        
+        // Chopped league - show delta from cutoff line
+        if playerEntry.matchup.isChoppedLeague,
+           let ranking = playerEntry.matchup.myTeamRanking,
+           let choppedSummary = playerEntry.matchup.choppedSummary {
+            let myScore = ranking.team.currentScore ?? 0
+            let cutoff = choppedSummary.cutoffScore
+            let delta = myScore - cutoff
+            return String(format: "%.1f", abs(delta))
+        }
+        
+        return nil
     }
     
     private var matchupDeltaColor: Color {
-        guard let diff = playerEntry.matchup.scoreDifferential else { return .secondary }
-        return diff >= 0 ? .gpGreen : .gpRedPink
+        // Regular matchup
+        if let diff = playerEntry.matchup.scoreDifferential {
+            return diff >= 0 ? .gpGreen : .gpRedPink
+        }
+        
+        // Chopped league - green if above cutoff, red if below
+        if playerEntry.matchup.isChoppedLeague,
+           let ranking = playerEntry.matchup.myTeamRanking,
+           let choppedSummary = playerEntry.matchup.choppedSummary {
+            let myScore = ranking.team.currentScore ?? 0
+            let cutoff = choppedSummary.cutoffScore
+            return myScore >= cutoff ? .gpGreen : .gpRedPink
+        }
+        
+        return .secondary
     }
     
     private var positionColor: Color {

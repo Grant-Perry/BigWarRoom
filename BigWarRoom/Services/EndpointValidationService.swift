@@ -23,16 +23,18 @@ class EndpointValidationService {
     // MARK: - ESPN API Tests
     
     /// Test ESPN league endpoint with mSettings view
-    func testESPNScoringSettings(leagueId: String, season: String = "2024", swid: String? = nil, espnS2: String? = nil) async -> ValidationResult {
-        let baseUrl = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(season)/segments/0/leagues/\(leagueId)"
+    func testESPNScoringSettings(leagueId: String, season: String? = nil, swid: String? = nil, espnS2: String? = nil) async -> ValidationResult {
+        let seasonYear = season ?? SeasonYearManager.shared.selectedYear
+        let baseUrl = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(seasonYear)/segments/0/leagues/\(leagueId)"
         let url = "\(baseUrl)?view=mSettings"
         
         return await makeRequest(to: url, method: "GET", espnCookies: (swid: swid, espnS2: espnS2))
     }
     
     /// Test ESPN fantasy league general endpoint (without mSettings)
-    func testESPNLeagueGeneral(leagueId: String, season: String = "2024", swid: String? = nil, espnS2: String? = nil) async -> ValidationResult {
-        let url = "https://fantasy.espn.com/apis/v3/games/ffl/seasons/\(season)/segments/0/leagues/\(leagueId)"
+    func testESPNLeagueGeneral(leagueId: String, season: String? = nil, swid: String? = nil, espnS2: String? = nil) async -> ValidationResult {
+        let seasonYear = season ?? SeasonYearManager.shared.selectedYear
+        let url = "https://fantasy.espn.com/apis/v3/games/ffl/seasons/\(seasonYear)/segments/0/leagues/\(leagueId)"
         
         return await makeRequest(to: url, method: "GET", espnCookies: (swid: swid, espnS2: espnS2))
     }

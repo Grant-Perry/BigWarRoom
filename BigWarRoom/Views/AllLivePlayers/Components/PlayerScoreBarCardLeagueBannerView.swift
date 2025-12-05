@@ -41,10 +41,8 @@ struct PlayerScoreBarCardLeagueBannerView: View {
                 .font(.caption2)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
-                // Allow longer league names to wrap instead of truncating
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-                .multilineTextAlignment(.leading)
+                .lineLimit(1)
+                .truncationMode(.tail) // Truncate long names with "..."
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)

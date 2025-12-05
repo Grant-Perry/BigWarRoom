@@ -38,8 +38,8 @@ struct MicroCardView: View {
     @State private var glowIntensity: Double = 0.0
     @State private var eliminatedPulse: Bool = false
     
-    // 💊 RX Sheet state
-    @State private var showingLineupRX = false
+    // 💊 RX Navigation state (converted from sheet to navigationDestination)
+    @State private var navigateToLineupRX = false
     
     // Initializer with all parameters including new eliminated ones
     init(
@@ -105,7 +105,7 @@ struct MicroCardView: View {
             celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
             matchup: matchup,
             isWinning: isWinning,
-            onRXTap: isEliminated ? nil : { showingLineupRX = true },
+            onRXTap: isEliminated ? nil : { navigateToLineupRX = true },
             isLineupOptimized: isLineupOptimized
         )
         .frame(width: 85, height: 160)
@@ -118,7 +118,7 @@ struct MicroCardView: View {
                 startEliminatedAnimation()
             }
         }
-        .sheet(isPresented: $showingLineupRX) {
+        .navigationDestination(isPresented: $navigateToLineupRX) {
             LineupRXView(matchup: matchup)
         }
     }

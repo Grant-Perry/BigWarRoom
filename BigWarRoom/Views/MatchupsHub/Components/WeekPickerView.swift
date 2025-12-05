@@ -32,8 +32,25 @@ struct WeekPickerView: View {
     /// NFL season has 18 weeks (17 regular + playoffs)
     private let maxWeeks = 18
     
-    /// NFL 2024 season start date (adjust as needed)
-    private let season2024Start = Calendar.current.date(from: DateComponents(year: 2024, month: 9, day: 5))!
+    /// NFL season start date - calculated from SeasonYearManager (SOT)
+    private var seasonStartDate: Date {
+        let calendar = Calendar.current
+        let selectedYear = Int(yearManager.selectedYear) ?? 2025
+        
+        // Known season start dates
+        if selectedYear == 2025 {
+            return calendar.date(from: DateComponents(year: 2025, month: 9, day: 4))!
+        } else if selectedYear == 2024 {
+            return calendar.date(from: DateComponents(year: 2024, month: 9, day: 5))!
+        } else {
+            // Fallback: find first Thursday of September
+            var startDate = calendar.date(from: DateComponents(year: selectedYear, month: 9, day: 1))!
+            while calendar.component(.weekday, from: startDate) != 5 { // Thursday = 5
+                startDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
+            }
+            return startDate
+        }
+    }
     
     // 🔥 PHASE 2.5: Dependency injection initializer
     init(
@@ -343,7 +360,7 @@ struct WeekPickerView: View {
     /// Calculate the start date for a given NFL week
     private func weekStartDate(for week: Int) -> String {
         let calendar = Calendar.current
-        let weekStartDate = calendar.date(byAdding: .day, value: (week - 1) * 7, to: season2024Start)!
+        let weekStartDate = calendar.date(byAdding: .day, value: (week - 1) * 7, to: seasonStartDate)!
         
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"

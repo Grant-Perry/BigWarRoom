@@ -13,7 +13,7 @@ struct WaiverWireView: View {
     let matchupInfoCache: [String: LineupRXView.MatchupInfo]
     let gameTimeCache: [String: String]
     
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -159,31 +159,19 @@ struct WaiverPlayerRow: View {
         return gameTimeCache[team]
     }
     
+    // Get SleeperPlayer for navigation
+    private var sleeperPlayer: SleeperPlayer? {
+        sleeperPlayerCache[playerID]
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
-            // Player headshot from Sleeper
-            if let sleeperPlayer = sleeperPlayerCache[playerID] {
-                AsyncImage(url: sleeperPlayer.headshotURL) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Circle()
-                            .fill(Color.gray.opacity(0.3))
-                    }
-                }
-                .frame(width: 40, height: 40)
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.gpGreen.opacity(0.5), lineWidth: 2)
-                )
-            } else {
-                Circle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(width: 40, height: 40)
-            }
+            // Player headshot - CLICKABLE to player stats
+            ClickablePlayerImage(
+                sleeperPlayer: sleeperPlayer,
+                size: 40,
+                borderColor: .gpGreen
+            )
             
             // Player info
             VStack(alignment: .leading, spacing: 4) {

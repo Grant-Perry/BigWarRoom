@@ -317,8 +317,9 @@ final class PlayerStatsStore {
     }
     
     private func loadESPNPosition(_ position: String) async -> [String: PlayerStats2024]? {
-        // ESPN's hidden fantasy API endpoints
-        let urlString = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2024/segments/0/leaguedefaults/3?view=kona_player_info"
+        // ESPN's hidden fantasy API endpoints - use SeasonYearManager as SOT
+        let season = SeasonYearManager.shared.selectedYear
+        let urlString = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(season)/segments/0/leaguedefaults/3?view=kona_player_info"
         
         guard let url = URL(string: urlString) else { return nil }
         

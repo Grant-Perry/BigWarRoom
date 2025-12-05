@@ -12,7 +12,7 @@ struct OptimalLineupView: View {
     let sleeperPlayerCache: [String: SleeperPlayer]
     let changeInfoCache: [String: (isChanged: Bool, improvement: Double?)]
     
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
     
     // Calculate active and bench totals
     private var activeTotal: Double {
@@ -332,8 +332,12 @@ struct OptimalLineupPlayerRow: View {
                 .foregroundColor(isChanged ? .gpBlue : .gpGreen)
                 .font(.system(size: 16))
             
-            // Player headshot - optimized with cached image
-            CachedPlayerImage(url: sleeperPlayer?.headshotURL, size: 40)
+            // Player headshot - CLICKABLE to player stats
+            ClickablePlayerImage(
+                sleeperPlayer: sleeperPlayer,
+                size: 40,
+                borderColor: .gpGreen
+            )
             
             // Player info
             VStack(alignment: .leading, spacing: 4) {
@@ -419,8 +423,12 @@ struct BenchPlayerRow: View {
                 .foregroundColor(wasStarting ? .gpRedPink : .gray.opacity(0.3))
                 .font(.system(size: wasStarting ? 16 : 8))
             
-            // Player headshot - optimized
-            CachedPlayerImage(url: sleeperPlayer?.headshotURL, size: 32)
+            // Player headshot - CLICKABLE to player stats
+            ClickablePlayerImage(
+                sleeperPlayer: sleeperPlayer,
+                size: 32,
+                borderColor: .gray
+            )
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(player.fullName)
@@ -486,6 +494,59 @@ struct CachedPlayerImage: View {
         } else {
             placeholderView
                 .frame(width: size, height: size)
+        }
+    }
+    
+    private var placeholderView: some View {
+        Circle()
+            .fill(Color.gray.opacity(0.3))
+    }
+}
+
+// MARK: - Clickable Player Image with Navigation to Stats
+
+struct ClickablePlayerImage: View {
+    let sleeperPlayer: SleeperPlayer?
+    let size: CGFloat
+    var borderColor: Color = .gpGreen
+    var borderWidth: CGFloat = 2
+    
+    var body: some View {
+        if let player = sleeperPlayer {
+            NavigationLink(destination: PlayerStatsCardView(player: player, team: nil)) {
+                playerImageContent
+            }
+            .buttonStyle(PlainButtonStyle())
+        } else {
+            playerImageContent
+        }
+    }
+    
+    private var playerImageContent: some View {
+        Group {
+            if let url = sleeperPlayer?.headshotURL {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    case .failure, .empty:
+                        placeholderView
+                    @unknown default:
+                        placeholderView
+                    }
+                }
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .overlay(
+                    Circle()
+                        .stroke(borderColor.opacity(0.5), lineWidth: borderWidth)
+                )
+            } else {
+                placeholderView
+                    .frame(width: size, height: size)
+            }
         }
     }
     

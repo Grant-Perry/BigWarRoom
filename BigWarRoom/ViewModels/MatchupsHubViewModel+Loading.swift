@@ -170,18 +170,9 @@ extension MatchupsHubViewModel {
         
         // print("🔥 SESSION \(sessionId): Exited withTaskGroup, proceeding to finalization...")
         
-        // 🔥 FINAL STEPS: 90% -> 100%
-        // print("🔥 SESSION \(sessionId): Starting finalization at 95%...")
+        // 🔥 FINAL STEPS: 90% -> 100% (no artificial delays!)
         await updateProgress(0.95, message: "Finalizing matchups...", sessionId: sessionId)
-        
-        // Brief pause to show near completion
-        try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
-        
-        // print("🔥 SESSION \(sessionId): Setting progress to 100%...")
         await updateProgress(1.0, message: "Complete!", sessionId: sessionId)
-        
-        // Brief pause to show 100% completion
-        try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 seconds
         
         // Finalize loading
         // print("🔥 SESSION \(sessionId): Calling finalizeLoading()...")

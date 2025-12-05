@@ -41,6 +41,13 @@ struct MoreTabView: View {
             destination: .settings
         ),
         MenuItem(
+            icon: "pills.fill",
+            iconColor: .gpGreen,
+            title: "Lineup RX",
+            subtitle: "AI-powered lineup optimization",
+            destination: .lineupRX
+        ),
+        MenuItem(
             icon: "person.3.fill",
             iconColor: .green,
             title: "Team Rosters",
@@ -181,6 +188,8 @@ struct MoreTabView: View {
             BettingOddsTestView()
         case .intelligence:
             OpponentIntelligenceDashboardView()
+        case .lineupRX:
+            LineupRXLeaguePickerView()
         }
     }
 }
@@ -197,7 +206,7 @@ struct MenuItem: Identifiable {
 }
 
 enum MenuDestination: CaseIterable {
-    case playerSearch, features, settings, teamRosters, warRoom, aiPicks, draftBoard, livePicks, myRoster, fantasy, bettingOddsTest, intelligence
+    case playerSearch, features, settings, teamRosters, warRoom, aiPicks, draftBoard, livePicks, myRoster, fantasy, bettingOddsTest, intelligence, lineupRX
 }
 
 // MARK: - Enhanced More Row Component

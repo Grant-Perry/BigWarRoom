@@ -10,7 +10,7 @@ import SwiftUI
 struct MoveInstructionsView: View {
     let result: LineupOptimizerService.OptimizationResult
     
-    @State private var isExpanded: Bool = true
+    @State private var isExpanded: Bool = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -91,8 +91,9 @@ struct MoveInstructionsView: View {
             .fill(Color.black.opacity(0.6))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color.gpBlue.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.gpRedPink, lineWidth: 2)
             )
+            .shadow(color: Color.gpRedPink.opacity(0.6), radius: 8, x: 0, y: 0)
     }
 }
 

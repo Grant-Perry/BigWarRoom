@@ -143,59 +143,23 @@ struct NFLScheduleView: View {
     
     // MARK: -> Header Section
     private func scheduleHeader(viewModel: NFLScheduleViewModel) -> some View {
-        VStack(spacing: 12) {
-            // Large "WEEK" title like FOX - CENTERED
-            VStack(spacing: 4) {
-                Text("WEEK \(WeekSelectionManager.shared.selectedWeek)")
-                    .font(.system(size: 60, weight: .bold, design: .default))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 4)
+        VStack(spacing: 8) {
+            // Week picker - using reusable TheWeekPicker component
+            TheWeekPicker(showingWeekPicker: $showingWeekPicker)
+            
+            // Week starting date with calendar icon
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.7))
                 
-                // Week starting date
-                Text("Week starting: \(getWeekStartDate())")
-                    .font(.system(size: 14, weight: .regular))
+                Text(getWeekStartDate())
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.9))
-                    .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
             }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, 20)
-            .padding(.bottom, 12)
+            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
             
-            // NFL Schedule title and controls
-            HStack {
-                Text("NFL SCHEDULE")
-                    .font(.system(size: 16, weight: .black, design: .default))
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                // Week picker - styled like Live Players
-                Button(action: { showingWeekPicker = true }) {
-                    HStack(spacing: 6) {
-                        Text("WEEK \(WeekSelectionManager.shared.selectedWeek)")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.blue)
-                        
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.blue)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.blue.opacity(0.5), lineWidth: 1)
-                            )
-                    )
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            .padding(.horizontal, 20)
-            
-            // Live indicator
+            // Live indicator (only show if live games)
             if viewModel.games.contains(where: { $0.isLive }) {
                 HStack(spacing: 6) {
                     Circle()
@@ -207,10 +171,8 @@ struct NFLScheduleView: View {
                     Text("LIVE GAMES")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.white)
-                    
-                    Spacer()
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, 12)
                 .padding(.vertical, 4)
                 .background(
                     Capsule()
@@ -220,10 +182,9 @@ struct NFLScheduleView: View {
                                 .stroke(Color.red.opacity(0.4), lineWidth: 1)
                         )
                 )
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 20)
             }
         }
+        .padding(.horizontal, 20)
     }
     
     // MARK: -> Games List
@@ -367,16 +328,35 @@ struct NFLScheduleView: View {
 
     // MARK: - Helper function to get week start date
     private func getWeekStartDate() -> String {
-        // NFL 2024 season start date (Week 1 starts September 5, 2024)
-        let season2024Start = Calendar.current.date(from: DateComponents(year: 2024, month: 9, day: 5))!
         let calendar = Calendar.current
+        let selectedYearString = SeasonYearManager.shared.selectedYear
+        let selectedYear = Int(selectedYearString) ?? 2025
+        
+        // NFL season start date - Week 1 starts first Thursday of September
+        // 2024 season: September 5, 2024
+        // 2025 season: September 4, 2025
+        let seasonStartDate: Date
+        if selectedYear == 2025 {
+            seasonStartDate = calendar.date(from: DateComponents(year: 2025, month: 9, day: 4))!
+        } else if selectedYear == 2024 {
+            seasonStartDate = calendar.date(from: DateComponents(year: 2024, month: 9, day: 5))!
+        } else {
+            // Fallback: estimate first Thursday of September for any year
+            var components = DateComponents(year: selectedYear, month: 9, day: 1)
+            var startDate = calendar.date(from: components)!
+            // Find first Thursday (weekday 5)
+            while calendar.component(.weekday, from: startDate) != 5 {
+                startDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
+            }
+            seasonStartDate = startDate
+        }
         
         // Calculate the start date for the selected week
-        let weekStartDate = calendar.date(byAdding: .day, value: (WeekSelectionManager.shared.selectedWeek - 1) * 7, to: season2024Start)!
+        let weekStartDate = calendar.date(byAdding: .day, value: (WeekSelectionManager.shared.selectedWeek - 1) * 7, to: seasonStartDate)!
         
-        // Format as "Thursday, January 4"
+        // Format as "Thursday, Dec 5"
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
+        formatter.dateFormat = "EEEE, MMM d"
         return formatter.string(from: weekStartDate)
     }
 }

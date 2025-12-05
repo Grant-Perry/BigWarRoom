@@ -39,76 +39,74 @@ struct LineupRXView: View {
     }
     
     var body: some View {
-        NavigationStack {
-            ZStack {
-                // Background
-                Image("BG7")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(0.35)
-                    .ignoresSafeArea(.all)
-                
-                ScrollView {
-                    LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
-                        // 🔥 STICKY HEADER: Wrap in Section to make it stick at top
-                        Section(header: stickyHeaderSection) {
-                            if let error = errorMessage {
-                                errorView(error)
-                            } else if optimizationResult == nil && isInitialLoad {
-                                // 🔥 SKELETON SCREEN: Show immediately on first load
-                                skeletonLoadingView
-                            } else {
-                                // Content sections - ALL EXTERNAL VIEWS NOW
-                                if let result = optimizationResult {
-                                    CurrentLineupAnalysisView(result: result)
-                                        .id("analysis")
-                                    
-                                    if !result.changes.isEmpty {
-                                        RecommendedChangesView(
-                                            result: result,
-                                            sleeperPlayerCache: sleeperPlayerCache,
-                                            matchupInfoCache: matchupInfoCache,
-                                            gameTimeCache: gameTimeCache
-                                        )
-                                        .id("changes")
-                                        
-                                        MoveInstructionsView(result: result)
-                                            .id("instructions")
-                                    }
-                                    
-                                    ByeWeekAlertsView(alerts: alertsCache)
-                                        .id("bye")
-                                    
-                                    if !waiverRecommendations.isEmpty {
-                                        WaiverWireView(
-                                            groupedWaivers: groupedWaivers,
-                                            sleeperPlayerCache: sleeperPlayerCache,
-                                            matchupInfoCache: matchupInfoCache,
-                                            gameTimeCache: gameTimeCache
-                                        )
-                                        .id("waiver")
-                                    }
-                                    
-                                    OptimalLineupView(
+        ZStack {
+            // Background
+            Image("BG7")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .opacity(0.35)
+                .ignoresSafeArea(.all)
+            
+            ScrollView {
+                LazyVStack(spacing: 20, pinnedViews: [.sectionHeaders]) {
+                    // 🔥 STICKY HEADER: Wrap in Section to make it stick at top
+                    Section(header: stickyHeaderSection) {
+                        if let error = errorMessage {
+                            errorView(error)
+                        } else if optimizationResult == nil && isInitialLoad {
+                            // 🔥 SKELETON SCREEN: Show immediately on first load
+                            skeletonLoadingView
+                        } else {
+                            // Content sections - ALL EXTERNAL VIEWS NOW
+                            if let result = optimizationResult {
+                                CurrentLineupAnalysisView(result: result)
+                                    .id("analysis")
+                                
+                                if !result.changes.isEmpty {
+                                    RecommendedChangesView(
                                         result: result,
                                         sleeperPlayerCache: sleeperPlayerCache,
-                                        changeInfoCache: changeInfoCache
+                                        matchupInfoCache: matchupInfoCache,
+                                        gameTimeCache: gameTimeCache
                                     )
-                                    .id("optimal")
+                                    .id("changes")
+                                    
+                                    MoveInstructionsView(result: result)
+                                        .id("instructions")
                                 }
+                                
+                                ByeWeekAlertsView(alerts: alertsCache, sleeperPlayerCache: sleeperPlayerCache)
+                                    .id("bye")
+                                
+                                if !waiverRecommendations.isEmpty {
+                                    WaiverWireView(
+                                        groupedWaivers: groupedWaivers,
+                                        sleeperPlayerCache: sleeperPlayerCache,
+                                        matchupInfoCache: matchupInfoCache,
+                                        gameTimeCache: gameTimeCache
+                                    )
+                                    .id("waiver")
+                                }
+                                
+                                OptimalLineupView(
+                                    result: result,
+                                    sleeperPlayerCache: sleeperPlayerCache,
+                                    changeInfoCache: changeInfoCache
+                                )
+                                .id("optimal")
                             }
                         }
                     }
-                    .padding()
                 }
-                .scrollIndicators(.visible)
+                .padding()
             }
-            .navigationBarHidden(true)
-            .onAppear {
-                currentWeek = WeekSelectionManager.shared.selectedWeek
-                Task {
-                    await loadData()
-                }
+            .scrollIndicators(.visible)
+        }
+        .navigationBarHidden(true)
+        .onAppear {
+            currentWeek = WeekSelectionManager.shared.selectedWeek
+            Task {
+                await loadData()
             }
         }
         .fullScreenCover(isPresented: $showingWeekPicker) {
@@ -134,43 +132,40 @@ struct LineupRXView: View {
         VStack(spacing: 10) {
             // Top row: Close | League Name + Logo | Week | Refresh
             HStack(spacing: 12) {
-                // Close button
+                // Back button (navigation-style)
                 Button(action: {
-                    // 💊 RX: Refresh optimization status for this matchup when closing
+                    // 💊 RX: Refresh optimization status for this matchup when leaving
                     Task {
                         await MatchupsHubViewModel.shared.checkLineupOptimization(for: matchup)
                     }
                     dismiss()
                 }) {
                     HStack(spacing: 4) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 12, weight: .semibold))
-                        Text("Close")
-                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Back")
+                            .font(.system(size: 15, weight: .medium))
                     }
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.15))
-                    )
+                    .foregroundColor(.gpBlue)
                 }
                 
-                // League name with logo
-                HStack(spacing: 8) {
+                // League name with logo (smaller logo, 2-line league name)
+                HStack(spacing: 6) {
                     if currentMatchup.league.source == .espn {
                         AppConstants.espnLogo
-                            .frame(width: 20, height: 20)
+                            .scaleEffect(0.32)
+                            .frame(width: 16, height: 16)
                     } else {
                         AppConstants.sleeperLogo
-                            .frame(width: 20, height: 20)
+                            .scaleEffect(0.32)
+                            .frame(width: 16, height: 16)
                     }
                     
                     Text(currentMatchup.league.league.name)
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                 }
                 
                 Spacer()

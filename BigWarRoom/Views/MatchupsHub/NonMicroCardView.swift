@@ -24,8 +24,8 @@ struct NonMicroCardView: View {
     @State private var glowIntensity: Double = 0.0
     @State private var eliminatedPulse: Bool = false
     
-    // 💊 RX Sheet state
-    @State private var showingLineupRX = false
+    // 💊 RX Navigation state (converted from sheet to navigationDestination)
+    @State private var navigateToLineupRX = false
     
     var body: some View {
         VStack {
@@ -44,7 +44,7 @@ struct NonMicroCardView: View {
                     scoreAnimation: scoreAnimation,
                     isGamesFinished: false, // 🔥 SIMPLIFIED: Always false, no celebration logic
                     celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
-                    onRXTap: { showingLineupRX = true },
+                    onRXTap: { navigateToLineupRX = true },
                     isLineupOptimized: isLineupOptimized
                 )
             }
@@ -73,7 +73,7 @@ struct NonMicroCardView: View {
                         .stroke(Color.gpRedPink.opacity(0.3), lineWidth: 1)
                 )
         )
-        .sheet(isPresented: $showingLineupRX) {
+        .navigationDestination(isPresented: $navigateToLineupRX) {
             LineupRXView(matchup: matchup)
         }
     }
