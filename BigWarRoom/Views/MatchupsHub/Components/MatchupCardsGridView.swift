@@ -13,20 +13,37 @@ struct MatchupCardsGridView: View {
     let microMode: Bool
     let dualViewMode: Bool
     let expandedCardId: String?
-    // 🏈 NAVIGATION FREEDOM: Remove callback - using NavigationLinks instead
-    // let onShowDetail: (UnifiedMatchup) -> Void
     let onMicroCardTap: (String) -> Void
     let onExpandedCardDismiss: () -> Void
     let getWinningStatus: (UnifiedMatchup) -> Bool
-    let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
+    let getOptimizationStatus: (UnifiedMatchup) -> Bool
+    
+    // 🔥 NEW: Bar-style layout toggle
+    @AppStorage("MatchupsHub_UseBarLayout") private var useBarLayout = false
     
     var body: some View {
         Group {
             // 🔥 NEW: Handle empty matchups with a friendly message
             if sortedMatchups.isEmpty {
                 NoMatchupsThisWeekView()
+            } else if useBarLayout && !microMode {
+                // 🔥 NEW: Bar-style layout (single column only)
+                LazyVStack(spacing: 40) {
+                    ForEach(sortedMatchups, id: \.id) { matchup in
+                        NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+                            MatchupBarCardView(
+                                matchup: matchup,
+                                isWinning: getWinningStatus(matchup),
+                                isLineupOptimized: getOptimizationStatus(matchup)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
             } else {
-                // 🔥 NUCLEAR REBUILD: Simple, bulletproof grid
+                // Original grid layouts
                 if microMode {
                     // Micro cards - 4 columns with more top padding
                     LazyVGrid(
@@ -88,20 +105,24 @@ struct MatchupCardsGridView: View {
                 }
             }
         }
-        .padding(.horizontal, 24) // Increased from 20 to 24 to prevent edge clipping
+        .padding(.horizontal, useBarLayout ? 0 : 24)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: dualViewMode)
+        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: useBarLayout)
         .overlay(
-            ExpandedCardOverlayView(
-                expandedCardId: expandedCardId,
-                sortedMatchups: sortedMatchups,
-                getWinningStatus: getWinningStatus,
-                // 🏈 NAVIGATION FREEDOM: Remove callback - NavigationLink handles tap
-                // onShowDetail: onShowDetail,
-                onDismiss: onExpandedCardDismiss,
-                getOptimizationStatus: getOptimizationStatus
-            )
+            // Only show overlay for non-bar layouts
+            Group {
+                if !useBarLayout {
+                    ExpandedCardOverlayView(
+                        expandedCardId: expandedCardId,
+                        sortedMatchups: sortedMatchups,
+                        getWinningStatus: getWinningStatus,
+                        onDismiss: onExpandedCardDismiss,
+                        getOptimizationStatus: getOptimizationStatus
+                    )
+                }
+            }
         )
     }
 }

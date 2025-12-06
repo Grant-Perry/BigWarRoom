@@ -258,12 +258,27 @@ struct ESPNTeam: Codable, Identifiable {
     let record: ESPNRecord?
     let roster: ESPNRoster?
     let valuesByStat: [String: ESPNStatValue]?
+    let logo: String? // 🔥 NEW: Team logo URL
+    let logoType: String? // 🔥 NEW: Logo type (e.g. "VECTOR")
     
     var displayName: String {
         if let location = location, let nickname = nickname {
             return "\(location) \(nickname)"
         }
         return nickname ?? location ?? "Team \(id)"
+    }
+    
+    // 🔥 NEW: Get logo URL (handles both direct URL and ESPN CDN URLs)
+    var logoURL: URL? {
+        guard let logo = logo, !logo.isEmpty else { return nil }
+        
+        // If it's already a full URL, use it directly
+        if logo.starts(with: "http://") || logo.starts(with: "https://") {
+            return URL(string: logo)
+        }
+        
+        // Otherwise, treat it as an ESPN CDN path
+        return URL(string: "https://g.espncdn.com\(logo)")
     }
     
     /// Convert to SleeperRoster for compatibility with league context for manager names
@@ -299,7 +314,7 @@ struct ESPNTeam: Codable, Identifiable {
             metadata: SleeperRosterMetadata(
                 teamName: displayName,
                 ownerName: managerName, // USE THE REAL MANAGER NAME FROM LEAGUE MEMBERS!
-                avatar: nil,
+                avatar: logoURL?.absoluteString, // 🔥 NEW: Pass through ESPN team logo URL
                 record: recordString
             )
         )

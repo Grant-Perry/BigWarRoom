@@ -147,28 +147,28 @@ final class ESPNAPIClient: DraftAPIClient {
             
             // 🔍 DEBUG: Log top-level JSON keys to see if positionAgainstOpponent exists
             if AppConstants.debug, let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("🔍 ESPN API Response Top-Level Keys: \(jsonObject.keys.sorted())")
+                DebugPrint(mode: .espnAPI, "ESPN API Response Top-Level Keys: \(jsonObject.keys.sorted())")
                 if let positionData = jsonObject["positionAgainstOpponent"] {
-                    print("✅ positionAgainstOpponent key EXISTS in response")
-                    print("🔍 positionAgainstOpponent type: \(type(of: positionData))")
+                    DebugPrint(mode: .espnAPI, "✅ positionAgainstOpponent key EXISTS in response")
+                    DebugPrint(mode: .espnAPI, "positionAgainstOpponent type: \(type(of: positionData))")
                     if let dict = positionData as? [String: Any] {
-                        print("🔍 positionAgainstOpponent keys: \(dict.keys.sorted())")
+                        DebugPrint(mode: .espnAPI, "positionAgainstOpponent keys: \(dict.keys.sorted())")
                         if let innerRatings = dict["positionalRatings"] as? [String: Any] {
-                            print("🔍 positionalRatings has \(innerRatings.keys.count) position entries")
-                            print("🔍 Position IDs: \(Array(innerRatings.keys.sorted()))")
+                            DebugPrint(mode: .espnAPI, "positionalRatings has \(innerRatings.keys.count) position entries")
+                            DebugPrint(mode: .espnAPI, "Position IDs: \(Array(innerRatings.keys.sorted()))")
                             // Check one position to see team structure
                             if let firstKey = innerRatings.keys.first,
                                let positionData = innerRatings[firstKey] as? [String: Any],
                                let ratingsByOpp = positionData["ratingsByOpponent"] as? [String: Any],
                                let firstTeamKey = ratingsByOpp.keys.first,
                                let teamRating = ratingsByOpp[firstTeamKey] as? [String: Any] {
-                                print("🔍 Sample team rating keys: \(teamRating.keys.sorted())")
-                                print("🔍 Sample team rating values: \(teamRating)")
+                                DebugPrint(mode: .espnAPI, "Sample team rating keys: \(teamRating.keys.sorted())")
+                                DebugPrint(mode: .espnAPI, "Sample team rating values: \(teamRating)")
                             }
                         }
                     }
                 } else {
-                    print("❌ positionAgainstOpponent key NOT FOUND in response")
+                    DebugPrint(mode: .espnAPI, "❌ positionAgainstOpponent key NOT FOUND in response")
                 }
             }
     
@@ -177,26 +177,40 @@ final class ESPNAPIClient: DraftAPIClient {
             // Try to decode and catch any errors related to positionAgainstOpponent
             do {
                 let espnLeague = try decoder.decode(ESPNLeague.self, from: data)
-                if AppConstants.debug {
-                    print("🔍 After decoding: positionAgainstOpponent is nil? \(espnLeague.positionAgainstOpponent == nil)")
-                    
-                    // If nil, try to decode just that field manually to see the error
-                    if espnLeague.positionAgainstOpponent == nil {
-                        if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let posData = jsonObject["positionAgainstOpponent"] {
-                            print("⚠️ positionAgainstOpponent exists in JSON but failed to decode")
-                            print("⚠️ Attempting manual decode to see error...")
-                            
-                            let posDataJson = try JSONSerialization.data(withJSONObject: ["positionAgainstOpponent": posData])
-                            struct Wrapper: Codable {
-                                let positionAgainstOpponent: ESPNPositionalRatingsResponse?
+                
+                // 🔍 DEBUG: Log team logo data to verify we're capturing it
+                DebugPrint(mode: .espnAPI, "ESPN League \(leagueID) - Team Logo Check:")
+                if let teams = espnLeague.teams {
+                    for team in teams {
+                        let logoStatus = team.logo != nil ? "✅ HAS LOGO" : "❌ NO LOGO"
+                        DebugPrint(mode: .espnAPI, "  Team \(team.id) (\(team.displayName)): \(logoStatus)")
+                        if let logo = team.logo {
+                            DebugPrint(mode: .espnAPI, "    Logo: \(logo)")
+                            if let logoURL = team.logoURL {
+                                DebugPrint(mode: .espnAPI, "    Full URL: \(logoURL.absoluteString)")
                             }
-                            do {
-                                let wrapper = try decoder.decode(Wrapper.self, from: posDataJson)
-                                print("✅ Manual decode successful: \(wrapper.positionAgainstOpponent != nil)")
-                            } catch {
-                                print("❌ Manual decode error: \(error)")
-                            }
+                        }
+                    }
+                }
+                
+                DebugPrint(mode: .espnAPI, "After decoding: positionAgainstOpponent is nil? \(espnLeague.positionAgainstOpponent == nil)")
+                
+                // If nil, try to decode just that field manually to see the error
+                if espnLeague.positionAgainstOpponent == nil {
+                    if let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let posData = jsonObject["positionAgainstOpponent"] {
+                        DebugPrint(mode: .espnAPI, "⚠️ positionAgainstOpponent exists in JSON but failed to decode")
+                        DebugPrint(mode: .espnAPI, "⚠️ Attempting manual decode to see error...")
+                        
+                        let posDataJson = try JSONSerialization.data(withJSONObject: ["positionAgainstOpponent": posData])
+                        struct Wrapper: Codable {
+                            let positionAgainstOpponent: ESPNPositionalRatingsResponse?
+                        }
+                        do {
+                            let wrapper = try decoder.decode(Wrapper.self, from: posDataJson)
+                            DebugPrint(mode: .espnAPI, "✅ Manual decode successful: \(wrapper.positionAgainstOpponent != nil)")
+                        } catch {
+                            DebugPrint(mode: .espnAPI, "❌ Manual decode error: \(error)")
                         }
                     }
                 }

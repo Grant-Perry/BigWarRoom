@@ -45,45 +45,20 @@ struct NonMicroTeamSection: View {
     
     var body: some View {
         VStack(spacing: dualViewMode ? 6 : 3) {
-            // Avatar with optional team logo tap
-            Group {
-                if let avatarURL = team.avatarURL {
-                    AsyncImage(url: avatarURL) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        // Show team initials immediately while avatar loads
-                        NonMicroTeamInitials(team: team, isWinning: isTeamWinning)
-                    }
-                    .frame(width: dualViewMode ? 38 : 28, height: dualViewMode ? 38 : 28)
-                    .clipShape(Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
-                                lineWidth: isTeamWinning ? 2 : 1
-                            )
+            // Use AsyncTeamAvatarView for proper ESPN logo rendering
+            AsyncTeamAvatarView(
+                team: team,
+                size: dualViewMode ? 38 : 28
+            )
+            .overlay(
+                Circle()
+                    .stroke(
+                        isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
+                        lineWidth: isTeamWinning ? 2 : 1
                     )
-                    .onTapGesture {
-                        // 🔥 NEW: Handle avatar tap for team roster
-                        handleTeamTap()
-                    }
-                } else {
-                    NonMicroTeamInitials(team: team, isWinning: isTeamWinning)
-                        .frame(width: dualViewMode ? 38 : 28, height: dualViewMode ? 38 : 28)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    isTeamWinning ? Color.gpGreen : Color.gpRedPink.opacity(0.6),
-                                    lineWidth: isTeamWinning ? 2 : 1
-                                )
-                        )
-                        .onTapGesture {
-                            // 🔥 NEW: Handle initials tap for team roster
-                            handleTeamTap()
-                        }
-                }
+            )
+            .onTapGesture {
+                handleTeamTap()
             }
             
             // Team name

@@ -530,12 +530,41 @@ final class LeagueMatchupProvider {
             return "ESPN Team \(espnTeam.id)"
         }()
         
+        // 🔥 NEW: Get team logo URL from ESPN league data
+        let teamLogoURL: String? = {
+            DebugPrint(mode: .espnAPI, "🎭 AVATAR DEBUG: Processing ESPN team ID \(espnTeam.id)")
+            DebugPrint(mode: .espnAPI, "   currentESPNLeague exists? \(currentESPNLeague != nil)")
+            
+            if let espnLeague = currentESPNLeague {
+                DebugPrint(mode: .espnAPI, "   Looking for team \(espnTeam.id) in \(espnLeague.teams?.count ?? 0) teams")
+                
+                if let espnTeamData = espnLeague.teams?.first(where: { $0.id == espnTeam.id }) {
+                    DebugPrint(mode: .espnAPI, "   ✅ Found team data for \(espnTeam.id)")
+                    DebugPrint(mode: .espnAPI, "   Team logo field: \(espnTeamData.logo ?? "nil")")
+                    DebugPrint(mode: .espnAPI, "   Team logoURL: \(espnTeamData.logoURL?.absoluteString ?? "nil")")
+                    
+                    let logoURL = espnTeamData.logoURL?.absoluteString
+                    DebugPrint(mode: .espnAPI, "   🎯 Setting avatar to: \(logoURL ?? "nil")")
+                    return logoURL
+                } else {
+                    DebugPrint(mode: .espnAPI, "   ❌ Team \(espnTeam.id) NOT FOUND in currentESPNLeague.teams")
+                }
+            } else {
+                DebugPrint(mode: .espnAPI, "   ❌ currentESPNLeague is nil!")
+            }
+            
+            DebugPrint(mode: .espnAPI, "   🎯 Final avatar value: nil")
+            return nil
+        }()
+        
+        DebugPrint(mode: .espnAPI, "🎭 CREATING FantasyTeam for \(realTeamName) with avatar: \(teamLogoURL ?? "nil")")
+        
         return FantasyTeam(
             id: String(espnTeam.id),
             name: realTeamName,
             ownerName: realTeamName,
             record: record,
-            avatar: nil,
+            avatar: teamLogoURL,  // 🔥 FIXED: Pass through ESPN team logo URL
             currentScore: score,
             projectedScore: score * 1.05,
             roster: fantasyPlayers,

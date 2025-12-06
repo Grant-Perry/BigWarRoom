@@ -16,6 +16,9 @@ struct AppSettingsView: View {
     // 🎨 WOODY'S REDESIGN TOGGLE
     @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
     
+    // 🔥 NEW: Bar-style layout toggle for Mission Control
+    @AppStorage("MatchupsHub_UseBarLayout") private var useBarLayout = false
+    
     var body: some View {
         NavigationView {
             List {
@@ -282,6 +285,28 @@ struct AppSettingsView: View {
                         Spacer()
                         
                         Toggle("", isOn: $useRedesignedCards)
+                            .labelsHidden()
+                    }
+                    
+                    // 🔥 NEW: Bar-style layout toggle for Mission Control
+                    HStack {
+                        Image(systemName: "rectangle.stack.fill")
+                            .foregroundColor(.blue)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mission Control Bar Layout")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("Modern horizontal bars for matchups")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $useBarLayout)
                             .labelsHidden()
                     }
                     

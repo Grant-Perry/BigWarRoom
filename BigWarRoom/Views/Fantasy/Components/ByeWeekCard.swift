@@ -14,10 +14,10 @@ struct ByeWeekCard: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Team avatar (grayed out for bye weeks)
-            TeamAvatarView(
+            // Use AsyncTeamAvatarView for proper ESPN logo rendering
+            AsyncTeamAvatarView(
                 team: team, 
-                size: CGSize(width: 50, height: 50),
+                size: 50,
                 isGrayedOut: true
             )
             

@@ -150,7 +150,6 @@ struct FantasyMatchupDetailView: View {
         ScrollView {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
-                    // MVVM REFACTOR: Using proper View components with filter parameters
                     FantasyMatchupActiveRosterSectionFiltered(
                         matchup: matchup,
                         fantasyViewModel: viewModel,
@@ -175,9 +174,8 @@ struct FantasyMatchupDetailView: View {
                     simplifiedRosterView
                 }
             }
-            .padding(.top, 8)
-            // FIX: Increase horizontal padding to prevent clipping
-            .padding(.horizontal, 16) // Increased from 8 to 16
+            .padding(.top, 4)
+            .padding(.horizontal, 16)
         }
         .clipped()
     }

@@ -81,15 +81,36 @@ struct FantasyDetailHeaderView: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Team comparison row
+        VStack(spacing: 0) {
+            // Team comparison row - COMPACT VERSION
             teamComparisonRow
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
             
-            // Enhanced controls section
+            // Enhanced controls section with distinct background
             enhancedControlsSection
+                .background(
+                    // Darker, distinct background for filter row
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color.black.opacity(0.6),
+                                    Color.black.opacity(0.8)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+                .overlay(
+                    // Subtle border to separate from header
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
         }
-        .padding(.vertical, 20)
-        .padding(.horizontal, 20)
         .background(
             ZStack {
                 // Main gradient background
@@ -146,190 +167,196 @@ struct FantasyDetailHeaderView: View {
     // MARK: - View Components
     
     private var teamComparisonRow: some View {
-        HStack(spacing: 24) {
-            // Home team (left side)
-            VStack(spacing: 4) {
-                // Avatar with border
-                ZStack {
-                    if let url = matchup.homeTeam.avatarURL {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 48, height: 48)
-                                .clipShape(Circle())
-                        } placeholder: {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .frame(width: 48, height: 48)
-                                .foregroundColor(.gray)
-                        }
-                    } else {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    if homeTeamIsWinning {
-                        Circle()
-                            .strokeBorder(Color.gpGreen, lineWidth: 2.5)
-                            .frame(width: 52, height: 52)
-                    }
-                }
-                
-                // Manager name
+        HStack(spacing: 20) {
+            // Home team (left side) - COMPACT
+            VStack(spacing: 3) {
+                // Manager name FIRST
                 Text(matchup.homeTeam.ownerName)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.yellow)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record - always show with label
-                // 🔥 DRY FIX: Use record directly from matchup team, fallback to getManagerRecord, then espnTeamRecords
-                let homeRecordText: String = {
-                    let managerID = matchup.homeTeam.id
-                    
-                    // First try: Direct access from matchup team (most reliable)
-                    if let record = matchup.homeTeam.record {
-                        return record.displayString
+                // Avatar and Record on same line
+                HStack(spacing: 6) {
+                    // Smaller Avatar with border
+                    ZStack {
+                        if let url = matchup.homeTeam.avatarURL {
+                            AsyncTeamAvatarView(
+                                url: url,
+                                size: 32,
+                                fallbackInitials: getInitials(from: matchup.homeTeam.ownerName)
+                            )
+                        } else {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Text(getInitials(from: matchup.homeTeam.ownerName))
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        
+                        if homeTeamIsWinning {
+                            Circle()
+                                .strokeBorder(Color.gpGreen, lineWidth: 2)
+                                .frame(width: 36, height: 36)
+                        }
                     }
                     
-                    // Second try: Direct lookup in espnTeamRecords if managerID is a number (faster than getManagerRecord)
-                    if let teamId = Int(managerID),
-                       let record = fantasyViewModel?.espnTeamRecords[teamId] {
-                        return record.displayString
-                    }
-                    
-                    // Third try: Use FantasyViewModel's getManagerRecord (handles sync cases)
-                    if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
-                        return record
-                    }
-                    
-                    return "N/A"
-                }()
-                Text("Record: \(homeRecordText)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-                
-                // SCORE and YET TO PLAY stack
-                VStack(spacing: 1) {
-                    // Team score
-                    Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
-                    
-                    // Yet to play count
-                    Text("Yet to play: \(homeTeamYetToPlay)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
+                    // Record (lose "Record:" label)
+                    let homeRecordText: String = {
+                        let managerID = matchup.homeTeam.id
+                        
+                        if let record = matchup.homeTeam.record {
+                            return record.displayString
+                        }
+                        
+                        if let teamId = Int(managerID),
+                           let record = fantasyViewModel?.espnTeamRecords[teamId] {
+                            return record.displayString
+                        }
+                        
+                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
+                            return record
+                        }
+                        
+                        return "N/A"
+                    }()
+                    Text(homeRecordText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.gray)
                 }
-                .padding(.top, 2)
+                
+                // SCORE
+                Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                
+                // Yet to play - larger number
+                HStack(spacing: 3) {
+                    Text("Yet to play:")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text("\(homeTeamYetToPlay)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                }
             }
             .frame(maxWidth: .infinity)
             
-            // Center VS section
-            VStack(spacing: 4) {
+            // Center VS section - COMPACT
+            VStack(spacing: 2) {
                 Text("VS")
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.white)
                 
                 Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10))
                     .foregroundColor(.gray)
                 
                 if let scoreDiff = fantasyViewModel?.scoreDifferenceText(matchup: matchup), !scoreDiff.isEmpty {
                     Text(scoreDiff)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundColor(.gpGreen)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: 4)
                                 .fill(Color.black.opacity(0.4))
                         )
                 }
             }
-            .frame(width: 70)
+            .frame(width: 60)
             
-            // Away team (right side)
-            VStack(spacing: 4) {
-                // Avatar with border
-                ZStack {
-                    if let url = matchup.awayTeam.avatarURL {
-                        AsyncImage(url: url) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 48, height: 48)
-                                .clipShape(Circle())
-                        } placeholder: {
-                            Image(systemName: "person.crop.circle.fill")
-                                .resizable()
-                                .frame(width: 48, height: 48)
-                                .foregroundColor(.gray)
-                        }
-                    } else {
-                        Image(systemName: "person.crop.circle.fill")
-                            .resizable()
-                            .frame(width: 48, height: 48)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    if awayTeamIsWinning {
-                        Circle()
-                            .strokeBorder(Color.gpGreen, lineWidth: 2.5)
-                            .frame(width: 52, height: 52)
-                    }
-                }
-                
-                // Manager name
+            // Away team (right side) - COMPACT
+            VStack(spacing: 3) {
+                // Manager name FIRST
                 Text(matchup.awayTeam.ownerName)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.yellow)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 
-                // Record - always show with label
-                // 🔥 DRY FIX: Use record directly from matchup team, fallback to getManagerRecord, then espnTeamRecords
-                let awayRecordText: String = {
-                    let managerID = matchup.awayTeam.id
+                // Avatar and Record on same line
+                HStack(spacing: 6) {
+                    // Record (lose "Record:" label)
+                    let awayRecordText: String = {
+                        let managerID = matchup.awayTeam.id
+                        
+                        if let record = matchup.awayTeam.record {
+                            return record.displayString
+                        }
+                        
+                        if let teamId = Int(managerID),
+                           let record = fantasyViewModel?.espnTeamRecords[teamId] {
+                            return record.displayString
+                        }
+                        
+                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
+                            return record
+                        }
+                        
+                        return "N/A"
+                    }()
+                    Text(awayRecordText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.gray)
                     
-                    // First try: Direct access from matchup team (most reliable)
-                    if let record = matchup.awayTeam.record {
-                        return record.displayString
+                    // Smaller Avatar with border
+                    ZStack {
+                        if let url = matchup.awayTeam.avatarURL {
+                            AsyncTeamAvatarView(
+                                url: url,
+                                size: 32,
+                                fallbackInitials: getInitials(from: matchup.awayTeam.ownerName)
+                            )
+                        } else {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.orange.opacity(0.6), Color.red.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Text(getInitials(from: matchup.awayTeam.ownerName))
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        
+                        if awayTeamIsWinning {
+                            Circle()
+                                .strokeBorder(Color.gpGreen, lineWidth: 2)
+                                .frame(width: 36, height: 36)
+                        }
                     }
-                    
-                    // Second try: Direct lookup in espnTeamRecords if managerID is a number (faster than getManagerRecord)
-                    if let teamId = Int(managerID),
-                       let record = fantasyViewModel?.espnTeamRecords[teamId] {
-                        return record.displayString
-                    }
-                    
-                    // Third try: Use FantasyViewModel's getManagerRecord (handles sync cases)
-                    if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
-                        return record
-                    }
-                    
-                    return "N/A"
-                }()
-                Text("Record: \(awayRecordText)")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.gray)
-                
-                // SCORE and YET TO PLAY stack
-                VStack(spacing: 1) {
-                    // Team score
-                    Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
-                    
-                    // Yet to play count
-                    Text("Yet to play: \(awayTeamYetToPlay)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondary)
                 }
-                .padding(.top, 2)
+                
+                // SCORE
+                Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
+                
+                // Yet to play - larger number
+                HStack(spacing: 3) {
+                    Text("Yet to play:")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text("\(awayTeamYetToPlay)")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
+                }
             }
             .frame(maxWidth: .infinity)
         }
@@ -338,40 +365,9 @@ struct FantasyDetailHeaderView: View {
     // MARK: - Enhanced Controls Section
     
     private var enhancedControlsSection: some View {
-        HStack {
-            // 👁️ NEW: Watch Icon with Badge (left side)
-            Button(action: {
-                showingWatchedPlayers = true
-            }) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "eye.fill")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(.gpYellow)
-                    
-                    // Red circle badge if there are watched players
-                    if watchService.watchedPlayers.count > 0 {
-                        ZStack {
-                            Circle()
-                                .fill(.red)
-                                .frame(width: 16, height: 16)
-                            
-                            Text("\(watchService.watchedPlayers.count)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.5)
-                        }
-                        .offset(x: 8, y: -8)
-                    }
-                }
-                .frame(width: 32, height: 32)
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            Spacer()
-            
+        HStack(spacing: 12) {
             // Sort Method with conditional arrow
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 // Sort Method Menu
                 Menu {
                     ForEach(MatchupSortingMethod.allCases) { method in
@@ -389,17 +385,15 @@ struct FantasyDetailHeaderView: View {
                         }
                     }
                 } label: {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 1) {
                         Text(sortingMethod.displayName.uppercased())
-                            .font(.caption)
-                            .fontWeight(.bold)
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.purple)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                         
-                        Text(sortingMethod == .score ? (sortHighToLow ? "Highest" : "Lowest") : "Sort By")
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                        Text("Sort By")
+                            .font(.system(size: 9, weight: .medium))
                             .foregroundColor(.secondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
@@ -413,7 +407,7 @@ struct FantasyDetailHeaderView: View {
                         onSortDirectionChanged()
                     }) {
                         Image(systemName: sortHighToLow ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.gpGreen)
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -437,17 +431,15 @@ struct FantasyDetailHeaderView: View {
                     }
                 }
             } label: {
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text(selectedPosition.displayName.uppercased())
-                        .font(.subheadline)
-                        .fontWeight(.bold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(selectedPosition == .all ? .gpBlue : .purple)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     
                     Text("Position")
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -461,17 +453,15 @@ struct FantasyDetailHeaderView: View {
             Button(action: {
                 showActiveOnly.toggle()
             }) {
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text(showActiveOnly ? "Yes" : "No")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(showActiveOnly ? .gpGreen : .gpRedPink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     
                     Text("Active Only")
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -485,31 +475,56 @@ struct FantasyDetailHeaderView: View {
             Button(action: {
                 showYetToPlayOnly.toggle()
             }) {
-                VStack(spacing: 2) {
+                VStack(spacing: 1) {
                     Text(showYetToPlayOnly ? "Only" : "All")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(showYetToPlayOnly ? .gpYellow : .secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                     
                     Text("Yet to Play")
-                        .font(.caption2)
-                        .fontWeight(.medium)
+                        .font(.system(size: 9, weight: .medium))
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
-                // Keep width stable so header card doesn't grow/shrink when text changes
-                .frame(width: 72)
+                .frame(width: 60)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Spacer()
+            
+            Button(action: {
+                showingWatchedPlayers = true
+            }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "eye.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.gpYellow)
+                    
+                    // Red circle badge if there are watched players
+                    if watchService.watchedPlayers.count > 0 {
+                        ZStack {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 14, height: 14)
+                            
+                            Text("\(watchService.watchedPlayers.count)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                        .offset(x: 6, y: -6)
+                    }
+                }
+                .frame(width: 28, height: 28)
             }
             .buttonStyle(PlainButtonStyle())
         }
-        // Lock row height so toggles don't cause subtle vertical size changes
-        .frame(height: 52)
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 8)
+        .frame(height: 40)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
     }
     
     // MARK: - Computed Properties (Data Only)
@@ -543,5 +558,20 @@ struct FantasyDetailHeaderView: View {
             let hasZeroPoints = (player.currentPoints ?? 0.0) == 0.0
             return hasZeroPoints
         }.count
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Get initials from manager name for avatar fallback
+    private func getInitials(from name: String) -> String {
+        let components = name.split(separator: " ")
+        if components.count >= 2 {
+            let first = components[0].prefix(1)
+            let last = components[1].prefix(1)
+            return "\(first)\(last)".uppercased()
+        } else if let first = components.first {
+            return String(first.prefix(2)).uppercased()
+        }
+        return "??"
     }
 }

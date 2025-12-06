@@ -554,11 +554,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     let showYetToPlayOnly: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Active Roster")
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(.horizontal, 16)
+        VStack(alignment: .leading, spacing: 12) {
             
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Active Roster (Left column - to match header)
@@ -755,7 +751,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
     let showYetToPlayOnly: Bool
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 12) {
+            // Keep Bench header for separation
             Text("Bench")
                 .font(.headline)
                 .foregroundColor(.white)

@@ -83,8 +83,11 @@ struct MatchupTeamSectionView: View {
     
     var body: some View {
         VStack(spacing: 8) {
-            // Team avatar - Enhanced for ESPN teams
-            TeamAvatarView(team: team)
+            // Use AsyncTeamAvatarView for proper ESPN logo rendering
+            AsyncTeamAvatarView(
+                team: team,
+                size: 44
+            )
             
             // Team info
             VStack(spacing: 2) {
