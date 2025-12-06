@@ -84,7 +84,7 @@ struct FantasyDetailHeaderView: View {
         VStack(spacing: 0) {
             // Team comparison row - COMPACT VERSION
             teamComparisonRow
-                .padding(.vertical, 12)
+                .padding(.vertical, 6)
                 .padding(.horizontal, 16)
             
             // Enhanced controls section with distinct background

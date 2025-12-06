@@ -122,8 +122,8 @@ struct FantasyMatchupDetailView: View {
                 gameStatusService: GameStatusService.shared
             )
             .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
+            .padding(.top, 0)
+            .padding(.bottom, 12)
             .zIndex(99)
 
             // Roster content

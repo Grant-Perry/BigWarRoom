@@ -20,7 +20,7 @@ struct PlayerComparisonView: View {
     var body: some View {
         ZStack {
             // Background
-            Image("BG1")
+            Image("BG5")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .opacity(0.25)

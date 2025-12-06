@@ -275,7 +275,7 @@ struct PlayerSearchView: View {
             }
         }
         .background(
-            Image("BG1")
+            Image("BG5")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .opacity(0.25)

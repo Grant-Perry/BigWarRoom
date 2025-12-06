@@ -15,10 +15,12 @@ struct LeagueMatchupsTabView: View {
     let fantasyViewModel: FantasyViewModel
     
     @State private var selectedIndex: Int = 0
+    @State private var selectedMatchupID: FantasyMatchup.ID? = nil
     @State private var isLoadingAllMatchups = false
     @State private var fetchedAllMatchups: [FantasyMatchup] = []
     @State private var isNavigating = false
     @State private var navigatingDirection: NavigationDirection? = nil
+    @State private var hasScrolledToInitialPosition = false
     @Environment(\.dismiss) private var dismiss
     
     // FIX: Add animation trigger that actually changes
@@ -42,22 +44,73 @@ struct LeagueMatchupsTabView: View {
         
         self._selectedIndex = State(initialValue: startIndex)
         self._fetchedAllMatchups = State(initialValue: allMatchups)
+        self._selectedMatchupID = State(initialValue: startingMatchup.id)
     }
     
     var body: some View {
-        // FIX: Use .background() modifier instead of ZStack to avoid layout conflicts
-        VStack(spacing: 0) {
-            // Header with navigation controls
-            headerView
-                .zIndex(100)
-            
-            // Main content
-            if isLoadingAllMatchups {
-                loadingView
-            } else {
-                mainTabView
+        ZStack {
+            // Background
+            ZStack {
+                Color.black
+                Image("BG7")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .opacity(0.35)
+            }
+            .ignoresSafeArea(.all)
+
+            // --- EXIT BUTTON FIX ---
+            // Absolute top-left overlay (never covered by long league names)
+            VStack {
+                HStack {
+                    Button(action: {
+                        dismiss()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                            Text("Exit")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.8))
+                        .clipShape(RoundedRectangle(cornerRadius: 20))
+                        .shadow(radius: 2)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.leading, 14)
+                    .padding(.top, 10)
+                    Spacer()
+                }
+                Spacer()
+            }
+            .zIndex(999) // Highest overlay
+
+            // Main content with ScrollView/tab stuff
+            VStack(spacing: 0) {
+                Color.clear.frame(height: 100)
+                paginatedScrollView
                     .overlay(
                         Group {
+                            if isLoadingAllMatchups {
+                                // Show loading overlay OVER the scroll view instead of replacing it
+                                Color.black.opacity(0.85)
+                                    .ignoresSafeArea(.all)
+                                    .overlay(
+                                        VStack(spacing: 12) {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .gpGreen))
+                                                .scaleEffect(2.0)
+                                            Text("Loading matchups...")
+                                                .font(.system(size: 22, weight: .medium))
+                                                .foregroundColor(.white)
+                                        }
+                                    )
+                            }
+                            
                             if isNavigating {
                                 Color.black.opacity(0.7)
                                     .ignoresSafeArea(.all)
@@ -66,7 +119,6 @@ struct LeagueMatchupsTabView: View {
                                             ProgressView()
                                                 .progressViewStyle(CircularProgressViewStyle(tint: .gpGreen))
                                                 .scaleEffect(2.0)
-                                            
                                             Text("Loading next matchup...")
                                                 .font(.system(size: 22, weight: .medium))
                                                 .foregroundColor(.white)
@@ -76,35 +128,98 @@ struct LeagueMatchupsTabView: View {
                         }
                     )
             }
+
+            // OVERLAY: Centered title section
+            VStack {
+                VStack(spacing: 4) {
+                    Text(leagueName)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
+                    
+                    if isLoadingAllMatchups {
+                        Text("Loading matchups...")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gpGreen.opacity(0.7))
+                            .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
+                    } else {
+                        Text("Matchup \(currentMatchupPosition) of \(displayMatchups.count)")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.gpGreen)
+                            .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
+                    }
+                }
+                .padding(.top, 50)
+                
+                Spacer()
+            }
+            
+            // OVERLAY: Navigation arrows (left and right edges)
+            HStack {
+                // Previous matchup button
+                if !isLoadingAllMatchups && hasPreviousMatchup {
+                    Button(action: {
+                        isNavigating = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if let prevID = previousMatchupID {
+                                selectedMatchupID = prevID
+                            }
+                        }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.leading, 16)
+                } else {
+                    Spacer()
+                        .frame(width: 76)
+                }
+                
+                Spacer()
+                
+                // Next matchup button
+                if !isLoadingAllMatchups && hasNextMatchup {
+                    Button(action: {
+                        isNavigating = true
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            if let nextID = nextMatchupID {
+                                selectedMatchupID = nextID
+                            }
+                        }
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.trailing, 16)
+                } else {
+                    Spacer()
+                        .frame(width: 76)
+                }
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
         .preferredColorScheme(.dark)
-        // FIX: Use background modifier instead of ZStack - this doesn't affect layout
-        .background(
-            ZStack {
-                Color.black
-                Image("BG7")
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .opacity(0.35)
-            }
-            .ignoresSafeArea(.all)
-        )
         .onAppear {
-            // FIX: Start loading immediately instead of async delay
-            isLoadingAllMatchups = true // Show loading state IMMEDIATELY
-            
-            // FIX: Start animation trigger
+            isLoadingAllMatchups = true
             animationTrigger.toggle()
             
             Task {
                 await fetchAllLeagueMatchups()
             }
         }
-        .onChange(of: selectedIndex) { _ in
-            // Reset after short delay
+        .onChange(of: selectedMatchupID) { _ in
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                 isNavigating = false
             }
@@ -255,23 +370,43 @@ struct LeagueMatchupsTabView: View {
     
     // MARK: - Main Tab View
     
-    private var mainTabView: some View {
-        TabView(selection: $selectedIndex) {
-            ForEach(Array(displayMatchups.enumerated()), id: \.element.id) { index, matchup in
-                // FIX: Remove background from FantasyMatchupDetailView since we handle it here
-                FantasyMatchupDetailView(
-                    matchup: matchup,
-                    fantasyViewModel: fantasyViewModel,
-                    leagueName: leagueName,
-                    livePlayersViewModel: AllLivePlayersViewModel.shared
-                )
-                .frame(maxWidth: .infinity)
-                .tag(index)
+    // NEW: Paginated ScrollView with peek effect (Paul Hudson style!)
+    private var paginatedScrollView: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 0) {
+                    ForEach(Array(displayMatchups.enumerated()), id: \.element.id) { index, matchup in
+                        FantasyMatchupDetailView(
+                            matchup: matchup,
+                            fantasyViewModel: fantasyViewModel,
+                            leagueName: leagueName,
+                            livePlayersViewModel: AllLivePlayersViewModel.shared
+                        )
+                        .containerRelativeFrame(.horizontal) // Fill container width minus margins
+                        .id(matchup.id) // For programmatic scrolling (use the ID)
+                    }
+                }
+                .scrollTargetLayout() // Tell ScrollView to snap to these children
+            }
+            .scrollTargetBehavior(.viewAligned) // Snap to views, not pages
+            .contentMargins(.horizontal, 20, for: .scrollContent) // Create peek spacing
+            .scrollIndicators(.hidden)
+            .scrollPosition(id: $selectedMatchupID, anchor: .center) // Bind to matchup ID with center anchor!
+            .onChange(of: isLoadingAllMatchups) { oldValue, newValue in
+                // When loading completes and we haven't scrolled yet, force scroll to starting matchup
+                if oldValue == true && newValue == false && !hasScrolledToInitialPosition {
+                    if let targetID = selectedMatchupID {
+                        // Delay to ensure ScrollView is fully laid out
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(targetID, anchor: .center)
+                            }
+                            hasScrolledToInitialPosition = true
+                        }
+                    }
+                }
             }
         }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .frame(maxWidth: .infinity) // FIX: Ensure TabView itself uses full width
-        // FIX: Don't clip the TabView - let content handle its own boundaries
     }
     
     // MARK: - Computed Properties
@@ -280,100 +415,32 @@ struct LeagueMatchupsTabView: View {
         return fetchedAllMatchups.isEmpty ? allMatchups : fetchedAllMatchups
     }
     
-    // MARK: - Header View
-    
-    private var headerView: some View {
-        HStack {
-            // FIXED: Always show exit button on left
-            Button(action: {
-                // 🔥 NAVIGATION FIX: Use dismiss() to go back to Mission Control
-                dismiss()
-            }) {
-                HStack(spacing: 4) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                    Text("Exit")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.black.opacity(0.8))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-            .buttonStyle(PlainButtonStyle())
-            
-            // Previous matchup button (only show if not first)
-            if selectedIndex > 0 {
-                Button(action: {
-                    isNavigating = true
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedIndex -= 1
-                    }
-                }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-            
-            Spacer()
-            
-            // Matchup counter in center
-            VStack(spacing: 2) {
-                Text(leagueName)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                if isLoadingAllMatchups {
-                    Text("Loading matchups...")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.gpGreen.opacity(0.7))
-                } else {
-                    Text("Matchup \(selectedIndex + 1) of \(displayMatchups.count)")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.gpGreen)
-                }
-            }
-            
-            Spacer()
-            
-            // Next matchup button (only show if not last)
-            if selectedIndex < displayMatchups.count - 1 {
-                Button(action: {
-                    isNavigating = true
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        selectedIndex += 1
-                    }
-                }) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(Circle())
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
+    private var currentMatchupIndex: Int {
+        guard let id = selectedMatchupID,
+              let idx = displayMatchups.firstIndex(where: { $0.id == id }) else {
+            return 0
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 44) // Account for safe area
-        .padding(.bottom, 12)
-        .background(
-            LinearGradient(
-                colors: [Color.black.opacity(0.9), Color.black.opacity(0.7), Color.clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 120)
-            .ignoresSafeArea(.all, edges: .top)
-        )
+        return idx
+    }
+    
+    private var currentMatchupPosition: Int {
+        // For user-friendly "Matchup X of Y" (1-based)
+        return currentMatchupIndex + 1
+    }
+    
+    private var hasPreviousMatchup: Bool {
+        currentMatchupIndex > 0
+    }
+    private var previousMatchupID: FantasyMatchup.ID? {
+        guard hasPreviousMatchup else { return nil }
+        return displayMatchups[currentMatchupIndex - 1].id
+    }
+    private var hasNextMatchup: Bool {
+        currentMatchupIndex < displayMatchups.count - 1
+    }
+    private var nextMatchupID: FantasyMatchup.ID? {
+        guard hasNextMatchup else { return nil }
+        return displayMatchups[currentMatchupIndex + 1].id
     }
     
     // MARK: - Data Fetching
@@ -384,42 +451,36 @@ struct LeagueMatchupsTabView: View {
             return
         }
         
-        // 🔥 FIXED: Create a NEW provider to fetch ALL matchups (not just user's matchup)
-        // Mission Control only stores the user's matchup, so we need to fetch fresh
-        
         isLoadingAllMatchups = true
-        
         let currentWeek = NFLWeekService.shared.currentWeek
         let currentYear = String(Calendar.current.component(.year, from: Date()))
-        
-        // Create isolated provider for this league
         let provider = LeagueMatchupProvider(
             league: selectedLeague,
             week: currentWeek,
             year: currentYear
         )
-        
+
         do {
-            // Fetch ALL matchups for this league
             let allLeagueMatchups = try await provider.fetchMatchups()
-            
             await MainActor.run {
                 fetchedAllMatchups = allLeagueMatchups
-                
-                // Update the selected index to point to the correct matchup
-                if let newIndex = fetchedAllMatchups.firstIndex(where: { $0.id == startingMatchup.id }) {
-                    selectedIndex = newIndex
+
+                // --- MATCHUP SELECTION FIX ---
+                // Preserve the starting matchup ID so scroll position works
+                if allLeagueMatchups.contains(where: { $0.id == startingMatchup.id }) {
+                    selectedMatchupID = startingMatchup.id
+                } else if let first = allLeagueMatchups.first {
+                    selectedMatchupID = first.id
                 } else {
-                    selectedIndex = 0 // Fallback to first matchup
+                    selectedMatchupID = nil
                 }
-                
+
                 isLoadingAllMatchups = false
             }
         } catch {
-            // Fallback to single matchup if fetch fails
             await MainActor.run {
                 fetchedAllMatchups = [startingMatchup]
-                selectedIndex = 0
+                selectedMatchupID = startingMatchup.id
                 isLoadingAllMatchups = false
             }
         }
