@@ -97,8 +97,8 @@ struct MatchupBarCardContentView: View {
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(.secondary)
                                 
-                                Text("Yet to play: \(toPlayCount(for: myTeam))")
-                                    .font(.system(size: 11, weight: .medium))
+                                Text("To play: \(toPlayCount(for: myTeam))")
+                                    .font(.system(size: 10, weight: .medium))
                                     .foregroundColor(.secondary.opacity(0.8))
                             }
                         }
@@ -107,7 +107,7 @@ struct MatchupBarCardContentView: View {
                     .padding(.leading, 16)
                     
                     // Center: Scores with VS and Delta - FIXED WIDTH, CENTERED
-                    VStack(spacing: 4) {
+                    VStack(spacing: 8) {
                         HStack(spacing: 6) {
                             // My score
                             Text(String(format: "%.1f", matchup.myTeam?.currentScore ?? 0.0))
@@ -161,8 +161,8 @@ struct MatchupBarCardContentView: View {
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(.secondary)
                                 
-                                Text("Yet to play: \(toPlayCount(for: opponent))")
-                                    .font(.system(size: 11, weight: .medium))
+                                Text("To play: \(toPlayCount(for: opponent))")
+                                    .font(.system(size: 10, weight: .medium))
                                     .foregroundColor(.secondary.opacity(0.8))
                             }
                         }
@@ -267,14 +267,32 @@ struct MatchupBarCardContentView: View {
                         // RX button - LineupRX asset icon with green/red circle
                         NavigationLink(destination: LineupRXView(matchup: matchup)) {
                             ZStack {
+                                // Glassmorphic background
                                 Circle()
-                                    .fill(isLineupOptimized ? Color.gpGreen : Color.gpRedPink)
-                                    .frame(width: 28, height: 28)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                (isLineupOptimized ? Color.gpGreen : Color.gpRedPink).opacity(0.3),
+                                                (isLineupOptimized ? Color.gpGreen : Color.gpRedPink).opacity(0.15)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .overlay(
+                                        Circle()
+                                            .stroke(
+                                                (isLineupOptimized ? Color.gpGreen : Color.gpRedPink).opacity(0.6),
+                                                lineWidth: 1.5
+                                            )
+                                    )
+                                    .frame(width: 24, height: 24)
+                                    .shadow(color: (isLineupOptimized ? Color.gpGreen : Color.gpRedPink).opacity(0.3), radius: 4, x: 0, y: 2)
                                 
                                 Image("LineupRX")
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
-                                    .frame(width: 20, height: 20)
+                                    .frame(width: 14, height: 14)
                                     .foregroundColor(.white)
                             }
                         }
@@ -286,6 +304,7 @@ struct MatchupBarCardContentView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: UIScreen.main.bounds.width - 60)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(

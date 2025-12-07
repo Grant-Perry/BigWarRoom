@@ -14,9 +14,12 @@ struct MatchupBarCardBackgroundView: View {
     var body: some View {
         ZStack {
             // Solid base layer with slight transparency
-            Color(red: 0.1, green: 0.15, blue: 0.3)
-                .opacity(0.85)
-            
+		   LinearGradient(
+			colors: [.gpBlueDark, .clear],
+			startPoint: .top,
+			endPoint: .bottom
+		   )                .opacity(0.85)
+
             // Optional accent gradient overlay for live states
             if matchup.isLive {
                 LinearGradient(

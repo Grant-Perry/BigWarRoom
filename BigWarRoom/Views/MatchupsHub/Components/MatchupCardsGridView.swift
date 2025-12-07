@@ -105,7 +105,7 @@ struct MatchupCardsGridView: View {
                 }
             }
         }
-        .padding(.horizontal, useBarLayout ? 0 : 24)
+        .padding(.horizontal, useBarLayout ? 0 : 44)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: microMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: expandedCardId)
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: dualViewMode)

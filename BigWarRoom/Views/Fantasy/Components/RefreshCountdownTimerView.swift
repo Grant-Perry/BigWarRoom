@@ -80,7 +80,7 @@ struct RefreshCountdownTimerView: View {
                 // 🔥 Timer text with swipe animation
                 ZStack {
                     Text("\(Int(timeRemaining))")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .shadow(color: timerColor.opacity(0.8), radius: 2, x: 0, y: 1)
                         .scaleEffect(timeRemaining < 3 ? 1.1 : 1.0)
@@ -96,7 +96,7 @@ struct RefreshCountdownTimerView: View {
                             )
                         )
                 }
-                .frame(width: 14, height: 14) // Fixed frame to prevent layout shifts
+                .frame(width: 24, height: 24) // Fixed frame to prevent layout shifts
                 .clipped()
                 .animation(.spring(response: 0.4, dampingFraction: 0.7, blendDuration: 0.1), value: Int(timeRemaining))
             }
