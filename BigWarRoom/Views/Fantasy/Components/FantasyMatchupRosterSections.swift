@@ -553,13 +553,16 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     let showActiveOnly: Bool
     let showYetToPlayOnly: Bool
     
+    @State private var cachedHomeRoster: [FantasyPlayer] = []
+    @State private var cachedAwayRoster: [FantasyPlayer] = []
+    @State private var lastFilterUpdate = Date.distantPast
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Active Roster (Left column - to match header)
                 VStack(spacing: 16) {
-                    let homeActiveRoster = getFilteredRoster(for: matchup, teamIndex: 1, isBench: false)
                     ForEach(homeActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -583,7 +586,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 
                 // Away Team Active Roster (Right column - to match header)
                 VStack(spacing: 16) {
-                    let awayActiveRoster = getFilteredRoster(for: matchup, teamIndex: 0, isBench: false)
                     ForEach(awayActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -607,6 +609,38 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
             .padding(.horizontal, 16)
         }
+        .onAppear {
+            updateCachedRosters()
+        }
+        .onChange(of: sortMethod) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: highToLow) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: selectedPosition) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: showActiveOnly) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: showYetToPlayOnly) { _, _ in
+            updateCachedRosters()
+        }
+    }
+    
+    private var homeActiveRoster: [FantasyPlayer] {
+        return cachedHomeRoster
+    }
+    
+    private var awayActiveRoster: [FantasyPlayer] {
+        return cachedAwayRoster
+    }
+    
+    private func updateCachedRosters() {
+        cachedHomeRoster = getFilteredRoster(for: matchup, teamIndex: 1, isBench: false)
+        cachedAwayRoster = getFilteredRoster(for: matchup, teamIndex: 0, isBench: false)
+        lastFilterUpdate = Date()
     }
     
     @ViewBuilder
@@ -658,21 +692,15 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        // Step 3: Apply active only filter
         if showActiveOnly {
+            // Build a Set of live teams for O(1) lookup
+            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+                .filter { $0.isLive }
+                .flatMap { [$0.homeTeam, $0.awayTeam] })
+            
             filteredPlayers = filteredPlayers.filter { player in
-                // "Active" means player's team is currently in a LIVE game
-                guard let playerTeam = player.team else {
-                    return false
-                }
-                
-                // Check if player's team is in a live game using NFLGameDataService
-                if let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) {
-                    return gameInfo.isLive
-                } else {
-                    // No game info available - assume not in live game
-                    return false
-                }
+                guard let playerTeam = player.team else { return false }
+                return liveTeams.contains(playerTeam)
             }
         }
         
@@ -750,6 +778,10 @@ struct FantasyMatchupBenchSectionFiltered: View {
     let showActiveOnly: Bool
     let showYetToPlayOnly: Bool
     
+    @State private var cachedHomeBench: [FantasyPlayer] = []
+    @State private var cachedAwayBench: [FantasyPlayer] = []
+    @State private var lastFilterUpdate = Date.distantPast
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Keep Bench header for separation
@@ -761,7 +793,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Bench (Left column - to match header)
                 VStack(spacing: 16) {
-                    let homeBenchRoster = getFilteredRoster(for: matchup, teamIndex: 1, isBench: true)
                     ForEach(homeBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -782,7 +813,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 
                 // Away Team Bench (Right column - to match header)
                 VStack(spacing: 16) {
-                    let awayBenchRoster = getFilteredRoster(for: matchup, teamIndex: 0, isBench: true)
                     ForEach(awayBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -803,6 +833,38 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
             .padding(.horizontal, 16)
         }
+        .onAppear {
+            updateCachedRosters()
+        }
+        .onChange(of: sortMethod) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: highToLow) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: selectedPosition) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: showActiveOnly) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: showYetToPlayOnly) { _, _ in
+            updateCachedRosters()
+        }
+    }
+    
+    private var homeBenchRoster: [FantasyPlayer] {
+        return cachedHomeBench
+    }
+    
+    private var awayBenchRoster: [FantasyPlayer] {
+        return cachedAwayBench
+    }
+    
+    private func updateCachedRosters() {
+        cachedHomeBench = getFilteredRoster(for: matchup, teamIndex: 1, isBench: true)
+        cachedAwayBench = getFilteredRoster(for: matchup, teamIndex: 0, isBench: true)
+        lastFilterUpdate = Date()
     }
     
     @ViewBuilder
@@ -851,19 +913,15 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        // Step 3: Apply active only filter
         if showActiveOnly {
+            // Build a Set of live teams for O(1) lookup
+            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+                .filter { $0.isLive }
+                .flatMap { [$0.homeTeam, $0.awayTeam] })
+            
             filteredPlayers = filteredPlayers.filter { player in
-                // "Active" means player's team is currently in a LIVE game
                 guard let playerTeam = player.team else { return false }
-                
-                // Check if player's team is in a live game using NFLGameDataService
-                if let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) {
-                    return gameInfo.isLive
-                } else {
-                    // No game info available - assume not in live game
-                    return false
-                }
+                return liveTeams.contains(playerTeam)
             }
         }
         

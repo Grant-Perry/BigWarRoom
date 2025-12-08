@@ -162,22 +162,6 @@ struct AllLivePlayersView: View {
         .onChange(of: allLivePlayersViewModel.sortChangeID) { _, _ in
             resetAnimations()
         }
-        .onChange(of: allLivePlayersViewModel.lastUpdateTime) { _ in
-            // Update watched player scores when live players update
-            let allOpponentPlayers = allLivePlayersViewModel.allPlayers.compactMap { playerEntry in
-                OpponentPlayer(
-                    id: UUID().uuidString,
-                    player: playerEntry.player,
-                    isStarter: playerEntry.isStarter,
-                    currentScore: playerEntry.currentScore,
-                    projectedScore: playerEntry.projectedScore,
-                    threatLevel: .moderate,
-                    matchupAdvantage: .neutral,
-                    percentageOfOpponentTotal: 0.0
-                )
-            }
-            watchService.updateWatchedPlayerScores(allOpponentPlayers)
-        }
         // 🔥 NEW: Provide AllLivePlayersViewModel to navigation environment
         .environment(allLivePlayersViewModel)
     }

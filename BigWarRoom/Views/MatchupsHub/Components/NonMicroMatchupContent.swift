@@ -14,14 +14,13 @@ struct NonMicroMatchupContent: View {
     let dualViewMode: Bool
     let scoreAnimation: Bool
     
-    // 🔥 NEW: Team roster navigation callback
     var onTeamLogoTap: ((String) -> Void)? = nil
-    
-    // 💊 RX button callback
     var onRXTap: (() -> Void)? = nil
-    
-    // 💊 RX: Optimization status
     var isLineupOptimized: Bool = false
+    
+    let myProjected: Double
+    let opponentProjected: Double
+    let projectionsLoaded: Bool
     
     private var isLiveGame: Bool {
         return matchup.isLive
@@ -52,12 +51,6 @@ struct NonMicroMatchupContent: View {
                     )
                 }
                 
-                // VS separator
-//                Text("VS")
-//                    .font(.system(size: dualViewMode ? 10 : 8, weight: .black))
-//                    .foregroundColor(.white.opacity(0.6))
-//                    .frame(width: dualViewMode ? 24 : 20)
-                
                 // Away team on RIGHT
                 if let awayTeam = getAwayTeam() {
                     NonMicroTeamSection(
@@ -69,6 +62,23 @@ struct NonMicroMatchupContent: View {
                         isLiveGame: isLiveGame,
                         onTeamLogoTap: onTeamLogoTap
                     )
+                }
+            }
+            .onAppear {
+                DebugPrint(mode: .liveUpdates, "🎯 CONTENT: projectionsLoaded=\(projectionsLoaded), my=\(myProjected), opp=\(opponentProjected)")
+            }
+            
+            // Projected scores (if loaded)
+            if projectionsLoaded && myProjected > 0 && opponentProjected > 0 {
+                ProjectedScoreView(
+                    myProjected: myProjected,
+                    opponentProjected: opponentProjected,
+                    alignment: .center,
+                    size: dualViewMode ? .small : .medium
+                )
+                .padding(.vertical, 2)
+                .onAppear {
+                    DebugPrint(mode: .liveUpdates, "🎯 RENDERING: Projected scores visible - My: \(myProjected), Opp: \(opponentProjected)")
                 }
             }
             
@@ -84,7 +94,6 @@ struct NonMicroMatchupContent: View {
                 )
             }
             
-            // 🔥 FIXED: Add Spacer to fill remaining height
             Spacer(minLength: 0)
         }
     }

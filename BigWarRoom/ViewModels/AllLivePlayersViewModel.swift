@@ -96,7 +96,7 @@ final class AllLivePlayersViewModel {
         self.gameStatusService = gameStatusService
         self.sharedStatsService = sharedStatsService
         self.weekSelectionManager = weekSelectionManager
-        // setupObservation()  // 🔥 DISABLED: Creates race condition with 15-second timer, causes throttle to block all API calls
+        // MatchupsHub already has auto-refresh, we'll observe it directly via onChange
         setupAutoRefresh()
     }
     

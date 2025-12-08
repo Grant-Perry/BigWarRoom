@@ -16,7 +16,10 @@ struct NonMicroCardContent: View {
     let isGamesFinished: Bool
     let celebrationBorderPulse: Bool
     let onRXTap: (() -> Void)?
-    let isLineupOptimized: Bool  // 💊 RX: Optimization status
+    let isLineupOptimized: Bool
+    let myProjected: Double
+    let opponentProjected: Double
+    let projectionsLoaded: Bool
     
     var body: some View {
         VStack(spacing: dualViewMode ? 6 : 4) {
@@ -38,7 +41,10 @@ struct NonMicroCardContent: View {
                     dualViewMode: dualViewMode,
                     scoreAnimation: scoreAnimation,
                     onRXTap: dualViewMode ? nil : onRXTap,
-                    isLineupOptimized: isLineupOptimized
+                    isLineupOptimized: isLineupOptimized,
+                    myProjected: myProjected,
+                    opponentProjected: opponentProjected,
+                    projectionsLoaded: projectionsLoaded
                 )
             }
         }
@@ -48,7 +54,6 @@ struct NonMicroCardContent: View {
         .background(NonMicroCardBackground(matchup: matchup, backgroundColors: backgroundColors))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
-            // 🔥 CELEBRATION: Use celebration border if games finished, otherwise regular border
             Group {
                 if isGamesFinished && !matchup.isMyManagerEliminated {
                     celebrationBorderOverlay

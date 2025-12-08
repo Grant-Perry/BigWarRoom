@@ -299,7 +299,6 @@ extension AllLivePlayersViewModel {
                 }
                 
         case .recent:
-            // Sort by most recent activity first, then by score as secondary sort
             sortedPlayers = players.sorted { player1, player2 in
                 let time1 = player1.lastActivityTime ?? Date.distantPast
                 let time2 = player2.lastActivityTime ?? Date.distantPast

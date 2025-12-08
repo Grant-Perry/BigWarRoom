@@ -11,39 +11,39 @@ import SwiftUI
 struct AllLivePlayersListView: View {
     @Bindable var allLLivePlayersViewModel: AllLivePlayersViewModel
     @Binding var animatedPlayers: [String]
-    let onPlayerTap: (UnifiedMatchup) -> Void // 🔥 DEPRECATED: Will be removed
+    let onPlayerTap: (UnifiedMatchup) -> Void
     
-    // 🔥 PHASE 3 DI: Add watchService parameter
     let watchService: PlayerWatchService
+    
+    @State private var animatedPlayerSet: Set<String> = []
     
     var body: some View {
         ScrollView {
-            // 🔥 FIXED: Use stable ID and reset animations when sort changes
-            LazyVStack(spacing: 8) { // Reduced from 12 to 8 for tighter spacing
+            LazyVStack(spacing: 8) {
                 ForEach(allLLivePlayersViewModel.filteredPlayers, id: \.id) { playerEntry in
                     // 🔥 SIMPLE: No NavigationLink wrapper - all navigation handled by buttons within the card
                     PlayerScoreBarCardView(
                         playerEntry: playerEntry,
                         animateIn: shouldAnimatePlayer(playerEntry.id),
-                        onTap: nil, // No card-level tap - use individual buttons instead
+                        onTap: nil,
                         viewModel: allLLivePlayersViewModel,
-                        watchService: watchService // 🔥 PHASE 3 DI: Pass watchService
+                        watchService: watchService
                     )
                     .onAppear {
                         handlePlayerAppearance(playerEntry)
                     }
                 }
             }
-            .id(allLLivePlayersViewModel.sortChangeID) // 🔥 FIXED: Force LazyVStack to rebuild when sort changes
-            .padding(.horizontal, 20) // 🔥 FIXED: Increased horizontal padding from default to 20 to prevent edge clipping
-            .padding(.top, 4) // 🔥 REDUCED: From 12 to 4 for tighter spacing
-            .padding(.bottom, 12) // Keep bottom padding for safe area
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
         }
-        .clipped() // Prevent scroll view overflow during fast scrolling
+        .clipped()
         .onChange(of: allLLivePlayersViewModel.shouldResetAnimations) { _, shouldReset in
             if shouldReset {
-                // 🔥 FIXED: Clear animation state when sorting changes
+                animatedPlayerSet.removeAll()
                 animatedPlayers.removeAll()
+                allLLivePlayersViewModel.shouldResetAnimations = false
             }
         }
     }
@@ -55,12 +55,10 @@ struct AllLivePlayersListView: View {
         MatchupDetailSheetsView(matchup: matchup)
     }
     
-    // 🔥 NEW: Determine if player should animate in
     private func shouldAnimatePlayer(_ playerID: String) -> Bool {
-        return !animatedPlayers.contains(playerID)
+        return !animatedPlayerSet.contains(playerID)
     }
     
-    // 🔥 NEW: Handle player card appearance with improved logic
     private func handlePlayerAppearance(_ playerEntry: AllLivePlayersViewModel.LivePlayerEntry) {
         guard shouldAnimatePlayer(playerEntry.id) else { return }
         
@@ -68,15 +66,15 @@ struct AllLivePlayersListView: View {
         let index = allLLivePlayersViewModel.filteredPlayers.firstIndex(where: { $0.id == playerEntry.id }) ?? 0
         
         // Optimized staggered animation with shorter delays
-        let delay = min(Double(index) * 0.03, 0.8) // Reduced delay and cap
+        let delay = min(Double(index) * 0.03, 0.8)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            // Check if view is still alive and player still exists
             guard !Task.isCancelled,
                   allLLivePlayersViewModel.filteredPlayers.contains(where: { $0.id == playerEntry.id }),
                   shouldAnimatePlayer(playerEntry.id) else { return }
             
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                animatedPlayerSet.insert(playerEntry.id)
                 animatedPlayers.append(playerEntry.id)
             }
         }

@@ -10,14 +10,12 @@ import SwiftUI
 struct NonMicroCardView: View {
     let matchup: UnifiedMatchup
     let isWinning: Bool
-    // 🏈 NAVIGATION FREEDOM: Remove onTap parameter - NavigationLink handles navigation
-    // let onTap: () -> Void
-    
-    // Accept dualViewMode parameter to make cards more compact in Single view
-    var dualViewMode: Bool = true
-    
-    // 💊 RX: Optimization status
+    let dualViewMode: Bool
     let isLineupOptimized: Bool
+    
+    @State private var myProjected: Double = 0.0
+    @State private var opponentProjected: Double = 0.0
+    @State private var projectionsLoaded = false
     
     @State private var cardScale: CGFloat = 1.0
     @State private var scoreAnimation: Bool = false
@@ -39,14 +37,16 @@ struct NonMicroCardView: View {
                     isWinning: isWinning,
                     dualViewMode: dualViewMode,
                     scoreAnimation: scoreAnimation,
-                    isGamesFinished: false, // 🔥 SIMPLIFIED: Always false, no celebration logic
-                    celebrationBorderPulse: false, // 🔥 SIMPLIFIED: Always false
-                    onRXTap: { }, // 🔥 FIX: Pass empty closure to show RX badge (navigation handled by overlay)
-                    isLineupOptimized: isLineupOptimized
+                    isGamesFinished: false,
+                    celebrationBorderPulse: false,
+                    onRXTap: nil,
+                    isLineupOptimized: isLineupOptimized,
+                    myProjected: myProjected,
+                    opponentProjected: opponentProjected,
+                    projectionsLoaded: projectionsLoaded
                 )
             }
         }
-	   // MARK: master frame dimensions for matchup cards
         .frame(
             width: dualViewMode ? 170 : 340,
             height: 190
@@ -54,6 +54,8 @@ struct NonMicroCardView: View {
         .fixedSize(horizontal: true, vertical: true)
         .scaleEffect(cardScale)
         .onAppear {
+            DebugPrint(mode: .liveUpdates, "🎯 CARD APPEARED: \(matchup.fantasyMatchup?.leagueID ?? "Unknown")")
+            
             if matchup.isLive {
                 startLiveAnimations()
             }
@@ -70,6 +72,22 @@ struct NonMicroCardView: View {
                         .stroke(Color.gpRedPink.opacity(0.3), lineWidth: 1)
                 )
         )
+        .task {
+            DebugPrint(mode: .liveUpdates, "🎯 TASK TRIGGERED: Starting projection load")
+            await loadProjectedScores()
+        }
+    }
+    
+    private func loadProjectedScores() async {
+        let leagueName = matchup.fantasyMatchup?.leagueID ?? "Unknown"
+        DebugPrint(mode: .liveUpdates, "🎯 PROJECTIONS: Loading for matchup \(leagueName)")
+        let projections = await matchup.getProjectedScores()
+        await MainActor.run {
+            self.myProjected = projections.myTeam
+            self.opponentProjected = projections.opponent
+            self.projectionsLoaded = true
+            DebugPrint(mode: .liveUpdates, "🎯 PROJECTIONS: Loaded - My: \(projections.myTeam), Opp: \(projections.opponent)")
+        }
     }
     
     // MARK: - Animation & Interaction

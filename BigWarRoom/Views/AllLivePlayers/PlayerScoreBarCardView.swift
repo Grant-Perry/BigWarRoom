@@ -46,15 +46,29 @@ struct PlayerScoreBarCardView: View {
         }
         .id(playerEntry.id) // Force view refresh
         .overlay(
-            // LIVE border around the entire card
+            // BYE border matches green live border style
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    playerEntry.player.isLive ? 
-                        LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                        LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: playerEntry.player.isLive ? 3 : 2
+                    playerEntry.player.isOnBye ?
+                        // BYE: Pink border with glassy gradient like green
+                        LinearGradient(
+                            colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        // LIVE: Green/blue glassy gradient
+                        (playerEntry.player.isLive ?
+                            LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing)),
+                    lineWidth: (playerEntry.player.isOnBye || playerEntry.player.isLive) ? 3 : 2
                 )
-                .opacity(playerEntry.player.isLive ? 0.8 : 0.6)
+                .opacity((playerEntry.player.isOnBye || playerEntry.player.isLive) ? 0.8 : 0.6)
+                .shadow(
+                    color: playerEntry.player.isOnBye ? .gpPink.opacity(0.8) : (playerEntry.player.isLive ? .gpGreen.opacity(0.8) : .clear),
+                    radius: (playerEntry.player.isOnBye || playerEntry.player.isLive) ? 15 : 0,
+                    x: 0,
+                    y: 0
+                )
         )
         .offset(y: animateIn ? cardOffset : 0)
         .opacity(animateIn ? cardOpacity : 1.0)

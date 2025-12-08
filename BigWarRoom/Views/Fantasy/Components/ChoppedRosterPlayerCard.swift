@@ -218,15 +218,29 @@ struct ChoppedRosterPlayerCard: View {
         .frame(height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            // Live border (like All Live Players)
+            // BYE border matches green live border style
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    viewModel.player.isLive ? 
-                        LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                        LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing),
-                    lineWidth: viewModel.player.isLive ? 3 : 2
+                    viewModel.player.isOnBye ?
+                        // BYE: Pink border with glassy gradient like green
+                        LinearGradient(
+                            colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ) :
+                        // LIVE: Green/blue glassy gradient
+                        (viewModel.player.isLive ?
+                            LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing)),
+                    lineWidth: (viewModel.player.isOnBye || viewModel.player.isLive) ? 3 : 2
                 )
-                .opacity(viewModel.player.isLive ? 0.8 : 0.6)
+                .opacity((viewModel.player.isOnBye || viewModel.player.isLive) ? 0.8 : 0.6)
+                .shadow(
+                    color: viewModel.player.isOnBye ? .gpPink.opacity(0.8) : (viewModel.player.isLive ? .gpGreen.opacity(0.8) : .clear),
+                    radius: (viewModel.player.isOnBye || viewModel.player.isLive) ? 15 : 0,
+                    x: 0,
+                    y: 0
+                )
         )
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .onTapGesture {

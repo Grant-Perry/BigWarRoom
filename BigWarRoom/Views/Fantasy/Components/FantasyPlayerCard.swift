@@ -49,7 +49,8 @@ struct FantasyPlayerCard: View {
                             jerseyNumber: player.jerseyNumber,
                             cornerRadius: 15,
                             showBorder: true,
-                            isLive: vm.isPlayerLive(player)
+                            isLive: vm.isPlayerLive(player),
+                            isOnBye: player.isOnBye
                         )
                     )
                     

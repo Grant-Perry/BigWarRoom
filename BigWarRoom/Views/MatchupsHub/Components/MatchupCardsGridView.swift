@@ -28,20 +28,22 @@ struct MatchupCardsGridView: View {
                 NoMatchupsThisWeekView()
             } else if useBarLayout && !microMode {
                 // 🔥 NEW: Bar-style layout (single column only)
-                LazyVStack(spacing: 40) {
-                    ForEach(sortedMatchups, id: \.id) { matchup in
-                        NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
-                            MatchupBarCardView(
-                                matchup: matchup,
-                                isWinning: getWinningStatus(matchup),
-                                isLineupOptimized: getOptimizationStatus(matchup)
-                            )
+                ScrollView {
+                    LazyVStack(spacing: 40) {
+                        ForEach(sortedMatchups, id: \.id) { matchup in
+                            NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+                                MatchupBarCardView(
+                                    matchup: matchup,
+                                    isWinning: getWinningStatus(matchup),
+                                    isLineupOptimized: getOptimizationStatus(matchup)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
-                        .buttonStyle(PlainButtonStyle())
                     }
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
             } else {
                 // Original grid layouts
                 if microMode {

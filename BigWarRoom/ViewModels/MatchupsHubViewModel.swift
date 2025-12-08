@@ -645,6 +645,24 @@ struct UnifiedMatchup: Identifiable, Hashable {
         
         return nil
     }
+    
+    /// Get projected score for my team (async)
+    func getMyTeamProjectedScore() async -> Double {
+        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
+        return projections?.myTeam ?? 0.0
+    }
+    
+    /// Get projected score for opponent team (async)
+    func getOpponentProjectedScore() async -> Double {
+        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
+        return projections?.opponent ?? 0.0
+    }
+    
+    /// Get both projected scores at once (more efficient)
+    func getProjectedScores() async -> (myTeam: Double, opponent: Double) {
+        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
+        return (projections?.myTeam ?? 0.0, projections?.opponent ?? 0.0)
+    }
 }
 
 /// Individual league loading state

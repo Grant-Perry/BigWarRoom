@@ -141,7 +141,26 @@ struct UnifiedPlayerCardBackground: View {
     
     @ViewBuilder
     private func buildFantasyBorder() -> some View {
-        if configuration.isLive {
+        // BYE status takes precedence over live status
+        if configuration.isOnBye {
+            // 🔥 BYE WEEK: Pink border matching green live border style
+            RoundedRectangle(cornerRadius: configuration.cornerRadius)
+                .stroke(
+                    LinearGradient(
+                        colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 6
+                )
+                .opacity(0.9)
+                .shadow(
+                    color: .gpPink.opacity(0.8),
+                    radius: 15,
+                    x: 0,
+                    y: 0
+                )
+        } else if configuration.isLive {
             // 🔥 LIVE: Bright green animated border with glow
             RoundedRectangle(cornerRadius: configuration.cornerRadius)
                 .stroke(
@@ -150,7 +169,7 @@ struct UnifiedPlayerCardBackground: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: configuration.borderWidth
+                    lineWidth: 6
                 )
                 .opacity(0.9)
                 .shadow(
@@ -318,6 +337,7 @@ struct BackgroundConfiguration {
     let showBorder: Bool
     let jerseyNumber: String?
     let isLive: Bool
+    let isOnBye: Bool
     
     /// **Simple Background Factory**
     static func simple(team: NFLTeam?, cornerRadius: CGFloat = 12) -> BackgroundConfiguration {
@@ -330,7 +350,8 @@ struct BackgroundConfiguration {
             borderWidth: 0,
             showBorder: false,
             jerseyNumber: nil,
-            isLive: false
+            isLive: false,
+            isOnBye: false
         )
     }
     
@@ -340,18 +361,23 @@ struct BackgroundConfiguration {
         jerseyNumber: String? = nil,
         cornerRadius: CGFloat = 15,
         showBorder: Bool = true,
-        isLive: Bool = false
+        isLive: Bool = false,
+        isOnBye: Bool = false
     ) -> BackgroundConfiguration {
-        BackgroundConfiguration(
+        let borderWidth: CGFloat = (isLive || isOnBye) ? 6 : 2
+        let shadowRadius: CGFloat = (isLive || isOnBye) ? 15 : 8
+        
+        return BackgroundConfiguration(
             style: .fantasy,
             team: team,
             cornerRadius: cornerRadius,
             teamColor: team?.primaryColor ?? .nyyDark,
-            shadowRadius: isLive ? 15 : 8,
-            borderWidth: isLive ? 6 : 2,
+            shadowRadius: shadowRadius,
+            borderWidth: borderWidth,
             showBorder: showBorder,
             jerseyNumber: jerseyNumber,
-            isLive: isLive
+            isLive: isLive,
+            isOnBye: isOnBye
         )
     }
     
@@ -370,7 +396,8 @@ struct BackgroundConfiguration {
             borderWidth: 0,
             showBorder: false,
             jerseyNumber: nil,
-            isLive: false
+            isLive: false,
+            isOnBye: false
         )
     }
 }

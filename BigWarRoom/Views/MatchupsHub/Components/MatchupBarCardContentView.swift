@@ -11,6 +11,9 @@ struct MatchupBarCardContentView: View {
     let matchup: UnifiedMatchup
     let isWinning: Bool
     let isLineupOptimized: Bool
+    let myProjected: Double
+    let opponentProjected: Double
+    let projectionsLoaded: Bool
     
     var body: some View {
         ZStack {
@@ -106,8 +109,9 @@ struct MatchupBarCardContentView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 16)
                     
-                    // Center: Scores with VS and Delta - FIXED WIDTH, CENTERED
-                    VStack(spacing: 8) {
+                    // Center: Scores with VS, Projected, and Delta
+                    VStack(spacing: 6) {
+                        // Current scores
                         HStack(spacing: 6) {
                             // My score
                             Text(String(format: "%.1f", matchup.myTeam?.currentScore ?? 0.0))
@@ -126,31 +130,64 @@ struct MatchupBarCardContentView: View {
                                 .minimumScaleFactor(0.8)
                         }
                         
-                        // Delta box directly under scores - always present with fixed height
-                        if let differential = matchup.scoreDifferential {
-                            Text(String(format: "%.1f", abs(differential)))
-                                .font(.system(size: 13, weight: .black))
-                                .foregroundColor(differential >= 0 ? .gpGreen : .gpRedPink)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule()
-                                        .fill((differential >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.2))
-                                        .overlay(
-                                            Capsule()
-                                                .stroke((differential >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.6), lineWidth: 1.5)
-                                        )
-                                )
-                        } else {
-                            // Placeholder to maintain consistent height
-                            Text("0.0")
-                                .font(.system(size: 13, weight: .black))
-                                .foregroundColor(.clear)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
+                        // Projected scores as thermometer bar with win %
+                        if projectionsLoaded && myProjected > 0 && opponentProjected > 0 {
+                            VStack(spacing: 2) {
+                                // Thermometer bar with win % overlay
+                                GeometryReader { geometry in
+                                    ZStack(alignment: .leading) {
+                                        // Background bar
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(Color.white.opacity(0.1))
+                                            .frame(height: 8)
+                                        
+                                        // Filled portion (my team's percentage)
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [
+                                                        myProjected > opponentProjected ? Color.green : Color.red,
+                                                        myProjected > opponentProjected ? Color.green.opacity(0.7) : Color.red.opacity(0.7)
+                                                    ],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                            )
+                                            .frame(width: geometry.size.width * projectedPercentage, height: 8)
+                                        
+                                        // Win percentage in center
+                                        HStack {
+                                            Spacer()
+                                            Text(winPercentageText)
+                                                .font(.system(size: 9, weight: .black))
+                                                .foregroundColor(myProjected > opponentProjected ? .gpGreen : .gpRedPink)
+                                                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                                .frame(height: 8)
+                                
+                                // Projected scores on either end
+                                HStack(spacing: 0) {
+                                    Text(String(format: "%.1f", myProjected))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(myProjected > opponentProjected ? .green : .red)
+                                    
+                                    Spacer()
+                                    
+                                    Text(String(format: "%.1f", opponentProjected))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(myProjected > opponentProjected ? .red : .green)
+                                }
+                            }
+                            .frame(width: 120)
+                            .onAppear {
+                                DebugPrint(mode: .liveUpdates, "🎯 DISPLAY: My(\(matchup.myTeam?.ownerName ?? "?"))=\(myProjected) vs Opp(\(matchup.opponentTeam?.ownerName ?? "?"))=\(opponentProjected)")
+                            }
                         }
                     }
-                    .frame(width: 140) // Slightly wider fixed width for perfect centering
+                    .frame(width: 140)
                     
                     // Opponent section (right) - flexible width
                     HStack(spacing: 8) {
@@ -213,7 +250,7 @@ struct MatchupBarCardContentView: View {
                 }
                 .padding(.vertical, 4)
                 
-                // Bottom row: League name, RX, Status
+                // Bottom row: League name, Delta, RX, Status
                 HStack(spacing: 12) {
                     // League name with logo (SMALLER)
                     HStack(spacing: 6) {
@@ -262,6 +299,23 @@ struct MatchupBarCardContentView: View {
                                 Capsule()
                                     .fill(Color.red.opacity(0.15))
                             )
+                        }
+                        
+                        // Delta badge (medium size)
+                        if let differential = matchup.scoreDifferential {
+                            Text(String(format: "%.1f", abs(differential)))
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundColor(differential >= 0 ? .gpGreen : .gpRedPink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    Capsule()
+                                        .fill((differential >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.2))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke((differential >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.6), lineWidth: 1.5)
+                                        )
+                                )
                         }
                         
                         // RX button - LineupRX asset icon with green/red circle
@@ -316,6 +370,17 @@ struct MatchupBarCardContentView: View {
     }
     
     // MARK: - Helper Methods
+    
+    private var projectedPercentage: CGFloat {
+        let total = myProjected + opponentProjected
+        guard total > 0 else { return 0.5 }
+        return CGFloat(myProjected / total)
+    }
+    
+    private var winPercentageText: String {
+        let percentage = Int(projectedPercentage * 100)
+        return "\(percentage)%"
+    }
     
     private func getInitials(from name: String) -> String {
         let components = name.split(separator: " ")
