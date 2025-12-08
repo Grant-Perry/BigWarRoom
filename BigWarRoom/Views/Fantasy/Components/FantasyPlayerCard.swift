@@ -43,6 +43,16 @@ struct FantasyPlayerCard: View {
         VStack {
             if let vm = viewModel {
                 ZStack(alignment: .topLeading) {
+                    // 🔥 Navigation layer - make entire card tappable
+                    if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
+                        NavigationLink(value: sleeperPlayer) {
+                            Rectangle()
+                                .fill(Color.clear)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .zIndex(1)
+                    }
+                    
                     UnifiedPlayerCardBackground(
                         configuration: .fantasy(
                             team: NFLTeam.team(for: player.team ?? ""),
@@ -53,6 +63,7 @@ struct FantasyPlayerCard: View {
                             isOnBye: player.isOnBye
                         )
                     )
+                    .zIndex(0)
                     
                     HStack {
                         Spacer()
@@ -69,20 +80,13 @@ struct FantasyPlayerCard: View {
                     }
                     .padding(.top, 20)
                     .padding(.trailing, 15)
+                    .zIndex(0)
                     
                     buildMainContent(vm: vm)
+                        .zIndex(2)
                 }
                 .frame(height: vm.cardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 15))
-                // 🔥 FIX: Use overlay with NavigationLink to avoid navigationDestination inside lazy container
-                .overlay {
-                    if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
-                        NavigationLink(value: sleeperPlayer) {
-                            Color.clear
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
             } else {
                 ProgressView()
                     .frame(height: 125)
@@ -120,7 +124,7 @@ struct FantasyPlayerCard: View {
             fantasyViewModel: fantasyViewModel
         )
         
-        // Player name and position - reuse existing component
+        // Player name and position with watch button - reuse existing component
         FantasyPlayerCardNamePositionView(
             player: player,
             positionalRanking: vm.getPositionalRanking(
@@ -130,11 +134,10 @@ struct FantasyPlayerCard: View {
                 isBench: isBench, 
                 fantasyViewModel: fantasyViewModel
             ),
-            teamColor: vm.teamColor
+            teamColor: vm.teamColor,
+            isPlayerWatched: isPlayerWatched,
+            onWatchToggle: toggleWatchStatus
         )
-        
-        // Watch toggle button
-        buildWatchToggle()
         
         // Game matchup section
         FantasyPlayerCardMatchupView(player: player)
@@ -149,27 +152,6 @@ struct FantasyPlayerCard: View {
     
     @ViewBuilder
     private func buildWatchToggle() -> some View {
-        VStack {
-            HStack {
-                Spacer()
-                
-                Button(action: toggleWatchStatus) {
-                    Image(systemName: isPlayerWatched ? "eye.fill" : "eye")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isPlayerWatched ? .gpYellow : .white.opacity(0.6))
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(Color.black.opacity(0.6))
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.top, 8)
-                .padding(.trailing, 8)
-            }
-            Spacer()
-        }
     }
     
     @ViewBuilder 

@@ -183,9 +183,10 @@ struct DebugMode: OptionSet {
     static let lineupRX           	= DebugMode(rawValue: 1 << 15)  // 32768
     static let liveUpdate2 		  	= DebugMode(rawValue: 1 << 16)  // 65536
     static let waivers            	= DebugMode(rawValue: 1 << 17)  // 131072
-    static let weekCheck          	= DebugMode(rawValue: 1 << 18)  // 262144, next free bit!
+    static let weekCheck          	= DebugMode(rawValue: 1 << 18)  // 262144
     static let lifecycle          	= DebugMode(rawValue: 1 << 19)
     static let general          	= DebugMode(rawValue: 1 << 20)
+    static let projectedScores    	= DebugMode(rawValue: 1 << 21)  // 2097152
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -209,7 +210,8 @@ struct DebugMode: OptionSet {
         .lineupRX,
 		.liveUpdate2,
         .waivers,
-        .weekCheck
+        .weekCheck,
+        .projectedScores
     ]
 }
 
@@ -225,7 +227,14 @@ enum DebugConfig {
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
 	/// Current: Disabled (set to [] for production)
-   static var activeMode: DebugMode = .liveUpdates //[] //.espnAPI // []
+	///
+	///					RIGHT HERE -----|
+	///									|
+	///									|
+	///								   \ /
+	///							    	⌄
+	///
+   static var activeMode: DebugMode = [] //.espnAPI // []
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

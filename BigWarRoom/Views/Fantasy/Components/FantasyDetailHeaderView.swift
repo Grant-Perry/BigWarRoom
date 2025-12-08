@@ -37,6 +37,13 @@ struct FantasyDetailHeaderView: View {
     // 🔥 PHASE 3 DI: Accept GameStatusService for "yet to play" calculations  
     let gameStatusService: GameStatusService?
     
+    // Projected scores state
+    @State private var homeProjected: Double = 0.0
+    @State private var awayProjected: Double = 0.0
+    @State private var projectionsLoaded = false
+    @State private var homeYetToPlayProjected: Double = 0.0
+    @State private var awayYetToPlayProjected: Double = 0.0
+    
     // 🔥 PHASE 3 DI: Add initializer with watchService
     init(
         leagueName: String,
@@ -240,14 +247,33 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
                 
-                // Yet to play - larger number
-                HStack(spacing: 3) {
+                // Projected scores thermometer (if loaded)
+                if projectionsLoaded && homeProjected > 0 && awayProjected > 0 {
+                    projectedThermometerView(
+                        myProjected: homeProjected,
+                        opponentProjected: awayProjected,
+                        isHomeTeam: true
+                    )
+                    .padding(.vertical, 4)
+                }
+                
+                // Yet to play - larger number with projected points
+                VStack(spacing: 2) {
                     Text("Yet to play:")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
-                    Text("\(homeTeamYetToPlay)")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                    
+                    HStack(spacing: 4) {
+                        Text("\(homeTeamYetToPlay)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                        
+                        if homeYetToPlayProjected > 0 {
+                            Text("~ +\(String(format: "%.1f", homeYetToPlayProjected))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.gpGreen.opacity(0.8))
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -348,17 +374,39 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
                 
-                // Yet to play - larger number
-                HStack(spacing: 3) {
+                // Projected scores thermometer (if loaded)
+                if projectionsLoaded && homeProjected > 0 && awayProjected > 0 {
+                    projectedThermometerView(
+                        myProjected: awayProjected,
+                        opponentProjected: homeProjected,
+                        isHomeTeam: false
+                    )
+                    .padding(.vertical, 4)
+                }
+                
+                // Yet to play - larger number with projected points
+                VStack(spacing: 2) {
                     Text("Yet to play:")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
-                    Text("\(awayTeamYetToPlay)")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
+                    
+                    HStack(spacing: 4) {
+                        Text("\(awayTeamYetToPlay)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
+                        
+                        if awayYetToPlayProjected > 0 {
+                            Text("~ +\(String(format: "%.1f", awayYetToPlayProjected))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.gpGreen.opacity(0.8))
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity)
+        }
+        .task {
+            await loadProjectedScores()
         }
     }
     
@@ -531,36 +579,144 @@ struct FantasyDetailHeaderView: View {
     
     /// Calculate number of players yet to play for home team
     private var homeTeamYetToPlay: Int {
-        calculateYetToPlay(for: matchup.homeTeam)
+        matchup.homeTeam.playersYetToPlay(gameStatusService: gameStatusService ?? GameStatusService.shared)
     }
     
     /// Calculate number of players yet to play for away team
     private var awayTeamYetToPlay: Int {
-        calculateYetToPlay(for: matchup.awayTeam)
-    }
-    
-    /// Calculate number of players yet to play for a given team
-    /// Players "yet to play" are starters with 0 points who haven't played yet
-    private func calculateYetToPlay(for team: FantasyTeam) -> Int {
-        return team.roster.filter { player in
-            // Only count starters
-            guard player.isStarter else { return false }
-            
-            // 🔥 PHASE 3 DI: Use injected GameStatusService if available
-            if let gameStatusService = gameStatusService {
-                return gameStatusService.isPlayerYetToPlay(
-                    playerTeam: player.team,
-                    currentPoints: player.currentPoints
-                )
-            }
-            
-            // Fallback logic if no GameStatusService provided
-            let hasZeroPoints = (player.currentPoints ?? 0.0) == 0.0
-            return hasZeroPoints
-        }.count
+        matchup.awayTeam.playersYetToPlay(gameStatusService: gameStatusService ?? GameStatusService.shared)
     }
     
     // MARK: - Helper Methods
+    
+    /// Projected thermometer view
+    private func projectedThermometerView(myProjected: Double, opponentProjected: Double, isHomeTeam: Bool) -> some View {
+        let winPercentage = projectedPercentage(myProjected, opponentProjected)
+        let isWinning = winPercentage >= 0.5
+        
+        return VStack(spacing: 2) {
+            // Thermometer bar with win %
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background bar
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 6)
+                    
+                    // Filled portion
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    isWinning ? Color.gpGreen : Color.gpRedPink,
+                                    isWinning ? Color.gpGreen.opacity(0.7) : Color.gpRedPink.opacity(0.7)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * winPercentage, height: 6)
+                    
+                    // Win percentage in center
+                    HStack {
+                        Spacer()
+                        Text(winPercentageText(myProjected, opponentProjected))
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                            .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
+                        Spacer()
+                    }
+                }
+            }
+            .frame(height: 6)
+            
+            // Projected score
+            Text(String(format: "%.1f", myProjected))
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+        }
+        .frame(width: 100)
+    }
+    
+    private func projectedPercentage(_ myProj: Double, _ oppProj: Double) -> CGFloat {
+        let total = myProj + oppProj
+        guard total > 0 else { return 0.5 }
+        return CGFloat(myProj / total)
+    }
+    
+    private func winPercentageText(_ myProj: Double, _ oppProj: Double) -> String {
+        let percentage = Int(projectedPercentage(myProj, oppProj) * 100)
+        return "\(percentage)%"
+    }
+    
+    private func loadProjectedScores() async {
+        // Get league context for custom projections
+        let leagueID = matchup.leagueID
+        let source: LeagueSource = fantasyViewModel?.selectedLeague?.source == .espn ? .espn : .sleeper
+        
+        let projections = await ProjectedPointsManager.shared.getProjectedTeamScore(
+            for: matchup.homeTeam,
+            leagueID: leagueID,
+            source: source
+        )
+        let awayProjections = await ProjectedPointsManager.shared.getProjectedTeamScore(
+            for: matchup.awayTeam,
+            leagueID: leagueID,
+            source: source
+        )
+        
+        // Calculate "yet to play" projected points
+        let homeYetToPlayProj = await calculateYetToPlayProjected(for: matchup.homeTeam, leagueID: leagueID, source: source)
+        let awayYetToPlayProj = await calculateYetToPlayProjected(for: matchup.awayTeam, leagueID: leagueID, source: source)
+        
+        await MainActor.run {
+            self.homeProjected = projections
+            self.awayProjected = awayProjections
+            self.homeYetToPlayProjected = homeYetToPlayProj
+            self.awayYetToPlayProjected = awayYetToPlayProj
+            self.projectionsLoaded = true
+        }
+    }
+    
+    /// Calculate sum of projected points for players yet to play
+    private func calculateYetToPlayProjected(for team: FantasyTeam, leagueID: String, source: LeagueSource) async -> Double {
+        var total: Double = 0.0
+        
+        let gameStatusService = self.gameStatusService ?? GameStatusService.shared
+        
+        DebugPrint(mode: .projectedScores, "🔍 calculateYetToPlayProjected START for team: \(team.ownerName)")
+        
+        for player in team.roster {
+            // Only count starters who are yet to play
+            guard player.isStarter else { continue }
+            
+            // Check if player is yet to play using GameStatusService
+            let isYetToPlay = gameStatusService.isPlayerYetToPlay(
+                playerTeam: player.team,
+                currentPoints: player.currentPoints
+            )
+            
+            DebugPrint(mode: .projectedScores, "   🎯 Player: \(player.fullName) - isStarter: \(player.isStarter), isYetToPlay: \(isYetToPlay), currentPoints: \(player.currentPoints)")
+            
+            if isYetToPlay {
+                // Get custom projected points for this player using league rules
+                if let projection = await ProjectedPointsManager.shared.getCustomProjectedPoints(
+                    for: player,
+                    leagueID: leagueID,
+                    source: source
+                ) {
+                    DebugPrint(mode: .projectedScores, "      ✅ Got projection: \(projection) for \(player.fullName)")
+                    total += projection
+                } else {
+                    DebugPrint(mode: .projectedScores, "      ❌ NO PROJECTION for \(player.fullName)")
+                }
+            }
+        }
+        
+        DebugPrint(mode: .projectedScores, "🔍 calculateYetToPlayProjected END for \(team.ownerName): Total = \(total)")
+        
+        return total
+    }
     
     /// Get initials from manager name for avatar fallback
     private func getInitials(from name: String) -> String {

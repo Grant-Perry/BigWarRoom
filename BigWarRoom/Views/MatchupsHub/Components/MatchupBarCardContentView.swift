@@ -146,8 +146,8 @@ struct MatchupBarCardContentView: View {
                                             .fill(
                                                 LinearGradient(
                                                     colors: [
-                                                        myProjected > opponentProjected ? Color.green : Color.red,
-                                                        myProjected > opponentProjected ? Color.green.opacity(0.7) : Color.red.opacity(0.7)
+                                                        projectedPercentage >= 0.5 ? Color.gpGreen : Color.gpRedPink,
+                                                        projectedPercentage >= 0.5 ? Color.gpGreen.opacity(0.7) : Color.gpRedPink.opacity(0.7)
                                                     ],
                                                     startPoint: .leading,
                                                     endPoint: .trailing
@@ -160,7 +160,7 @@ struct MatchupBarCardContentView: View {
                                             Spacer()
                                             Text(winPercentageText)
                                                 .font(.system(size: 9, weight: .black))
-                                                .foregroundColor(myProjected > opponentProjected ? .gpGreen : .gpRedPink)
+                                                .foregroundColor(projectedPercentage >= 0.5 ? .gpGreen : .gpRedPink)
                                                 .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
                                             Spacer()
                                         }
@@ -172,13 +172,13 @@ struct MatchupBarCardContentView: View {
                                 HStack(spacing: 0) {
                                     Text(String(format: "%.1f", myProjected))
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(myProjected > opponentProjected ? .green : .red)
+                                        .foregroundColor(projectedPercentage >= 0.5 ? .gpGreen : .gpRedPink)
                                     
                                     Spacer()
                                     
                                     Text(String(format: "%.1f", opponentProjected))
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(myProjected > opponentProjected ? .red : .green)
+                                        .foregroundColor(projectedPercentage >= 0.5 ? .gpRedPink : .gpGreen)
                                 }
                             }
                             .frame(width: 120)
@@ -400,9 +400,7 @@ struct MatchupBarCardContentView: View {
     }
     
     private func toPlayCount(for team: FantasyTeam) -> Int {
-        team.roster.filter { player in
-            player.isStarter && !player.hasPlayedThisWeek
-        }.count
+        return team.playersYetToPlay(gameStatusService: GameStatusService.shared)
     }
     
     private var shadowColor: Color {

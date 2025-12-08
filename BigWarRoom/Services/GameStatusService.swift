@@ -78,11 +78,23 @@ final class GameStatusService {
     
     /// Determine if a player is "yet to play" based on real game status
     /// This is the authoritative method for "yet to play" calculation
+    /// 🔥 FIXED: Now properly excludes BYE players
     func isPlayerYetToPlay(
         playerTeam: String?,
         currentPoints: Double?,
         gameDate: Date? = nil
     ) -> Bool {
+        // 🔥 BYE CHECK: If player team has no game, they're NOT "yet to play"
+        guard let team = playerTeam, !team.isEmpty else {
+            return false
+        }
+        
+        // Check if team is on BYE (no game data available)
+        if nflGameDataService.getGameInfo(for: team) == nil {
+            // No game = BYE week, not "yet to play"
+            return false
+        }
+        
         // First check: If we have a game date and it's in the past, no one is "yet to play"
         if let gameDate = gameDate {
             let calendar = Calendar.current
@@ -91,7 +103,6 @@ final class GameStatusService {
             
             // If game date is before today, all games are finished
             if gameDayStart < today {
-//                print("🏁 YET TO PLAY: Game date \(gameDate) is in the past - all games finished")
                 return false
             }
         }
@@ -105,9 +116,8 @@ final class GameStatusService {
                 return gameDayStart >= today
             }
             
-            // Last resort fallback
-//            print("⚠️ YET TO PLAY: Cannot determine game status for team '\(playerTeam ?? "nil")' - assuming yet to play")
-            return true
+            // No game info = BYE
+            return false
         }
         
         let points = currentPoints ?? 0.0
@@ -120,8 +130,6 @@ final class GameStatusService {
         let gameNotFinal = !status.contains("final") && !status.contains("post")
         
         let yetToPlay = hasZeroPoints && gameNotFinal
-        
-//        print("🎯 YET TO PLAY: Team \(playerTeam ?? "nil"), Points: \(points), Status: \(status) -> Yet to play: \(yetToPlay)")
         
         return yetToPlay
     }

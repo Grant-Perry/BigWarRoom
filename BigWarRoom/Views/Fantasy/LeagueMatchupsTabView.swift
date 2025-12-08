@@ -97,7 +97,7 @@ struct LeagueMatchupsTabView: View {
                         Group {
                             if isLoadingAllMatchups {
                                 // Show loading overlay OVER the scroll view instead of replacing it
-                                Color.black.opacity(0.85)
+                                Color.black.opacity(0.55)
                                     .ignoresSafeArea(.all)
                                     .overlay(
                                         VStack(spacing: 12) {
@@ -112,7 +112,7 @@ struct LeagueMatchupsTabView: View {
                             }
                             
                             if isNavigating {
-                                Color.black.opacity(0.7)
+                                Color.black.opacity(0.55)
                                     .ignoresSafeArea(.all)
                                     .overlay(
                                         VStack(spacing: 12) {

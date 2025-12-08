@@ -61,28 +61,42 @@ struct FantasyMatchupDetailView: View {
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
         // FIX: Only add background when NOT embedded in LeagueMatchupsTabView
-        if isEmbeddedInTabView {
-            // Embedded in LeagueMatchupsTabView - no background, content only
-            contentView
-        } else {
-            // Standalone - add background
-            ZStack {
-                // Background
-                ZStack {
-                    Color.black
-                    Image("BG7")
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .opacity(0.35)
-                }
-                .ignoresSafeArea(.all)
-                
-                // Content
+        Group {
+            if isEmbeddedInTabView {
+                // Embedded in LeagueMatchupsTabView - no background, content only
                 contentView
+                    .navigationDestination(for: SleeperPlayer.self) { player in
+                        PlayerStatsCardView(
+                            player: player,
+                            team: NFLTeam.team(for: player.team ?? "")
+                        )
+                    }
+            } else {
+                // Standalone - add background
+                ZStack {
+                    // Background
+                    ZStack {
+                        Color.black
+                        Image("BG7")
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .opacity(0.35)
+                    }
+                    .ignoresSafeArea(.all)
+                    
+                    // Content
+                    contentView
+                }
+                .navigationBarHidden(true)
+                .navigationBarBackButtonHidden(true)
+                .preferredColorScheme(.dark)
+                .navigationDestination(for: SleeperPlayer.self) { player in
+                    PlayerStatsCardView(
+                        player: player,
+                        team: NFLTeam.team(for: player.team ?? "")
+                    )
+                }
             }
-            .navigationBarHidden(true)
-            .navigationBarBackButtonHidden(true)
-            .preferredColorScheme(.dark)
         }
     }
 

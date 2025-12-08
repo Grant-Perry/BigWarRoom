@@ -17,6 +17,10 @@ struct FantasyMatchupActiveRosterSection: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     
+    @State private var homeProjected: Double = 0.0
+    @State private var awayProjected: Double = 0.0
+    @State private var projectionsLoaded = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Active Roster")
@@ -38,9 +42,10 @@ struct FantasyMatchupActiveRosterSection: View {
                         )
                     }
                     
-                    // Away team score
+                    // Away team score with projections
                     teamScoreCard(
                         score: fantasyViewModel.getScore(for: matchup, teamIndex: 0),
+                        projected: awayProjected,
                         isWinning: fantasyViewModel.getScore(for: matchup, teamIndex: 0) > fantasyViewModel.getScore(for: matchup, teamIndex: 1),
                         label: "Active Total"
                     )
@@ -59,9 +64,10 @@ struct FantasyMatchupActiveRosterSection: View {
                         )
                     }
                     
-                    // Home team score
+                    // Home team score with projections
                     teamScoreCard(
                         score: fantasyViewModel.getScore(for: matchup, teamIndex: 1),
+                        projected: homeProjected,
                         isWinning: fantasyViewModel.getScore(for: matchup, teamIndex: 1) > fantasyViewModel.getScore(for: matchup, teamIndex: 0),
                         label: "Active Total"
                     )
@@ -69,29 +75,67 @@ struct FantasyMatchupActiveRosterSection: View {
             }
             .padding(.horizontal, 20)
         }
+        .task {
+            await loadProjectedScores()
+        }
     }
     
     @ViewBuilder
-    private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(isWinning ? .gpGreen : .white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(.secondarySystemBackground),
-                                isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
+    private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
+        if projectionsLoaded && projected > 0 {
+            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isWinning ? .gpGreen : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(.secondarySystemBackground),
+                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
-            )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text("\(label): \(String(format: "%.2f", score))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isWinning ? .gpGreen : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(.secondarySystemBackground),
+                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+        }
+    }
+    
+    private func loadProjectedScores() async {
+        let homeProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.homeTeam)
+        let awayProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.awayTeam)
+        
+        await MainActor.run {
+            self.homeProjected = homeProj
+            self.awayProjected = awayProj
+            self.projectionsLoaded = true
+        }
     }
     
     /// Get roster for a team with proper position sorting
@@ -140,6 +184,10 @@ struct FantasyMatchupBenchSection: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     
+    @State private var homeBenchProjected: Double = 0.0
+    @State private var awayBenchProjected: Double = 0.0
+    @State private var projectionsLoaded = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Bench")
@@ -164,6 +212,7 @@ struct FantasyMatchupBenchSection: View {
                     let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
+                        projected: awayBenchProjected,
                         isWinning: false,
                         label: "Bench Total"
                     )
@@ -185,6 +234,7 @@ struct FantasyMatchupBenchSection: View {
                     let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
+                        projected: homeBenchProjected,
                         isWinning: false,
                         label: "Bench Total"
                     )
@@ -192,26 +242,80 @@ struct FantasyMatchupBenchSection: View {
             }
             .padding(.horizontal, 20)
         }
+        .task {
+            await loadBenchProjectedScores()
+        }
     }
     
     @ViewBuilder
-    private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                            startPoint: .top,
-                            endPoint: .bottom
+    private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
+        if projectionsLoaded && projected > 0 {
+            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
                         )
-                    )
-            )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text("\(label): \(String(format: "%.2f", score))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+        }
+    }
+    
+    private func loadBenchProjectedScores() async {
+        let homeBenchPlayers = getRoster(for: matchup, teamIndex: 1, isBench: true)
+        let awayBenchPlayers = getRoster(for: matchup, teamIndex: 0, isBench: true)
+        
+        var homeBenchProj = 0.0
+        var awayBenchProj = 0.0
+        
+        for player in homeBenchPlayers {
+            if let currentScore = player.currentPoints, currentScore > 0 {
+                homeBenchProj += currentScore
+            } else if let projection = await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
+                homeBenchProj += projection
+            }
+        }
+        
+        for player in awayBenchPlayers {
+            if let currentScore = player.currentPoints, currentScore > 0 {
+                awayBenchProj += currentScore
+            } else if let projection = await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
+                awayBenchProj += projection
+            }
+        }
+        
+        await MainActor.run {
+            self.homeBenchProjected = homeBenchProj
+            self.awayBenchProjected = awayBenchProj
+            self.projectionsLoaded = true
+        }
     }
     
     /// Get roster for a team with proper position sorting
@@ -540,10 +644,9 @@ struct FantasyMatchupBenchSectionSorted: View {
     }
 }
 
-// MARK: - FILTERED Roster Sections (NEW - with comprehensive filtering)
+// MARK: - FILTERED Roster Sections (with comprehensive filtering)
 
 /// **Active Roster Section with Full Filtering Capabilities**
-/// **UPDATED: Removed search functionality, kept position and active filters**
 struct FantasyMatchupActiveRosterSectionFiltered: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -556,6 +659,9 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     @State private var cachedHomeRoster: [FantasyPlayer] = []
     @State private var cachedAwayRoster: [FantasyPlayer] = []
     @State private var lastFilterUpdate = Date.distantPast
+    @State private var homeProjected: Double = 0.0
+    @State private var awayProjected: Double = 0.0
+    @State private var projectionsLoaded = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -579,6 +685,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                     
                     teamScoreCard(
                         score: homeScore,
+                        projected: homeProjected,
                         isWinning: homeWinning,
                         label: "Active Total"
                     )
@@ -602,6 +709,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                     
                     teamScoreCard(
                         score: awayScore,
+                        projected: awayProjected,
                         isWinning: awayWinning,
                         label: "Active Total"
                     )
@@ -611,6 +719,9 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         }
         .onAppear {
             updateCachedRosters()
+            Task {
+                await loadProjectedScores()
+            }
         }
         .onChange(of: sortMethod) { _, _ in
             updateCachedRosters()
@@ -643,47 +754,77 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         lastFilterUpdate = Date()
     }
     
-    @ViewBuilder
-    private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(isWinning ? .gpGreen : .white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color(.secondarySystemBackground),
-                                isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            )
+    private func loadProjectedScores() async {
+        let homeProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.homeTeam)
+        let awayProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.awayTeam)
+        
+        await MainActor.run {
+            self.homeProjected = homeProj
+            self.awayProjected = awayProj
+            self.projectionsLoaded = true
+        }
     }
     
-    /// Get roster with comprehensive filtering and sorting (NO SEARCH)
+    @ViewBuilder
+    private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
+        if projectionsLoaded && projected > 0 {
+            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isWinning ? .gpGreen : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(.secondarySystemBackground),
+                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text("\(label): \(String(format: "%.2f", score))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(isWinning ? .gpGreen : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    Color(.secondarySystemBackground),
+                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
+                                ]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+        }
+    }
+    
+    /// Get roster with comprehensive filtering and sorting
     private func getFilteredRoster(for matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> [FantasyPlayer] {
         let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
         
-        // Step 1: Filter by bench/starter status
         var filteredPlayers = team.roster.filter { player in
             isBench ? !player.isStarter : player.isStarter
         }
         
-        let originalCount = filteredPlayers.count
-        
-        // Step 2: Apply position filter
         if selectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
                 let filterPosition = selectedPosition.rawValue.uppercased()
                 
-                // Handle special cases
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
                 }
@@ -693,7 +834,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         }
         
         if showActiveOnly {
-            // Build a Set of live teams for O(1) lookup
             let liveTeams = Set(NFLGameDataService.shared.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
@@ -704,7 +844,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        // Step 4: Apply "Yet to Play" filter
         if showYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
@@ -714,7 +853,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        // Step 5: Apply sorting
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:
@@ -724,7 +862,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 if order1 != order2 {
                     return highToLow ? order1 > order2 : order1 < order2
                 } else {
-                    // If same position, sort by score (high to low)
                     let points1 = player1.currentPoints ?? 0.0
                     let points2 = player2.currentPoints ?? 0.0
                     return points1 > points2
@@ -750,7 +887,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         return filteredPlayers
     }
     
-    /// Position sorting order
     private func positionSortOrder(_ position: String) -> Int {
         switch position.uppercased() {
         case "QB": return 1
@@ -768,7 +904,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
 }
 
 /// **Bench Section with Full Filtering Capabilities**
-/// **UPDATED: Removed search functionality, kept position and active filters**
 struct FantasyMatchupBenchSectionFiltered: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -781,10 +916,12 @@ struct FantasyMatchupBenchSectionFiltered: View {
     @State private var cachedHomeBench: [FantasyPlayer] = []
     @State private var cachedAwayBench: [FantasyPlayer] = []
     @State private var lastFilterUpdate = Date.distantPast
+    @State private var homeBenchProjected: Double = 0.0
+    @State private var awayBenchProjected: Double = 0.0
+    @State private var projectionsLoaded = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Keep Bench header for separation
             Text("Bench")
                 .font(.headline)
                 .foregroundColor(.white)
@@ -806,6 +943,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
                     let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
+                        projected: homeBenchProjected,
                         isWinning: false,
                         label: "Bench Total"
                     )
@@ -826,6 +964,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
                     let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
+                        projected: awayBenchProjected,
                         isWinning: false,
                         label: "Bench Total"
                     )
@@ -835,6 +974,9 @@ struct FantasyMatchupBenchSectionFiltered: View {
         }
         .onAppear {
             updateCachedRosters()
+            Task {
+                await loadBenchProjectedScores()
+            }
         }
         .onChange(of: sortMethod) { _, _ in
             updateCachedRosters()
@@ -867,44 +1009,89 @@ struct FantasyMatchupBenchSectionFiltered: View {
         lastFilterUpdate = Date()
     }
     
-    @ViewBuilder
-    private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
-            .font(.subheadline)
-            .fontWeight(.semibold)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            )
+    private func loadBenchProjectedScores() async {
+        let homeBenchPlayers = homeBenchRoster
+        let awayBenchPlayers = awayBenchRoster
+        
+        var homeBenchProj = 0.0
+        var awayBenchProj = 0.0
+        
+        for player in homeBenchPlayers {
+            if let currentScore = player.currentPoints, currentScore > 0 {
+                homeBenchProj += currentScore
+            } else if let projection = await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
+                homeBenchProj += projection
+            }
+        }
+        
+        for player in awayBenchPlayers {
+            if let currentScore = player.currentPoints, currentScore > 0 {
+                awayBenchProj += currentScore
+            } else if let projection = await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
+                awayBenchProj += projection
+            }
+        }
+        
+        await MainActor.run {
+            self.homeBenchProjected = homeBenchProj
+            self.awayBenchProjected = awayBenchProj
+            self.projectionsLoaded = true
+        }
     }
     
-    /// Get roster with comprehensive filtering and sorting (NO SEARCH)
+    @ViewBuilder
+    private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
+        if projectionsLoaded && projected > 0 {
+            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        } else {
+            Text("\(label): \(String(format: "%.2f", score))")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+        }
+    }
+    
     private func getFilteredRoster(for matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> [FantasyPlayer] {
         let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
         
-        // Step 1: Filter by bench/starter status
         var filteredPlayers = team.roster.filter { player in
             isBench ? !player.isStarter : player.isStarter
         }
         
-        let originalCount = filteredPlayers.count
-        
-        // Step 2: Apply position filter
         if selectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
                 let filterPosition = selectedPosition.rawValue.uppercased()
                 
-                // Handle special cases
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
                 }
@@ -914,7 +1101,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
         }
         
         if showActiveOnly {
-            // Build a Set of live teams for O(1) lookup
             let liveTeams = Set(NFLGameDataService.shared.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
@@ -925,7 +1111,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        // Step 4: Apply "Yet to Play" filter
         if showYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
@@ -935,7 +1120,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        // Step 5: Apply sorting
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
             switch sortMethod {
             case .position:
@@ -970,7 +1154,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
         return filteredPlayers
     }
     
-    /// Position sorting order
     private func positionSortOrder(_ position: String) -> Int {
         switch position.uppercased() {
         case "QB": return 1

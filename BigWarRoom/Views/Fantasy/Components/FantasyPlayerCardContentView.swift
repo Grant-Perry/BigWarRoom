@@ -15,8 +15,10 @@ struct FantasyPlayerCardMainContentView: View {
     
     let onScoreTap: (() -> Void)?
     
-    // 🔥 FIXED: Add FantasyViewModel to get corrected ESPN scores
     let fantasyViewModel: FantasyViewModel?
+    
+    @State private var projectedPoints: Double = 0.0
+    @State private var projectionsLoaded = false
     
     init(player: FantasyPlayer, isPlayerLive: Bool, glowIntensity: Double, onScoreTap: (() -> Void)? = nil, fantasyViewModel: FantasyViewModel? = nil) {
         self.player = player
@@ -27,42 +29,49 @@ struct FantasyPlayerCardMainContentView: View {
     }
     
     var body: some View {
-        HStack(spacing: 8) { // 🔥 FIX: Reduced spacing from 12 to 8 to give score area more room
+        HStack(spacing: 8) {
             // Player headshot
             FantasyPlayerCardHeadshotView(
                 player: player,
                 isPlayerLive: isPlayerLive
             )
             
-            // Score display - UPDATED: Make tappable when action provided
-            VStack(alignment: .trailing, spacing: 4) {
+            // Score display with projections
+            VStack(alignment: .trailing, spacing: 2) {
                 Spacer()
                 
                 HStack(alignment: .bottom, spacing: 4) {
                     Spacer()
                     
-                    // 🔥 FIX: Wrap score in button if tap action provided with proper gesture handling
                     if let onScoreTap = onScoreTap {
                         scoreText
                             .onTapGesture {
                                 onScoreTap()
                             }
-                            // 🔥 CRITICAL: Remove .allowsHitTesting and .zIndex that were blocking parent card taps
                     } else {
                         scoreText
                     }
                 }
-                .padding(.bottom, 36)
-                .padding(.trailing, 4) // 🔥 FIXED: Reduced from 8 to 4 to give even more space
+                
+                // Projected points and difference - single line, trailing alignment
+                if projectionsLoaded {
+                    projectedPointsView
+                }
+                
+                Spacer()
+                    .frame(height: 20)
             }
+            .padding(.trailing, 4)
             .zIndex(3)
+        }
+        .task {
+            await loadProjectedPoints()
         }
     }
     
     // MARK: - Helper Views
     
     private var scoreText: some View {
-        // 🔥 FIXED: Use corrected score from FantasyViewModel when available
         let displayScore: String
         if let fantasyViewModel = fantasyViewModel {
             let correctedScore = fantasyViewModel.getCorrectedPlayerScore(for: player)
@@ -71,35 +80,83 @@ struct FantasyPlayerCardMainContentView: View {
             displayScore = player.currentPointsString
         }
         
-        // 🔥 DEBUG: Log which score is being used for Daniel Jones
-        if player.fullName.contains("Daniel Jones") {
-            print("🎯 FANTASY CARD FINAL DEBUG: \(player.fullName)")
-            print("   Player ID: \(player.id)")
-            print("   Original Score: \(player.currentPoints ?? 0.0)")
-            print("   Display Score: \(displayScore)")
-            print("   Has FantasyViewModel: \(fantasyViewModel != nil)")
-        }
-        
         return Text(displayScore)
-            .font(.system(size: 22, weight: .black))
+            .font(.system(size: 16, weight: .black))
             .foregroundColor(.white)
             .lineLimit(1)
-            .minimumScaleFactor(0.5) // 🔥 FIXED: Lowered from 0.7 to 0.5 to prevent truncation
+            .minimumScaleFactor(0.5)
             .scaleEffect(isPlayerLive ? (glowIntensity > 0.5 ? 1.15 : 1.0) : 1.0)
             .shadow(color: .black.opacity(0.9), radius: 3, x: 0, y: 2)
-            .padding(.horizontal, 4) // 🔥 FIXED: Reduced from 6 to 4 for more space
-            .padding(.vertical, 4)
-            .frame(minWidth: 70) // 🔥 FIXED: Increased from 60 to 70 for more space
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .frame(minWidth: 50)
             .overlay(
                 onScoreTap != nil ? 
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.white.opacity(0.3), lineWidth: 1.5) // 🔥 FIX: Make border more visible
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1.5)
                     .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.black.opacity(0.2)) // 🔥 FIX: Add subtle background to indicate tappable
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(Color.black.opacity(0.2))
                     )
                 : nil
             )
+    }
+    
+    private var projectedPointsView: some View {
+        let currentPoints = player.currentPoints ?? 0.0
+        let difference = currentPoints - projectedPoints
+        let differenceText = difference >= 0 ? "+\(String(format: "%.1f", difference))" : String(format: "%.1f", difference)
+        let differenceColor: Color = difference >= 0 ? .gpGreen : .gpRedPink
+        
+        return HStack(spacing: 2) {
+            Text("Proj:")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text("\(String(format: "%.1f", projectedPoints))")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.white.opacity(0.8))
+            
+            Text("|")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundColor(.white.opacity(0.4))
+            
+            Text(differenceText)
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(differenceColor)
+        }
+        .lineLimit(1)
+        .frame(alignment: .trailing)
+    }
+    
+    private func loadProjectedPoints() async {
+        // Try to get league context from fantasyViewModel
+        if let fantasyViewModel = fantasyViewModel,
+           let selectedLeague = fantasyViewModel.selectedLeague {
+            let leagueID = selectedLeague.league.id
+            let source: LeagueSource = selectedLeague.source == .espn ? .espn : .sleeper
+            
+            // Use custom projections with league scoring rules
+            if let projection = await ProjectedPointsManager.shared.getCustomProjectedPoints(
+                for: player,
+                leagueID: leagueID,
+                source: source
+            ) {
+                await MainActor.run {
+                    self.projectedPoints = projection
+                    self.projectionsLoaded = true
+                }
+                return
+            }
+        }
+        
+        // Fallback to generic projection if no league context
+        if let projection = try? await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
+            await MainActor.run {
+                self.projectedPoints = projection
+                self.projectionsLoaded = true
+            }
+        }
     }
 }
 
@@ -109,17 +166,17 @@ struct FantasyPlayerCardHeadshotView: View {
     let isPlayerLive: Bool
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomLeading) {
             AsyncImage(url: player.headshotURL) { phase in
                 switch phase {
                 case .empty:
                     ProgressView()
-                        .frame(width: 95, height: 95)
+                        .frame(width: 65, height: 65)
                 case .success(let image):
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: 95, height: 95)
+                        .frame(width: 65, height: 65)
                         .clipped()
                         .opacity(isPlayerLive ? 1.0 : 0.85)
                 case .failure:
@@ -132,19 +189,14 @@ struct FantasyPlayerCardHeadshotView: View {
                 }
             }
             
-            // 🔥 NEW: Injury Status Badge (positioned at bottom-right of headshot)
             if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
-                            .offset(x: -4, y: -4) // Position as subscript to headshot
-                    }
-                }
+                InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                    .scaleEffect(0.7)
+                    .offset(x: 3, y: -3)
             }
         }
-        .offset(x: -20, y: -8)
+        .offset(x: -6)
+        .clipped()
         .zIndex(2)
     }
 }
@@ -155,7 +207,7 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
     let isPlayerLive: Bool
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomLeading) {
             Group {
                 if let espnURL = player.espnHeadshotURL {
                     AsyncImage(url: espnURL) { phase2 in
@@ -164,7 +216,7 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
                             image2
                                 .resizable()
                                 .aspectRatio(contentMode: .fill)
-                                .frame(width: 95, height: 95)
+                                .frame(width: 65, height: 65)
                                 .clipped()
                                 .opacity(isPlayerLive ? 1.0 : 0.85)
                         default:
@@ -182,16 +234,10 @@ struct FantasyPlayerCardFallbackHeadshotView: View {
                 }
             }
             
-            // 🔥 NEW: Injury Status Badge (for fallback images too)
             if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
-                            .offset(x: -4, y: -4)
-                    }
-                }
+                InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                    .scaleEffect(0.7)
+                    .offset(x: 3, y: -3)
             }
         }
     }
@@ -210,25 +256,19 @@ struct FantasyPlayerCardDefaultCircleView: View {
     }
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomLeading) {
             Circle()
                 .fill(teamColor.opacity(0.8))
-                .frame(width: 95, height: 95)
+                .frame(width: 65, height: 65)
             
             Text(player.shortName.prefix(2))
-                .font(.system(size: 24, weight: .bold))
+                .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
             
-            // 🔥 NEW: Injury Status Badge (even for default circles)
             if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        InjuryStatusBadgeView(injuryStatus: injuryStatus)
-                            .offset(x: -4, y: -4)
-                    }
-                }
+                InjuryStatusBadgeView(injuryStatus: injuryStatus)
+                    .scaleEffect(0.7)
+                    .offset(x: 3, y: -3)
             }
         }
         .opacity(isPlayerLive ? 1.0 : 0.85)
@@ -240,34 +280,57 @@ struct FantasyPlayerCardNamePositionView: View {
     let player: FantasyPlayer
     let positionalRanking: String
     let teamColor: Color
+    let isPlayerWatched: Bool
+    let onWatchToggle: () -> Void
     
     var body: some View {
-        HStack {
-            Spacer()
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(player.fullName)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
+        VStack {
+            HStack(alignment: .top, spacing: 6) {
+                Spacer()
                 
-                // UPDATED: Remove tap action - just display the badge
-                Text(positionalRanking)
-                    .font(.system(size: 12, weight: .black))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.black.opacity(0.8))
-                            .stroke(teamColor.opacity(0.6), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(player.fullName)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
+                    
+                    // Position badge and watch button on same line
+                    HStack(spacing: 4) {
+                        // Watch button - small and before position
+                        Button(action: onWatchToggle) {
+                            Image(systemName: isPlayerWatched ? "eye.fill" : "eye")
+                                .font(.system(size: 8, weight: .medium))
+                                .foregroundColor(isPlayerWatched ? .gpYellow : .white.opacity(0.6))
+                                .frame(width: 14, height: 14)
+                                .background(
+                                    Circle()
+                                        .fill(Color.black.opacity(0.6))
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        Text(positionalRanking)
+                            .font(.system(size: 8, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(Color.black.opacity(0.8))
+                                    .stroke(teamColor.opacity(0.6), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.6), radius: 2, x: 0, y: 1)
+                    }
+                }
             }
+            .padding(.top, 6)
+            .padding(.trailing, 6)
+            .offset(x: -6, y: 10)
+
+            Spacer()
         }
-        .padding(.top, 8)
-        .padding(.trailing, 8)
         .zIndex(4)
     }
 }
@@ -281,12 +344,12 @@ struct FantasyPlayerCardMatchupView: View {
             Spacer()
             HStack {
                 Spacer()
-                MatchupTeamFinalView(player: player, scaleEffect: 1.2)
+                MatchupTeamFinalView(player: player, scaleEffect: 1.0)
                 Spacer()
             }
-            .padding(.bottom, 45)
+            .padding(.bottom, 30)
         }
-        .zIndex(5)
+        .zIndex(1)
     }
 }
 
@@ -300,6 +363,8 @@ struct FantasyPlayerCardStatsView: View {
         VStack {
             Spacer()
             HStack {
+                // 🔥 COMMENTED OUT: Stats taking up too much space
+                /*
                 if player.currentPoints ?? 0.0 > 0, let statLine = statLine {
                     Text(statLine)
                         .font(.system(size: 9, weight: .bold))
@@ -326,6 +391,7 @@ struct FantasyPlayerCardStatsView: View {
                         .padding(.vertical, 4)
                         .background(Color.clear)
                 }
+                */
                 Spacer()
             }
             .padding(.horizontal, 8)

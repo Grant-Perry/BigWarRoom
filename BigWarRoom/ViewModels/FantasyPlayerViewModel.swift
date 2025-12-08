@@ -119,9 +119,9 @@ class FantasyPlayerViewModel {
         return isPlayerLive(player) ? 15 : 0
     }
     
-    /// Consistent card height for layout uniformity
+    /// Card height - reduced for more compact layout
     var cardHeight: CGFloat {
-        return 125
+        return 90
     }
     
     // MARK: - Business Logic Methods
