@@ -58,32 +58,6 @@ final class SleeperProjectionsService {
         
         // Note: playerID comes from the dictionary key, not the value
         // Note: week/season/seasonType are in the URL, not the response
-        
-        // MARK: - 🔥 NEW: Extract raw stats for custom scoring calculation
-        
-        /// Convert projection to raw stats dictionary for league-specific scoring
-        func toRawStats() -> [String: Double] {
-            var stats: [String: Double] = [:]
-            
-            // Passing stats
-            if let pass_yd = pass_yd { stats["pass_yd"] = pass_yd }
-            if let pass_td = pass_td { stats["pass_td"] = pass_td }
-            if let pass_int = pass_int { stats["pass_int"] = pass_int }
-            
-            // Rushing stats
-            if let rush_yd = rush_yd { stats["rush_yd"] = rush_yd }
-            if let rush_td = rush_td { stats["rush_td"] = rush_td }
-            
-            // Receiving stats
-            if let rec = rec { stats["rec"] = rec }
-            if let rec_yd = rec_yd { stats["rec_yd"] = rec_yd }
-            if let rec_td = rec_td { stats["rec_td"] = rec_td }
-            
-            // Turnovers
-            if let fum_lost = fum_lost { stats["fum_lost"] = fum_lost }
-            
-            return stats
-        }
     }
     
     // MARK: - Public API

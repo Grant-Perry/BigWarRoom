@@ -650,24 +650,12 @@ struct FantasyDetailHeaderView: View {
     }
     
     private func loadProjectedScores() async {
-        // Get league context for custom projections
-        let leagueID = matchup.leagueID
-        let source: LeagueSource = fantasyViewModel?.selectedLeague?.source == .espn ? .espn : .sleeper
-        
-        let projections = await ProjectedPointsManager.shared.getProjectedTeamScore(
-            for: matchup.homeTeam,
-            leagueID: leagueID,
-            source: source
-        )
-        let awayProjections = await ProjectedPointsManager.shared.getProjectedTeamScore(
-            for: matchup.awayTeam,
-            leagueID: leagueID,
-            source: source
-        )
+        let projections = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.homeTeam)
+        let awayProjections = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.awayTeam)
         
         // Calculate "yet to play" projected points
-        let homeYetToPlayProj = await calculateYetToPlayProjected(for: matchup.homeTeam, leagueID: leagueID, source: source)
-        let awayYetToPlayProj = await calculateYetToPlayProjected(for: matchup.awayTeam, leagueID: leagueID, source: source)
+        let homeYetToPlayProj = await calculateYetToPlayProjected(for: matchup.homeTeam)
+        let awayYetToPlayProj = await calculateYetToPlayProjected(for: matchup.awayTeam)
         
         await MainActor.run {
             self.homeProjected = projections
@@ -679,12 +667,10 @@ struct FantasyDetailHeaderView: View {
     }
     
     /// Calculate sum of projected points for players yet to play
-    private func calculateYetToPlayProjected(for team: FantasyTeam, leagueID: String, source: LeagueSource) async -> Double {
+    private func calculateYetToPlayProjected(for team: FantasyTeam) async -> Double {
         var total: Double = 0.0
         
         let gameStatusService = self.gameStatusService ?? GameStatusService.shared
-        
-        DebugPrint(mode: .projectedScores, "🔍 calculateYetToPlayProjected START for team: \(team.ownerName)")
         
         for player in team.roster {
             // Only count starters who are yet to play
@@ -696,24 +682,13 @@ struct FantasyDetailHeaderView: View {
                 currentPoints: player.currentPoints
             )
             
-            DebugPrint(mode: .projectedScores, "   🎯 Player: \(player.fullName) - isStarter: \(player.isStarter), isYetToPlay: \(isYetToPlay), currentPoints: \(player.currentPoints)")
-            
             if isYetToPlay {
-                // Get custom projected points for this player using league rules
-                if let projection = await ProjectedPointsManager.shared.getCustomProjectedPoints(
-                    for: player,
-                    leagueID: leagueID,
-                    source: source
-                ) {
-                    DebugPrint(mode: .projectedScores, "      ✅ Got projection: \(projection) for \(player.fullName)")
+                // Get projected points for this player
+                if let projection = await ProjectedPointsManager.shared.getProjectedPoints(for: player) {
                     total += projection
-                } else {
-                    DebugPrint(mode: .projectedScores, "      ❌ NO PROJECTION for \(player.fullName)")
                 }
             }
         }
-        
-        DebugPrint(mode: .projectedScores, "🔍 calculateYetToPlayProjected END for \(team.ownerName): Total = \(total)")
         
         return total
     }

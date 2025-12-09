@@ -121,7 +121,7 @@ class FantasyPlayerViewModel {
     
     /// Card height - reduced for more compact layout
     var cardHeight: CGFloat {
-        return 90
+        return 100
     }
     
     // MARK: - Business Logic Methods
