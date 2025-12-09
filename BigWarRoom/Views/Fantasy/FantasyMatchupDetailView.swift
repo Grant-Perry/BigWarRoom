@@ -21,6 +21,9 @@ struct FantasyMatchupDetailView: View {
     // Shared instance to ensure stats are loaded early
     // 🔥 PHASE 3 DI: Remove .shared assignment, will be injected
     @State private var livePlayersViewModel: AllLivePlayersViewModel
+    
+    // 🔥 NEW: Observe global matchups for auto-refresh
+    @State private var matchupsHubViewModel: MatchupsHubViewModel = MatchupsHubViewModel.shared
 
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position
@@ -51,12 +54,24 @@ struct FantasyMatchupDetailView: View {
         self.fantasyViewModel = fantasyViewModel
         self._livePlayersViewModel = State(initialValue: livePlayersViewModel)
     }
+    
+    // 🔥 NEW: Get the latest matchup data from the global hub
+    private var latestMatchup: FantasyMatchup {
+        // Try to find updated matchup data from the hub
+        if let updated = matchupsHubViewModel.myMatchups.first(where: { unifiedMatchup in
+            unifiedMatchup.fantasyMatchup?.id == matchup.id
+        })?.fantasyMatchup {
+            return updated
+        }
+        // Fallback to the original matchup passed in
+        return matchup
+    }
 
     // MARK: - Body
 
     var body: some View {
-        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
+        let awayTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 0) ?? latestMatchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 1) ?? latestMatchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
@@ -102,8 +117,8 @@ struct FantasyMatchupDetailView: View {
 
     // FIX: Extract content to separate view with proper padding
     private var contentView: some View {
-        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
+        let awayTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 0) ?? latestMatchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 1) ?? latestMatchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
         
@@ -111,7 +126,7 @@ struct FantasyMatchupDetailView: View {
             // Fantasy detail header with team comparison
             FantasyDetailHeaderView(
                 leagueName: leagueName,
-                matchup: matchup,
+                matchup: latestMatchup,
                 awayTeamIsWinning: awayTeamIsWinning,
                 homeTeamIsWinning: homeTeamIsWinning,
                 fantasyViewModel: fantasyViewModel,
@@ -165,7 +180,7 @@ struct FantasyMatchupDetailView: View {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
                     FantasyMatchupActiveRosterSectionFiltered(
-                        matchup: matchup,
+                        matchup: latestMatchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
@@ -175,7 +190,7 @@ struct FantasyMatchupDetailView: View {
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
-                        matchup: matchup,
+                        matchup: latestMatchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
@@ -201,17 +216,17 @@ struct FantasyMatchupDetailView: View {
         VStack(spacing: 16) {
             // HOME team roster first
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(matchup.homeTeam.name) Roster")
+                Text("\(latestMatchup.homeTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(matchup.homeTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(latestMatchup.homeTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
-                            matchup: matchup,
+                            matchup: latestMatchup,
                             teamIndex: 1,
                             isBench: false
                         )
@@ -222,17 +237,17 @@ struct FantasyMatchupDetailView: View {
 
             // AWAY team roster second
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(matchup.awayTeam.name) Roster")
+                Text("\(latestMatchup.awayTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(matchup.awayTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(latestMatchup.awayTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
-                            matchup: matchup,
+                            matchup: latestMatchup,
                             teamIndex: 0,
                             isBench: false
                         )

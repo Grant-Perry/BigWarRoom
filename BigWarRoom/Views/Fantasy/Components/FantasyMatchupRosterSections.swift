@@ -83,42 +83,43 @@ struct FantasyMatchupActiveRosterSection: View {
     @ViewBuilder
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
-            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(isWinning ? .gpGreen : .white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(.secondarySystemBackground),
-                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+            HStack(spacing: 4) {
+                Text("\(label): \(String(format: "%.2f", score))")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("| (\(String(format: "%.1f", projected)))")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                    )
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         } else {
             Text("\(label): \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(isWinning ? .gpGreen : .white)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(.secondarySystemBackground),
-                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                                ]),
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -214,7 +215,7 @@ struct FantasyMatchupBenchSection: View {
                         score: benchTotal,
                         projected: awayBenchProjected,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
                 
@@ -236,7 +237,7 @@ struct FantasyMatchupBenchSection: View {
                         score: benchTotal,
                         projected: homeBenchProjected,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
             }
@@ -373,7 +374,7 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
             
-            HStack(alignment: .top, spacing: 24) {
+            HStack(alignment: .top, spacing: 16) {
                 // Home Team Active Roster (Left column - to match header)
                 VStack(spacing: 16) {
                     let homeActiveRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: false)
@@ -521,7 +522,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 16)
             
-            HStack(alignment: .top, spacing: 24) {
+            HStack(alignment: .top, spacing: 16) {
                 // Home Team Bench (Left column - to match header)
                 VStack(spacing: 16) {
                     let homeBenchRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: true)
@@ -668,7 +669,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Active Roster (Left column - to match header)
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     ForEach(homeActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -687,12 +688,12 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                         score: homeScore,
                         projected: homeProjected,
                         isWinning: homeWinning,
-                        label: "Active Total"
+                        label: "Total"
                     )
                 }
                 
                 // Away Team Active Roster (Right column - to match header)
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     ForEach(awayActiveRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -711,7 +712,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                         score: awayScore,
                         projected: awayProjected,
                         isWinning: awayWinning,
-                        label: "Active Total"
+                        label: "Total"
                     )
                 }
             }
@@ -768,42 +769,43 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     @ViewBuilder
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
-            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(isWinning ? .gpGreen : .white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(.secondarySystemBackground),
-                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+            HStack(spacing: 4) {
+                Text("\(label): \(String(format: "%.2f", score))")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("| (\(String(format: "%.1f", projected)))")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                    )
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         } else {
             Text("\(label): \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(isWinning ? .gpGreen : .white)
+                .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
                         .fill(
                             LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color(.secondarySystemBackground),
-                                    isWinning ? Color.gpGreen.opacity(0.2) : Color.clear
-                                ]),
+                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -929,7 +931,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
             
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Bench (Left column - to match header)
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     ForEach(homeBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -945,12 +947,12 @@ struct FantasyMatchupBenchSectionFiltered: View {
                         score: benchTotal,
                         projected: homeBenchProjected,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
                 
                 // Away Team Bench (Right column - to match header)
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
                     ForEach(awayBenchRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
@@ -966,7 +968,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
                         score: benchTotal,
                         projected: awayBenchProjected,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
             }
@@ -1042,24 +1044,31 @@ struct FantasyMatchupBenchSectionFiltered: View {
     @ViewBuilder
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
-            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+            HStack(spacing: 4) {
+                Text("\(label): \(String(format: "%.2f", score))")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("| (\(String(format: "%.1f", projected)))")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                    )
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         } else {
             Text("\(label): \(String(format: "%.2f", score))")
                 .font(.subheadline)

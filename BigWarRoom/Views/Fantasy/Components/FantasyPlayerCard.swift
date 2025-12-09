@@ -48,7 +48,7 @@ struct FantasyPlayerCard: View {
                             team: NFLTeam.team(for: player.team ?? ""),
                             jerseyNumber: player.jerseyNumber,
                             cornerRadius: 15,
-                            showBorder: true,
+                            showBorder: false,
                             isLive: vm.isPlayerLive(player),
                             isOnBye: player.isOnBye
                         )
@@ -72,8 +72,36 @@ struct FantasyPlayerCard: View {
                     
                     buildMainContent(vm: vm)
                 }
-                .frame(width: 190, height: vm.cardHeight) // Wider card!
+                .frame(width: 190, height: vm.cardHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 15))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(
+                            vm.isPlayerLive(player) ? 
+                                LinearGradient(
+                                    colors: [.gpGreen, .gpGreen.opacity(0.8), .cyan.opacity(0.6), .gpGreen.opacity(0.9), .gpGreen],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ) :
+                                player.isOnBye ?
+                                    LinearGradient(
+                                        colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ) :
+                                    LinearGradient(
+                                        colors: [vm.teamColor.opacity(0.6), Color.clear, vm.teamColor.opacity(0.4)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                            lineWidth: (vm.isPlayerLive(player) || player.isOnBye) ? 4 : 2
+                        )
+                        .opacity((vm.isPlayerLive(player) || player.isOnBye) ? 0.7 : 0.5)
+                )
+                .shadow(
+                    color: vm.isPlayerLive(player) ? .gpGreen.opacity(0.5) : player.isOnBye ? .gpPink.opacity(0.5) : .clear,
+                    radius: (vm.isPlayerLive(player) || player.isOnBye) ? 10 : 0
+                )
                 // 🔥 FIX: Use overlay with NavigationLink to avoid navigationDestination inside lazy container
                 .overlay {
                     if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {

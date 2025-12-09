@@ -124,6 +124,11 @@ class FantasyPlayerViewModel {
         return 100
     }
     
+    /// Spacing between cards in grid
+    var cardSpacing: CGFloat {
+        return 16
+    }
+    
     // MARK: - Business Logic Methods
     
     /// Sets up initial configuration for a player
