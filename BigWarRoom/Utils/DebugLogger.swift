@@ -224,8 +224,12 @@ enum DebugConfig {
     /// - `.globalRefresh` - Only global refresh logs
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
+	///
+	///  DO NOT DELETE: ---   the DebugMode is HERE: --------|
+	///											 |
+	///   								         ∨
 	/// Current: Disabled (set to [] for production)
-   static var activeMode: DebugMode = .liveUpdates //[] //.espnAPI // []
+   static var activeMode: DebugMode = [] //.espnAPI // []
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

@@ -85,10 +85,7 @@ extension DraftRoomViewModel {
             if let userID = currentUserID {
                 logDebug("Sleeper league - looking for my roster with userID: \(userID)", category: "DraftRoom")
                 if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                    // Update roster coordinator
-                    if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-                        defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
-                    }
+                    // The roster coordinator doesn't support this delegate method
                     myDraftSlot = myRoster.draftSlot
                     logDebug("Found MY Sleeper roster! RosterID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)", category: "DraftRoom")
                 } else {
@@ -278,10 +275,9 @@ extension DraftRoomViewModel {
                 
                 if let userID = currentUserID {
                     if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                        // Update roster coordinator
-                        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-                            defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
-                        }
+                        // if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                        //     defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
+                        // }
                         myDraftSlot = myRoster.draftSlot
                     }
                 }

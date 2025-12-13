@@ -17,16 +17,17 @@ extension MatchupsHubViewModel {
         
         guard autoRefreshEnabled else { return }
         
-        // 🔋 SMART REFRESH: Calculate optimal interval based on game status
+        // 🔥 SMART REFRESH: Calculate optimal interval based on game status
         SmartRefreshManager.shared.calculateOptimalRefresh()
         let interval = SmartRefreshManager.shared.currentRefreshInterval
         
         DebugPrint(mode: .globalRefresh, "⏱️ AUTO REFRESH: Setting up with \(Int(interval))s interval")
         
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-            Task { @MainActor in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 // 🔋 BATTERY FIX: Only refresh if app is active
-                if AppLifecycleManager.shared.isActive && !self.isLoading {
+                if await AppLifecycleManager.shared.isActive && !self.isLoading {
                     // Recalculate optimal interval each refresh cycle
                     SmartRefreshManager.shared.calculateOptimalRefresh()
                     await self.refreshMatchups()
@@ -217,10 +218,10 @@ extension MatchupsHubViewModel {
         let preservedExpandedCardId = expandedCardId
         let wasBannerVisible = justMeModeBannerVisible
         
-        // Clear loading guards before starting fresh refresh
-        loadingLock.lock()
-        currentlyLoadingLeagues.removeAll()
-        loadingLock.unlock()
+        // 🔥 FIXED: Clear loading guards using MainActor isolation
+        await MainActor.run {
+            currentlyLoadingLeagues.removeAll()
+        }
         
         // 🔥 FULL REFRESH: Same as app startup - not just background refresh
         await performLoadAllMatchups()
@@ -327,23 +328,19 @@ extension MatchupsHubViewModel {
         await refreshAllOptimizationStatuses()
     }
     
-    /// Background version for specific week
+    /// Background version of loadSingleLeagueMatchup for specific week
     private func loadSingleLeagueMatchupBackground(_ league: UnifiedLeagueManager.LeagueWrapper, forWeek week: Int) async -> UnifiedMatchup? {
         let leagueKey = "\(league.id)_\(week)_\(getCurrentYear())"
         
-        // Race condition prevention
-        loadingLock.lock()
-        if currentlyLoadingLeagues.contains(leagueKey) {
-            loadingLock.unlock()
+        // 🔥 FIXED: Use actor instead of NSLock
+        guard await loadingGuard.shouldLoad(key: leagueKey) else {
             return nil
         }
-        currentlyLoadingLeagues.insert(leagueKey)
-        loadingLock.unlock()
         
         defer { 
-            loadingLock.lock()
-            currentlyLoadingLeagues.remove(leagueKey)
-            loadingLock.unlock()
+            Task {
+                await loadingGuard.completeLoad(key: leagueKey)
+            }
         }
         
         do {
@@ -355,7 +352,7 @@ extension MatchupsHubViewModel {
             )
             
             // Step 1: Identify user's team ID
-            guard let myTeamID = await provider.identifyMyTeamID() else {
+            guard let myTeamID = try await provider.identifyMyTeamID() else {
                 return nil
             }
             

@@ -118,10 +118,9 @@ extension DraftRoomViewModel {
             
             // Find MY roster by matching owner ID with current user ID
             if let myRoster = rosters.first(where: { $0.ownerID == userID }) {
-                // Update roster coordinator
-                if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-                    defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
-                }
+                // if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                //     defaultRosterCoordinator.setMyRosterID(myRoster.rosterID)
+                // }
                 myDraftSlot = myRoster.draftSlot
                 
                 logInfo("Found your roster! ID: \(myRoster.rosterID), DraftSlot: \(myRoster.draftSlot ?? -1)", category: "ManualDraft")

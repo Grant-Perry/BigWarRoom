@@ -356,8 +356,9 @@ final class FantasyMatchupListViewModel {
         
         // FALLBACK: Check connected league settings (only for Sleeper)
         if let leagueWrapper = draftRoomViewModel?.selectedLeagueWrapper,
-           leagueWrapper.source == .sleeper,
-           let sleeperLeague = leagueWrapper.league as? SleeperLeague {
+           leagueWrapper.source == .sleeper {
+            // FIXED: Cast always succeeds, leagueWrapper.league is already SleeperLeague
+            let sleeperLeague = leagueWrapper.league as! SleeperLeague
             return sleeperLeague.settings?.isChoppedLeague ?? false
         }
         

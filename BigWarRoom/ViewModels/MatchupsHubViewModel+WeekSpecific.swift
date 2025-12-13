@@ -111,20 +111,15 @@ extension MatchupsHubViewModel {
     private func loadSingleLeagueMatchupForWeek(_ league: UnifiedLeagueManager.LeagueWrapper, week: Int) async -> UnifiedMatchup? {
         let leagueKey = "\(league.id)_\(week)_\(getCurrentYear())"
         
-        // Race condition prevention
-        loadingLock.lock()
-        if currentlyLoadingLeagues.contains(leagueKey) {
-            loadingLock.unlock()
-            // x Print("⚠️ LOADING: Already loading league \(league.league.name) for week \(week), skipping duplicate request")
+        // 🔥 FIXED: Use actor instead of NSLock
+        guard await loadingGuard.shouldLoad(key: leagueKey) else {
             return nil
         }
-        currentlyLoadingLeagues.insert(leagueKey)
-        loadingLock.unlock()
         
         defer { 
-            loadingLock.lock()
-            currentlyLoadingLeagues.remove(leagueKey)
-            loadingLock.unlock()
+            Task {
+                await loadingGuard.completeLoad(key: leagueKey)
+            }
         }
         
         await updateLeagueLoadingState(league.id, status: .loading, progress: 0.1)
@@ -141,7 +136,7 @@ extension MatchupsHubViewModel {
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.2)
             
             // Step 1: Identify user's team ID
-            guard let myTeamID = await provider.identifyMyTeamID() else {
+            guard let myTeamID = try await provider.identifyMyTeamID() else {
                 // x Print("❌ IDENTIFICATION FAILED: Could not find my team in league \(league.league.name)")
                 await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
                 return nil

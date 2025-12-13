@@ -22,11 +22,15 @@ actor AvailablePlayersService {
         for leagueWrapper: UnifiedLeagueManager.LeagueWrapper,
         position: String? = nil
     ) async -> [SleeperPlayer] {
-        DebugPrint(mode: .waivers, "💊 Finding available players for \(leagueWrapper.league.name)")
+        await MainActor.run {
+            DebugPrint(mode: .waivers, "💊 Finding available players for \(leagueWrapper.league.name)")
+        }
         
         // Get all rostered player IDs/ESPNIDs based on league source
         let rosteredInfo = await getAllRosteredPlayerInfo(for: leagueWrapper)
-        DebugPrint(mode: .waivers, "💊 Found \(rosteredInfo.sleeperIDs.count) rostered players")
+        await MainActor.run {
+            DebugPrint(mode: .waivers, "💊 Found \(rosteredInfo.sleeperIDs.count) rostered players")
+        }
         
         // Get all Sleeper players from MainActor context
         let allPlayers = await MainActor.run {
@@ -68,7 +72,9 @@ actor AvailablePlayersService {
             return player1.fullName < player2.fullName
         }
         
-        DebugPrint(mode: .waivers, "💊 Found \(sortedPlayers.count) available players at \(position ?? "all positions")")
+        await MainActor.run {
+            DebugPrint(mode: .waivers, "💊 Found \(sortedPlayers.count) available players at \(position ?? "all positions")")
+        }
         
         return sortedPlayers
     }
@@ -135,20 +141,22 @@ actor AvailablePlayersService {
         case .sleeper:
             // For Sleeper leagues, get Sleeper player IDs directly
             do {
-                guard let sleeperClient = leagueWrapper.client as? SleeperAPIClient else {
+                guard let sleeperClient = await leagueWrapper.client as? SleeperAPIClient else {
                     return RosteredPlayerInfo(sleeperIDs: [], espnIDs: [])
                 }
                 
                 let rosters = try await sleeperClient.fetchRosters(leagueID: leagueWrapper.league.id)
                 rosteredSleeperIDs = Set(rosters.flatMap { $0.playerIDs ?? [] })
             } catch {
-                DebugPrint(mode: .waivers, "❌ Failed to fetch Sleeper rosters: \(error)")
+                await MainActor.run {
+                    DebugPrint(mode: .waivers, "❌ Failed to fetch Sleeper rosters: \(error)")
+                }
             }
             
         case .espn:
             // 🔥 USE HYBRID APPROACH: Canonical mapping + name/team fallback
             do {
-                guard let espnClient = leagueWrapper.client as? ESPNAPIClient else {
+                guard let espnClient = await leagueWrapper.client as? ESPNAPIClient else {
                     return RosteredPlayerInfo(sleeperIDs: [], espnIDs: [])
                 }
                 
@@ -205,12 +213,21 @@ actor AvailablePlayersService {
                     }
                 }
                 
-                if AppConstants.debug {
-                    DebugPrint(mode: .waivers, "✅ ESPN→Sleeper: \(canonicalHits) canonical, \(fallbackHits) fallback, \(rosteredSleeperIDs.count) total")
+                // Check if debug is enabled
+                let isDebugEnabled = await MainActor.run {
+                    AppConstants.debug
+                }
+                
+                if isDebugEnabled {
+                    await MainActor.run {
+                        DebugPrint(mode: .waivers, "✅ ESPN→Sleeper: \(canonicalHits) canonical, \(fallbackHits) fallback, \(rosteredSleeperIDs.count) total")
+                    }
                 }
                 
             } catch {
-                DebugPrint(mode: .waivers, "❌ Failed to fetch ESPN league data: \(error)")
+                await MainActor.run {
+                    DebugPrint(mode: .waivers, "❌ Failed to fetch ESPN league data: \(error)")
+                }
             }
         }
         

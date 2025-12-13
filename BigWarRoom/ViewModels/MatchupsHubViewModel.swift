@@ -76,9 +76,28 @@ final class MatchupsHubViewModel {
     private var observationTask: Task<Void, Never>?
     
     // MARK: - Loading Guards
+    // 🔥 FIXED: Remove NSLock - using actor isolation instead
     internal var currentlyLoadingLeagues = Set<String>()
-    internal let loadingLock = NSLock()
     internal let maxConcurrentLoads = 3
+    
+    // 🔥 NEW: Actor for thread-safe loading guard (internal, not private)
+    internal actor LoadingGuard {
+        private var loadingKeys = Set<String>()
+        
+        func shouldLoad(key: String) -> Bool {
+            if loadingKeys.contains(key) {
+                return false
+            }
+            loadingKeys.insert(key)
+            return true
+        }
+        
+        func completeLoad(key: String) {
+            loadingKeys.remove(key)
+        }
+    }
+    
+    internal let loadingGuard = LoadingGuard()
     
     // MARK: - Initialization with Dependency Injection (PHASE 3 DI COMPLETE)
     init(

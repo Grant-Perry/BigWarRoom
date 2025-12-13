@@ -187,21 +187,15 @@ extension MatchupsHubViewModel {
         let currentYear = getCurrentYear()
         let leagueKey = "\(league.id)_\(currentWeek)_\(currentYear)"
         
-        // 🔥 FIX: Bulletproof race condition prevention with lock
-        loadingLock.lock()
-        if currentlyLoadingLeagues.contains(leagueKey) {
-            loadingLock.unlock()
-            // print("🔥 SINGLE LEAGUE: Already loading \(league.league.name), skipping")
+        // 🔥 FIXED: Use actor instead of NSLock
+        guard await loadingGuard.shouldLoad(key: leagueKey) else {
             return nil
         }
-        currentlyLoadingLeagues.insert(leagueKey)
-        loadingLock.unlock()
         
         defer { 
-            loadingLock.lock()
-            currentlyLoadingLeagues.remove(leagueKey)
-            loadingLock.unlock()
-            // print("🔥 SINGLE LEAGUE: Finished loading \(league.league.name)")
+            Task {
+                await loadingGuard.completeLoad(key: leagueKey)
+            }
         }
         
         // Update individual league progress

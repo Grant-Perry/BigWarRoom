@@ -11,8 +11,24 @@ import Foundation
 extension FantasyViewModel {
     
     // MARK: -> Loading Guards
-    private static var currentlyFetchingLeagues = Set<String>()
-    private static let fetchingLock = NSLock()
+    // 🔥 FIXED: Use actor-isolated state instead of NSLock
+    private actor LoadingGuard {
+        private var currentlyFetchingLeagues = Set<String>()
+        
+        func shouldFetch(key: String) -> Bool {
+            if currentlyFetchingLeagues.contains(key) {
+                return false
+            }
+            currentlyFetchingLeagues.insert(key)
+            return true
+        }
+        
+        func completeFetch(key: String) {
+            currentlyFetchingLeagues.remove(key)
+        }
+    }
+    
+    private static let loadingGuard = LoadingGuard()
     
     /// Fetch matchups for selected league, week, and year
     func fetchMatchups() async {
@@ -25,21 +41,14 @@ extension FantasyViewModel {
         let leagueKey = "\(league.league.leagueID)_\(selectedWeek)_\(selectedYear)"
         
         // FIX: Bulletproof loading guard to prevent infinite loops
-        Self.fetchingLock.lock()
-        let isAlreadyFetching = Self.currentlyFetchingLeagues.contains(leagueKey)
-        if !isAlreadyFetching {
-            Self.currentlyFetchingLeagues.insert(leagueKey)
-        }
-        Self.fetchingLock.unlock()
-        
-        if isAlreadyFetching {
+        guard await Self.loadingGuard.shouldFetch(key: leagueKey) else {
             return
         }
         
         defer { 
-            Self.fetchingLock.lock()
-            Self.currentlyFetchingLeagues.remove(leagueKey)
-            Self.fetchingLock.unlock()
+            Task {
+                await Self.loadingGuard.completeFetch(key: leagueKey)
+            }
         }
         
         isLoading = true
@@ -147,21 +156,14 @@ extension FantasyViewModel {
         let leagueKey = "\(league.league.leagueID)_\(selectedWeek)_\(selectedYear)"
         
         // FIX: Add loading guard to refresh as well
-        Self.fetchingLock.lock()
-        let isAlreadyRefreshing = Self.currentlyFetchingLeagues.contains(leagueKey)
-        if !isAlreadyRefreshing {
-            Self.currentlyFetchingLeagues.insert(leagueKey)
-        }
-        Self.fetchingLock.unlock()
-        
-        if isAlreadyRefreshing {
+        guard await Self.loadingGuard.shouldFetch(key: leagueKey) else {
             return
         }
         
         defer {
-            Self.fetchingLock.lock()
-            Self.currentlyFetchingLeagues.remove(leagueKey)
-            Self.fetchingLock.unlock()
+            Task {
+                await Self.loadingGuard.completeFetch(key: leagueKey)
+            }
         }
         
         do {

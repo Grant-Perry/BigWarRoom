@@ -209,7 +209,7 @@ final class DraftRoomViewModel {
         
         // Set up delegates
         (self.connectionCoordinator as? DefaultDraftConnectionCoordinator)?.delegate = self
-        (self.rosterCoordinator as? DefaultDraftRosterCoordinator)?.delegate = self
+        // (self.rosterCoordinator as? DefaultDraftRosterCoordinator)?.delegate = self
         (self.suggestionsCoordinator as? DefaultDraftSuggestionsCoordinator)?.delegate = self
         
         setupObservation() // 🔥 PHASE 3: Replace Combine binding with observation
@@ -253,11 +253,10 @@ final class DraftRoomViewModel {
                         draftRosters: draftRosters
                     )
                     
-                    // Update roster coordinator's published properties
-                    if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-                        defaultRosterCoordinator.recentLivePicks = Array(polling.recentPicks)
-                        defaultRosterCoordinator.allDraftPicks = enhancedPicks
-                    }
+                    // if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+                    //     defaultRosterCoordinator.recentLivePicks = Array(polling.recentPicks)
+                    //     defaultRosterCoordinator.allDraftPicks = enhancedPicks
+                    // }
                     
                     // Check for turn changes and new picks
                     await checkForTurnChange()
@@ -321,11 +320,10 @@ final class DraftRoomViewModel {
         manualDraftNeedsPosition = false
         manualDraftInfo = nil
         
-        // Update roster coordinator
-        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-            defaultRosterCoordinator.setMyRosterID(nil)
-            defaultRosterCoordinator.setMyDraftSlot(nil)
-        }
+        // if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+        //     defaultRosterCoordinator.setMyRosterID(nil)
+        //     defaultRosterCoordinator.setMyDraftSlot(nil)
+        // }
         
         // Delegate to connection coordinator
         connectionCoordinator.disconnectFromLive()
@@ -484,9 +482,8 @@ extension DraftRoomViewModel {
     }
     
     internal func updateMyRosterInfo() {
-        // Update roster coordinator with current context
-        if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
-            defaultRosterCoordinator.setMyDraftSlot(self.myDraftSlot)
-        }
+        // if let defaultRosterCoordinator = rosterCoordinator as? DefaultDraftRosterCoordinator {
+        //     defaultRosterCoordinator.setMyDraftSlot(self.myDraftSlot)
+        // }
     }
 }

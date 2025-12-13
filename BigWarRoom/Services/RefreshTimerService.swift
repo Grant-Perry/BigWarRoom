@@ -49,7 +49,7 @@ final class RefreshTimerService {
         self.init(refreshInterval: Double(AppConstants.MatchupRefresh))
     }
     
-    init(refreshInterval: TimeInterval = Double(AppConstants.MatchupRefresh)) {
+    init(refreshInterval: TimeInterval) {
         self.refreshInterval = refreshInterval
         self.refreshCountdown = refreshInterval
     }
@@ -71,10 +71,11 @@ final class RefreshTimerService {
         
         self.onRefreshCallback = onRefresh
         
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
-            Task { @MainActor in
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 // 🔋 BATTERY FIX: Only refresh if app is active
-                if AppLifecycleManager.shared.isActive {
+                if await AppLifecycleManager.shared.isActive {
                     await onRefresh()
                 }
             }
@@ -102,10 +103,11 @@ final class RefreshTimerService {
     private func startCountdownTimer() {
         stopCountdownTimer()
         
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            Task { @MainActor in
+        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
                 // 🔋 BATTERY FIX: Only countdown if app is active
-                if AppLifecycleManager.shared.isActive {
+                if await AppLifecycleManager.shared.isActive {
                     self.refreshCountdown -= 1.0
                     
                     if self.refreshCountdown <= 0 {

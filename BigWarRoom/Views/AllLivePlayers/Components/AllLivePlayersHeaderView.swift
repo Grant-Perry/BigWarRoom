@@ -715,13 +715,14 @@ struct AllLivePlayersHeaderView: View {
         refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
             Task { @MainActor in
                 // 🔋 BATTERY FIX: Only refresh if app is active
-                if AppLifecycleManager.shared.isActive && !allLivePlayersViewModel.isLoading {
+                if await AppLifecycleManager.shared.isActive && !allLivePlayersViewModel.isLoading {
                     // Recalculate optimal interval
                     SmartRefreshManager.shared.calculateOptimalRefresh()
                     // Background refresh without UI disruption
                     await performBackgroundRefresh()
                 } else {
-                    DebugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(AppLifecycleManager.shared.isActive), loading=\(allLivePlayersViewModel.isLoading))")
+                    let isActive = await AppLifecycleManager.shared.isActive
+                    DebugPrint(mode: .liveUpdates, "⏸️ TIMER SKIP: App inactive or loading (active=\(isActive), loading=\(allLivePlayersViewModel.isLoading))")
                 }
             }
         }
@@ -741,12 +742,14 @@ struct AllLivePlayersHeaderView: View {
     private func startCountdownTimer() {
         resetCountdown()
         countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            // 🔋 BATTERY FIX: Only countdown if app is active
-            if AppLifecycleManager.shared.isActive {
-                if refreshCountdown > 0 {
-                    refreshCountdown -= 1
-                } else {
-                    resetCountdown()
+            Task { @MainActor in
+                // 🔋 BATTERY FIX: Only countdown if app is active
+                if await AppLifecycleManager.shared.isActive {
+                    if refreshCountdown > 0 {
+                        refreshCountdown -= 1
+                    } else {
+                        resetCountdown()
+                    }
                 }
             }
         }
