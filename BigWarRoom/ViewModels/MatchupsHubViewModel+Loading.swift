@@ -511,6 +511,8 @@ extension MatchupsHubViewModel {
                 scoresRequest.addValue("application/json", forHTTPHeaderField: "Accept")
                 scoresRequest.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
                 
+                DebugPrint(mode: .matchupLoading, "   📡 Fetching current week scores...")
+                
                 let (scoresData, _) = try await URLSession.shared.data(for: scoresRequest)
                 currentWeekScores = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: scoresData)
                 DebugPrint(mode: .matchupLoading, "   ✅ Fetched current week scores")
@@ -625,8 +627,215 @@ extension MatchupsHubViewModel {
     
     // 🔥 NEW: Fetch all active Sleeper playoff matchups  
     private func fetchAllActiveSleeperPlayoffMatchups(league: UnifiedLeagueManager.LeagueWrapper, week: Int) async -> [FantasyMatchup] {
-        // TODO: Implement Sleeper playoff matchup fetching if needed
-        return []
+        DebugPrint(mode: .matchupLoading, "   🌐 fetchAllActiveSleeperPlayoffMatchups STARTED for \(league.league.name)")
+        
+        do {
+            // Fetch matchups for this week
+            guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)") else {
+                DebugPrint(mode: .matchupLoading, "   ❌ Failed to create URL")
+                return []
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   📡 Fetching matchup data from Sleeper API...")
+            
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let matchupResponses = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Decoded \(matchupResponses.count) matchup responses")
+            
+            // Fetch rosters to get team info
+            let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters")!
+            let (rosterData, _) = try await URLSession.shared.data(from: rostersURL)
+            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: rosterData)
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Decoded \(rosters.count) rosters")
+            
+            // Fetch users for display names
+            let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users")!
+            let (userData, _) = try await URLSession.shared.data(from: usersURL)
+            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: userData)
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Decoded \(users.count) users")
+            
+            // Group matchups by matchupID (each matchupID represents a head-to-head matchup)
+            var matchupGroups: [Int: [SleeperMatchupResponse]] = [:]
+            for matchupResponse in matchupResponses {
+                guard let matchupID = matchupResponse.matchupID else { continue }
+                matchupGroups[matchupID, default: []].append(matchupResponse)
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   📊 Found \(matchupGroups.count) matchup groups")
+            
+            var activeMatchups: [FantasyMatchup] = []
+            
+            // Build FantasyMatchup for each group
+            for (matchupID, matchupGroup) in matchupGroups {
+                // Skip if not exactly 2 teams (should always be 2 in head-to-head)
+                guard matchupGroup.count == 2 else {
+                    DebugPrint(mode: .matchupLoading, "   ⚠️ Skipping matchup \(matchupID) - has \(matchupGroup.count) teams instead of 2")
+                    continue
+                }
+                
+                let team1Response = matchupGroup[0]
+                let team2Response = matchupGroup[1]
+                
+                // Build FantasyTeam objects
+                let team1 = await buildSleeperFantasyTeam(
+                    from: team1Response,
+                    rosters: rosters,
+                    users: users,
+                    week: week,
+                    league: league
+                )
+                
+                let team2 = await buildSleeperFantasyTeam(
+                    from: team2Response,
+                    rosters: rosters,
+                    users: users,
+                    week: week,
+                    league: league
+                )
+                
+                guard let homeTeam = team1, let awayTeam = team2 else {
+                    DebugPrint(mode: .matchupLoading, "   ⚠️ Could not build teams for matchup \(matchupID)")
+                    continue
+                }
+                
+                DebugPrint(mode: .matchupLoading, "   ✅ Building matchup: \(homeTeam.name) vs \(awayTeam.name)")
+                
+                // Convert SleeperMatchupResponse to SleeperMatchup for compatibility
+                let sleeperMatchup1 = SleeperMatchup(
+                    roster_id: team1Response.rosterID,
+                    points: team1Response.points,
+                    projected_points: team1Response.projectedPoints,
+                    matchup_id: team1Response.matchupID ?? 0,
+                    starters: team1Response.starters,
+                    players: team1Response.players
+                )
+                
+                let sleeperMatchup2 = SleeperMatchup(
+                    roster_id: team2Response.rosterID,
+                    points: team2Response.points,
+                    projected_points: team2Response.projectedPoints,
+                    matchup_id: team2Response.matchupID ?? 0,
+                    starters: team2Response.starters,
+                    players: team2Response.players
+                )
+                
+                // Create FantasyMatchup
+                let matchup = FantasyMatchup(
+                    id: "\(league.league.leagueID)_\(matchupID)_\(week)",
+                    leagueID: league.league.leagueID,
+                    week: week,
+                    year: getCurrentYear(),
+                    homeTeam: homeTeam,
+                    awayTeam: awayTeam,
+                    status: .complete,
+                    winProbability: nil,
+                    startTime: nil,
+                    sleeperMatchups: (sleeperMatchup1, sleeperMatchup2)
+                )
+                
+                activeMatchups.append(matchup)
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Fetched \(activeMatchups.count) active Sleeper playoff matchups")
+            return activeMatchups
+            
+        } catch {
+            DebugPrint(mode: .matchupLoading, "   ❌ Sleeper playoff matchup fetch failed: \(error)")
+            return []
+        }
+    }
+    
+    // 🔥 NEW: Helper to build FantasyTeam from Sleeper matchup response
+    private func buildSleeperFantasyTeam(
+        from matchupResponse: SleeperMatchupResponse,
+        rosters: [SleeperRoster],
+        users: [SleeperLeagueUser],
+        week: Int,
+        league: UnifiedLeagueManager.LeagueWrapper
+    ) async -> FantasyTeam? {
+        
+        // Find roster for this matchup response
+        guard let roster = rosters.first(where: { $0.rosterID == matchupResponse.rosterID }) else {
+            DebugPrint(mode: .matchupLoading, "   ⚠️ Could not find roster for rosterID \(matchupResponse.rosterID)")
+            return nil
+        }
+        
+        // Find user for this roster
+        let user = users.first { $0.userID == roster.ownerID }
+        let managerName = user?.displayName ?? "Team \(roster.rosterID)"
+        
+        // Build roster of FantasyPlayer objects
+        let starters = matchupResponse.starters ?? []
+        let allPlayers = matchupResponse.players ?? []
+        
+        var fantasyPlayers: [FantasyPlayer] = []
+        
+        // Access private properties using Mirror reflection (like in fetchEliminatedSleeperTeam)
+        let playerDirectoryService = (Mirror(reflecting: self).children.first { $0.label == "playerDirectory" }?.value as? PlayerDirectoryStore)
+        let gameStatusServiceInstance = (Mirror(reflecting: self).children.first { $0.label == "gameStatusService" }?.value as? GameStatusService)
+        
+        for playerID in allPlayers {
+            if let sleeperPlayer = playerDirectoryService?.player(for: playerID) {
+                let isStarter = starters.contains(playerID)
+                let playerTeam = sleeperPlayer.team ?? "UNK"
+                let playerPosition = sleeperPlayer.position ?? "FLEX"
+                
+                // Get game status
+                let gameStatus = gameStatusServiceInstance?.getGameStatusWithFallback(for: playerTeam)
+                
+                // Get player score (would need to be fetched separately or from cached provider)
+                // For now, use 0.0 as placeholder - we could enhance this later
+                let playerScore = 0.0
+                
+                let fantasyPlayer = FantasyPlayer(
+                    id: playerID,
+                    sleeperID: playerID,
+                    espnID: sleeperPlayer.espnID,
+                    firstName: sleeperPlayer.firstName,
+                    lastName: sleeperPlayer.lastName,
+                    position: playerPosition,
+                    team: playerTeam,
+                    jerseyNumber: sleeperPlayer.number?.description,
+                    currentPoints: playerScore,
+                    projectedPoints: playerScore * 1.1,
+                    gameStatus: gameStatus,
+                    isStarter: isStarter,
+                    lineupSlot: isStarter ? playerPosition : nil,
+                    injuryStatus: sleeperPlayer.injuryStatus
+                )
+                fantasyPlayers.append(fantasyPlayer)
+            }
+        }
+        
+        // Get team record
+        let record = TeamRecord(
+            wins: roster.wins ?? 0,
+            losses: roster.losses ?? 0,
+            ties: roster.ties ?? 0
+        )
+        
+        // Get avatar URL
+        let avatarURL = user?.avatar != nil ? "https://sleepercdn.com/avatars/\(user!.avatar!)" : nil
+        
+        let team = FantasyTeam(
+            id: String(roster.rosterID),
+            name: managerName,
+            ownerName: managerName,
+            record: record,
+            avatar: avatarURL,
+            currentScore: matchupResponse.points ?? 0.0,
+            projectedScore: matchupResponse.projectedPoints ?? 0.0,
+            roster: fantasyPlayers,
+            rosterID: roster.rosterID,
+            faabTotal: league.league.settings?.waiverBudget,
+            faabUsed: roster.waiversBudgetUsed
+        )
+        
+        DebugPrint(mode: .matchupLoading, "   ✅ Built Sleeper team: \(managerName) with \(fantasyPlayers.count) players, score: \(matchupResponse.points ?? 0.0)")
+        return team
     }
     
     /// Fetch roster data for an eliminated team
@@ -710,25 +919,28 @@ extension MatchupsHubViewModel {
             let myUser = users.first { $0.userID == myRoster.ownerID }
             let managerName = myUser?.displayName ?? "Team \(myRoster.rosterID)"
             
-            // Build fantasy players from roster
+            // Build roster of FantasyPlayer objects
             let starters = myMatchupResponse.starters ?? []
             let allPlayers = myMatchupResponse.players ?? []
             
             var fantasyPlayers: [FantasyPlayer] = []
             
+            // Access private properties using Mirror reflection (like in fetchEliminatedSleeperTeam)
+            let playerDirectoryService = (Mirror(reflecting: self).children.first { $0.label == "playerDirectory" }?.value as? PlayerDirectoryStore)
+            let gameStatusServiceInstance = (Mirror(reflecting: self).children.first { $0.label == "gameStatusService" }?.value as? GameStatusService)
+            
             for playerID in allPlayers {
-                // --- FIX: Use non-private, robust player lookup ---
-                if let sleeperPlayer = (Mirror(reflecting: self).children.first { $0.label == "playerDirectory" }?.value as? PlayerDirectoryStore)?.player(for: playerID) {
+                if let sleeperPlayer = playerDirectoryService?.player(for: playerID) {
                     let isStarter = starters.contains(playerID)
-                    let playerScore = provider.getPlayerScore(playerId: playerID)
                     let playerTeam = sleeperPlayer.team ?? "UNK"
                     let playerPosition = sleeperPlayer.position ?? "FLEX"
                     
-                    // --- FIX: Use non-private, robust game status lookup ---
-                    let gsService = (Mirror(reflecting: self).children.first { $0.label == "gameStatusService" }?.value as? GameStatusService)
+                    // Get game status
+                    let gameStatus = gameStatusServiceInstance?.getGameStatusWithFallback(for: playerTeam)
                     
-                    // FIX: Use a string fallback for unknown/missing status (if your enum is custom)
-                    let gameStatus = gsService?.getGameStatusWithFallback(for: playerTeam)
+                    // Get player score (would need to be fetched separately or from cached provider)
+                    // For now, use 0.0 as placeholder - we could enhance this later
+                    let playerScore = 0.0
                     
                     let fantasyPlayer = FantasyPlayer(
                         id: playerID,
