@@ -266,6 +266,31 @@ struct AppSettingsView: View {
                             }
                     }
                     
+                    // Show Eliminated Playoff Leagues Toggle
+                    HStack {
+                        Image(systemName: "trophy.slash")
+                            .foregroundColor(.red)
+                            .frame(width: 24)
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show Eliminated Playoff Leagues")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            
+                            Text("Display regular leagues where you're out of playoffs")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Toggle("", isOn: $viewModel.showEliminatedPlayoffLeagues)
+                            .labelsHidden()
+                            .onChange(of: viewModel.showEliminatedPlayoffLeagues) { _, newValue in
+                                viewModel.updateShowEliminatedPlayoffLeagues(newValue)
+                            }
+                    }
+                    
                     // 🎯 MODERN SPORTS APP DESIGN TOGGLE
                     HStack {
                         Image(systemName: "sparkles")

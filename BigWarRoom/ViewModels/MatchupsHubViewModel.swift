@@ -556,6 +556,26 @@ struct UnifiedMatchup: Identifiable, Hashable {
     
     // 🔥 NEW: Check if MY manager is eliminated from a chopped league
     var isMyManagerEliminated: Bool {
+        // Check for playoff elimination first (opponent name check)
+        if let opponentName = opponentTeam?.name, opponentName == "Eliminated from Playoffs" {
+            DebugPrint(mode: .matchupLoading, "   🔍 PLAYOFF CHECK: \(league.league.name) - opponent name: '\(opponentName)'")
+            DebugPrint(mode: .matchupLoading, "     ✅ PLAYOFF ELIMINATION DETECTED for \(league.league.name)")
+            return true
+        }
+        
+        // Check chopped leagues
+        if isChoppedLeague {
+            return checkChoppedElimination()
+        }
+        
+        DebugPrint(mode: .matchupLoading, "     ✅ KEEP: \(league.league.name) - not eliminated")
+        return false
+    }
+    
+    // MARK: - Private Elimination Checks
+    
+    /// Check if eliminated from a chopped league
+    private func checkChoppedElimination() -> Bool {
         // Only applies to chopped leagues
         guard isChoppedLeague else { 
 //            print("❌ Not a chopped league, returning false")

@@ -279,6 +279,13 @@ extension MatchupsHubViewModel {
         await updateLeagueLoadingState(league.id, status: .loading, progress: 0.9)
         
         if matchups.isEmpty {
+            // 🔥 NEW: Check if this is a playoff elimination scenario
+            let currentWeek = getCurrentWeek()
+            if isPlayoffWeek(league: league, week: currentWeek) {
+                DebugPrint(mode: .matchupLoading, "🏆 EMPTY MATCHUPS + PLAYOFF WEEK: Treating as elimination for \(league.league.name)")
+                return await handlePlayoffEliminationMatchup(league: league, myTeamID: myTeamID, week: currentWeek, provider: provider, allMatchups: matchups)
+            }
+            
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
             return nil
         }
@@ -300,6 +307,367 @@ extension MatchupsHubViewModel {
             return unifiedMatchup
         } else {
             await updateLeagueLoadingState(league.id, status: .failed, progress: 0.0)
+            return nil
+        }
+    }
+    
+    // MARK: - Playoff Elimination Handling
+    
+    /// Check if the current week is a playoff week
+    private func isPlayoffWeek(league: UnifiedLeagueManager.LeagueWrapper, week: Int) -> Bool {
+        DebugPrint(mode: .matchupLoading, "🔍 isPlayoffWeek called for \(league.league.name), week \(week)")
+        
+        // Get playoff start week from league settings
+        let playoffStart: Int?
+        
+        if league.source == .sleeper {
+            playoffStart = league.league.settings?.playoffWeekStart
+            DebugPrint(mode: .matchupLoading, "   Sleeper playoff start: \(playoffStart ?? 0)")
+        } else if league.source == .espn {
+            // ESPN stores playoff info in league settings
+            // For now, assume week 15+ is playoffs (standard ESPN)
+            playoffStart = 15
+            DebugPrint(mode: .matchupLoading, "   ESPN playoff start: 15 (default)")
+        } else {
+            playoffStart = nil
+        }
+        
+        guard let playoffWeekStart = playoffStart else {
+            DebugPrint(mode: .matchupLoading, "   ❌ No playoff start found")
+            return false
+        }
+        
+        let isPlayoffs = week >= playoffWeekStart
+        DebugPrint(mode: .matchupLoading, "   Result: \(isPlayoffs ? "YES" : "NO") (week \(week) >= \(playoffWeekStart))")
+        return isPlayoffs
+    }
+    
+    /// Handle playoff elimination - create a special matchup showing the eliminated team
+    private func handlePlayoffEliminationMatchup(
+        league: UnifiedLeagueManager.LeagueWrapper,
+        myTeamID: String,
+        week: Int,
+        provider: LeagueMatchupProvider,
+        allMatchups: [FantasyMatchup]
+    ) async -> UnifiedMatchup? {
+        
+        DebugPrint(mode: .matchupLoading, "🏆 Creating eliminated playoff matchup for \(league.league.name)")
+        
+        // Try to build my team from the roster API
+        let myTeam = await fetchEliminatedTeamRoster(
+            league: league,
+            myTeamID: myTeamID,
+            week: week,
+            provider: provider
+        )
+        
+        guard let eliminatedTeam = myTeam else {
+            DebugPrint(mode: .matchupLoading, "   ❌ Failed to fetch eliminated team roster")
+            return nil
+        }
+        
+        DebugPrint(mode: .matchupLoading, "   ✅ Successfully fetched eliminated team roster: \(eliminatedTeam.name) with score \(eliminatedTeam.currentScore ?? 0.0)")
+        
+        // Create a placeholder opponent team to indicate elimination
+        let placeholderOpponent = FantasyTeam(
+            id: "eliminated_placeholder",
+            name: "Eliminated from Playoffs",
+            ownerName: "Eliminated from Playoffs",
+            record: nil,
+            avatar: nil,
+            currentScore: 0.0,
+            projectedScore: 0.0,
+            roster: [],
+            rosterID: 0,
+            faabTotal: nil,
+            faabUsed: nil
+        )
+        
+        // Create eliminated matchup
+        let eliminatedMatchup = FantasyMatchup(
+            id: "\(league.league.leagueID)_eliminated_\(week)_\(myTeamID)",
+            leagueID: league.league.leagueID,
+            week: week,
+            year: getCurrentYear(),
+            homeTeam: eliminatedTeam,
+            awayTeam: placeholderOpponent,
+            status: .complete,
+            winProbability: 0.0,
+            startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
+            sleeperMatchups: nil
+        )
+        
+        let unifiedMatchup = UnifiedMatchup(
+            id: "\(league.id)_eliminated_\(week)",
+            league: league,
+            fantasyMatchup: eliminatedMatchup,
+            choppedSummary: nil,
+            lastUpdated: Date(),
+            myTeamRanking: nil,
+            myIdentifiedTeamID: myTeamID,
+            authenticatedUsername: sleeperCredentials.currentUsername
+        )
+        
+        await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
+        DebugPrint(mode: .matchupLoading, "   ✅ Created eliminated playoff matchup for \(league.league.name) Week \(week)")
+        return unifiedMatchup
+    }
+    
+    /// Fetch roster data for an eliminated team
+    private func fetchEliminatedTeamRoster(
+        league: UnifiedLeagueManager.LeagueWrapper,
+        myTeamID: String,
+        week: Int,
+        provider: LeagueMatchupProvider
+    ) async -> FantasyTeam? {
+        
+        if league.source == .sleeper {
+            return await fetchEliminatedSleeperTeam(league: league, myTeamID: myTeamID, week: week, provider: provider)
+        } else if league.source == .espn {
+            return await fetchEliminatedESPNTeam(league: league, myTeamID: myTeamID, week: week)
+        }
+        
+        return nil
+    }
+    
+    /// Fetch Sleeper team roster for eliminated team
+    private func fetchEliminatedSleeperTeam(
+        league: UnifiedLeagueManager.LeagueWrapper,
+        myTeamID: String,
+        week: Int,
+        provider: LeagueMatchupProvider
+    ) async -> FantasyTeam? {
+        
+        do {
+            // Fetch roster data
+            let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters")!
+            let (data, _) = try await URLSession.shared.data(from: rostersURL)
+            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            
+            // Find my roster - try both String and Int matching
+            let myRoster = rosters.first { roster in
+                String(roster.rosterID) == myTeamID || roster.ownerID == myTeamID
+            }
+            
+            guard let myRoster = myRoster else {
+                DebugPrint(mode: .matchupLoading, "   ❌ Could not find roster for team ID: \(myTeamID)")
+                return nil
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Found roster ID: \(myRoster.rosterID)")
+            
+            // Fetch matchup response for this week to get starters and scores
+            let matchupsURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)")!
+            let (matchupData, _) = try await URLSession.shared.data(from: matchupsURL)
+            let matchupResponses = try JSONDecoder().decode([SleeperMatchupResponse].self, from: matchupData)
+            
+            // Find my matchup response (has starters and points)
+            guard let myMatchupResponse = matchupResponses.first(where: { $0.rosterID == myRoster.rosterID }) else {
+                DebugPrint(mode: .matchupLoading, "   ⚠️ No matchup response found, creating with empty roster")
+                // Return basic team with no players (eliminated scenario)
+                let record = TeamRecord(
+                    wins: myRoster.wins ?? 0,
+                    losses: myRoster.losses ?? 0,
+                    ties: myRoster.ties ?? 0
+                )
+                
+                return FantasyTeam(
+                    id: myTeamID,
+                    name: "Team \(myRoster.rosterID)",
+                    ownerName: "Team \(myRoster.rosterID)",
+                    record: record,
+                    avatar: nil,
+                    currentScore: 0.0,
+                    projectedScore: 0.0,
+                    roster: [],
+                    rosterID: myRoster.rosterID,
+                    faabTotal: league.league.settings?.waiverBudget,
+                    faabUsed: myRoster.waiversBudgetUsed
+                )
+            }
+            
+            // Fetch user info for display name
+            let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users")!
+            let (userData, _) = try await URLSession.shared.data(from: usersURL)
+            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: userData)
+            
+            let myUser = users.first { $0.userID == myRoster.ownerID }
+            let managerName = myUser?.displayName ?? "Team \(myRoster.rosterID)"
+            
+            // Build fantasy players from roster
+            let starters = myMatchupResponse.starters ?? []
+            let allPlayers = myMatchupResponse.players ?? []
+            
+            var fantasyPlayers: [FantasyPlayer] = []
+            
+            for playerID in allPlayers {
+                // --- FIX: Use non-private, robust player lookup ---
+                if let sleeperPlayer = (Mirror(reflecting: self).children.first { $0.label == "playerDirectory" }?.value as? PlayerDirectoryStore)?.player(for: playerID) {
+                    let isStarter = starters.contains(playerID)
+                    let playerScore = provider.getPlayerScore(playerId: playerID)
+                    let playerTeam = sleeperPlayer.team ?? "UNK"
+                    let playerPosition = sleeperPlayer.position ?? "FLEX"
+                    
+                    // --- FIX: Use non-private, robust game status lookup ---
+                    let gsService = (Mirror(reflecting: self).children.first { $0.label == "gameStatusService" }?.value as? GameStatusService)
+                    
+                    // FIX: Use a string fallback for unknown/missing status (if your enum is custom)
+                    let gameStatus = gsService?.getGameStatusWithFallback(for: playerTeam)
+                    
+                    let fantasyPlayer = FantasyPlayer(
+                        id: playerID,
+                        sleeperID: playerID,
+                        espnID: sleeperPlayer.espnID,
+                        firstName: sleeperPlayer.firstName,
+                        lastName: sleeperPlayer.lastName,
+                        position: playerPosition,
+                        team: playerTeam,
+                        jerseyNumber: sleeperPlayer.number?.description,
+                        currentPoints: playerScore,
+                        projectedPoints: playerScore * 1.1,
+                        gameStatus: gameStatus,
+                        isStarter: isStarter,
+                        lineupSlot: isStarter ? playerPosition : nil,
+                        injuryStatus: sleeperPlayer.injuryStatus
+                    )
+                    fantasyPlayers.append(fantasyPlayer)
+                }
+            }
+            
+            // Get team record
+            let record = TeamRecord(
+                wins: myRoster.wins ?? 0,
+                losses: myRoster.losses ?? 0,
+                ties: myRoster.ties ?? 0
+            )
+            
+            // Get avatar URL
+            let avatarURL = myUser?.avatar != nil ? "https://sleepercdn.com/avatars/\(myUser!.avatar!)" : nil
+            
+            let team = FantasyTeam(
+                id: myTeamID,
+                name: managerName,
+                ownerName: managerName,
+                record: record,
+                avatar: avatarURL,
+                currentScore: myMatchupResponse.points ?? 0.0,
+                projectedScore: myMatchupResponse.projectedPoints ?? 0.0,
+                roster: fantasyPlayers,
+                rosterID: myRoster.rosterID,
+                faabTotal: league.league.settings?.waiverBudget,
+                faabUsed: myRoster.waiversBudgetUsed
+            )
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Built Sleeper eliminated team: \(managerName) with \(fantasyPlayers.count) players, score: \(myMatchupResponse.points ?? 0.0)")
+            return team
+            
+        } catch {
+            DebugPrint(mode: .matchupLoading, "   ❌ Failed to fetch eliminated Sleeper team: \(error)")
+            return nil
+        }
+    }
+    
+    /// Fetch ESPN team roster for eliminated team
+    private func fetchEliminatedESPNTeam(
+        league: UnifiedLeagueManager.LeagueWrapper,
+        myTeamID: String,
+        week: Int
+    ) async -> FantasyTeam? {
+        
+        DebugPrint(mode: .matchupLoading, "   🔍 Fetching eliminated ESPN team for league \(league.league.name), team ID \(myTeamID), week \(week)")
+        
+        do {
+            // Fetch full league data for this week
+            guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(getCurrentYear())/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
+                return nil
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   🌐 Fetching from ESPN API...")
+            
+            var request = URLRequest(url: url)
+            request.addValue("application/json", forHTTPHeaderField: "Accept")
+            
+            let espnToken = getCurrentYear() == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
+            request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
+            
+            DebugPrint(mode: .matchupLoading, "   🔐 Using credentials for year \(getCurrentYear())")
+            
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Decoded ESPN league data, found \(model.teams.count) teams")
+            
+            // Find my team
+            guard let myTeam = model.teams.first(where: { String($0.id) == myTeamID }) else {
+                DebugPrint(mode: .matchupLoading, "   ❌ Could not find team with ID \(myTeamID)")
+                return nil
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Found team: \(myTeam.name ?? "Unknown")")
+            
+            // Calculate my score
+            let myScore = myTeam.activeRosterScore(for: week)
+            
+            // Get team name
+            let teamName = myTeam.name ?? "Team \(myTeam.id)"
+            
+            // Build roster
+            var fantasyPlayers: [FantasyPlayer] = []
+            
+            if let roster = myTeam.roster {
+                fantasyPlayers = roster.entries.map { entry in
+                    let player = entry.playerPoolEntry.player
+                    let isActive = true  // treat as active for now
+
+                    let weeklyScore = player.stats.first { stat in
+                        stat.scoringPeriodId == week && stat.statSourceId == 0
+                    }?.appliedTotal ?? 0.0
+
+                    let projectedScore = player.stats.first { stat in
+                        stat.scoringPeriodId == week && stat.statSourceId == 1
+                    }?.appliedTotal ?? 0.0
+
+                    return FantasyPlayer(
+                        id: String(player.id),
+                        sleeperID: nil,
+                        espnID: String(player.id),
+                        firstName: player.fullName,
+                        lastName: "",
+                        position: entry.positionString,
+                        team: player.nflTeamAbbreviation ?? "UNK",
+                        jerseyNumber: nil,
+                        currentPoints: weeklyScore,
+                        projectedPoints: projectedScore,
+                        gameStatus: (Mirror(reflecting: self).children.first { $0.label == "gameStatusService" }?.value as? GameStatusService)?.getGameStatusWithFallback(for: player.nflTeamAbbreviation ?? "UNK"),
+                        isStarter: isActive,
+                        lineupSlot: nil,
+                        injuryStatus: nil
+                    )
+                }
+            }
+            
+            DebugPrint(mode: .matchupLoading, "   ✅ Built ESPN eliminated team: \(teamName) with \(fantasyPlayers.count) players")
+            
+            return FantasyTeam(
+                id: myTeamID,
+                name: teamName,
+                ownerName: teamName,
+                record: TeamRecord(
+                    wins: myTeam.record?.overall.wins ?? 0,
+                    losses: myTeam.record?.overall.losses ?? 0,
+                    ties: myTeam.record?.overall.ties ?? 0
+                ),
+                avatar: nil,
+                currentScore: myScore,
+                projectedScore: myScore * 1.05,
+                roster: fantasyPlayers,
+                rosterID: myTeam.id,
+                faabTotal: nil,
+                faabUsed: nil
+            )
+            
+        } catch {
+            DebugPrint(mode: .matchupLoading, "   ❌ Failed to fetch eliminated ESPN team: \(error)")
             return nil
         }
     }

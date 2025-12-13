@@ -17,6 +17,7 @@ final class SettingsViewModel {
     var debugModeEnabled: Bool = AppConstants.debug
     var isTestingConnection: Bool = false
     var showEliminatedChoppedLeagues: Bool = false
+    var showEliminatedPlayoffLeagues: Bool = false
     
     // 💊 RX: Lineup optimization improvement threshold (persistent)
     var lineupOptimizationThreshold: Double = 10.0 // 10% default, range 10-100%
@@ -103,6 +104,9 @@ final class SettingsViewModel {
         // Load show eliminated chopped leagues preference (default: false)
         showEliminatedChoppedLeagues = UserDefaults.standard.bool(forKey: "showEliminatedChoppedLeagues")
         
+        // Load show eliminated playoff leagues preference (default: false)
+        showEliminatedPlayoffLeagues = UserDefaults.standard.bool(forKey: "showEliminatedPlayoffLeagues")
+        
         // 💊 RX: Load lineup optimization threshold (default: 10%)
         let savedThreshold = UserDefaults.standard.double(forKey: "lineupOptimizationThreshold")
         lineupOptimizationThreshold = savedThreshold > 0 ? savedThreshold : 10.0
@@ -149,6 +153,11 @@ final class SettingsViewModel {
     func updateShowEliminatedChoppedLeagues(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "showEliminatedChoppedLeagues")
         NSLog("🔧 Show eliminated chopped leagues \(enabled ? "enabled" : "disabled")")
+    }
+    
+    func updateShowEliminatedPlayoffLeagues(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: "showEliminatedPlayoffLeagues")
+        NSLog("🔧 Show eliminated playoff leagues \(enabled ? "enabled" : "disabled")")
     }
     
     // 📱 Update keep app active setting
@@ -426,6 +435,10 @@ extension UserDefaults {
     
     var showEliminatedChoppedLeagues: Bool {
         return bool(forKey: "showEliminatedChoppedLeagues")
+    }
+    
+    var showEliminatedPlayoffLeagues: Bool {
+        return bool(forKey: "showEliminatedPlayoffLeagues")
     }
     
     // 💊 RX: Lineup optimization threshold (default 10%)

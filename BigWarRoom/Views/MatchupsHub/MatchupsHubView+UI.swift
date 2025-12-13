@@ -97,22 +97,38 @@ extension MatchupsHubView {
     var sortedMatchups: [UnifiedMatchup] {
         let allMatchups = matchupsHubViewModel.sortedMatchups(sortByWinning: sortByWinning)
         
-        // Filter out eliminated chopped leagues if setting is disabled
-        let showEliminated = UserDefaults.standard.showEliminatedChoppedLeagues
-        if !showEliminated {
-            return allMatchups.filter { matchup in
-                // Keep non-chopped leagues
-                guard matchup.isChoppedLeague else { return true }
-                
-                // For chopped leagues, check if I'm eliminated
-                guard let myTeamRanking = matchup.myTeamRanking else { return true }
-                
-                // Filter out if eliminated
-                return !myTeamRanking.isEliminated
-            }
-        }
+        // Get both toggle settings
+        let showChoppedEliminated = UserDefaults.standard.showEliminatedChoppedLeagues
+        let showPlayoffEliminated = UserDefaults.standard.showEliminatedPlayoffLeagues
         
-        return allMatchups
+        // Filter based on settings
+        return allMatchups.filter { matchup in
+            // Check if this is a playoff-eliminated league (opponent = "Eliminated from Playoffs")
+            let isPlayoffEliminated = matchup.opponentTeam?.name == "Eliminated from Playoffs"
+            
+            if isPlayoffEliminated {
+                DebugPrint(mode: .matchupLoading, "     🔍 CHECK: \(matchup.league.league.name) - type: ELIMINATED")
+                if showPlayoffEliminated {
+                    DebugPrint(mode: .matchupLoading, "       ✅ KEEP: playoff elimination")
+                    return true
+                } else {
+                    DebugPrint(mode: .matchupLoading, "       ❌ FILTER OUT: playoff elimination (toggle OFF)")
+                    return false
+                }
+            }
+            
+            // Check Chopped league elimination
+            if matchup.isChoppedLeague {
+                if !showChoppedEliminated {
+                    // Filter out eliminated chopped leagues if setting is disabled
+                    guard let myTeamRanking = matchup.myTeamRanking else { return true }
+                    return !myTeamRanking.isEliminated
+                }
+                return true // Show all chopped leagues if toggle is ON
+            }
+            
+            return true // Show all other matchups
+        }
     }
     
     // MARK: - Sheet Views
