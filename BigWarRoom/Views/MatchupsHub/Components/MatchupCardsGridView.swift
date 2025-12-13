@@ -18,8 +18,47 @@ struct MatchupCardsGridView: View {
     let getWinningStatus: (UnifiedMatchup) -> Bool
     let getOptimizationStatus: (UnifiedMatchup) -> Bool
     
+    // 🔥 NEW: All matchups (before filtering) to pass to detail views for horizontal scrolling
+    let allMatchups: [UnifiedMatchup]
+    
     // 🔥 NEW: Bar-style layout toggle
     @AppStorage("MatchupsHub_UseBarLayout") private var useBarLayout = false
+    
+    // 🔥 NEW: Helper to get matchups from the same league for swiping
+    private func getLeagueMatchups(for matchup: UnifiedMatchup) -> [UnifiedMatchup] {
+        // 🔥 FIX: If this matchup already has all league matchups stored, use those
+        if let storedMatchups = matchup.allLeagueMatchups, !storedMatchups.isEmpty {
+            // Convert FantasyMatchup array to UnifiedMatchup array
+            return storedMatchups.map { fantasyMatchup in
+                UnifiedMatchup(
+                    id: "\(matchup.league.id)_\(fantasyMatchup.id)",
+                    league: matchup.league,
+                    fantasyMatchup: fantasyMatchup,
+                    choppedSummary: nil,
+                    lastUpdated: matchup.lastUpdated,
+                    myTeamRanking: nil,
+                    myIdentifiedTeamID: matchup.myIdentifiedTeamID,
+                    authenticatedUsername: "" // Not needed for display
+                )
+            }
+        }
+        
+        // Fallback to old logic
+        // 1. Filter to same league
+        let sameLeague = allMatchups.filter { $0.league.id == matchup.league.id }
+        
+        // 2. If this is an eliminated matchup, include YOUR matchup + only ACTIVE playoff matchups
+        if matchup.isMyManagerEliminated {
+            // Get all active (non-eliminated) matchups from this league
+            let activeMatchups = sameLeague.filter { !$0.isMyManagerEliminated }
+            
+            // Always include YOUR matchup first, then the active ones
+            return [matchup] + activeMatchups
+        }
+        
+        // 3. For non-eliminated, show all matchups from this league
+        return sameLeague
+    }
     
     var body: some View {
         Group {
@@ -31,7 +70,10 @@ struct MatchupCardsGridView: View {
                 ScrollView {
                     LazyVStack(spacing: 40) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
-                            NavigationLink(destination: MatchupDetailSheetsView(matchup: matchup)) {
+                            NavigationLink(destination: MatchupDetailSheetsView(
+                                matchup: matchup,
+                                allLeagueMatchups: getLeagueMatchups(for: matchup)
+                            )) {
                                 MatchupBarCardView(
                                     matchup: matchup,
                                     isWinning: getWinningStatus(matchup),
@@ -53,15 +95,21 @@ struct MatchupCardsGridView: View {
                         spacing: 44
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
-                            MatchupCardViewBuilder(
+                            NavigationLink(destination: MatchupDetailSheetsView(
                                 matchup: matchup,
-                                microMode: true,
-                                expandedCardId: expandedCardId,
-                                isWinning: getWinningStatus(matchup),
-                                onMicroCardTap: onMicroCardTap,
-                                dualViewMode: dualViewMode,
-                                isLineupOptimized: getOptimizationStatus(matchup)
-                            )
+                                allLeagueMatchups: getLeagueMatchups(for: matchup)
+                            )) {
+                                MatchupCardViewBuilder(
+                                    matchup: matchup,
+                                    microMode: true,
+                                    expandedCardId: expandedCardId,
+                                    isWinning: getWinningStatus(matchup),
+                                    onMicroCardTap: onMicroCardTap,
+                                    dualViewMode: dualViewMode,
+                                    isLineupOptimized: getOptimizationStatus(matchup)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                     .padding(.top, 20)
@@ -75,15 +123,21 @@ struct MatchupCardsGridView: View {
                         spacing: 40
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
-                            MatchupCardViewBuilder(
+                            NavigationLink(destination: MatchupDetailSheetsView(
                                 matchup: matchup,
-                                microMode: false,
-                                expandedCardId: expandedCardId,
-                                isWinning: getWinningStatus(matchup),
-                                onMicroCardTap: onMicroCardTap,
-                                dualViewMode: true,
-                                isLineupOptimized: getOptimizationStatus(matchup)
-                            )
+                                allLeagueMatchups: getLeagueMatchups(for: matchup)
+                            )) {
+                                MatchupCardViewBuilder(
+                                    matchup: matchup,
+                                    microMode: false,
+                                    expandedCardId: expandedCardId,
+                                    isWinning: getWinningStatus(matchup),
+                                    onMicroCardTap: onMicroCardTap,
+                                    dualViewMode: true,
+                                    isLineupOptimized: getOptimizationStatus(matchup)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                 } else {
@@ -93,15 +147,21 @@ struct MatchupCardsGridView: View {
                         spacing: 40
                     ) {
                         ForEach(sortedMatchups, id: \.id) { matchup in
-                            MatchupCardViewBuilder(
+                            NavigationLink(destination: MatchupDetailSheetsView(
                                 matchup: matchup,
-                                microMode: false,
-                                expandedCardId: expandedCardId,
-                                isWinning: getWinningStatus(matchup),
-                                onMicroCardTap: onMicroCardTap,
-                                dualViewMode: false,
-                                isLineupOptimized: getOptimizationStatus(matchup)
-                            )
+                                allLeagueMatchups: getLeagueMatchups(for: matchup)
+                            )) {
+                                MatchupCardViewBuilder(
+                                    matchup: matchup,
+                                    microMode: false,
+                                    expandedCardId: expandedCardId,
+                                    isWinning: getWinningStatus(matchup),
+                                    onMicroCardTap: onMicroCardTap,
+                                    dualViewMode: false,
+                                    isLineupOptimized: getOptimizationStatus(matchup)
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
                 }
@@ -121,7 +181,8 @@ struct MatchupCardsGridView: View {
                         sortedMatchups: sortedMatchups,
                         getWinningStatus: getWinningStatus,
                         onDismiss: onExpandedCardDismiss,
-                        getOptimizationStatus: getOptimizationStatus
+                        getOptimizationStatus: getOptimizationStatus,
+                        allMatchups: allMatchups
                     )
                 }
             }
@@ -139,6 +200,24 @@ struct ExpandedCardOverlayView: View {
     let onDismiss: () -> Void
     let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
     
+    // 🔥 NEW: All matchups for league filtering
+    let allMatchups: [UnifiedMatchup]
+    
+    // 🔥 NEW: Helper to get league matchups
+    private func getLeagueMatchups(for matchup: UnifiedMatchup) -> [UnifiedMatchup] {
+        let sameLeague = allMatchups.filter { $0.league.id == matchup.league.id }
+        
+        if matchup.isMyManagerEliminated {
+            // Get all active (non-eliminated) matchups from this league
+            let activeMatchups = sameLeague.filter { !$0.isMyManagerEliminated }
+            
+            // Always include YOUR matchup first, then the active ones
+            return [matchup] + activeMatchups
+        }
+        
+        return sameLeague
+    }
+    
     var body: some View {
         if let expandedId = expandedCardId,
            let expandedMatchup = sortedMatchups.first(where: { $0.id == expandedId }) {
@@ -151,7 +230,10 @@ struct ExpandedCardOverlayView: View {
                     }
                 }
             
-            NavigationLink(destination: MatchupDetailSheetsView(matchup: expandedMatchup)) {
+            NavigationLink(destination: MatchupDetailSheetsView(
+                matchup: expandedMatchup,
+                allLeagueMatchups: getLeagueMatchups(for: expandedMatchup)
+            )) {
                 NonMicroCardView(
                     matchup: expandedMatchup,
                     isWinning: getWinningStatus(expandedMatchup),

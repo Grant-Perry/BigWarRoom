@@ -411,8 +411,9 @@ struct UnifiedMatchup: Identifiable, Hashable {
     let myTeamRanking: FantasyTeamRanking? // For Chopped leagues
     let myIdentifiedTeamID: String? // 🔥 NEW: Store the correctly identified team ID
     private let authenticatedUsername: String
+    let allLeagueMatchups: [FantasyMatchup]? // 🔥 NEW: All matchups in this league for horizontal scrolling
     
-    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil, authenticatedUsername: String) {
+    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil, authenticatedUsername: String, allLeagueMatchups: [FantasyMatchup]? = nil) {
         self.id = id
         self.league = league
         self.fantasyMatchup = fantasyMatchup
@@ -421,6 +422,7 @@ struct UnifiedMatchup: Identifiable, Hashable {
         self.myTeamRanking = myTeamRanking
         self.myIdentifiedTeamID = myIdentifiedTeamID
         self.authenticatedUsername = authenticatedUsername
+        self.allLeagueMatchups = allLeagueMatchups
     }
     
     /// Create a configured FantasyViewModel for this matchup

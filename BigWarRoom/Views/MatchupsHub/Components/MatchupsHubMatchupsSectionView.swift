@@ -29,6 +29,9 @@ struct MatchupsHubMatchupsSectionView: View {
     let getWinningStatus: (UnifiedMatchup) -> Bool
     let getOptimizationStatus: (UnifiedMatchup) -> Bool  // 💊 RX: Get optimization status
     
+    // 🔥 NEW: All matchups (unfiltered) for detail view navigation
+    let allMatchups: [UnifiedMatchup]
+    
     var body: some View {
         VStack(spacing: 12) {
             MatchupsSectionHeaderView(
@@ -55,7 +58,8 @@ struct MatchupsHubMatchupsSectionView: View {
                 onMicroCardTap: onMicroCardTap,
                 onExpandedCardDismiss: onExpandedCardDismiss,
                 getWinningStatus: getWinningStatus,
-                getOptimizationStatus: getOptimizationStatus
+                getOptimizationStatus: getOptimizationStatus,
+                allMatchups: allMatchups
             )
         }
     }

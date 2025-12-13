@@ -88,7 +88,8 @@ extension MatchupsHubView {
                 }
             },
             getWinningStatus: matchupsHubViewModel.getWinningStatusForMatchup,
-            getOptimizationStatus: matchupsHubViewModel.isLineupOptimized
+            getOptimizationStatus: matchupsHubViewModel.isLineupOptimized,
+            allMatchups: matchupsHubViewModel.myMatchups
         )
     }
     

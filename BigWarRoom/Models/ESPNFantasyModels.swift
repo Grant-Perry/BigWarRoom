@@ -90,6 +90,7 @@ struct ESPNFantasyMatchupModel: Codable {
     let home: ESPNTeamMatchupModel
     let winner: String?
     let matchupPeriodId: Int
+    let playoffTierType: String?  // NEW: Identifies playoff bracket (WINNERS_BRACKET, LOSERS_BRACKET, etc.)
 }
 
 /// ESPN Team Matchup
