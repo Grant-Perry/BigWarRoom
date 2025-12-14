@@ -286,6 +286,8 @@ extension MatchupsHubViewModel {
         
         // Step 5: Find user's matchup using provider
         if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
+            // 🔥 FIX: Store ALL league matchups for horizontal swiping
+            // This allows users to swipe through all matchups in the league
             let unifiedMatchup = UnifiedMatchup(
                 id: "\(league.id)_\(myMatchup.id)",
                 league: league,
@@ -294,7 +296,8 @@ extension MatchupsHubViewModel {
                 lastUpdated: Date(),
                 myTeamRanking: nil,
                 myIdentifiedTeamID: myTeamID,
-                authenticatedUsername: sleeperCredentials.currentUsername
+                authenticatedUsername: sleeperCredentials.currentUsername,
+                allLeagueMatchups: matchups  // ← Pass all league matchups for swiping
             )
             
             await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)

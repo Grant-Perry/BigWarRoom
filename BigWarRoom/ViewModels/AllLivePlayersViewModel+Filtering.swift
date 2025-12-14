@@ -139,6 +139,11 @@ extension AllLivePlayersViewModel {
                 }.prefix(50)
                 
                 // Convert to LivePlayerEntry format for display
+                guard let templateMatchup = allPlayers.first?.matchup else {
+                    filteredPlayers = []
+                    return
+                }
+                
                 players = matchingNFLPlayers.compactMap { sleeperPlayer in
                     let fantasyPlayer = FantasyPlayer(
                         id: sleeperPlayer.playerID,
@@ -154,13 +159,9 @@ extension AllLivePlayersViewModel {
                         gameStatus: nil,
                         isStarter: false,
                         lineupSlot: nil,
-                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED: From SleeperPlayer
+                        injuryStatus: sleeperPlayer.injuryStatus
                     )
-                    
-                    guard let templateMatchup = allPlayers.first?.matchup else { 
-                        return nil 
-                    }
-                    
+
                     return LivePlayerEntry(
                         id: "search_all_\(sleeperPlayer.playerID)",
                         player: fantasyPlayer,
@@ -173,7 +174,8 @@ extension AllLivePlayersViewModel {
                         matchup: templateMatchup,
                         performanceTier: .average,
                         lastActivityTime: nil,
-                        previousScore: nil
+                        previousScore: nil,
+                        accumulatedDelta: 0.0
                     )
                 }
             }
@@ -234,12 +236,15 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: tier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.previousScore
+                previousScore: entry.previousScore,
+                accumulatedDelta: entry.accumulatedDelta
             )
         }
 
         // Step 6: Apply sorting
-        filteredPlayers = sortPlayers(updatedPlayers)
+        let sorted = sortPlayers(updatedPlayers)
+        filteredPlayers = []
+        filteredPlayers = sorted
     }
     
     // MARK: - Sorting Logic

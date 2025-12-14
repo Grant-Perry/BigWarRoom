@@ -18,6 +18,17 @@ extension AllLivePlayersViewModel {
         DebugPrint(mode: .liveUpdate2, "  - Has fantasyMatchup: \(matchup.fantasyMatchup != nil)")
         DebugPrint(mode: .liveUpdate2, "  - Has myTeamRanking: \(matchup.myTeamRanking != nil)")
 
+        // 🔥 RESPECT USER SETTINGS: Skip eliminated playoff matchups if setting is off
+        if matchup.isMyManagerEliminated {
+            let showEliminatedPlayoffs = UserDefaults.standard.showEliminatedPlayoffLeagues
+            if !showEliminatedPlayoffs {
+                DebugPrint(mode: .liveUpdate2, "⏭️ SKIPPING: Eliminated playoff matchup (setting is OFF)")
+                return []
+            } else {
+                DebugPrint(mode: .liveUpdate2, "✅ INCLUDING: Eliminated playoff matchup (setting is ON)")
+            }
+        }
+
         // Regular matchups - extract from MY team only
         if matchup.fantasyMatchup != nil {
             DebugPrint(mode: .liveUpdate2, "📊 REGULAR LEAGUE: \(matchup.league.league.name)")
@@ -26,12 +37,17 @@ extension AllLivePlayersViewModel {
                 DebugPrint(mode: .liveUpdate2, "  - Found \(myStarters.count) starters")
                 for player in myStarters {
                     let calculatedScore = player.currentPoints ?? 0.0
-                    
-                    // 🔥 NEW: Track activity for recent sort
-                    let existingPlayer = allPlayers.first { $0.player.id == player.id }
-                    let previousScore = existingPlayer?.currentScore
-                    let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
-                    
+
+                    // 💥 FIX: Use player.id + matchup.id for card-unique lookup
+                    let existingPlayer = allPlayers.first { $0.player.id == player.id && $0.matchup.id == matchup.id }
+                    let oldCurrent = existingPlayer?.currentScore ?? calculatedScore
+                    let previousActivityTime = existingPlayer?.lastActivityTime
+                    let priorDelta = existingPlayer?.accumulatedDelta ?? 0.0
+                    let freshDelta = calculatedScore - oldCurrent
+                    let newAccumulatedDelta = abs(freshDelta) > 0.01 ? (priorDelta + freshDelta) : priorDelta
+
+                    let activityTime = (abs(freshDelta) > 0.01) ? Date() : previousActivityTime
+
                     // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                     // Injury status and jersey number are already populated during player creation
                     
@@ -47,7 +63,8 @@ extension AllLivePlayersViewModel {
                         matchup: matchup,
                         performanceTier: .average, // Calculated later
                         lastActivityTime: activityTime,
-                        previousScore: previousScore
+                        previousScore: oldCurrent,
+                        accumulatedDelta: newAccumulatedDelta
                     ))
                 }
             }
@@ -81,14 +98,19 @@ extension AllLivePlayersViewModel {
                 DebugPrint(mode: .liveUpdate2, "    - PlayerID: '\(player.id)'")
                 DebugPrint(mode: .liveUpdate2, "    - SleeperID: '\(player.sleeperID ?? "nil")'") 
                 DebugPrint(mode: .liveUpdate2, "    - ESPNID: '\(player.espnID ?? "nil")'")
-                
+
                 let calculatedScore = player.currentPoints ?? 0.0
-                
-                // 🔥 NEW: Track activity for recent sort
-                let existingPlayer = allPlayers.first { $0.player.id == player.id }
-                let previousScore = existingPlayer?.currentScore
-                let activityTime = (previousScore != nil && abs(calculatedScore - (previousScore ?? 0.0)) > 0.01) ? Date() : existingPlayer?.lastActivityTime
-                
+
+                // 💥 FIX: Use player.id + matchup.id for card-unique lookup
+                let existingPlayer = allPlayers.first { $0.player.id == player.id && $0.matchup.id == matchup.id }
+                let oldCurrent = existingPlayer?.currentScore ?? calculatedScore
+                let previousActivityTime = existingPlayer?.lastActivityTime
+                let priorDelta = existingPlayer?.accumulatedDelta ?? 0.0
+                let freshDelta = calculatedScore - oldCurrent
+                let newAccumulatedDelta = abs(freshDelta) > 0.01 ? (priorDelta + freshDelta) : priorDelta
+
+                let activityTime = (abs(freshDelta) > 0.01) ? Date() : previousActivityTime
+
                 // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                 // Injury status and jersey number are already populated during player creation
                 
@@ -104,7 +126,8 @@ extension AllLivePlayersViewModel {
                     matchup: matchup,
                     performanceTier: .average, // Calculated later
                     lastActivityTime: activityTime,
-                    previousScore: previousScore
+                    previousScore: oldCurrent,
+                    accumulatedDelta: newAccumulatedDelta
                 ))
             }
         }
@@ -200,7 +223,8 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: tier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.previousScore
+                previousScore: entry.previousScore,
+                accumulatedDelta: entry.accumulatedDelta // 🔥 Add this everywhere!
             )
         }
         
@@ -295,7 +319,8 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: tier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.previousScore
+                previousScore: entry.previousScore,
+                accumulatedDelta: entry.accumulatedDelta // 🔥 Add this everywhere!
             )
         }
         
@@ -388,7 +413,8 @@ extension AllLivePlayersViewModel {
                         matchup: templateMatchup,
                         performanceTier: .average,
                         lastActivityTime: nil,
-                        previousScore: nil
+                        previousScore: nil,
+                        accumulatedDelta: 0.0 // Zero for searched cards
                     )
                 }
             }
@@ -448,7 +474,8 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: tier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.previousScore
+                previousScore: entry.previousScore,
+                accumulatedDelta: entry.accumulatedDelta // 🔥 Add this everywhere!
             )
         }
 

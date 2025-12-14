@@ -229,7 +229,7 @@ enum DebugConfig {
 	///											 |
 	///   								         ∨
 	/// Current: Disabled (set to [] for production)
-   static var activeMode: DebugMode = .matchupLoading
+   static var activeMode: DebugMode = [] // .matchupLoading
 
     /// Reset all iteration counters (useful for testing)
     static func resetIterations() {

@@ -202,6 +202,7 @@ extension AllLivePlayersViewModel {
         // 🔥 NEW: Activity tracking for recent sort
         var lastActivityTime: Date?
         var previousScore: Double?
+        var accumulatedDelta: Double    // Sticky delta for pill, survives refreshes
         
         // 🔥 REMOVED: These are now on FantasyPlayer model itself!
         // Access via: playerEntry.player.injuryStatus
@@ -295,7 +296,8 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: entry.performanceTier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.currentScore  // Reset to current score
+                previousScore: entry.currentScore,
+                accumulatedDelta: 0.0
             )
         }
         
@@ -313,7 +315,8 @@ extension AllLivePlayersViewModel {
                 matchup: entry.matchup,
                 performanceTier: entry.performanceTier,
                 lastActivityTime: entry.lastActivityTime,
-                previousScore: entry.currentScore  // Reset to current score
+                previousScore: entry.currentScore,
+                accumulatedDelta: 0.0
             )
         }
     }

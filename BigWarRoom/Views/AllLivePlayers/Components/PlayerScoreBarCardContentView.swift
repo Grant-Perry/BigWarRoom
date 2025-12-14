@@ -87,8 +87,9 @@ struct PlayerScoreBarCardContentView: View {
                         Spacer()
                         
                         // Per-player score delta (in pill)
-                        if let deltaText = scoreDeltaText, let deltaValue = scoreDeltaValue {
-                            Text(deltaText)
+                        if abs(playerEntry.accumulatedDelta) > 0.01 {
+                            let deltaValue = playerEntry.accumulatedDelta
+                            Text(String(format: "%+.2f", deltaValue))
                                 .font(.system(size: 10, weight: .bold))
                                 .foregroundColor(deltaValue >= 0 ? .gpGreen : .gpRedPink)
                                 .lineLimit(1)
