@@ -225,9 +225,10 @@ enum DebugConfig {
     /// - `[.espnAPI, .recordCalculation]` - Multiple specific areas
 	///
 	///
-	///  DO NOT DELETE: ---   the DebugMode is HERE: --------|
-	///											 |
-	///   								         ∨
+	///  DO NOT DELETE: ----   the DebugMode is HERE ┐
+	///                                      │
+	///                                      │
+	///                                      ▼
 	/// Current: Disabled (set to [] for production)
    static var activeMode: DebugMode = [] // .matchupLoading
 
