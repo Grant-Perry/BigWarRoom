@@ -215,7 +215,7 @@ struct DebugMode: OptionSet {
 
 // MARK: - Debug Configuration
 
-   /// 
+   ///
 enum DebugConfig {
     /// Change this to focus debug output on specific areas
     /// 
@@ -230,7 +230,6 @@ enum DebugConfig {
 	///                                      │
 	///                                      │
 	///                                      ▼
-	/// Current: Disabled (set to [] for production)
    static var activeMode: DebugMode = [] // .matchupLoading
 
     /// Reset all iteration counters (useful for testing)

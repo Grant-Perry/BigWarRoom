@@ -135,9 +135,30 @@ extension MatchupsHubView {
     // MARK: - Sheet Views
     
     func buildMatchupDetailSheet(for matchup: UnifiedMatchup) -> some View {
-        // 🔥 FIXED: Filter ALL matchups from the same league and pass them
-        let leagueMatchups = matchupsHubViewModel.myMatchups.filter { otherMatchup in
-            otherMatchup.league.id == matchup.league.id
+        // 🔥 FIXED: Use the pre-loaded allLeagueMatchups from the matchup object
+        // This ensures we have ALL matchups from the league (including active playoff matchups)
+        // regardless of filter settings that might hide eliminated matchups in the main view
+        let leagueMatchups: [UnifiedMatchup]
+        
+        if let storedMatchups = matchup.allLeagueMatchups, !storedMatchups.isEmpty {
+            // Convert FantasyMatchup array to UnifiedMatchup array
+            leagueMatchups = storedMatchups.map { fantasyMatchup in
+                UnifiedMatchup(
+                    id: "\(matchup.league.id)_\(fantasyMatchup.id)",
+                    league: matchup.league,
+                    fantasyMatchup: fantasyMatchup,
+                    choppedSummary: nil,
+                    lastUpdated: matchup.lastUpdated,
+                    myTeamRanking: nil,
+                    myIdentifiedTeamID: matchup.myIdentifiedTeamID,
+                    authenticatedUsername: ""
+                )
+            }
+        } else {
+            // Fallback: Filter from myMatchups (for backward compatibility)
+            leagueMatchups = matchupsHubViewModel.myMatchups.filter { otherMatchup in
+                otherMatchup.league.id == matchup.league.id
+            }
         }
         
         return MatchupDetailSheetsView(matchup: matchup, allLeagueMatchups: leagueMatchups)
