@@ -215,6 +215,7 @@ struct DebugMode: OptionSet {
 
 // MARK: - Debug Configuration
 
+   /// 
 enum DebugConfig {
     /// Change this to focus debug output on specific areas
     /// 
