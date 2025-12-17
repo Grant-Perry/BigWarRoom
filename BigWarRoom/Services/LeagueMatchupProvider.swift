@@ -879,12 +879,12 @@ final class LeagueMatchupProvider {
         let rosterRecord: TeamRecord? = {
             
             if let roster = sleeperRosters.first(where: { $0.rosterID == matchupResponse.rosterID }) {
-                DebugLogger.fantasy("🔍 Creating team for roster \(matchupResponse.rosterID):")
-                DebugLogger.fantasy("   Root level: wins=\(roster.wins ?? 0), losses=\(roster.losses ?? 0)")
+                DebugPrint(mode: .fantasy, "🔍 Creating team for roster \(matchupResponse.rosterID):")
+                DebugPrint(mode: .fantasy, "   Root level: wins=\(roster.wins ?? 0), losses=\(roster.losses ?? 0)")
                 
                 // Try root level first
                 if let wins = roster.wins, let losses = roster.losses {
-                    DebugLogger.fantasy("✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (root level)")
+                    DebugPrint(mode: .fantasy, "✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (root level)")
                     return TeamRecord(
                         wins: wins,
                         losses: losses,
@@ -893,20 +893,18 @@ final class LeagueMatchupProvider {
                 }
                 
                 // Fallback to settings object
-                if let settings = roster.settings,
-                   let wins = settings.wins,
-                   let losses = settings.losses {
-                    DebugLogger.fantasy("✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (settings)")
+                if let wins = roster.settings?.wins, let losses = roster.settings?.losses {
+                    DebugPrint(mode: .fantasy, "✅ Record found for roster \(matchupResponse.rosterID): \(wins)-\(losses) (settings)")
                     return TeamRecord(
                         wins: wins,
                         losses: losses,
-                        ties: settings.ties ?? 0
+                        ties: roster.settings?.ties ?? 0
                     )
                 }
                 
-                DebugLogger.fantasy("❌ NO record data for roster \(matchupResponse.rosterID) - wins/losses not in root or settings")
+                DebugPrint(mode: .fantasy, "❌ NO record data for roster \(matchupResponse.rosterID) - wins/losses not in root or settings")
             } else {
-                DebugLogger.fantasy("❌ Roster not found for rosterID \(matchupResponse.rosterID) (sleeperRosters.count=\(sleeperRosters.count))")
+                DebugPrint(mode: .fantasy, "❌ Roster not found for rosterID \(matchupResponse.rosterID) (sleeperRosters.count=\(sleeperRosters.count))")
             }
             return nil
         }()

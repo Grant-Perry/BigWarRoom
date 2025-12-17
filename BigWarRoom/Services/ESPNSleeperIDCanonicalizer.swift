@@ -65,7 +65,7 @@ final class ESPNSleeperIDCanonicalizer {
         // If we loaded from cache successfully, mark as built
         if !canonicalMapping.isEmpty {
             mappingState = .built
-            DebugLogger.playerIDMapping("✅ Canonical mapping loaded from cache (\(canonicalMapping.count) entries)")
+            DebugPrint(mode: .playerIDMapping, "✅ Canonical mapping loaded from cache (\(canonicalMapping.count) entries)")
         }
     }
     
@@ -102,7 +102,7 @@ final class ESPNSleeperIDCanonicalizer {
             return
         case .building:
             // Currently building, avoid recursion
-            DebugLogger.playerIDMapping("⚠️ Canonical mapping already building, skipping duplicate call")
+            DebugPrint(mode: .playerIDMapping, "⚠️ Canonical mapping already building, skipping duplicate call")
             return
         case .notBuilt:
             // Need to build
@@ -110,7 +110,7 @@ final class ESPNSleeperIDCanonicalizer {
         }
         
         mappingState = .building
-        DebugLogger.playerIDMapping("🏗️ Building canonical ESPN→Sleeper ID mapping...", level: .info)
+        DebugPrint(mode: .playerIDMapping, "🏗️ Building canonical ESPN→Sleeper ID mapping...")
         
         var newCanonicalMapping: [String: String] = [:]
         var newReverseMapping: [String: String] = [:]
@@ -167,20 +167,20 @@ final class ESPNSleeperIDCanonicalizer {
         saveCachedMapping()
         
         // Log results ONCE
-        DebugLogger.playerIDMapping("🎯 Canonical mapping complete:", level: .info)
-        DebugLogger.playerIDMapping("  📊 Total ESPN→Sleeper mappings: \(canonicalMapping.count)")
-        DebugLogger.playerIDMapping("  🔗 Players with duplicate ESPN IDs: \(duplicateESPNIDs.count)")
+        DebugPrint(mode: .playerIDMapping, "🎯 Canonical mapping complete:")
+        DebugPrint(mode: .playerIDMapping, "  📊 Total ESPN→Sleeper mappings: \(canonicalMapping.count)")
+        DebugPrint(mode: .playerIDMapping, "  🔗 Players with duplicate ESPN IDs: \(duplicateESPNIDs.count)")
         
         // Show some duplicate examples (limit spam)
         let duplicateExamples = Array(duplicateESPNIDs.prefix(3))
         for (playerName, espnIDs) in duplicateExamples {
-            DebugLogger.playerIDMapping("  🔄 '\(playerName)' had ESPN IDs: \(espnIDs.joined(separator: ", "))")
+            DebugPrint(mode: .playerIDMapping, "  🔄 '\(playerName)' had ESPN IDs: \(espnIDs.joined(separator: ", "))")
         }
     }
     
     /// Force refresh canonical mapping (clears cache and rebuilds)
     func refreshCanonicalMapping() {
-        DebugLogger.playerIDMapping("♻️ Force refreshing canonical mapping...", level: .info)
+        DebugPrint(mode: .playerIDMapping, "♻️ Force refreshing canonical mapping...")
         canonicalMapping.removeAll()
         reverseMapping.removeAll()
         mappingState = .notBuilt
@@ -262,15 +262,15 @@ final class ESPNSleeperIDCanonicalizer {
         do {
             let data = try JSONEncoder().encode(canonicalMapping)
             try data.write(to: cacheFileURL)
-            DebugLogger.playerIDMapping("💾 Cached canonical mapping (\(canonicalMapping.count) entries)")
+            DebugPrint(mode: .playerIDMapping, "💾 Cached canonical mapping (\(canonicalMapping.count) entries)")
         } catch {
-            DebugLogger.error("Failed to cache canonical mapping: \(error)", category: .playerIDMapping)
+            DebugPrint(mode: .playerIDMapping, "Failed to cache canonical mapping: \(error)")
         }
     }
     
     private func loadCachedMapping() {
         guard FileManager.default.fileExists(atPath: cacheFileURL.path) else {
-            DebugLogger.playerIDMapping("📭 No cached canonical mapping found, will build on first use")
+            DebugPrint(mode: .playerIDMapping, "📭 No cached canonical mapping found, will build on first use")
             return
         }
         
@@ -289,9 +289,9 @@ final class ESPNSleeperIDCanonicalizer {
             }
             reverseMapping = tempReverseMapping
             
-            DebugLogger.playerIDMapping("💾 Loaded cached canonical mapping (\(canonicalMapping.count) entries)")
+            DebugPrint(mode: .playerIDMapping, "💾 Loaded cached canonical mapping (\(canonicalMapping.count) entries)")
         } catch {
-            DebugLogger.error("Failed to load cached canonical mapping: \(error)", category: .playerIDMapping)
+            DebugPrint(mode: .playerIDMapping, "Failed to load cached canonical mapping: \(error)")
             canonicalMapping.removeAll()
             reverseMapping.removeAll()
         }

@@ -6,9 +6,9 @@ extension DraftRoomViewModel {
     func selectDraft(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         // ESPN leagues: Ask for position FIRST, then complete setup
         if leagueWrapper.source == .espn {
-            DebugLogger.draft("ESPN league selected - prompting for draft position first")
-            DebugLogger.draft("League: \(leagueWrapper.league.name)")
-            DebugLogger.draft("Total Rosters: \(leagueWrapper.league.totalRosters)")
+            DebugPrint(mode: .draft, "ESPN league selected - prompting for draft position first")
+            DebugPrint(mode: .draft, "League: \(leagueWrapper.league.name)")
+            DebugPrint(mode: .draft, "Total Rosters: \(leagueWrapper.league.totalRosters)")
             
             // Store the league wrapper and show position prompt
             pendingESPNLeagueWrapper = leagueWrapper
@@ -104,7 +104,7 @@ extension DraftRoomViewModel {
     private func buildRosterDisplayInfo(rosters: [SleeperRoster], leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         var info: [Int: DraftRosterInfo] = [:]
 
-        DebugLogger.draft("Building draftRosters dictionary for \(rosters.count) rosters")
+        DebugPrint(mode: .draft, "Building draftRosters dictionary for \(rosters.count) rosters")
         
         for roster in rosters {
             let displayName = await resolveRosterDisplayName(for: roster)
@@ -163,21 +163,21 @@ extension DraftRoomViewModel {
     private func startDraftPolling(leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async {
         // Start polling the actual draft
         if let draftID = leagueWrapper.league.draftID {
-            DebugLogger.draft("Checking draft status before starting polling...")
+            DebugPrint(mode: .draft, "Checking draft status before starting polling...")
             
             // For ESPN leagues, check if draft is actually live before polling
             if leagueWrapper.source == .espn {
                 await handleESPNDraftPolling(draftID: draftID, apiClient: leagueWrapper.client)
             } else {
                 // For Sleeper leagues, always start polling (they handle it well)
-                DebugLogger.draft("Sleeper league - starting polling for draftID: \(draftID)")
+                DebugPrint(mode: .draft, "Sleeper league - starting polling for draftID: \(draftID)")
                 polling.startPolling(draftID: draftID, apiClient: leagueWrapper.client)
             }
         } else {
-            DebugLogger.warning("No draftID found for league: \(leagueWrapper.league.name)", category: .draft)
+            DebugPrint(mode: .draft, "No draftID found for league: \(leagueWrapper.league.name)")
             // For ESPN leagues, try using the league ID as draft ID
             if leagueWrapper.source == .espn {
-                DebugLogger.draft("ESPN league - trying to use leagueID as draftID: \(leagueWrapper.league.leagueID)")
+                DebugPrint(mode: .draft, "ESPN league - trying to use leagueID as draftID: \(leagueWrapper.league.leagueID)")
                 await handleESPNDraftPolling(draftID: leagueWrapper.league.leagueID, apiClient: leagueWrapper.client)
             }
         }

@@ -104,10 +104,10 @@ extension FantasyViewModel {
                 // Use the team's record if available
                 if let record = team.record {
                     let recordString = record.displayString
-                    DebugLogger.fantasy("📊 RECORD FOUND: \(team.ownerName) -> \(recordString)")
+                    DebugPrint(mode: .fantasy, "📊 RECORD FOUND: \(team.ownerName) -> \(recordString)")
                     return recordString
                 } else {
-                    DebugLogger.fantasy("📊 NO RECORD: \(team.ownerName) (team.record is nil)")
+                    DebugPrint(mode: .fantasy, "📊 NO RECORD: \(team.ownerName) (team.record is nil)")
                 }
             }
         }
@@ -117,7 +117,7 @@ extension FantasyViewModel {
         if let teamId = Int(managerID),
            let record = espnTeamRecords[teamId] {
             let recordString = record.displayString
-            DebugLogger.fantasy("📊 RECORD FOUND (fallback): Team \(teamId) -> \(recordString)")
+            DebugPrint(mode: .fantasy, "📊 RECORD FOUND (fallback): Team \(teamId) -> \(recordString)")
             return recordString
         }
         

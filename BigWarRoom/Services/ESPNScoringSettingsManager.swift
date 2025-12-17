@@ -669,7 +669,7 @@ final class ScoringSettingsManager {
     ) -> PointsValidationResult? {
         // Get scoring settings for this league
         guard let scoringSettings = getScoringSettings(for: leagueID, source: source) else {
-            let basis = getScoringBasis(for: leagueID)
+            let _ = getScoringBasis(for: leagueID)
             
             return PointsValidationResult(
                 player: player,
@@ -747,22 +747,22 @@ final class ScoringSettingsManager {
     
     /// Print all registered scoring bases for debugging
     func printAllScoringBases() {
-        DebugLogger.scoring("ALL SCORING BASES:", level: .info)
+        DebugPrint(mode: .scoring, "ALL SCORING BASES:")
         
         // ESPN leagues
-        DebugLogger.scoring("ESPN Leagues:", level: .info)
+        DebugPrint(mode: .scoring, "ESPN Leagues:")
         for (leagueID, basis) in leagueScoringBasis.filter({ espnScoringSettings[$0.key] != nil }) {
             let rawCount = espnScoringSettings[leagueID]?.count ?? 0
             let validatedCount = validatedESPNScoringSettings[leagueID]?.count ?? 0
-            DebugLogger.scoring("  \(leagueID): \(basis)", level: .info)
-            DebugLogger.scoring("    Raw: \(rawCount) → Validated: \(validatedCount)", level: .info)
+            DebugPrint(mode: .scoring, "  \(leagueID): \(basis)")
+            DebugPrint(mode: .scoring, "    Raw: \(rawCount) → Validated: \(validatedCount)")
         }
         
         // Sleeper leagues  
-        DebugLogger.scoring("Sleeper Leagues:", level: .info)
+        DebugPrint(mode: .scoring, "Sleeper Leagues:")
         for (leagueID, basis) in leagueScoringBasis.filter({ sleeperScoringSettings[$0.key] != nil }) {
             let ruleCount = sleeperScoringSettings[leagueID]?.count ?? 0
-            DebugLogger.scoring("  \(leagueID): \(basis) -> \(ruleCount) rules", level: .info)
+            DebugPrint(mode: .scoring, "  \(leagueID): \(basis) -> \(ruleCount) rules")
         }
         
         // Failed leagues
@@ -771,9 +771,9 @@ final class ScoringSettingsManager {
         }
         
         if !failedLeagues.isEmpty {
-            DebugLogger.scoring("Failed Leagues:", level: .warning)
+            DebugPrint(mode: .scoring, "Failed Leagues:")
             for (leagueID, basis) in failedLeagues {
-                DebugLogger.scoring("  \(leagueID): \(basis)", level: .warning)
+                DebugPrint(mode: .scoring, "  \(leagueID): \(basis)")
             }
         }
     }
@@ -782,37 +782,37 @@ final class ScoringSettingsManager {
     func printDifferentialAnalysisDetails(for leagueID: String) {
         guard let rawSettings = espnScoringSettings[leagueID],
               let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            DebugLogger.error("No data for league \(leagueID)", category: .scoring)
+            DebugPrint(mode: .scoring, "No data for league \(leagueID)")
             return
         }
         
-        DebugLogger.scoring("DIFFERENTIAL ANALYSIS DETAILS: League \(leagueID)", level: .info)
-        DebugLogger.scoring("Raw Rules: \(rawSettings.count)", level: .info)
-        DebugLogger.scoring("Validated Rules: \(validatedSettings.count)", level: .info)
-        DebugLogger.scoring("Filtered Out: \(rawSettings.count - validatedSettings.count)", level: .info)
+        DebugPrint(mode: .scoring, "DIFFERENTIAL ANALYSIS DETAILS: League \(leagueID)")
+        DebugPrint(mode: .scoring, "Raw Rules: \(rawSettings.count)")
+        DebugPrint(mode: .scoring, "Validated Rules: \(validatedSettings.count)")
+        DebugPrint(mode: .scoring, "Filtered Out: \(rawSettings.count - validatedSettings.count)")
         
-        DebugLogger.scoring("VALIDATED RULES:", level: .info)
+        DebugPrint(mode: .scoring, "VALIDATED RULES:")
         for (statKey, points) in validatedSettings.sorted(by: { $0.key < $1.key }) {
             let isCore = ESPNScoringBaselines.coreStats.contains(statKey) ? " (CORE)" : ""
-            DebugLogger.scoring("  \(statKey): \(points)\(isCore)", level: .info)
+            DebugPrint(mode: .scoring, "  \(statKey): \(points)\(isCore)")
         }
         
-        DebugLogger.scoring("FILTERED OUT:", level: .info)
+        DebugPrint(mode: .scoring, "FILTERED OUT:")
         let filteredOut = rawSettings.filter { validatedSettings[$0.key] == nil }
         for (statKey, points) in filteredOut.sorted(by: { $0.key < $1.key }) {
-            DebugLogger.scoring("  \(statKey): \(points)", level: .info)
+            DebugPrint(mode: .scoring, "  \(statKey): \(points)")
         }
         
-        DebugLogger.scoring("LEAGUE TYPE ANALYSIS:", level: .info)
+        DebugPrint(mode: .scoring, "LEAGUE TYPE ANALYSIS:")
         let leagueType = detectLeagueType(from: rawSettings)
-        DebugLogger.scoring("  Detected: \(leagueType)", level: .info)
+        DebugPrint(mode: .scoring, "  Detected: \(leagueType)")
         let receptionPoints = rawSettings["rec"] ?? 0.0
-        DebugLogger.scoring("  Reception Points: \(receptionPoints)", level: .info)
+        DebugPrint(mode: .scoring, "  Reception Points: \(receptionPoints)")
     }
     
     /// 🔥 NEW: Test differential analysis against known players
     func testDifferentialAnalysis(for leagueID: String) {
-        DebugLogger.scoring("TESTING DIFFERENTIAL ANALYSIS: League \(leagueID)", level: .info)
+        DebugPrint(mode: .scoring, "TESTING DIFFERENTIAL ANALYSIS: League \(leagueID)")
         
         // Create test players with known stats
         let testScenarios = [
@@ -848,7 +848,7 @@ final class ScoringSettingsManager {
         ]
         
         guard let validatedSettings = validatedESPNScoringSettings[leagueID] else {
-            DebugLogger.error("No validated settings for league \(leagueID)", category: .scoring)
+            DebugPrint(mode: .scoring, "No validated settings for league \(leagueID)")
             return
         }
         
@@ -857,13 +857,13 @@ final class ScoringSettingsManager {
             let inRange = calculatedPoints >= scenario.expectedRange.0 && calculatedPoints <= scenario.expectedRange.1
             let status = inRange ? "✅ PASS" : "❌ FAIL"
             
-            DebugLogger.scoring("\(status) \(scenario.name): \(String(format: "%.2f", calculatedPoints)) pts (expected: \(scenario.expectedRange.0)-\(scenario.expectedRange.1))", level: .info)
+            DebugPrint(mode: .scoring, "\(status) \(scenario.name): \(String(format: "%.2f", calculatedPoints)) pts (expected: \(scenario.expectedRange.0)-\(scenario.expectedRange.1))")
             
             // Show breakdown
             for (statKey, statValue) in scenario.stats {
                 if let pointsPerStat = validatedSettings[statKey] {
                     let points = calculateStatPoints(statKey: statKey, statValue: statValue, pointsPerStat: pointsPerStat)
-                    DebugLogger.scoring("  \(statKey): \(statValue) × \(pointsPerStat) = \(String(format: "%.2f", points))", level: .info)
+                    DebugPrint(mode: .scoring, "  \(statKey): \(statValue) × \(pointsPerStat) = \(String(format: "%.2f", points))")
                 }
             }
         }
@@ -881,7 +881,7 @@ final class ScoringSettingsManager {
         sleeperScoringSettings.removeAll()
         validatedESPNScoringSettings.removeAll()
         leagueScoringBasis.removeAll()
-        DebugLogger.scoring("All scoring settings cleared", level: .info)
+        DebugPrint(mode: .scoring, "All scoring settings cleared")
     }
 }
 

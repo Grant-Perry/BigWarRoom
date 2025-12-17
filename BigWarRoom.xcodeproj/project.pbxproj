@@ -113,6 +113,8 @@
 			);
 			mainGroup = 9B6733512E5CD535005F2CAF;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9B67335B2E5CD535005F2CAF /* Products */;
 			projectDirPath = "";
@@ -288,7 +290,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.92.20;
+				MARKETING_VERSION = 8.92.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -325,7 +327,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 8.92.20;
+				MARKETING_VERSION = 8.92.22;
 				PRODUCT_BUNDLE_IDENTIFIER = com.grantperry.BigWarRoom;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

@@ -351,34 +351,24 @@ final class PlayerDirectoryStore {
             $0.espnID != nil && !$0.espnID!.isEmpty 
         }.count
         
-        DebugLogger.playerIDMapping("ESPN ID Coverage: \(playersWithESPNID)/\(totalPlayers) players have ESPN IDs (\(String(format: "%.1f", Double(playersWithESPNID)/Double(totalPlayers)*100))%)", level: .info)
+        DebugPrint(mode: .playerIDMapping, "ESPN ID Coverage: \(playersWithESPNID)/\(totalPlayers) players have ESPN IDs (\(String(format: "%.1f", Double(playersWithESPNID)/Double(totalPlayers)*100))%)")
         
-        // Show some examples of players WITH ESPN IDs
-        let playersWithIDs = players.values.filter { $0.espnID != nil && !$0.espnID!.isEmpty }.prefix(5)
-        if !playersWithIDs.isEmpty {
-            DebugLogger.playerIDMapping("Players WITH ESPN IDs:", level: .info)
-            for player in playersWithIDs {
-                DebugLogger.playerIDMapping("  ✅ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID!)'")
-            }
+        DebugPrint(mode: .playerIDMapping, "Players WITH ESPN IDs:")
+        for player in players.values.filter({ $0.espnID != nil }).prefix(10) {
+            DebugPrint(mode: .playerIDMapping, "  ✅ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID!)'")
         }
         
-        // Show some examples of players WITHOUT ESPN IDs
-        let playersWithoutIDs = players.values.filter { $0.espnID == nil || $0.espnID!.isEmpty }.prefix(5)
-        if !playersWithoutIDs.isEmpty {
-            DebugLogger.playerIDMapping("Players WITHOUT ESPN IDs:", level: .info)
-            for player in playersWithoutIDs {
-                DebugLogger.playerIDMapping("  ❌ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID ?? "nil")'")
-            }
+        DebugPrint(mode: .playerIDMapping, "Players WITHOUT ESPN IDs:")
+        for player in players.values.filter({ $0.espnID == nil }).prefix(10) {
+            DebugPrint(mode: .playerIDMapping, "  ❌ \(player.fullName) (\(player.position ?? "?")) -> ESPN ID: '\(player.espnID ?? "nil")'")
         }
         
-        // Check some high-profile players specifically
-        let testPlayers = ["Lamar Jackson", "Patrick Mahomes", "Josh Allen", "Derrick Henry", "Christian McCaffrey"]
-        DebugLogger.playerIDMapping("High-profile player ESPN ID check:", level: .info)
-        for testName in testPlayers {
-            if let foundPlayer = players.values.first(where: { $0.fullName.contains(testName) }) {
-                DebugLogger.playerIDMapping("  \(foundPlayer.fullName) -> ESPN ID: '\(foundPlayer.espnID ?? "nil")'")
+        DebugPrint(mode: .playerIDMapping, "High-profile player ESPN ID check:")
+        for testName in ["Patrick Mahomes", "Christian McCaffrey", "Travis Kelce"] {
+            if let foundPlayer = players.values.first(where: { $0.fullName.lowercased().contains(testName.lowercased()) }) {
+                DebugPrint(mode: .playerIDMapping, "  \(foundPlayer.fullName) -> ESPN ID: '\(foundPlayer.espnID ?? "nil")'")
             } else {
-                DebugLogger.playerIDMapping("  \(testName) -> NOT FOUND in player database")
+                DebugPrint(mode: .playerIDMapping, "  \(testName) -> NOT FOUND in player database")
             }
         }
     }

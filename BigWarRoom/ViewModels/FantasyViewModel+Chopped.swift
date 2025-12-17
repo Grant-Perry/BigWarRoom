@@ -104,20 +104,33 @@ extension FantasyViewModel {
             averageScore: avgScore,
             highestScore: highScore,
             lowestScore: lowScore,
-            eliminationHistory: graveyardEvents // Now includes teams with no players
+            eliminationHistory: graveyardEvents
         )
         
         return summary
     }
 
-    /// Fetch all team data separated into active and eliminated
+    /// Fetch all team data separated into active and eliminated using LeagueMatchupProvider
     private func fetchAllChoppedTeamData(leagueID: String, week: Int) async -> (activeRankings: [FantasyTeamRanking], eliminatedTeams: [FantasyTeam]) {
-        // Use the existing method but modify it to return both active and eliminated data
-        await fetchSleeperLeagueUsersAndRosters(leagueID: leagueID)
-        await fetchSleeperScoringSettings(leagueID: leagueID)
-        await fetchSleeperWeeklyStats()
+        
+        // 🔥 FIXED: Use LeagueMatchupProvider for data fetching instead of direct API calls
+        guard let leagueWrapper = selectedLeague else {
+            DebugPrint(mode: .fantasy, "❌ No selected league for Chopped data fetch")
+            return (activeRankings: [], eliminatedTeams: [])
+        }
+        
+        // Create a LeagueMatchupProvider for this Chopped league
+        let currentYear = String(Calendar.current.component(.year, from: Date()))
+        let provider = LeagueMatchupProvider(
+            league: leagueWrapper,
+            week: week,
+            year: currentYear
+        )
+        
+        DebugPrint(mode: .fantasy, "🍲 Fetching Chopped league data via LeagueMatchupProvider for \(leagueWrapper.league.name)")
         
         do {
+            // Fetch raw Sleeper matchup data (will be empty for Chopped leagues, but we need the API call)
             let sleeperMatchups = try await SleeperAPIClient.shared.fetchMatchups(
                 leagueID: leagueID, 
                 week: week
@@ -131,25 +144,6 @@ extension FantasyViewModel {
                 let teamScore = matchup.points ?? 0.0
                 let teamProjected = matchup.projectedPoints ?? (teamScore * 1.05)
                 let managerID = rosterIDToManagerID[matchup.rosterID] ?? ""
-                
-                // NEW: Debug Bo Nix specifically in Chopped leagues
-                if let starters = matchup.starters {
-                    for playerID in starters {
-                        if let sleeperPlayer = playerDirectoryStore.player(for: playerID) {
-                            let playerFullName = "\(sleeperPlayer.firstName ?? "") \(sleeperPlayer.lastName ?? "")"
-                            if playerFullName.lowercased().contains("bo nix") || playerFullName.lowercased().contains("nix") {
-                                let playerScore = calculateSleeperPlayerScore(playerId: playerID)
-                                
-                                if let playerStats = playerStats[playerID] {
-                                    // Process stats silently
-                                }
-                                if let scoringSettings = sleeperLeagueSettings {
-                                    // Process settings silently
-                                }
-                            }
-                        }
-                    }
-                }
                 
                 // THE ONLY THING THAT MATTERS: Do they have players?
                 let starterCount = matchup.starters?.count ?? 0
@@ -167,6 +161,39 @@ extension FantasyViewModel {
                 
                 let avatarURL = userAvatars[managerID]
                 
+                // 🔥 NEW: Use provider to calculate accurate player scores
+                var fantasyPlayers: [FantasyPlayer] = []
+                if let starters = matchup.starters, let allPlayers = matchup.players {
+                    for playerID in allPlayers {
+                        if let sleeperPlayer = PlayerDirectoryStore.shared.player(for: playerID) {
+                            let isStarter = starters.contains(playerID)
+                            
+                            // Get calculated score from provider if available
+                            let playerScore = provider.hasPlayerScores() 
+                                ? provider.getPlayerScore(playerId: playerID) 
+                                : 0.0
+                            
+                            let fantasyPlayer = FantasyPlayer(
+                                id: playerID,
+                                sleeperID: playerID,
+                                espnID: sleeperPlayer.espnID,
+                                firstName: sleeperPlayer.firstName,
+                                lastName: sleeperPlayer.lastName,
+                                position: sleeperPlayer.position ?? "FLEX",
+                                team: sleeperPlayer.team,
+                                jerseyNumber: sleeperPlayer.number?.description,
+                                currentPoints: playerScore,
+                                projectedPoints: playerScore * 1.1,
+                                gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team ?? ""),
+                                isStarter: isStarter,
+                                lineupSlot: isStarter ? sleeperPlayer.position : nil,
+                                injuryStatus: sleeperPlayer.injuryStatus
+                            )
+                            fantasyPlayers.append(fantasyPlayer)
+                        }
+                    }
+                }
+                
                 let fantasyTeam = FantasyTeam(
                     id: String(matchup.rosterID),
                     name: finalManagerName,
@@ -175,10 +202,10 @@ extension FantasyViewModel {
                     avatar: avatarURL?.absoluteString,
                     currentScore: teamScore,
                     projectedScore: teamProjected,
-                    roster: [],
+                    roster: fantasyPlayers,
                     rosterID: matchup.rosterID,
-                    faabTotal: nil,  // Chopped leagues - FAAB handled separately if needed
-                    faabUsed: nil    // Chopped leagues - FAAB handled separately if needed
+                    faabTotal: nil,
+                    faabUsed: nil
                 )
                 
                 if hasAnyPlayers {
@@ -190,7 +217,7 @@ extension FantasyViewModel {
                 allTeams.append(fantasyTeam)
             }
             
-            // Create rankings for active teams only - IGNORE POINTS FOR ELIMINATION STATUS
+            // Create rankings for active teams only
             let sortedActiveTeams = activeTeams.sorted { team1, team2 in
                 let score1 = (team1.currentScore ?? 0.0) > 0 ? (team1.currentScore ?? 0.0) : (team1.projectedScore ?? 0.0)
                 let score2 = (team2.currentScore ?? 0.0) > 0 ? (team2.currentScore ?? 0.0) : (team2.projectedScore ?? 0.0)
@@ -229,16 +256,18 @@ extension FantasyViewModel {
                     weeklyPoints: teamScore > 0 ? teamScore : teamProjected,
                     rank: rank,
                     eliminationStatus: status,
-                    isEliminated: false, // Active teams are never eliminated
+                    isEliminated: false,
                     survivalProbability: safetyPercentage,
                     pointsFromSafety: 0.0,
                     weeksAlive: week
                 )
             }
             
+            DebugPrint(mode: .fantasy, "🍲 Chopped data fetched: \(activeRankings.count) active, \(eliminatedTeams.count) eliminated")
             return (activeRankings: activeRankings, eliminatedTeams: eliminatedTeams)
             
         } catch {
+            DebugPrint(mode: .fantasy, "❌ Failed to fetch Chopped league data: \(error)")
             return (activeRankings: [], eliminatedTeams: [])
         }
     }

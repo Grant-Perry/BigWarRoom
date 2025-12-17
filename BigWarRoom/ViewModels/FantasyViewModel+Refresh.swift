@@ -70,7 +70,7 @@ extension FantasyViewModel {
             )
             
             if let cachedProvider = cachedProvider {
-                DebugLogger.fantasy("📦 Using CACHED provider for league \(league.league.leagueID)")
+                DebugPrint(mode: .fantasy, "📦 Using CACHED provider for league \(league.league.leagueID)")
                 
                 // Get matchups from cached provider
                 let providerMatchups = try await cachedProvider.fetchMatchups()
@@ -91,20 +91,31 @@ extension FantasyViewModel {
                 }
                 
             } else {
-                // Fallback: Use original API calls if no cached provider available
-                DebugLogger.fantasy("📦 NO CACHED PROVIDER - Using FALLBACK fetch for league \(league.league.leagueID), source=\(league.source)")
+                // Fallback: Create a NEW provider if no cached one available
+                DebugPrint(mode: .fantasy, "📦 NO CACHED PROVIDER - Creating NEW provider for league \(league.league.leagueID)")
                 
-                if league.source == .espn {
-                    DebugLogger.fantasy("  📡 FALLBACK: Fetching ESPN data via fetchESPNFantasyData")
-                    await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
-                } else {
-                    DebugLogger.fantasy("  📡 FALLBACK: Fetching Sleeper data via fetchSleeperLeagueUsersAndRosters")
-                    await fetchSleeperScoringSettings(leagueID: league.league.leagueID)
-                    await fetchSleeperWeeklyStats()
-                    await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
-                    await fetchSleeperMatchups(leagueID: league.league.leagueID, week: selectedWeek)
+                let newProvider = LeagueMatchupProvider(
+                    league: league,
+                    week: selectedWeek,
+                    year: selectedYear
+                )
+                
+                // Fetch matchups using the new provider
+                let providerMatchups = try await newProvider.fetchMatchups()
+                
+                if !providerMatchups.isEmpty {
+                    matchups = providerMatchups
+                    DebugPrint(mode: .fantasy, "  ✅ NEW provider fetch complete, matchups.count=\(matchups.count)")
+                } else if league.source == .sleeper {
+                    // Handle Chopped leagues
+                    detectedAsChoppedLeague = true
+                    hasActiveRosters = true
+                    DebugPrint(mode: .fantasy, "  🍲 Detected Chopped league (empty matchups)")
+                } else if league.source == .espn {
+                    // ESPN shouldn't have empty matchups unless there's an error
+                    errorMessage = "No matchups found for week \(selectedWeek). Check if this week has started."
+                    DebugPrint(mode: .fantasy, "  ⚠️ ESPN league has empty matchups")
                 }
-                DebugLogger.fantasy("  ✅ FALLBACK fetch complete, matchups.count=\(matchups.count)")
             }
             
             // FIX: Better handling when matchups are empty
@@ -167,14 +178,18 @@ extension FantasyViewModel {
         }
         
         do {
-            if league.source == .espn {
-                await fetchESPNFantasyData(leagueID: league.league.leagueID, week: selectedWeek)
-            } else {
-                // FIX: Ensure user data is available before refreshing matchups
-                if userIDs.isEmpty {
-                    await fetchSleeperLeagueUsersAndRosters(leagueID: league.league.leagueID)
-                }
-                await refreshSleeperData(leagueID: league.league.leagueID, week: selectedWeek)
+            // 🔥 FIXED: Use LeagueMatchupProvider for refresh instead of direct API calls
+            let provider = LeagueMatchupProvider(
+                league: league,
+                week: selectedWeek,
+                year: selectedYear
+            )
+            
+            let refreshedMatchups = try await provider.fetchMatchups()
+            
+            if !refreshedMatchups.isEmpty {
+                matchups = refreshedMatchups
+                DebugPrint(mode: .fantasy, "🔄 Matchups refreshed: \(refreshedMatchups.count) matchups")
             }
             
             if isChoppedLeague(selectedLeague) {
@@ -182,7 +197,7 @@ extension FantasyViewModel {
             }
             
         } catch {
-            // Handle refresh errors silently
+            DebugPrint(mode: .fantasy, "❌ Refresh failed: \(error)")
         }
     }
 
@@ -190,26 +205,14 @@ extension FantasyViewModel {
     private func refreshChoppedData(leagueID: String, week: Int) async {
         if let updatedSummary = await createRealChoppedSummaryWithHistory(leagueID: leagueID, week: week) {
             currentChoppedSummary = updatedSummary
+            DebugPrint(mode: .fantasy, "🍲 Chopped data refreshed")
         }
     }
 
     /// Real-time Sleeper data refresh without UI disruption
     private func refreshSleeperData(leagueID: String, week: Int) async {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
-            return
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
-            
-            // FIX: Use the proper Sleeper matchup processing instead of legacy method
-            if !sleeperMatchups.isEmpty {
-                await processSleeperMatchupsWithProjections(sleeperMatchups, leagueID: leagueID)
-            }
-            
-        } catch {
-            // Handle refresh errors silently
-        }
+        // 🔥 REMOVED: This method is no longer needed since we use LeagueMatchupProvider
+        // Keeping the stub in case it's called from elsewhere
+        DebugPrint(mode: .fantasy, "⚠️ refreshSleeperData called but is deprecated - use refreshMatchups() instead")
     }
 }

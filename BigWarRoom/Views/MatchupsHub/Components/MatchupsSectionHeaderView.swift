@@ -50,7 +50,7 @@ struct MatchupsSectionHeaderView: View {
             )
             
             // 🔋 SMART REFRESH: Only show timer when actively refreshing
-            if SmartRefreshManager.shared.shouldShowCountdownTimer {
+            if SmartRefreshManager.shared.hasLiveGames {
                 // 🔥 EXACT Live Players Timer (replacing PollingCountdownDial)
                 ZStack {
                     // 🔥 External glow layers (multiple for depth)
