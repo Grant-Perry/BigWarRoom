@@ -453,28 +453,6 @@ struct LeagueMatchupsTabView: View {
         }
         
         isLoadingAllMatchups = true
-        
-        // 🔥 FIX: If we already have matchups passed in (from Mission Control), use them
-        // Only fetch from API if we started with an empty array
-        if !allMatchups.isEmpty {
-            await MainActor.run {
-                fetchedAllMatchups = allMatchups
-                
-                // Preserve the starting matchup ID so scroll position works
-                if allMatchups.contains(where: { $0.id == startingMatchup.id }) {
-                    selectedMatchupID = startingMatchup.id
-                } else if let first = allMatchups.first {
-                    selectedMatchupID = first.id
-                } else {
-                    selectedMatchupID = nil
-                }
-                
-                isLoadingAllMatchups = false
-            }
-            return
-        }
-        
-        // Only fetch from API if we don't already have matchups
         let currentWeek = NFLWeekService.shared.currentWeek
         let currentYear = String(Calendar.current.component(.year, from: Date()))
         let provider = LeagueMatchupProvider(

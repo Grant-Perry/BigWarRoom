@@ -284,6 +284,19 @@ extension MatchupsHubViewModel {
             return nil
         }
         
+        // 🔥 FIX: During playoffs, fetch ALL matchups for horizontal swiping
+        let currentWeek = getCurrentWeek()
+        let allLeagueMatchups: [FantasyMatchup]
+        
+        if isPlayoffWeek(league: league, week: currentWeek) {
+            DebugPrint(mode: .matchupLoading, "🏆 ACTIVE PLAYOFF WEEK: Fetching all playoff matchups for \(league.league.name)")
+            allLeagueMatchups = await fetchAllActivePlayoffMatchups(league: league, week: currentWeek)
+            DebugPrint(mode: .matchupLoading, "   ✅ Fetched \(allLeagueMatchups.count) total playoff matchups")
+        } else {
+            // Regular season - just use the matchups we already have (likely just yours)
+            allLeagueMatchups = matchups
+        }
+        
         // Step 5: Find user's matchup using provider
         if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
             // 🔥 FIX: Store ALL league matchups for horizontal swiping
@@ -297,7 +310,7 @@ extension MatchupsHubViewModel {
                 myTeamRanking: nil,
                 myIdentifiedTeamID: myTeamID,
                 authenticatedUsername: sleeperCredentials.currentUsername,
-                allLeagueMatchups: matchups  // ← Pass all league matchups for swiping
+                allLeagueMatchups: allLeagueMatchups  // ← Use playoff matchups if playoff week
             )
             
             await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
@@ -475,13 +488,21 @@ extension MatchupsHubViewModel {
             let weekMatchups: [ESPNFantasyMatchupModel]
             
             if week >= playoffStartWeek {
-                DebugPrint(mode: .matchupLoading, "   🏆 PLAYOFF WEEK DETECTED - Filtering by playoffTierType != 'NONE'")
+                DebugPrint(mode: .matchupLoading, "   🏆 PLAYOFF WEEK DETECTED - Filtering by playoffTierType != 'NONE' AND matchupPeriodId == \(week)")
                 
-                // ONLY include matchups with a non-NONE playoff tier type
+                // ONLY include matchups with a non-NONE playoff tier type AND matching the current week
                 weekMatchups = model.schedule.filter { matchup in
+                    // Must have playoff tier type
                     guard let tierType = matchup.playoffTierType, !tierType.isEmpty, tierType != "NONE" else {
                         return false
                     }
+                    
+                    // Must match current week
+                    guard matchup.matchupPeriodId == week else {
+                        DebugPrint(mode: .matchupLoading, "      ⏭️ Skipping playoff matchup from different week: ID=\(matchup.id), tier=\(tierType), period=\(matchup.matchupPeriodId) (want \(week))")
+                        return false
+                    }
+                    
                     DebugPrint(mode: .matchupLoading, "      ✅ Including playoff matchup: ID=\(matchup.id), tier=\(tierType), period=\(matchup.matchupPeriodId)")
                     return true
                 }
@@ -830,7 +851,7 @@ extension MatchupsHubViewModel {
             record: record,
             avatar: avatarURL,
             currentScore: matchupResponse.points ?? 0.0,
-            projectedScore: matchupResponse.projectedPoints ?? 0.0,
+            projectedScore: matchupResponse.points ?? 0.0 * 1.05,
             roster: fantasyPlayers,
             rosterID: roster.rosterID,
             faabTotal: league.league.settings?.waiverBudget,
@@ -982,7 +1003,7 @@ extension MatchupsHubViewModel {
                 record: record,
                 avatar: avatarURL,
                 currentScore: myMatchupResponse.points ?? 0.0,
-                projectedScore: myMatchupResponse.projectedPoints ?? 0.0,
+                projectedScore: myMatchupResponse.points ?? 0.0 * 1.05,
                 roster: fantasyPlayers,
                 rosterID: myRoster.rosterID,
                 faabTotal: league.league.settings?.waiverBudget,
