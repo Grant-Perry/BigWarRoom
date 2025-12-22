@@ -129,21 +129,48 @@ struct ScoreBreakdownFactory {
         // Get the week, defaulting to current selected week
         let effectiveWeek = week ?? WeekSelectionManager.shared.selectedWeek
         
+        DebugPrint(mode: .scoring, "🔍 ScoreBreakdown: Creating breakdown for \(player.fullName) (ESPN ID: \(player.id)), week \(effectiveWeek)")
+        
         // 🎯 NEW: Use canonical ESPN→Sleeper ID mapping
         let canonicalSleeperID = ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: player.id)
-        guard let sleeperPlayer = PlayerDirectoryStore.shared.player(for: canonicalSleeperID) else {
+        DebugPrint(mode: .scoring, "🔍 ScoreBreakdown: Canonical Sleeper ID: \(canonicalSleeperID)")
+        
+        // 🔥 NEW: Try direct lookup first using the player.sleeperID if available
+        var sleeperPlayer: SleeperPlayer? = PlayerDirectoryStore.shared.player(for: canonicalSleeperID)
+        
+        // 🔥 FALLBACK: If canonical mapping didn't work, try searching by name
+        if sleeperPlayer == nil {
+            DebugPrint(mode: .scoring, "⚠️ ScoreBreakdown: No mapping found, searching by name: \(player.fullName)")
+            let normalizedSearchName = player.fullName.lowercased()
+            sleeperPlayer = PlayerDirectoryStore.shared.players.values.first { sleeperPlayer in
+                sleeperPlayer.fullName.lowercased() == normalizedSearchName
+            }
+            
+            if let foundPlayer = sleeperPlayer {
+                DebugPrint(mode: .scoring, "✅ ScoreBreakdown: Found player by name search: \(foundPlayer.fullName), ID: \(foundPlayer.playerID)")
+            }
+        }
+        
+        guard let sleeperPlayer = sleeperPlayer else {
+            DebugPrint(mode: .scoring, "❌ ScoreBreakdown: Could not find SleeperPlayer for ID \(canonicalSleeperID) or name '\(player.fullName)'")
             return createEmptyBreakdown(player: player, week: effectiveWeek)
         }
         
-        // 🔥 FIX: Pass AllLivePlayersViewModel to StatsFacade so it can check global stats
+        DebugPrint(mode: .scoring, "✅ ScoreBreakdown: Found SleeperPlayer: \(sleeperPlayer.fullName), playerID: \(sleeperPlayer.playerID)")
+        
+        // 🔥 FIX: Pass PlayerStatsCache to StatsFacade so it can check cache
         guard let stats = StatsFacade.getPlayerStats(
             playerID: sleeperPlayer.playerID,
             week: effectiveWeek,
             localStatsProvider: localStatsProvider,
-            allLivePlayersViewModel: allLivePlayersViewModel
+            allLivePlayersViewModel: allLivePlayersViewModel,
+            playerStatsCache: PlayerStatsCache.shared
         ) else {
+            DebugPrint(mode: .scoring, "❌ ScoreBreakdown: No stats found for playerID \(sleeperPlayer.playerID), week \(effectiveWeek)")
             return createEmptyBreakdown(player: player, week: effectiveWeek)
         }
+        
+        DebugPrint(mode: .scoring, "✅ ScoreBreakdown: Found stats (\(stats.count) items): \(stats)")
         
         // Always create consistent breakdown using player's authoritative total
         return createConsistentBreakdown(

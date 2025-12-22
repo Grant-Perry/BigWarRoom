@@ -51,9 +51,32 @@ extension AllLivePlayersViewModel {
                     // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                     // Injury status and jersey number are already populated during player creation
                     
+                    var normPosition = player.position.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                    if normPosition == "DST" || normPosition == "D/ST" || normPosition == "DEFENSE" {
+                        normPosition = "DEF"
+                    }
+
+                    // Patch the player copy for LivePlayerEntry:
+                    let normalizedPlayer = FantasyPlayer(
+                        id: player.id,
+                        sleeperID: player.sleeperID,
+                        espnID: player.espnID,
+                        firstName: player.firstName,
+                        lastName: player.lastName,
+                        position: normPosition, // USE NORMALIZED POSITION!
+                        team: player.team,
+                        jerseyNumber: player.jerseyNumber,
+                        currentPoints: player.currentPoints,
+                        projectedPoints: player.projectedPoints,
+                        gameStatus: player.gameStatus,
+                        isStarter: player.isStarter,
+                        lineupSlot: player.lineupSlot,
+                        injuryStatus: player.injuryStatus
+                    )
+
                     players.append(LivePlayerEntry(
                         id: "\(matchup.id)_my_\(player.id)",
-                        player: player,
+                        player: normalizedPlayer, // <--- PATCHED
                         leagueName: matchup.league.league.name,
                         leagueSource: matchup.league.source.rawValue,
                         currentScore: calculatedScore,
@@ -114,9 +137,29 @@ extension AllLivePlayersViewModel {
                 // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                 // Injury status and jersey number are already populated during player creation
                 
+                var normPosition = player.position.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+                if normPosition == "DST" || normPosition == "D/ST" || normPosition == "DEFENSE" {
+                    normPosition = "DEF"
+                }
+                let normalizedPlayer = FantasyPlayer(
+                    id: player.id,
+                    sleeperID: player.sleeperID,
+                    espnID: player.espnID,
+                    firstName: player.firstName,
+                    lastName: player.lastName,
+                    position: normPosition,
+                    team: player.team,
+                    jerseyNumber: player.jerseyNumber,
+                    currentPoints: player.currentPoints,
+                    projectedPoints: player.projectedPoints,
+                    gameStatus: player.gameStatus,
+                    isStarter: player.isStarter,
+                    lineupSlot: player.lineupSlot,
+                    injuryStatus: player.injuryStatus
+                )
                 players.append(LivePlayerEntry(
                     id: "\(matchup.id)_chopped_\(player.id)",
-                    player: player,
+                    player: normalizedPlayer,
                     leagueName: matchup.league.league.name,
                     leagueSource: matchup.league.source.rawValue,
                     currentScore: calculatedScore,

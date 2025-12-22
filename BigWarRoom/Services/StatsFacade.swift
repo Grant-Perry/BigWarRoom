@@ -35,26 +35,42 @@ struct StatsFacade {
         weekSelectionManager: WeekSelectionManager? = nil
     ) -> [String: Double]? {
         
+        DebugPrint(mode: .scoring, "📊 StatsFacade: Looking up stats for playerID: \(playerID), week: \(week)")
+        
         // STEP 1: Try local stats provider first (highest priority)
         if let localStats = localStatsProvider?.getLocalPlayerStats(for: playerID) {
-            print("📊 StatsFacade: Found local stats for \(playerID) (\(localStats.count) stats)")
+            DebugPrint(mode: .scoring, "✅ StatsFacade: Found LOCAL stats for \(playerID) (\(localStats.count) stats)")
             return localStats
         }
+        DebugPrint(mode: .scoring, "⏭️ StatsFacade: No local stats provider or no local stats")
         
         // STEP 2: Try PlayerStatsCache (cached API data) if provided
-        if let cache = playerStatsCache,
-           let cachedStats = cache.getPlayerStats(playerID: playerID, week: week) {
-            print("📊 StatsFacade: Found cached stats for \(playerID) (\(cachedStats.count) stats)")
-            return cachedStats
+        if let cache = playerStatsCache {
+            DebugPrint(mode: .scoring, "🔍 StatsFacade: Checking cache for playerID: \(playerID), week: \(week)")
+            if let cachedStats = cache.getPlayerStats(playerID: playerID, week: week) {
+                DebugPrint(mode: .scoring, "✅ StatsFacade: Found CACHED stats for \(playerID) (\(cachedStats.count) stats)")
+                return cachedStats
+            } else {
+                DebugPrint(mode: .scoring, "❌ StatsFacade: No cached stats found")
+            }
+        } else {
+            DebugPrint(mode: .scoring, "⚠️ StatsFacade: PlayerStatsCache NOT PROVIDED")
         }
         
         // STEP 3: Try AllLivePlayersViewModel (global live data) if provided
-        if let globalStats = allLivePlayersViewModel?.playerStats[playerID] {
-            print("📊 StatsFacade: Found global stats for \(playerID) (\(globalStats.count) stats)")
-            return globalStats
+        if let viewModel = allLivePlayersViewModel {
+            DebugPrint(mode: .scoring, "🔍 StatsFacade: Checking AllLivePlayersViewModel (\(viewModel.playerStats.count) players)")
+            if let globalStats = viewModel.playerStats[playerID] {
+                DebugPrint(mode: .scoring, "✅ StatsFacade: Found GLOBAL stats for \(playerID) (\(globalStats.count) stats)")
+                return globalStats
+            } else {
+                DebugPrint(mode: .scoring, "❌ StatsFacade: Player \(playerID) not in AllLivePlayersViewModel")
+            }
+        } else {
+            DebugPrint(mode: .scoring, "⚠️ StatsFacade: AllLivePlayersViewModel NOT PROVIDED")
         }
         
-        print("📊 StatsFacade: NO STATS FOUND for playerID: \(playerID), week: \(week)")
+        DebugPrint(mode: .scoring, "❌ StatsFacade: NO STATS FOUND for playerID: \(playerID), week: \(week)")
         return nil
     }
     

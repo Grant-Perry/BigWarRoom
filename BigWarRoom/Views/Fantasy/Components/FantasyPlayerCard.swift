@@ -23,6 +23,7 @@ struct FantasyPlayerCard: View {
     @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
+    @State private var selectedPlayerForNavigation: SleeperPlayer? = nil // 🔥 NEW: Navigation trigger
     
     // 🔥 SIMPLIFIED: Just take the essentials, create ViewModel in onAppear
     init(
@@ -57,7 +58,11 @@ struct FantasyPlayerCard: View {
                     HStack {
                         Spacer()
                         VStack {
-                            if let team = NFLTeam.team(for: player.team ?? "") {
+                            // 🔥 FIX: Normalize team code for DST players (same logic as AllLivePlayers)
+                            let teamCode = player.team ?? ""
+                            let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
+                            
+                            if let team = NFLTeam.team(for: normalizedTeamCode) {
                                 TeamAssetManager.shared.logoOrFallback(for: team.id)
                                     .frame(width: 90, height: 90)
                                     .opacity(vm.isPlayerLive(player) ? 0.4 : 0.25)
@@ -102,14 +107,12 @@ struct FantasyPlayerCard: View {
                     color: vm.isPlayerLive(player) ? .gpGreen.opacity(0.5) : player.isOnBye ? .gpPink.opacity(0.5) : .clear,
                     radius: (vm.isPlayerLive(player) || player.isOnBye) ? 10 : 0
                 )
-                // 🔥 FIX: Use overlay with NavigationLink to avoid navigationDestination inside lazy container
-                .overlay {
-                    if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
-                        NavigationLink(value: sleeperPlayer) {
-                            Color.clear
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
+                // 🔥 NEW: Navigation via state change
+                .navigationDestination(item: $selectedPlayerForNavigation) { sleeperPlayer in
+                    PlayerStatsCardView(
+                        player: sleeperPlayer,
+                        team: NFLTeam.team(for: sleeperPlayer.team ?? "")
+                    )
                 }
             } else {
                 ProgressView()
@@ -145,7 +148,14 @@ struct FantasyPlayerCard: View {
             onScoreTap: {
                 showingScoreBreakdown = true
             },
-            fantasyViewModel: fantasyViewModel
+            fantasyViewModel: fantasyViewModel,
+            sleeperPlayer: vm.getSleeperPlayerData(for: player),
+            onPlayerImageTap: {
+                // 🔥 NEW: Trigger navigation via state
+                if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
+                    selectedPlayerForNavigation = sleeperPlayer
+                }
+            }
         )
         
         // Player name and position - reuse existing component

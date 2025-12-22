@@ -24,7 +24,7 @@ final class SmartRefreshManager {
     
     // MARK: - State
     private(set) var currentRefreshInterval: TimeInterval = TimeInterval(AppConstants.MatchupRefresh)
-    private(set) var shouldShowCountdownTimer: Bool = true
+    private(set) var shouldShowCountdownTimer: Bool = false
     private(set) var refreshReason: String = "Default"
     private(set) var hasLiveGames: Bool = false
     
@@ -79,14 +79,14 @@ final class SmartRefreshManager {
             
         case .gamesStartingSoon:
             currentRefreshInterval = mediumRefreshInterval
-            shouldShowCountdownTimer = true
+            shouldShowCountdownTimer = false
             hasLiveGames = false
             refreshReason = "Games starting soon"
             DebugPrint(mode: .globalRefresh, "⏰ SMART REFRESH: Games starting soon - 1 min interval")
             
         case .gamesScheduledToday:
             currentRefreshInterval = slowRefreshInterval
-            shouldShowCountdownTimer = true
+            shouldShowCountdownTimer = false
             hasLiveGames = false
             refreshReason = "Games scheduled today"
             DebugPrint(mode: .globalRefresh, "📅 SMART REFRESH: Games scheduled - 15 min interval")

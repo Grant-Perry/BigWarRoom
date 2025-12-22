@@ -17,15 +17,29 @@ struct FantasyPlayerCardMainContentView: View {
     
     let fantasyViewModel: FantasyViewModel?
     
+    // 🔥 NEW: Add navigation trigger
+    let sleeperPlayer: SleeperPlayer?
+    let onPlayerImageTap: (() -> Void)?
+    
     @State private var projectedPoints: Double = 0.0
     @State private var projectionsLoaded = false
     
-    init(player: FantasyPlayer, isPlayerLive: Bool, glowIntensity: Double, onScoreTap: (() -> Void)? = nil, fantasyViewModel: FantasyViewModel? = nil) {
+    init(
+        player: FantasyPlayer,
+        isPlayerLive: Bool,
+        glowIntensity: Double,
+        onScoreTap: (() -> Void)? = nil,
+        fantasyViewModel: FantasyViewModel? = nil,
+        sleeperPlayer: SleeperPlayer? = nil,
+        onPlayerImageTap: (() -> Void)? = nil
+    ) {
         self.player = player
         self.isPlayerLive = isPlayerLive
         self.glowIntensity = glowIntensity
         self.onScoreTap = onScoreTap
         self.fantasyViewModel = fantasyViewModel
+        self.sleeperPlayer = sleeperPlayer
+        self.onPlayerImageTap = onPlayerImageTap
     }
     
     var body: some View {
@@ -33,7 +47,9 @@ struct FantasyPlayerCardMainContentView: View {
             // Player headshot
             FantasyPlayerCardHeadshotView(
                 player: player,
-                isPlayerLive: isPlayerLive
+                isPlayerLive: isPlayerLive,
+                sleeperPlayer: sleeperPlayer,
+                onPlayerImageTap: onPlayerImageTap
             )
             
             // Score display with projections
@@ -151,31 +167,30 @@ struct FantasyPlayerCardMainContentView: View {
 struct FantasyPlayerCardHeadshotView: View {
     let player: FantasyPlayer
     let isPlayerLive: Bool
+    let sleeperPlayer: SleeperPlayer?
+    let onPlayerImageTap: (() -> Void)?
+    
+    // 🔥 NEW: Check if this is a DST player
+    private var isDefenseOrSpecialTeams: Bool {
+        let position = player.position.uppercased()
+        return position.contains("DEF") || position.contains("DST") || position.contains("D/ST")
+    }
     
     var body: some View {
         ZStack {
-            AsyncImage(url: player.headshotURL) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                        .frame(width: 80, height: 80)
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(width: 90, height: 90)
-                        .clipped()
-                        .opacity(isPlayerLive ? 1.0 : 0.85)
-                case .failure:
-                    FantasyPlayerCardFallbackHeadshotView(
-                        player: player,
-                        isPlayerLive: isPlayerLive
-                    )
-                @unknown default:
-                    EmptyView()
+            // 🔥 MODIFIED: Use tap gesture instead of NavigationLink
+            Group {
+                if isDefenseOrSpecialTeams {
+                    dstTeamLogo
+                } else {
+                    playerHeadshot
                 }
             }
+            .onTapGesture {
+                onPlayerImageTap?()
+            }
             
+            // Injury badge
             if let injuryStatus = player.injuryStatus, !injuryStatus.isEmpty {
                 VStack {
                     Spacer()
@@ -185,10 +200,61 @@ struct FantasyPlayerCardHeadshotView: View {
                             .offset(x: -3, y: -3)
                     }
                 }
+                .allowsHitTesting(false)
             }
         }
         .offset(x: -20, y: -8)
         .zIndex(2)
+    }
+    
+    // 🔥 NEW: Team logo for DST players
+    @ViewBuilder
+    private var dstTeamLogo: some View {
+        let teamCode = player.team ?? ""
+        let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
+        
+        if let team = NFLTeam.team(for: normalizedTeamCode) {
+            TeamAssetManager.shared.logoOrFallback(for: team.id)
+                .frame(width: 90, height: 90)
+                .opacity(isPlayerLive ? 1.0 : 0.85)
+        } else {
+            // Fallback if team not found
+            Circle()
+                .fill(Color.gray.opacity(0.8))
+                .frame(width: 90, height: 90)
+                .overlay(
+                    Text("DEF")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                )
+                .opacity(isPlayerLive ? 1.0 : 0.85)
+        }
+    }
+    
+    // 🔥 EXTRACTED: Regular player headshot logic
+    @ViewBuilder
+    private var playerHeadshot: some View {
+        AsyncImage(url: player.headshotURL) { phase in
+            switch phase {
+            case .empty:
+                ProgressView()
+                    .frame(width: 80, height: 80)
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 90, height: 90)
+                    .clipped()
+                    .opacity(isPlayerLive ? 1.0 : 0.85)
+            case .failure:
+                FantasyPlayerCardFallbackHeadshotView(
+                    player: player,
+                    isPlayerLive: isPlayerLive
+                )
+            @unknown default:
+                EmptyView()
+            }
+        }
     }
 }
 

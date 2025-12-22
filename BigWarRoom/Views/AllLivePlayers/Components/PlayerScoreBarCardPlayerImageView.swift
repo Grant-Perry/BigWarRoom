@@ -48,79 +48,77 @@ struct PlayerScoreBarCardPlayerImageView: View {
     
     // Extracted image content to separate computed property
     private var playerImageContent: some View {
-        ZStack {
+        // 🔥 DEBUG: Log D/ST detection OUTSIDE the view builder
+        let _ = logDSTPlayerInfo()
+        
+        return ZStack {
             // Main player image or team logo
-            Group {
-                // 🔥 NEW: For D/ST players, use team logo instead of player photo
-                if isDefenseOrSpecialTeams {
-                    // Show team logo for defense/special teams
-                    if let team = NFLTeam.team(for: playerEntry.player.team ?? "") {
-                        TeamAssetManager.shared.logoOrFallback(for: team.id)
-                            .frame(width: 150, height: 180)
-                    } else {
-                        // Fallback for defense without recognized team
+            if isDefenseOrSpecialTeams {
+                // Use EXACT same logic as the background logo in PlayerScoreBarCardContentView
+                let teamCode = playerEntry.player.team ?? ""
+                let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
+                
+                if let team = NFLTeam.team(for: normalizedTeamCode) {
+                    TeamAssetManager.shared.logoOrFallback(for: team.id)
+                        .frame(width: 140, height: 140)
+                } else {
+                    // Fallback
+                    Circle()
+                        .fill(Color.gray)
+                        .frame(width: 80, height: 80)
+                        .overlay(
+                            Text("DEF")
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                        )
+                }
+            } else {
+                // Regular player - show headshot
+                AsyncImage(url: playerEntry.player.headshotURL) { phase in
+                    switch phase {
+                    case .empty:
+                        // Loading state
                         Rectangle()
                             .fill(teamGradient)
                             .overlay(
-                                VStack(spacing: 4) {
-                                    Text(playerEntry.position)
-                                        .font(.system(size: 18, weight: .bold))
-                                        .foregroundColor(.white)
-                                    Text(playerEntry.player.team ?? "")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.8))
-                                }
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             )
-                            .frame(width: 150, height: 180)
-                    }
-                } else {
-                    // Regular player - show headshot
-                    AsyncImage(url: playerEntry.player.headshotURL) { phase in
-                        switch phase {
-                        case .empty:
-                            // Loading state
-                            Rectangle()
-                                .fill(teamGradient)
-                                .overlay(
-                                    ProgressView()
-                                        .scaleEffect(0.6)
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                )
-                        case .success(let image):
-                            // Successfully loaded image
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        case .failure(_):
-                            // Failed to load - try alternative URL or show fallback
-                            AsyncImage(url: alternativeImageURL) { altPhase in
-                                switch altPhase {
-                                case .success(let altImage):
-                                    altImage
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                default:
-                                    Rectangle()
-                                        .fill(teamGradient)
-                                        .overlay(
-                                            Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
-                                                .font(.system(size: 26, weight: .bold))
-                                                .foregroundColor(.white)
-                                        )
-                                }
+                    case .success(let image):
+                        // Successfully loaded image
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                    case .failure(_):
+                        // Failed to load - try alternative URL or show fallback
+                        AsyncImage(url: alternativeImageURL) { altPhase in
+                            switch altPhase {
+                            case .success(let altImage):
+                                altImage
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            default:
+                                Rectangle()
+                                    .fill(teamGradient)
+                                    .overlay(
+                                        Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
+                                            .font(.system(size: 26, weight: .bold))
+                                            .foregroundColor(.white)
+                                    )
                             }
-                        @unknown default:
-                            Rectangle()
-                                .fill(teamGradient)
-                                .overlay(
-                                    Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
-                                        .font(.system(size: 26, weight: .bold))
-                                        .foregroundColor(.white)
-                                )
                         }
+                    @unknown default:
+                        Rectangle()
+                            .fill(teamGradient)
+                            .overlay(
+                                Text(playerEntry.player.firstName?.prefix(1).uppercased() ?? "?")
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(.white)
+                            )
                     }
-                    .frame(width: 150, height: 180)
                 }
+                .frame(width: 150, height: 180)
             }
             
             // 🔥 NEW: Injury Status Badge (positioned at bottom-right of image)
@@ -150,10 +148,31 @@ struct PlayerScoreBarCardPlayerImageView: View {
         }
     }
     
-    // 🔥 NEW: Helper to identify defense/special teams players
+    // --- Insert the logger function here ---
+    private func logDSTPlayerInfo() {
+        if isDefenseOrSpecialTeams {
+            let teamCode = playerEntry.player.team ?? ""
+            let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
+            DebugPrint(mode: .matchupLoading, "🏈 D/ST PLAYER: \(playerEntry.player.fullName)")
+            DebugPrint(mode: .matchupLoading, "   Raw team code: \(teamCode)")
+            DebugPrint(mode: .matchupLoading, "   Normalized code: \(normalizedTeamCode)")
+            DebugPrint(mode: .matchupLoading, "   Position: \(playerEntry.position)")
+            if let team = NFLTeam.team(for: normalizedTeamCode) {
+                DebugPrint(mode: .matchupLoading, "   ✅ Found team: \(team.fullName)")
+            } else {
+                DebugPrint(mode: .matchupLoading, "   ❌ NO TEAM FOUND - showing fallback")
+            }
+        }
+    }
+    
+    // 🔥 UPDATED: Helper to identify defense/special teams players - check all variations
     private var isDefenseOrSpecialTeams: Bool {
         let position = playerEntry.position.uppercased()
-        return position == "DEF" || position == "DST" || position == "D/ST"
+        let isDST = position.contains("DEF") || position.contains("DST") || position.contains("D/ST")
+        
+        DebugPrint(mode: .matchupLoading, limit: 3, "🔍 Position check for \(playerEntry.player.fullName): '\(position)' -> isDST: \(isDST)")
+        
+        return isDST
     }
     
     // 🔥 FIXED: Get Sleeper player data using SAME logic as Content View
