@@ -75,7 +75,7 @@ struct ScheduleGameCard: View {
                     // Completed game - show final scores with winning team in green AND day name
                     VStack(spacing: 1) {
                         // Show day name for completed games too
-                        if !game.dayName.isEmpty && game.dayName != "TBD" && game.dayName.uppercased() != "SUNDAY" {
+                        if !game.dayName.isEmpty && game.dayName != "TBD" {
                             Text(game.dayName.uppercased())
                                 .font(.system(size: 10, weight: .bold, design: .default))
                                 .foregroundColor(.white.opacity(0.8))
@@ -112,10 +112,10 @@ struct ScheduleGameCard: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                 } else {
-                    // Upcoming game - show day and time (no Sunday text for Sunday games)
+                    // Upcoming game - show day and time
                     VStack(spacing: 2) {
-                        // Remove debug text and fix logic
-                        if game.dayName.uppercased() != "SUNDAY" && !game.dayName.isEmpty && game.dayName != "TBD" {
+                        // Show day name for all games
+                        if !game.dayName.isEmpty && game.dayName != "TBD" {
                             Text(game.dayName.uppercased())
                                 .font(.system(size: 14, weight: .bold, design: .default))
                                 .foregroundColor(.white)
