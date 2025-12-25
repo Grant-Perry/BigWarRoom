@@ -146,6 +146,8 @@ struct ScheduleByeTeamCell: View {
     let isLoadingImpacts: Bool
     let onTap: () -> Void
     
+    @State private var standingsService = NFLStandingsService.shared
+    
     var body: some View {
         Button(action: {
             // Only fire action if not loading and has problem
@@ -163,6 +165,8 @@ struct ScheduleByeTeamCell: View {
                                 .fill(team.primaryColor.opacity(0.15))
                                 .frame(width: 60, height: 60)
                         )
+                        .grayscale(standingsService.isTeamEliminated(for: team.id) ? 1.0 : 0.0)
+                        .opacity(standingsService.isTeamEliminated(for: team.id) ? 0.4 : 1.0)
                     
                     // Badge: Checkmark or X (only show after loading completes)
                     if !isLoadingImpacts, let impact = byeWeekImpact {
@@ -190,12 +194,32 @@ struct ScheduleByeTeamCell: View {
                                 .offset(x: 4, y: -4)
                         }
                     }
+                    
+                    // 🔥 NEW: Show elimination skull badge
+                    if standingsService.isTeamEliminated(for: team.id) {
+                        Image(systemName: "skull.fill")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .background(
+                                Circle()
+                                    .fill(Color.black)
+                                    .frame(width: 20, height: 20)
+                            )
+                            .offset(x: -24, y: -4)
+                    }
                 }
                 
                 // Team name
                 Text(team.name)
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(standingsService.isTeamEliminated(for: team.id) ? .white.opacity(0.4) : .white.opacity(0.8))
+                
+                // 🔥 NEW: Show "ELIMINATED" text if eliminated
+                if standingsService.isTeamEliminated(for: team.id) {
+                    Text("ELIMINATED")
+                        .font(.system(size: 8, weight: .black))
+                        .foregroundColor(.gray)
+                }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
@@ -219,6 +243,11 @@ struct ScheduleByeTeamCell: View {
     private var borderColor: Color {
         if isLoadingImpacts {
             return team.primaryColor.opacity(0.3)
+        }
+        
+        // 🔥 NEW: Gray border for eliminated teams
+        if standingsService.isTeamEliminated(for: team.id) {
+            return Color.gray.opacity(0.3)
         }
         
         guard let impact = byeWeekImpact else {

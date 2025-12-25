@@ -19,32 +19,33 @@ struct ScheduleGameCard: View {
         HStack(spacing: 0) {
             // Away team logo (left side, full height, bleeding off card)
             HStack(spacing: 0) {
-                ZStack {
-                    TeamLogoView(teamCode: game.awayTeam, size: 140) // Larger base logo
-                        .scaleEffect(1.05) // Reduced from 1.1 to 1.05 for less zoom
-                        .clipped() // Crop to the frame
-                        .shadow(color: .black.opacity(0.6), radius: 8, x: 2, y: 4) // Deep shadow for 3D depth
-                        .shadow(color: .black.opacity(0.3), radius: 3, x: 1, y: 2) // Secondary shadow for more depth
-                }
-                .frame(width: 90, height: 64) // Even wider logos (85->90), same height
-                .clipShape(Rectangle()) // Sharp rectangular clip
-                .overlay(
-                    Rectangle()
-                        .stroke(getTeamColor(for: game.awayTeam), lineWidth: 2)
-                )
-                
-                // Away team record - white vertical bar with rotated text
+                // Away team record - white vertical bar with rotated text (LEADING side)
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 20, height: 64) // 20px wide, full height
+                    .frame(width: 20, height: 64)
                     .overlay(
                         Text(getTeamRecord(for: game.awayTeam))
-                            .font(.system(size: 13, weight: .bold)) // Increased from 11 to 13
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
-                            .kerning(1.5) // Add letter spacing to spread out text
-                            .rotationEffect(.degrees(90)) // Top to bottom
-                            .fixedSize() // Prevent text wrapping
+                            .kerning(1.5)
+                            .rotationEffect(.degrees(90))
+                            .fixedSize()
                     )
+                
+                TeamLogoView(teamCode: game.awayTeam, size: 140)
+                    .scaleEffect(1.05)
+                    .clipped()
+                    .shadow(color: .black.opacity(0.6), radius: 8, x: 2, y: 4)
+                    .shadow(color: .black.opacity(0.3), radius: 3, x: 1, y: 2)
+                    .frame(width: 90, height: 64)
+                    .clipShape(Rectangle())
+                    .overlay(
+                        Rectangle()
+                            .stroke(getTeamColor(for: game.awayTeam), lineWidth: 2)
+                    )
+                
+                // Away team status badge - styled exactly like record bar (TRAILING side)
+                playoffStatusBadge(for: game.awayTeam, isHome: false)
             }
             
             Spacer()
@@ -138,32 +139,33 @@ struct ScheduleGameCard: View {
             
             // Home team logo (right side, full height, bleeding off card)
             HStack(spacing: 0) {
-                // Home team record - white vertical bar with rotated text (before logo)
+                // Home team record - white vertical bar with rotated text (LEADING side)
                 Rectangle()
                     .fill(Color.white.opacity(0.2))
-                    .frame(width: 20, height: 64) // 20px wide, full height
+                    .frame(width: 20, height: 64)
                     .overlay(
                         Text(getTeamRecord(for: game.homeTeam))
-                            .font(.system(size: 13, weight: .bold)) // Increased from 11 to 13
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundColor(.white)
-                            .kerning(1.5) // Add letter spacing to spread out text
-                            .rotationEffect(.degrees(90)) // Same direction as away team
-                            .fixedSize() // Prevent text wrapping
+                            .kerning(1.5)
+                            .rotationEffect(.degrees(90))
+                            .fixedSize()
                     )
                 
-                ZStack {
-                    TeamLogoView(teamCode: game.homeTeam, size: 140) // Larger base logo
-                        .scaleEffect(1.05) // Reduced from 1.1 to 1.05 for less zoom
-                        .clipped() // Crop to the frame
-                        .shadow(color: .black.opacity(0.6), radius: 8, x: -2, y: 4) // Deep shadow for 3D depth (opposite x for right side)
-                        .shadow(color: .black.opacity(0.3), radius: 3, x: -1, y: 2) // Secondary shadow for more depth
-                }
-                .frame(width: 90, height: 64) // Even wider logos (85->90), same height
-                .clipShape(Rectangle()) // Sharp rectangular clip
-                .overlay(
-                    Rectangle()
-                        .stroke(getTeamColor(for: game.homeTeam), lineWidth: 2)
-                )
+                TeamLogoView(teamCode: game.homeTeam, size: 140)
+                    .scaleEffect(1.05)
+                    .clipped()
+                    .shadow(color: .black.opacity(0.6), radius: 8, x: -2, y: 4)
+                    .shadow(color: .black.opacity(0.3), radius: 3, x: -1, y: 2)
+                    .frame(width: 90, height: 64)
+                    .clipShape(Rectangle())
+                    .overlay(
+                        Rectangle()
+                            .stroke(getTeamColor(for: game.homeTeam), lineWidth: 2)
+                    )
+                
+                // Home team status badge - styled exactly like record bar (TRAILING side)
+                playoffStatusBadge(for: game.homeTeam, isHome: true)
             }
         }
         .frame(height: 64) // Card height
@@ -199,7 +201,65 @@ struct ScheduleGameCard: View {
                 )
         )
         .clipShape(Rectangle()) // Clip the entire card as rectangle
+        .overlay(
+            EmptyView()
+        )
     }
+    
+    // 🔥 Playoff status badge styled EXACTLY like record bar
+    @ViewBuilder
+    private func playoffStatusBadge(for teamCode: String, isHome: Bool) -> some View {
+        let status = standingsService.getPlayoffStatus(for: teamCode)
+        let _ = DebugPrint(mode: .contention, "📛 Status Badge Check: \(teamCode) -> \(status.displayText)")
+        
+        if status != .unknown {
+            Rectangle()
+                .fill(
+                    RadialGradient(
+                        colors: [getStatusColor(for: teamCode), .clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 32
+                    )
+                )
+                .frame(width: 20, height: 64)
+                .overlay(
+                    Text(getStatusText(for: teamCode) ?? "")
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                        .kerning(1.2)
+                        .rotationEffect(.degrees(90))
+                        .fixedSize()
+                )
+        } else {
+            let _ = DebugPrint(mode: .contention, "⚠️  No badge for \(teamCode) - status is UNKNOWN")
+            EmptyView()
+        }
+    }
+    
+    // Helper to get status text
+    private func getStatusText(for teamCode: String) -> String? {
+        let status = standingsService.getPlayoffStatus(for: teamCode)
+        switch status {
+        case .eliminated: return "NIXED"
+        case .bubble: return "BUBBLE"
+        case .clinched: return "CLINCH"
+        case .alive: return "HUNT"
+        case .unknown: return nil
+        }
+    }
+    
+    // Helper to get status color
+    private func getStatusColor(for teamCode: String) -> Color {
+        let status = standingsService.getPlayoffStatus(for: teamCode)
+        switch status {
+        case .eliminated: return .red
+        case .bubble: return .orange
+        case .clinched: return .blue
+        case .alive: return .green
+        case .unknown: return .white
+        }
+    } 
     
     // Helper function to get team color
     private func getTeamColor(for teamCode: String) -> Color {
@@ -209,6 +269,7 @@ struct ScheduleGameCard: View {
     // Helper function to get team record
     private func getTeamRecord(for teamCode: String) -> String {
         let record = standingsService.getTeamRecord(for: teamCode)
+        let _ = DebugPrint(mode: .contention, "📊 Record fetch: \(teamCode) -> \(record)")
         return record
     }
 }
