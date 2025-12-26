@@ -6,6 +6,125 @@
 //
 
 import Foundation
+import SwiftUI
+
+// MARK: - Sportsbook Enum
+
+/// Supported sportsbooks with display abbreviations and brand colors
+enum Sportsbook: String, CaseIterable, Codable, Identifiable {
+    case draftkings = "draftkings"
+    case fanduel = "fanduel"
+    case betmgm = "betmgm"
+    case caesars = "caesars"
+    case pointsbet = "pointsbetus"
+    case betrivers = "betrivers"
+    case pinnacle = "pinnacle"
+    case bestLine = "best" // Special case: show the most favorable line
+    
+    var id: String { rawValue }
+    
+    /// Short abbreviation for display on cards (e.g., "DK", "FD")
+    var abbreviation: String {
+        switch self {
+        case .draftkings: return "DK"
+        case .fanduel: return "FD"
+        case .betmgm: return "MGM"
+        case .caesars: return "CZR"
+        case .pointsbet: return "PB"
+        case .betrivers: return "BR"
+        case .pinnacle: return "PIN"
+        case .bestLine: return "★"
+        }
+    }
+    
+    /// Full display name for settings
+    var displayName: String {
+        switch self {
+        case .draftkings: return "DraftKings"
+        case .fanduel: return "FanDuel"
+        case .betmgm: return "BetMGM"
+        case .caesars: return "Caesars"
+        case .pointsbet: return "PointsBet"
+        case .betrivers: return "BetRivers"
+        case .pinnacle: return "Pinnacle"
+        case .bestLine: return "Best Available"
+        }
+    }
+    
+    /// Primary brand color
+    var primaryColor: Color {
+        switch self {
+        case .draftkings: return Color(red: 0.0, green: 0.69, blue: 0.31)   // DK Green #00B050
+        case .fanduel: return Color(red: 0.08, green: 0.46, blue: 0.82)     // FD Blue #1493FF
+        case .betmgm: return Color(red: 0.77, green: 0.63, blue: 0.16)      // MGM Gold #C5A028
+        case .caesars: return Color(red: 0.77, green: 0.07, blue: 0.19)     // Caesars Red #C41230
+        case .pointsbet: return Color(red: 1.0, green: 0.27, blue: 0.22)    // PointsBet Red #FF4438
+        case .betrivers: return Color(red: 0.0, green: 0.4, blue: 0.7)      // BetRivers Blue #0066B2
+        case .pinnacle: return Color(red: 0.0, green: 0.2, blue: 0.4)       // Pinnacle Navy #003366
+        case .bestLine: return Color(red: 1.0, green: 0.84, blue: 0.0)      // Gold star #FFD700
+        }
+    }
+    
+    /// Secondary/text color for contrast
+    var textColor: Color {
+        switch self {
+        case .draftkings: return .white
+        case .fanduel: return .white
+        case .betmgm: return .black
+        case .caesars: return Color(red: 1.0, green: 0.84, blue: 0.0) // Gold text
+        case .pointsbet: return .white
+        case .betrivers: return .white
+        case .pinnacle: return .white
+        case .bestLine: return .black
+        }
+    }
+    
+    /// Match API bookmaker key to our enum
+    static func from(apiKey: String) -> Sportsbook? {
+        let lowercased = apiKey.lowercased()
+        return Sportsbook.allCases.first { $0 != .bestLine && lowercased.contains($0.rawValue) }
+    }
+}
+
+// MARK: - Sportsbook Badge View
+
+/// Compact branded badge for displaying sportsbook on cards
+struct SportsbookBadge: View {
+    let book: Sportsbook
+    var size: CGFloat = 11
+    
+    var body: some View {
+        Text(book.abbreviation)
+            .font(.system(size: size, weight: .black, design: .rounded))
+            .foregroundColor(book.textColor)
+            .padding(.horizontal, book == .bestLine ? 3 : 4)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(book.primaryColor)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(book.textColor.opacity(0.3), lineWidth: 0.5)
+            )
+    }
+}
+
+// MARK: - Preview
+#Preview("Sportsbook Badges") {
+    VStack(spacing: 12) {
+        ForEach(Sportsbook.allCases) { book in
+            HStack {
+                SportsbookBadge(book: book)
+                Text(book.displayName)
+                    .foregroundColor(.white)
+                Spacer()
+            }
+        }
+    }
+    .padding()
+    .background(Color.black)
+}
 
 // MARK: - The Odds API Response Models
 
@@ -90,6 +209,17 @@ struct TheOddsOutcome: Codable {
 
 // MARK: - Processed Game Betting Odds (Spreads / Totals / Moneyline)
 
+/// Individual book's odds for a game
+struct BookOdds: Hashable {
+    let book: Sportsbook
+    let favoriteTeamCode: String?
+    let favoriteMoneylineOdds: Int?      // Raw numeric value for comparison
+    let favoriteMoneylineDisplay: String? // Formatted string like "-130"
+    let totalPoints: Double?
+    let spreadPoints: Double?
+    let spreadTeamCode: String?
+}
+
 /// Processed game betting odds for display in the NFL Schedule.
 struct GameBettingOdds: Hashable {
     let gameID: String
@@ -113,7 +243,11 @@ struct GameBettingOdds: Hashable {
     let moneylineDisplay: String?
     
     let sportsbook: String?
+    let sportsbookEnum: Sportsbook?  // 🔥 NEW: Typed sportsbook
     let lastUpdated: Date?
+    
+    /// 🔥 NEW: All available book odds for this game (for best line comparison)
+    let allBookOdds: [BookOdds]?
     
     /// Single-line summary for schedule cards
     var scheduleLine: String? {
@@ -127,6 +261,20 @@ struct GameBettingOdds: Hashable {
         case let (s?, t?):
             return "\(t) · \(s)"
         }
+    }
+    
+    /// 🔥 NEW: Get the best moneyline (most favorable for betting the favorite)
+    /// Most favorable = closest to even (least negative)
+    var bestMoneylineBook: BookOdds? {
+        guard let allOdds = allBookOdds else { return nil }
+        return allOdds
+            .filter { $0.favoriteMoneylineOdds != nil }
+            .max { ($0.favoriteMoneylineOdds ?? -9999) < ($1.favoriteMoneylineOdds ?? -9999) }
+    }
+    
+    /// 🔥 NEW: Get odds for a specific book
+    func odds(for book: Sportsbook) -> BookOdds? {
+        return allBookOdds?.first { $0.book == book }
     }
 }
 

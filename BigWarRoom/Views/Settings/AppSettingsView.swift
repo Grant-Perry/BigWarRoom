@@ -19,6 +19,9 @@ struct AppSettingsView: View {
     // 🔥 NEW: Bar-style layout toggle for Mission Control
     @AppStorage("MatchupsHub_UseBarLayout") private var useBarLayout = false
     
+    // 🎰 Preferred sportsbook for odds display
+    @AppStorage("PreferredSportsbook") private var preferredSportsbookRaw: String = Sportsbook.bestLine.rawValue
+    
     var body: some View {
         NavigationView {
             List {
@@ -334,6 +337,61 @@ struct AppSettingsView: View {
                         Toggle("", isOn: $useBarLayout)
                             .labelsHidden()
                     }
+                    
+                    // 🎰 Sportsbook Preference for Schedule Odds
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "dollarsign.circle.fill")
+                                .foregroundColor(.green)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Odds Source")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                
+                                Text("Which sportsbook lines to display on Schedule")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        // Grid of sportsbook badges
+                        LazyVGrid(columns: [
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                            GridItem(.flexible()),
+                            GridItem(.flexible())
+                        ], spacing: 8) {
+                            ForEach(Sportsbook.allCases) { book in
+                                Button {
+                                    preferredSportsbookRaw = book.rawValue
+                                } label: {
+                                    VStack(spacing: 4) {
+                                        Text(book.abbreviation)
+                                            .font(.system(size: 12, weight: .black, design: .rounded))
+                                            .foregroundColor(book.textColor)
+                                            .frame(width: 40, height: 24)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(book.primaryColor)
+                                            )
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .stroke(preferredSportsbookRaw == book.rawValue ? Color.white : Color.clear, lineWidth: 2)
+                                            )
+                                        
+                                        Text(book == .bestLine ? "Best" : book.abbreviation)
+                                            .font(.system(size: 9, weight: .medium))
+                                            .foregroundColor(preferredSportsbookRaw == book.rawValue ? .white : .secondary)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.leading, 32)
+                    }
+                    .padding(.vertical, 4)
                     
                     // 💊 RX: Lineup Optimization Threshold
                     VStack(alignment: .leading, spacing: 12) {

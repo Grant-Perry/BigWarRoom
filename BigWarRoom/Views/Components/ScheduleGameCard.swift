@@ -26,11 +26,13 @@ struct ScheduleGameCard: View {
                     .frame(width: 20, height: 64)
                     .overlay(
                         Text(getTeamRecord(for: game.awayTeam))
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
-                            .kerning(1.5)
+                            .kerning(1.0)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .frame(width: 58) // Constrain width for scaling (slightly less than 64 height)
                             .rotationEffect(.degrees(90))
-                            .fixedSize()
                     )
                 
                 TeamLogoView(teamCode: game.awayTeam, size: 140)
@@ -114,58 +116,51 @@ struct ScheduleGameCard: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                 } else {
-                    // Upcoming game - show day and time
-                    VStack(spacing: 2) {
-                        // Show day name for all games
-                        if !game.dayName.isEmpty && game.dayName != "TBD" {
-                            Text(game.dayName.uppercased())
-                                .font(.system(size: 14, weight: .bold, design: .default))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
-                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
-                        }
-                        
-                        Text(game.startTime)
-                            .font(.system(size: 20, weight: .bold, design: .default))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                            .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
-                        
-                        if let odds,
-                           let team = odds.favoriteMoneylineTeamCode,
-                           let ml = odds.favoriteMoneylineOdds,
-                           let total = odds.totalPoints {
-                            VStack(spacing: 1) {
-                                Text("\(team) \(ml)")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                
+                    // Upcoming game - clean odds display (day/time is in the header)
+                    if let odds = odds {
+                        VStack(spacing: 4) {
+                            // Moneyline - big and bold
+                            if let team = odds.favoriteMoneylineTeamCode,
+                               let ml = odds.favoriteMoneylineOdds {
                                 HStack(spacing: 6) {
+                                    Text(team)
+                                        .font(.system(size: 16, weight: .black))
+                                        .foregroundColor(.white)
+                                    Text(ml)
+                                        .font(.system(size: 16, weight: .bold))
+                                        .foregroundColor(.gpGreen)
+                                }
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            } else if let spread = odds.spreadDisplay {
+                                Text(spread)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            }
+                            
+                            // O/U + sportsbook badge
+                            HStack(spacing: 5) {
+                                if let total = odds.totalPoints {
                                     Image(systemName: "arrow.up.arrow.down")
-                                        .font(.system(size: 8, weight: .bold))
-                                        .foregroundColor(.white.opacity(0.7))
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.6))
                                     
                                     Text(total)
-                                        .font(.system(size: 11, weight: .semibold))
+                                        .font(.system(size: 13, weight: .semibold))
                                         .foregroundColor(.white.opacity(0.85))
                                 }
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                                
+                                if let book = odds.sportsbookEnum {
+                                    SportsbookBadge(book: book, size: 9)
+                                }
                             }
-                            .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
-                        } else if let line = odds?.scheduleLine {
-                            // Fallback (e.g., if a market isn't available)
-                            Text(line)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.85))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                                .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
+                            .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
                         }
+                    } else {
+                        // No odds available
+                        Text("—")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
                     }
                 }
             }
@@ -180,11 +175,13 @@ struct ScheduleGameCard: View {
                     .frame(width: 20, height: 64)
                     .overlay(
                         Text(getTeamRecord(for: game.homeTeam))
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.white)
-                            .kerning(1.5)
+                            .kerning(1.0)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                            .frame(width: 58) // Constrain width for scaling (slightly less than 64 height)
                             .rotationEffect(.degrees(90))
-                            .fixedSize()
                     )
                 
                 TeamLogoView(teamCode: game.homeTeam, size: 140)
@@ -276,7 +273,7 @@ struct ScheduleGameCard: View {
     private func getStatusText(for teamCode: String) -> String? {
         let status = standingsService.getPlayoffStatus(for: teamCode)
         switch status {
-        case .eliminated: return "NIXED"
+        case .eliminated: return "OUT"
         case .bubble: return "BUBBLE"
         case .clinched: return "CLINCH"
         case .alive: return "HUNT"
@@ -306,6 +303,158 @@ struct ScheduleGameCard: View {
         let record = standingsService.getTeamRecord(for: teamCode)
         let _ = DebugPrint(mode: .contention, "📊 Record fetch: \(teamCode) -> \(record)")
         return record
+    }
+}
+
+// MARK: -> Compact Schedule Game Card (for collapsible time slots)
+struct ScheduleGameCardCompact: View {
+    let game: ScheduleGame
+    let odds: GameBettingOdds?
+    
+    @State private var teamAssets = TeamAssetManager.shared
+    @State private var standingsService = NFLStandingsService.shared
+    
+    private let cardHeight: CGFloat = 52
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Away Team Section
+            HStack(spacing: 8) {
+                // Playoff badge (if applicable)
+                compactPlayoffBadge(for: game.awayTeam)
+                
+                // Logo
+                TeamLogoView(teamCode: game.awayTeam, size: 40)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: 1, y: 1)
+                
+                // Team code + record
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(game.awayTeam)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text(getTeamRecord(for: game.awayTeam))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Center: Score or minimal info
+            if game.isLive || game.awayScore > 0 || game.homeScore > 0 {
+                // Score display
+                VStack(spacing: 2) {
+                    HStack(spacing: 4) {
+                        Text("\(game.awayScore)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(game.awayScore > game.homeScore ? .gpGreen : .white)
+                        
+                        Text("-")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.3))
+                        
+                        Text("\(game.homeScore)")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(game.homeScore > game.awayScore ? .gpGreen : .white)
+                    }
+                    
+                    if game.isLive {
+                        Text(game.displayTime)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.red))
+                    } else {
+                        Text("FINAL")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+                .frame(width: 80)
+            } else {
+                // Upcoming - just show odds on the right side
+                Spacer()
+            }
+            
+            // Home Team Section
+            HStack(spacing: 8) {
+                // Team code + record (trailing aligned)
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text(game.homeTeam)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                    
+                    Text(getTeamRecord(for: game.homeTeam))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                
+                // Logo
+                TeamLogoView(teamCode: game.homeTeam, size: 40)
+                    .clipShape(Circle())
+                    .shadow(color: .black.opacity(0.4), radius: 2, x: -1, y: 1)
+                
+                // Playoff badge (if applicable)
+                compactPlayoffBadge(for: game.homeTeam)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            
+            // Odds preview for upcoming games (far right)
+            if !game.isLive && game.awayScore == 0 && game.homeScore == 0 {
+                if let odds = odds,
+                   let team = odds.favoriteMoneylineTeamCode,
+                   let ml = odds.favoriteMoneylineOdds {
+                    Text("\(team) \(ml)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 70, alignment: .trailing)
+                        .padding(.leading, 8)
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: cardHeight)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.black.opacity(0.3))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+    
+    private func getTeamColor(for teamCode: String) -> Color {
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
+    }
+    
+    private func getTeamRecord(for teamCode: String) -> String {
+        return standingsService.getTeamRecord(for: teamCode)
+    }
+    
+    // 🔥 Compact playoff badge - small colored dot
+    @ViewBuilder
+    private func compactPlayoffBadge(for teamCode: String) -> some View {
+        let status = standingsService.getPlayoffStatus(for: teamCode)
+        
+        if status != .unknown {
+            Circle()
+                .fill(getStatusColor(for: status))
+                .frame(width: 8, height: 8)
+                .shadow(color: getStatusColor(for: status).opacity(0.6), radius: 3)
+        }
+    }
+    
+    private func getStatusColor(for status: PlayoffStatus) -> Color {
+        switch status {
+        case .eliminated: return .red
+        case .bubble: return .orange
+        case .clinched: return .blue
+        case .alive: return .green
+        case .unknown: return .clear
+        }
     }
 }
 

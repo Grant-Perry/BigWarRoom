@@ -7,6 +7,12 @@
 
 import Foundation
 import Observation
+import SwiftUI
+
+// MARK: - User Preference Key
+extension UserDefaults {
+    static let preferredSportsbookKey = "PreferredSportsbook"
+}
 
 @Observable
 @MainActor
@@ -21,6 +27,20 @@ final class BettingOddsService {
     // Cache for game odds (spreads/totals)
     private var gameOddsCache: [String: ([String: GameBettingOdds], Date)] = [:]
     private let gameOddsCacheExpiration: TimeInterval = 600 // 10 minutes
+    
+    // 🔥 NEW: User's preferred sportsbook (defaults to best line)
+    var preferredSportsbook: Sportsbook {
+        get {
+            if let raw = UserDefaults.standard.string(forKey: UserDefaults.preferredSportsbookKey),
+               let book = Sportsbook(rawValue: raw) {
+                return book
+            }
+            return .bestLine // Default to best available
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: UserDefaults.preferredSportsbookKey)
+        }
+    }
     
     // API Configuration
     private var apiKey: String {
@@ -293,43 +313,90 @@ final class BettingOddsService {
             return nil
         }
         
-        // Pick a reasonable sportsbook (prefer common US books)
-        let preferredBooks = ["draftkings", "fanduel", "betmgm", "caesars", "pointsbetus", "betrivers", "pinnacle"]
-        let bookmaker = oddsGame.bookmakers.first(where: { preferredBooks.contains($0.key.lowercased()) }) ?? oddsGame.bookmakers.first
+        // 🔥 NEW: Extract odds from ALL available books
+        var allBookOdds: [BookOdds] = []
         
-        let spreadsMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "spreads" })
-        let totalsMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "totals" })
-        let h2hMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "h2h" })
+        for bookmaker in oddsGame.bookmakers {
+            guard let book = Sportsbook.from(apiKey: bookmaker.key) else { continue }
+            
+            let h2hMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "h2h" })
+            let totalsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "totals" })
+            let spreadsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "spreads" })
+            
+            // Extract moneyline favorite
+            let favoriteML = extractFavoriteMoneylineNumeric(
+                homeCode: scheduleGame.homeTeam,
+                awayCode: scheduleGame.awayTeam,
+                homeName: oddsGame.homeTeam,
+                awayName: oddsGame.awayTeam,
+                market: h2hMarket
+            )
+            
+            // Extract total
+            let total = totalsMarket?.outcomes.first?.point
+            
+            // Extract spread
+            let spreadInfo = extractSpreadInfo(
+                homeCode: scheduleGame.homeTeam,
+                awayCode: scheduleGame.awayTeam,
+                homeName: oddsGame.homeTeam,
+                awayName: oddsGame.awayTeam,
+                market: spreadsMarket
+            )
+            
+            let bookOdds = BookOdds(
+                book: book,
+                favoriteTeamCode: favoriteML?.teamCode,
+                favoriteMoneylineOdds: favoriteML?.odds,
+                favoriteMoneylineDisplay: favoriteML?.display,
+                totalPoints: total,
+                spreadPoints: spreadInfo?.points,
+                spreadTeamCode: spreadInfo?.teamCode
+            )
+            
+            allBookOdds.append(bookOdds)
+        }
         
-        let spreadDisplay = formatSpread(
-            homeCode: scheduleGame.homeTeam,
-            awayCode: scheduleGame.awayTeam,
-            homeName: oddsGame.homeTeam,
-            awayName: oddsGame.awayTeam,
-            market: spreadsMarket
-        )
+        // 🔥 Determine which book to display based on user preference
+        let displayBook: BookOdds?
+        let selectedSportsbook: Sportsbook?
         
-        let totalDisplay = formatTotalDisplay(market: totalsMarket)
-        let totalPoints = extractTotalPoints(market: totalsMarket)
+        if preferredSportsbook == .bestLine {
+            // Find the best moneyline (least negative = most favorable)
+            displayBook = allBookOdds
+                .filter { $0.favoriteMoneylineOdds != nil }
+                .max { ($0.favoriteMoneylineOdds ?? -9999) < ($1.favoriteMoneylineOdds ?? -9999) }
+            selectedSportsbook = displayBook?.book
+        } else {
+            // Use the user's preferred book
+            displayBook = allBookOdds.first { $0.book == preferredSportsbook }
+            selectedSportsbook = preferredSportsbook
+        }
         
-        let moneylineDisplay = formatMoneyline(
-            homeCode: scheduleGame.homeTeam,
-            awayCode: scheduleGame.awayTeam,
-            homeName: oddsGame.homeTeam,
-            awayName: oddsGame.awayTeam,
-            market: h2hMarket
-        )
+        // Fallback to any available book if preferred not found
+        let finalBook = displayBook ?? allBookOdds.first
+        let finalSportsbook = selectedSportsbook ?? finalBook?.book
         
-        let favoriteML = extractFavoriteMoneyline(
-            homeCode: scheduleGame.homeTeam,
-            awayCode: scheduleGame.awayTeam,
-            homeName: oddsGame.homeTeam,
-            awayName: oddsGame.awayTeam,
-            market: h2hMarket
-        )
+        // Format display values from the selected book
+        let spreadDisplay: String?
+        if let spread = finalBook?.spreadPoints, let teamCode = finalBook?.spreadTeamCode {
+            spreadDisplay = "\(teamCode) \(formatPoint(spread))"
+        } else {
+            spreadDisplay = nil
+        }
+        
+        let totalDisplay: String?
+        let totalPoints: String?
+        if let total = finalBook?.totalPoints {
+            totalDisplay = "O/U \(formatPoint(total))"
+            totalPoints = formatPoint(total)
+        } else {
+            totalDisplay = nil
+            totalPoints = nil
+        }
         
         // Avoid returning empty objects
-        if spreadDisplay == nil && totalDisplay == nil && moneylineDisplay == nil {
+        if finalBook?.favoriteMoneylineDisplay == nil && spreadDisplay == nil && totalDisplay == nil {
             return nil
         }
         
@@ -339,13 +406,73 @@ final class BettingOddsService {
             awayTeamCode: scheduleGame.awayTeam,
             spreadDisplay: spreadDisplay,
             totalDisplay: totalDisplay,
-            favoriteMoneylineTeamCode: favoriteML?.teamCode,
-            favoriteMoneylineOdds: favoriteML?.odds,
+            favoriteMoneylineTeamCode: finalBook?.favoriteTeamCode,
+            favoriteMoneylineOdds: finalBook?.favoriteMoneylineDisplay,
             totalPoints: totalPoints,
-            moneylineDisplay: moneylineDisplay,
-            sportsbook: bookmaker?.title,
-            lastUpdated: nil
+            moneylineDisplay: nil, // We don't need the full ML display anymore
+            sportsbook: finalSportsbook?.displayName,
+            sportsbookEnum: finalSportsbook,
+            lastUpdated: Date(),
+            allBookOdds: allBookOdds
         )
+    }
+    
+    // 🔥 NEW: Extract numeric moneyline for comparison
+    private func extractFavoriteMoneylineNumeric(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> (teamCode: String, odds: Int, display: String)? {
+        guard let market = market else { return nil }
+        
+        func outcome(forTeamName name: String) -> TheOddsOutcome? {
+            return market.outcomes.first(where: { teamsMatch($0.name, name) })
+        }
+        
+        guard let homeOutcome = outcome(forTeamName: homeName),
+              let awayOutcome = outcome(forTeamName: awayName) else {
+            return nil
+        }
+        
+        let homePrice = Int(homeOutcome.price)
+        let awayPrice = Int(awayOutcome.price)
+        
+        // Favorite is the more negative price
+        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
+        let teamCode = homeIsFav ? homeCode : awayCode
+        let price = homeIsFav ? homePrice : awayPrice
+        let display = price > 0 ? "+\(price)" : "\(price)"
+        
+        return (teamCode, price, display)
+    }
+    
+    // 🔥 NEW: Extract spread info (points and team)
+    private func extractSpreadInfo(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> (teamCode: String, points: Double)? {
+        guard let market = market else { return nil }
+        
+        func point(forTeamName name: String) -> Double? {
+            return market.outcomes.first(where: { teamsMatch($0.name, name) })?.point
+        }
+        
+        guard let homePoint = point(forTeamName: homeName),
+              let awayPoint = point(forTeamName: awayName) else {
+            return nil
+        }
+        
+        // Favorite is the team with negative points
+        if homePoint < awayPoint {
+            return (homeCode, homePoint)
+        } else {
+            return (awayCode, awayPoint)
+        }
     }
     
     private func formatSpread(

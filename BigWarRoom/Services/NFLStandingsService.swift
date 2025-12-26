@@ -159,7 +159,7 @@ final class NFLStandingsService {
     // MARK: - ESPN Standings (Playoff clincher / seed / eliminated)
     //
     // We use ESPN's standings endpoint to avoid trying to re-implement NFL elimination math.
-    // This brings our Schedule tab badges (CLINCH / HUNT / BUBBLE / NIXED) back in line with
+    // This brings our Schedule tab badges (CLINCH / HUNT / BUBBLE / OUT) back in line with
     // the source-of-truth flags (clincher + playoffSeed).
     private struct ESPNStandingsV2Response: Decodable {
         let children: [Child]?

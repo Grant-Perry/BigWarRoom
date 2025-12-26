@@ -23,6 +23,13 @@ struct NFLScheduleView: View {
     // 🔥 NEW: Add UnifiedLeagueManager for bye week impact analysis
     @State private var unifiedLeagueManager: UnifiedLeagueManager?
     
+    // 🔥 Collapsible sections - all collapsed by default
+    @State private var expandedDays: Set<String> = []
+    @State private var expandedTimeSlots: Set<String> = []
+    
+    // 🔥 Card style toggle - compact vs full (default to COMPACT)
+    @AppStorage("ScheduleCardStyleCompact") private var useCompactCards: Bool = true
+    
     // 🔥 SIMPLIFIED: No params needed, use .shared internally
     init() {}
     
@@ -137,11 +144,11 @@ struct NFLScheduleView: View {
     
     // MARK: -> FOX Style Background
     private var foxStyleBackground: some View {
-        // Use BG2 asset from assets folder with reduced opacity
-        Image("BG2")
+        // Use BG3 asset with reduced opacity
+        Image("BG3")
             .resizable()
             .aspectRatio(contentMode: .fill)
-            .opacity(0.4) // Set to 0.4 opacity as requested
+            .opacity(0.35)
             .ignoresSafeArea(.all)
     }
     
@@ -151,17 +158,47 @@ struct NFLScheduleView: View {
             // Week picker - using reusable TheWeekPicker component
             TheWeekPicker(showingWeekPicker: $showingWeekPicker)
             
-            // Week starting date with calendar icon
-            HStack(spacing: 6) {
-                Image(systemName: "calendar")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
+            // Week starting date + Card style toggle
+            HStack {
+                // Week starting date with calendar icon
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                    
+                    Text(getWeekStartDate())
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
                 
-                Text(getWeekStartDate())
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
+                Spacer()
+                
+                // Card style toggle
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        useCompactCards.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: useCompactCards ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(useCompactCards ? "Compact" : "Full")
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.1))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color.gpGreen.opacity(0.4), lineWidth: 1)
+                            )
+                    )
+                }
             }
-            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 2)
             
             // Live indicator (only show if live games)
             if viewModel.games.contains(where: { $0.isLive }) {
@@ -257,37 +294,48 @@ struct NFLScheduleView: View {
     
     // MARK: -> Games Scroll View
     private func gamesScrollView(viewModel: NFLScheduleViewModel) -> some View {
-        ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 8) {
-                ForEach(viewModel.games, id: \.id) { game in
-                    // 🏈 NAVIGATION FREEDOM: Use NavigationLink instead of Button + sheet
-                    NavigationLink(destination: TeamFilteredMatchupsView(
-                                    awayTeam: game.awayTeam,
-                                    homeTeam: game.homeTeam,
-                                    matchupsHubViewModel: matchupsHubViewModel,
-                                    gameData: game
-                                )) {
-                        ScheduleGameCard(game: game, odds: viewModel.gameOddsByGameID[game.id]) {
-                            // NavigationLink handles navigation
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(width: UIScreen.main.bounds.width * 0.8)
-                        .contentShape(Rectangle())
+        let groupedByDay = groupGamesByDay(viewModel.games)
+        let sortedDays = groupedByDay.keys.sorted { day1, day2 in
+            guard let game1 = groupedByDay[day1]?.values.flatMap({ $0 }).first?.startDate,
+                  let game2 = groupedByDay[day2]?.values.flatMap({ $0 }).first?.startDate else { return false }
+            return game1 < game2
+        }
+        
+        return ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 16) {
+                ForEach(sortedDays, id: \.self) { day in
+                    if let timeSlots = groupedByDay[day] {
+                        daySectionView(
+                            day: day,
+                            timeSlots: timeSlots,
+                            viewModel: viewModel
+                        )
                     }
-                    .buttonStyle(PlainButtonStyle())
+                }
+                .onAppear {
+                    // Expand first day initially (if nothing is expanded yet)
+                    if expandedDays.isEmpty, let firstDay = sortedDays.first {
+                        expandedDays.insert(firstDay)
+                        // Also expand all time slots in the first day
+                        if let timeSlots = groupedByDay[firstDay] {
+                            for time in timeSlots.keys {
+                                expandedTimeSlots.insert("\(firstDay)_\(time)")
+                            }
+                        }
+                    }
                 }
                 
-                // BYE Week Section - 🔥 UPDATED: Pass dependencies for impact analysis
+                // BYE Week Section
                 if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
                         matchupsHubViewModel: matchupsHubViewModel
                     )
-                    .padding(.top, 24)
+                    .padding(.top, 12)
                 }
                 
-                // FULL SLATE banner + key (inline, under the banner)
+                // FULL SLATE banner + key
                 if viewModel.byeWeekTeams.isEmpty {
                     VStack(spacing: 10) {
                         noByeWeeksBanner
@@ -296,12 +344,417 @@ struct NFLScheduleView: View {
                             playoffStatusKey
                         }
                     }
-                    .padding(.top, 24)
+                    .padding(.top, 12)
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.top, 8)
             .padding(.bottom, 32)
+        }
+    }
+    
+    // MARK: -> Group Games by Day, then by Time
+    private func groupGamesByDay(_ games: [ScheduleGame]) -> [String: [String: [ScheduleGame]]] {
+        var grouped: [String: [String: [ScheduleGame]]] = [:]
+        
+        let dayFormatter = DateFormatter()
+        dayFormatter.dateFormat = "EEEE" // e.g., "Sunday"
+        
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "h:mm a" // e.g., "1:00 PM"
+        
+        for game in games {
+            let dayKey: String
+            let timeKey: String
+            
+            if let date = game.startDate {
+                dayKey = dayFormatter.string(from: date)
+                timeKey = timeFormatter.string(from: date)
+            } else {
+                dayKey = game.dayName.isEmpty ? "TBD" : game.dayName
+                timeKey = game.startTime.isEmpty ? "TBD" : game.startTime
+            }
+            
+            if grouped[dayKey] == nil {
+                grouped[dayKey] = [:]
+            }
+            if grouped[dayKey]?[timeKey] == nil {
+                grouped[dayKey]?[timeKey] = []
+            }
+            grouped[dayKey]?[timeKey]?.append(game)
+        }
+        
+        return grouped
+    }
+    
+    // MARK: -> Day Section View
+    private func daySectionView(
+        day: String,
+        timeSlots: [String: [ScheduleGame]],
+        viewModel: NFLScheduleViewModel
+    ) -> some View {
+        // Check if day has any LIVE games (not just completed)
+        let allGamesInDay = timeSlots.values.flatMap { $0 }
+        let hasLiveGames = allGamesInDay.contains { $0.isLive }
+        
+        // Only force-expand if there are LIVE games
+        let isDayExpanded = hasLiveGames || expandedDays.contains(day)
+        let totalGames = allGamesInDay.count
+        
+        // Sort time slots by actual time
+        let sortedTimeSlots = timeSlots.keys.sorted { time1, time2 in
+            guard let game1 = timeSlots[time1]?.first?.startDate,
+                  let game2 = timeSlots[time2]?.first?.startDate else { return false }
+            return game1 < game2
+        }
+        
+        return VStack(spacing: 0) {
+            // Day Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    if expandedDays.contains(day) {
+                        expandedDays.remove(day)
+                        // Also collapse all time slots in this day
+                        for time in sortedTimeSlots {
+                            expandedTimeSlots.remove("\(day)_\(time)")
+                        }
+                    } else {
+                        expandedDays.insert(day)
+                        // Also expand all time slots in this day
+                        for time in sortedTimeSlots {
+                            expandedTimeSlots.insert("\(day)_\(time)")
+                        }
+                    }
+                }
+            } label: {
+                dayHeader(
+                    day: day,
+                    gameCount: totalGames,
+                    isExpanded: isDayExpanded,
+                    isCollapsible: true,
+                    hasLiveGames: hasLiveGames
+                )
+            }
+            .buttonStyle(.plain)
+            
+            // Time Slots (if day is expanded)
+            if isDayExpanded {
+                VStack(spacing: 8) {
+                    ForEach(sortedTimeSlots, id: \.self) { time in
+                        if let games = timeSlots[time] {
+                            timeSlotSection(
+                                time: time,
+                                day: day,
+                                games: games,
+                                viewModel: viewModel
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color.black.opacity(0.6))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.gpGreen.opacity(0.5), Color.gpGreen.opacity(0.15)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .padding(.horizontal, 12)
+    }
+    
+    // MARK: -> Day Header
+    private func dayHeader(
+        day: String,
+        gameCount: Int,
+        isExpanded: Bool,
+        isCollapsible: Bool,
+        hasLiveGames: Bool = false
+    ) -> some View {
+        HStack(spacing: 12) {
+            // Chevron with gradient
+            Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
+                .font(.system(size: 20, weight: .bold))
+                .foregroundStyle(
+                    hasLiveGames 
+                        ? LinearGradient(colors: [.red, .red.opacity(0.5)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+            
+            // Day name
+            Text(day.uppercased())
+                .font(.system(size: 18, weight: .black, design: .default))
+                .foregroundColor(.white)
+                .kerning(2.0)
+            
+            // Live indicator
+            if hasLiveGames {
+                Text("LIVE")
+                    .font(.system(size: 9, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.red))
+            }
+            
+            Spacer()
+            
+            // Game count badge - styled like Week 17 picker
+            Text("\(gameCount)")
+                .font(.custom("BebasNeue-Regular", size: 22))
+                .foregroundColor(.white)
+                .frame(minWidth: 32, minHeight: 32)
+                .background(
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.gpGreen.opacity(0.8), Color.blue.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.gpGreen.opacity(0.6), Color.blue.opacity(0.6)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.gpGreen.opacity(0.3),
+                            Color.blue.opacity(0.3)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.gpGreen.opacity(0.6),
+                            Color.blue.opacity(0.6)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.gpGreen.opacity(0.2), radius: 8, x: 0, y: 4)
+    }
+    
+    // MARK: -> Time Slot Section
+    private func timeSlotSection(
+        time: String,
+        day: String,
+        games: [ScheduleGame],
+        viewModel: NFLScheduleViewModel
+    ) -> some View {
+        let slotKey = "\(day)_\(time)"
+        let hasLiveGames = games.contains { $0.isLive }
+        
+        // Only force-expand if there are LIVE games
+        let isExpanded = hasLiveGames || expandedTimeSlots.contains(slotKey)
+        
+        return VStack(spacing: 0) {
+            // Time Header
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    if expandedTimeSlots.contains(slotKey) {
+                        expandedTimeSlots.remove(slotKey)
+                    } else {
+                        expandedTimeSlots.insert(slotKey)
+                    }
+                }
+            } label: {
+                timeSlotHeader(
+                    time: time,
+                    day: day,
+                    gameCount: games.count,
+                    isExpanded: isExpanded,
+                    isCollapsible: true,
+                    games: games,
+                    viewModel: viewModel
+                )
+            }
+            .buttonStyle(.plain)
+            
+            // Games (if expanded) - indented narrower than header
+            if isExpanded {
+                VStack(spacing: useCompactCards ? 6 : 10) {
+                    ForEach(games, id: \.id) { game in
+                        NavigationLink(destination: TeamFilteredMatchupsView(
+                            awayTeam: game.awayTeam,
+                            homeTeam: game.homeTeam,
+                            matchupsHubViewModel: matchupsHubViewModel,
+                            gameData: game
+                        )) {
+                            if useCompactCards {
+                                ScheduleGameCardCompact(
+                                    game: game,
+                                    odds: viewModel.gameOddsByGameID[game.id]
+                                )
+                            } else {
+                                ScheduleGameCard(
+                                    game: game,
+                                    odds: viewModel.gameOddsByGameID[game.id],
+                                    action: {}
+                                )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, useCompactCards ? 20 : 12) // Less indent for full cards
+                .padding(.top, 8)
+                .padding(.bottom, 10)
+            }
+        }
+    }
+    
+    // MARK: -> Time Slot Header
+    private func timeSlotHeader(
+        time: String,
+        day: String,
+        gameCount: Int,
+        isExpanded: Bool,
+        isCollapsible: Bool,
+        games: [ScheduleGame],
+        viewModel: NFLScheduleViewModel
+    ) -> some View {
+        let hasLiveGames = games.contains { $0.isLive }
+        
+        return HStack(spacing: 10) {
+            // Chevron with gradient
+            Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(
+                    hasLiveGames
+                        ? LinearGradient(colors: [.red, .red.opacity(0.4)], startPoint: .top, endPoint: .bottom)
+                        : LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                )
+                .frame(width: 14)
+            
+            // Time text - larger
+            Text(time)
+                .font(.system(size: 16, weight: .bold, design: .default))
+                .foregroundColor(.white)
+            
+            // Live indicator
+            if hasLiveGames {
+                Circle()
+                    .fill(Color.red)
+                    .frame(width: 6, height: 6)
+            }
+            
+            Text("•")
+                .foregroundColor(.white.opacity(0.4))
+            
+            Text("\(gameCount) game\(gameCount == 1 ? "" : "s")")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+            
+            Spacer()
+            
+            // Mini odds preview (when collapsed)
+            if !isExpanded {
+                miniOddsPreview(games: games, viewModel: viewModel)
+            }
+            
+            // Day name on trailing - same size as time, so when scrolled you know the day
+            Text(day.uppercased())
+                .font(.system(size: 16, weight: .bold, design: .default))
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.gpGreen.opacity(0.25),
+                            Color.blue.opacity(0.25)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.gpGreen.opacity(0.5),
+                            Color.blue.opacity(0.5)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.gpGreen.opacity(0.15), radius: 6, x: 0, y: 3)
+    }
+    
+    // MARK: -> Mini Odds Preview (shown when collapsed)
+    private func miniOddsPreview(games: [ScheduleGame], viewModel: NFLScheduleViewModel) -> some View {
+        let previewGames = Array(games.prefix(3))
+        
+        return HStack(spacing: 4) {
+            ForEach(previewGames, id: \.id) { game in
+                if let odds = viewModel.gameOddsByGameID[game.id],
+                   let team = odds.favoriteMoneylineTeamCode,
+                   let ml = odds.favoriteMoneylineOdds {
+                    HStack(spacing: 2) {
+                        Text(team)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white.opacity(0.8))
+                        Text(ml)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundColor(.gpGreen)
+                    }
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.08))
+                    )
+                }
+            }
+            
+            if games.count > 3 {
+                Text("+\(games.count - 3)")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.white.opacity(0.4))
+            }
         }
     }
     
@@ -340,8 +793,62 @@ struct NFLScheduleView: View {
     }
 
     private var playoffStatusKey: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            playoffStatusKeyExplanation
+        VStack(spacing: 12) {
+            // Playoff Status Section - styled like FULL SLATE
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "flag.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.gpGreen)
+                    
+                    Text("PLAYOFF STATUS")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundColor(.white)
+                        .kerning(1.2)
+                    
+                    Spacer()
+                }
+                
+                playoffStatusKeyExplanation
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
+                    )
+            )
+            
+            // Sportsbook Legend Section - styled like FULL SLATE
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "dollarsign.circle.fill")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.gpGreen)
+                    
+                    Text("ODDS SOURCE")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundColor(.white)
+                        .kerning(1.2)
+                    
+                    Spacer()
+                }
+                
+                sportsbookLegend
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.06))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
+                    )
+            )
         }
         .padding(.horizontal, 20)
     }
@@ -351,7 +858,45 @@ struct NFLScheduleView: View {
             statusExplainLine(code: "CLINCH", pillColor: .blue, text: "Clinched playoff berth")
             statusExplainLine(code: "HUNT", pillColor: .green, text: "Currently in a playoff spot (not clinched)")
             statusExplainLine(code: "BUBBLE", pillColor: .orange, text: "Outside the playoff spots, still alive")
-            statusExplainLine(code: "NIXED", pillColor: .red, text: "Eliminated from playoff contention")
+            statusExplainLine(code: "OUT", pillColor: .red, text: "Eliminated from playoff contention")
+        }
+    }
+    
+    // MARK: -> Sportsbook Legend
+    private var sportsbookLegend: some View {
+        let row1: [Sportsbook] = [.draftkings, .fanduel, .betmgm, .caesars]
+        let row2: [Sportsbook] = [.pointsbet, .betrivers, .pinnacle, .bestLine]
+        
+        return VStack(spacing: 12) {
+            // Row 1: DK, FD, MGM, CZR
+            HStack(spacing: 0) {
+                ForEach(row1) { book in
+                    VStack(spacing: 3) {
+                        SportsbookBadge(book: book, size: 11)
+                        Text(book.displayName)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            
+            // Row 2: PB, BR, PIN, Best
+            HStack(spacing: 0) {
+                ForEach(row2) { book in
+                    VStack(spacing: 3) {
+                        SportsbookBadge(book: book, size: 11)
+                        Text(book.displayName)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.75))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
         }
     }
     
