@@ -12,6 +12,7 @@ struct ScheduleGameCard: View {
     let game: ScheduleGame
     let odds: GameBettingOdds?
     let action: () -> Void
+    var showDayTime: Bool = false  // For classic mode - shows day/time in center
     
     @State private var teamAssets = TeamAssetManager.shared
     @State private var standingsService = NFLStandingsService.shared
@@ -116,51 +117,68 @@ struct ScheduleGameCard: View {
                             .foregroundColor(.white.opacity(0.7))
                     }
                 } else {
-                    // Upcoming game - clean odds display (day/time is in the header)
-                    if let odds = odds {
-                        VStack(spacing: 4) {
-                            // Moneyline - big and bold
-                            if let team = odds.favoriteMoneylineTeamCode,
-                               let ml = odds.favoriteMoneylineOdds {
-                                HStack(spacing: 6) {
-                                    Text(team)
-                                        .font(.system(size: 16, weight: .black))
-                                        .foregroundColor(.white)
-                                    Text(ml)
-                                        .font(.system(size: 16, weight: .bold))
-                                        .foregroundColor(.gpGreen)
-                                }
-                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                            } else if let spread = odds.spreadDisplay {
-                                Text(spread)
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    // Upcoming game
+                    VStack(spacing: 2) {
+                        // Show day/time for classic mode
+                        if showDayTime {
+                            if !game.dayName.isEmpty && game.dayName != "TBD" {
+                                Text(game.dayName.uppercased())
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.7))
                             }
                             
-                            // O/U + sportsbook badge
-                            HStack(spacing: 5) {
-                                if let total = odds.totalPoints {
-                                    Image(systemName: "arrow.up.arrow.down")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white.opacity(0.6))
-                                    
-                                    Text(total)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.85))
+                            Text(game.startTime)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundColor(.white)
+                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                        }
+                        
+                        // Odds display
+                        if let odds = odds {
+                            VStack(spacing: 2) {
+                                // Moneyline
+                                if let team = odds.favoriteMoneylineTeamCode,
+                                   let ml = odds.favoriteMoneylineOdds {
+                                    HStack(spacing: 4) {
+                                        Text(team)
+                                            .font(.system(size: showDayTime ? 12 : 16, weight: .black))
+                                            .foregroundColor(.white)
+                                        Text(ml)
+                                            .font(.system(size: showDayTime ? 12 : 16, weight: .bold))
+                                            .foregroundColor(.gpGreen)
+                                    }
+                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                                } else if let spread = odds.spreadDisplay {
+                                    Text(spread)
+                                        .font(.system(size: showDayTime ? 11 : 14, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                 }
                                 
-                                if let book = odds.sportsbookEnum {
-                                    SportsbookBadge(book: book, size: 9)
+                                // O/U + sportsbook badge
+                                HStack(spacing: 4) {
+                                    if let total = odds.totalPoints {
+                                        Image(systemName: "arrow.up.arrow.down")
+                                            .font(.system(size: 8, weight: .bold))
+                                            .foregroundColor(.white.opacity(0.6))
+                                        
+                                        Text(total)
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(.white.opacity(0.85))
+                                    }
+                                    
+                                    if let book = odds.sportsbookEnum {
+                                        SportsbookBadge(book: book, size: 8)
+                                    }
                                 }
+                                .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
                             }
-                            .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                        } else if !showDayTime {
+                            // No odds and no day/time - show placeholder
+                            Text("—")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundColor(.white.opacity(0.3))
                         }
-                    } else {
-                        // No odds available
-                        Text("—")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.white.opacity(0.3))
                     }
                 }
             }

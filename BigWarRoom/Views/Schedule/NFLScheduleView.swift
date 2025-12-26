@@ -27,8 +27,26 @@ struct NFLScheduleView: View {
     @State private var expandedDays: Set<String> = []
     @State private var expandedTimeSlots: Set<String> = []
     
-    // 🔥 Card style toggle - compact vs full (default to COMPACT)
-    @AppStorage("ScheduleCardStyleCompact") private var useCompactCards: Bool = true
+    // 🔥 Card style: 0 = Compact, 1 = Full, 2 = Classic (flat list, no grouping)
+    @AppStorage("ScheduleCardStyle") private var cardStyle: Int = 2
+    
+    private var cardStyleLabel: String {
+        switch cardStyle {
+        case 0: return "Compact"
+        case 1: return "Full"
+        case 2: return "Classic"
+        default: return "Compact"
+        }
+    }
+    
+    private var cardStyleIcon: String {
+        switch cardStyle {
+        case 0: return "rectangle.compress.vertical"
+        case 1: return "rectangle.expand.vertical"
+        case 2: return "list.bullet"
+        default: return "rectangle.compress.vertical"
+        }
+    }
     
     // 🔥 SIMPLIFIED: No params needed, use .shared internally
     init() {}
@@ -174,16 +192,16 @@ struct NFLScheduleView: View {
                 
                 Spacer()
                 
-                // Card style toggle
+                // Card style toggle (cycles: Compact -> Full -> Classic)
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        useCompactCards.toggle()
+                        cardStyle = (cardStyle + 1) % 3
                     }
                 } label: {
                     HStack(spacing: 4) {
-                        Image(systemName: useCompactCards ? "rectangle.compress.vertical" : "rectangle.expand.vertical")
+                        Image(systemName: cardStyleIcon)
                             .font(.system(size: 11, weight: .semibold))
-                        Text(useCompactCards ? "Compact" : "Full")
+                        Text(cardStyleLabel)
                             .font(.system(size: 11, weight: .semibold))
                     }
                     .foregroundColor(.white.opacity(0.8))
@@ -238,7 +256,12 @@ struct NFLScheduleView: View {
             } else if viewModel.games.isEmpty {
                 emptyStateView
             } else {
-                gamesScrollView(viewModel: viewModel)
+                // Classic mode = flat list, otherwise grouped
+                if cardStyle == 2 {
+                    classicFlatListView(viewModel: viewModel)
+                } else {
+                    gamesScrollView(viewModel: viewModel)
+                }
             }
         }
     }
@@ -292,6 +315,63 @@ struct NFLScheduleView: View {
         .padding(.top, 60)
     }
     
+    // MARK: -> Classic Flat List View (no grouping - original layout)
+    private func classicFlatListView(viewModel: NFLScheduleViewModel) -> some View {
+        let sortedGames = viewModel.games.sorted { 
+            ($0.startDate ?? Date.distantFuture) < ($1.startDate ?? Date.distantFuture)
+        }
+        
+        return ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 10) {
+                ForEach(sortedGames, id: \.id) { game in
+                    NavigationLink(destination: TeamFilteredMatchupsView(
+                        awayTeam: game.awayTeam,
+                        homeTeam: game.homeTeam,
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        gameData: game
+                    )) {
+                        // Use the original full card with day/time shown
+                        ScheduleGameCard(
+                            game: game,
+                            odds: viewModel.gameOddsByGameID[game.id],
+                            action: {},
+                            showDayTime: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                // BYE Week Section
+                if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
+                    ScheduleByeWeekSection(
+                        byeTeams: viewModel.byeWeekTeams,
+                        unifiedLeagueManager: manager,
+                        matchupsHubViewModel: matchupsHubViewModel
+                    )
+                    .padding(.top, 12)
+                }
+                
+                // FULL SLATE banner + key
+                if viewModel.byeWeekTeams.isEmpty {
+                    VStack(spacing: 10) {
+                        noByeWeeksBanner
+                        
+                        if shouldShowPlayoffKey(for: viewModel) {
+                            playoffStatusKey
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+                
+                Spacer(minLength: 100)
+            }
+            .padding(.horizontal, 16)
+        }
+        .refreshable {
+            await viewModel.refreshSchedule()
+        }
+    }
+    
     // MARK: -> Games Scroll View
     private func gamesScrollView(viewModel: NFLScheduleViewModel) -> some View {
         let groupedByDay = groupGamesByDay(viewModel.games)
@@ -316,7 +396,7 @@ struct NFLScheduleView: View {
                     // Expand first day initially (if nothing is expanded yet)
                     if expandedDays.isEmpty, let firstDay = sortedDays.first {
                         expandedDays.insert(firstDay)
-                        // Also expand all time slots in the first day
+                        // Expand ALL time slots in the first day
                         if let timeSlots = groupedByDay[firstDay] {
                             for time in timeSlots.keys {
                                 expandedTimeSlots.insert("\(firstDay)_\(time)")
@@ -413,12 +493,18 @@ struct NFLScheduleView: View {
             Button {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     if expandedDays.contains(day) {
+                        // Collapse this day
                         expandedDays.remove(day)
                         // Also collapse all time slots in this day
                         for time in sortedTimeSlots {
                             expandedTimeSlots.remove("\(day)_\(time)")
                         }
                     } else {
+                        // 🔥 Accordion: Close all other days first
+                        expandedDays.removeAll()
+                        expandedTimeSlots.removeAll()
+                        
+                        // Now expand this day
                         expandedDays.insert(day)
                         // Also expand all time slots in this day
                         for time in sortedTimeSlots {
@@ -607,7 +693,7 @@ struct NFLScheduleView: View {
             
             // Games (if expanded) - indented narrower than header
             if isExpanded {
-                VStack(spacing: useCompactCards ? 6 : 10) {
+                VStack(spacing: cardStyle == 0 ? 6 : 10) {
                     ForEach(games, id: \.id) { game in
                         NavigationLink(destination: TeamFilteredMatchupsView(
                             awayTeam: game.awayTeam,
@@ -615,7 +701,7 @@ struct NFLScheduleView: View {
                             matchupsHubViewModel: matchupsHubViewModel,
                             gameData: game
                         )) {
-                            if useCompactCards {
+                            if cardStyle == 0 {
                                 ScheduleGameCardCompact(
                                     game: game,
                                     odds: viewModel.gameOddsByGameID[game.id]
@@ -631,7 +717,7 @@ struct NFLScheduleView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, useCompactCards ? 20 : 12) // Less indent for full cards
+                .padding(.horizontal, cardStyle == 0 ? 20 : 12) // Less indent for full cards
                 .padding(.top, 8)
                 .padding(.bottom, 10)
             }
