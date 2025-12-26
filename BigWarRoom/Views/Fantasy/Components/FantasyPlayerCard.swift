@@ -145,6 +145,7 @@ struct FantasyPlayerCard: View {
             player: player,
             isPlayerLive: vm.isPlayerLive(player),
             glowIntensity: vm.glowIntensity,
+            isBench: isBench,
             onScoreTap: {
                 showingScoreBreakdown = true
             },

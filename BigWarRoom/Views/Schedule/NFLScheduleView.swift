@@ -15,6 +15,10 @@ struct NFLScheduleView: View {
     @State private var showingTeamMatchups = false
     @State private var selectedGame: ScheduleGame?
     @State private var navigationPath = NavigationPath()
+    @State private var standingsService = NFLStandingsService.shared
+    
+    // Keep legend pills same width so the explanation text aligns
+    private let legendPillWidth: CGFloat = 78
     
     // 🔥 NEW: Add UnifiedLeagueManager for bye week impact analysis
     @State private var unifiedLeagueManager: UnifiedLeagueManager?
@@ -281,9 +285,18 @@ struct NFLScheduleView: View {
                         matchupsHubViewModel: matchupsHubViewModel
                     )
                     .padding(.top, 24)
-                } else if viewModel.byeWeekTeams.isEmpty {
-                    noByeWeeksBanner
-                        .padding(.top, 24)
+                }
+                
+                // FULL SLATE banner + key (inline, under the banner)
+                if viewModel.byeWeekTeams.isEmpty {
+                    VStack(spacing: 10) {
+                        noByeWeeksBanner
+                        
+                        if shouldShowPlayoffKey(for: viewModel) {
+                            playoffStatusKey
+                        }
+                    }
+                    .padding(.top, 24)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -324,6 +337,62 @@ struct NFLScheduleView: View {
             )
         }
         .padding(.horizontal, 20)
+    }
+
+    private var playoffStatusKey: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            playoffStatusKeyExplanation
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var playoffStatusKeyExplanation: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            statusExplainLine(code: "CLINCH", pillColor: .blue, text: "Clinched playoff berth")
+            statusExplainLine(code: "HUNT", pillColor: .green, text: "Currently in a playoff spot (not clinched)")
+            statusExplainLine(code: "BUBBLE", pillColor: .orange, text: "Outside the playoff spots, still alive")
+            statusExplainLine(code: "NIXED", pillColor: .red, text: "Eliminated from playoff contention")
+        }
+    }
+    
+    private func statusExplainLine(code: String, pillColor: Color, text: String) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            statusKeyPill(text: code, color: pillColor)
+                .frame(width: legendPillWidth, alignment: .center)
+            
+//            Text(":")
+//                .font(.system(size: 11, weight: .bold))
+//                .foregroundColor(.white.opacity(0.85))
+            
+            Text(text)
+                .font(.system(size: 11, weight: .medium)) // bump 1 step
+                .foregroundColor(.white.opacity(0.75))
+        }
+    }
+    
+    private func statusKeyPill(text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .black))
+            .foregroundColor(.white)
+            .kerning(1.1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(color.opacity(0.85))
+            )
+    }
+    
+    private func shouldShowPlayoffKey(for viewModel: NFLScheduleViewModel) -> Bool {
+        // Show the key only when at least one team on this week's slate is clinched or eliminated.
+        let teamCodes = Set(viewModel.games.flatMap { [$0.awayTeam, $0.homeTeam] })
+        for code in teamCodes {
+            let status = standingsService.getPlayoffStatus(for: code)
+            if status == .clinched || status == .eliminated {
+                return true
+            }
+        }
+        return false
     }
 
     // MARK: - Helper function to get week start date

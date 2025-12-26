@@ -156,6 +156,39 @@ final class NFLStandingsService {
         "TEN": "10", "WSH": "28", "WAS": "28" // Handle both Washington codes
     ]
     
+    // MARK: - ESPN Standings (Playoff clincher / seed / eliminated)
+    //
+    // We use ESPN's standings endpoint to avoid trying to re-implement NFL elimination math.
+    // This brings our Schedule tab badges (CLINCH / HUNT / BUBBLE / NIXED) back in line with
+    // the source-of-truth flags (clincher + playoffSeed).
+    private struct ESPNStandingsV2Response: Decodable {
+        let children: [Child]?
+        
+        struct Child: Decodable {
+            let standings: Standings?
+        }
+        
+        struct Standings: Decodable {
+            let entries: [Entry]?
+        }
+        
+        struct Entry: Decodable {
+            let team: Team
+            let stats: [Stat]?
+        }
+        
+        struct Team: Decodable {
+            let abbreviation: String
+        }
+        
+        struct Stat: Decodable {
+            let name: String?
+            let type: String?
+            let value: Double?
+            let displayValue: String?
+        }
+    }
+    
     // MARK: - Initialization
     
     // 🔥 PHASE 2.5: Make init public for dependency injection
@@ -188,11 +221,16 @@ final class NFLStandingsService {
             
             DebugPrint(mode: .espnAPI, "🏈 Fetching NFL team records from ESPN API...")
             
+            // Prefer ESPN standings flags (clincher/eliminated + playoff seed) for playoff status.
+            // Fallback to our calculation only if the standings endpoint fails.
+            let selectedYear = Int(SeasonYearManager.shared.selectedYear) ?? Calendar.current.component(.year, from: Date())
+            let espnStatusMap = await self.fetchPlayoffStatusMapFromESPNStandings(season: selectedYear)
+            
             // Fetch individual team records
             await withTaskGroup(of: (String, NFLTeamRecord?).self) { group in
-                for (teamCode, teamId) in teamIdMap {
+                for (teamCode, teamId) in self.teamIdMap {
                     group.addTask {
-                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId, playoffStatusMap: [:])
+                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId, playoffStatusMap: espnStatusMap)
                     }
                 }
                 
@@ -219,47 +257,25 @@ final class NFLStandingsService {
                         DebugPrint(mode: .contention, "🔄 Synced WSH -> WAS")
                     }
                     
-                    self.teamRecords = newTeamRecords
-                    
-                    // 🔥 CALCULATE playoff statuses after all records are fetched
-                    let playoffStatuses = self.calculatePlayoffStatuses()
-                    
-                    // Update records with calculated status
-                    for (teamCode, status) in playoffStatuses {
-                        if let record = self.teamRecords[teamCode] {
-                            self.teamRecords[teamCode] = NFLTeamRecord(
-                                teamCode: record.teamCode,
-                                teamName: record.teamName,
-                                wins: record.wins,
-                                losses: record.losses,
-                                ties: record.ties,
-                                playoffStatus: status
-                            )
-                            
-                            // 🔥 FIX: Also update the alternate Washington code
-                            if teamCode == "WAS" {
-                                self.teamRecords["WSH"] = NFLTeamRecord(
-                                    teamCode: "WSH",
+                    // If ESPN standings didn't provide statuses, compute a fallback.
+                    if espnStatusMap.isEmpty {
+                        DebugPrint(mode: .espnAPI, "🏈 ESPN standings status map empty; falling back to local playoff-status calculation")
+                        let playoffStatuses = self.calculatePlayoffStatuses()
+                        for (teamCode, status) in playoffStatuses {
+                            if let record = newTeamRecords[teamCode] {
+                                newTeamRecords[teamCode] = NFLTeamRecord(
+                                    teamCode: record.teamCode,
                                     teamName: record.teamName,
                                     wins: record.wins,
                                     losses: record.losses,
                                     ties: record.ties,
                                     playoffStatus: status
                                 )
-                                DebugPrint(mode: .contention, "🔄 Synced WAS status -> WSH: \(status.displayText)")
-                            } else if teamCode == "WSH" {
-                                self.teamRecords["WAS"] = NFLTeamRecord(
-                                    teamCode: "WAS",
-                                    teamName: record.teamName,
-                                    wins: record.wins,
-                                    losses: record.losses,
-                                    ties: record.ties,
-                                    playoffStatus: status
-                                )
-                                DebugPrint(mode: .contention, "🔄 Synced WSH status -> WAS: \(status.displayText)")
                             }
                         }
                     }
+                    
+                    self.teamRecords = newTeamRecords
                     
                     self.isLoading = false
                     self.cacheTimestamp = Date()
@@ -271,6 +287,61 @@ final class NFLStandingsService {
                     }
                 }
             }
+        }
+    }
+    
+    /// Fetch playoff statuses from ESPN standings (`clincher` + `playoffSeed`).
+    /// Returns an empty map if anything fails (callers should fallback).
+    private func fetchPlayoffStatusMapFromESPNStandings(season: Int) async -> [String: PlayoffStatus] {
+        guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=\(season)") else {
+            return [:]
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let response = try JSONDecoder().decode(ESPNStandingsV2Response.self, from: data)
+            
+            var statusMap: [String: PlayoffStatus] = [:]
+            
+            let children = response.children ?? []
+            for child in children {
+                let entries = child.standings?.entries ?? []
+                for entry in entries {
+                    let rawCode = entry.team.abbreviation.uppercased()
+                    let normalizedCode = normalizeTeamCode(rawCode)
+                    
+                    let clincher = entry.stats?.first(where: { ($0.name ?? $0.type) == "clincher" })?.displayValue?.lowercased()
+                    let seedValue = entry.stats?.first(where: { ($0.name ?? $0.type) == "playoffSeed" })?.value
+                    
+                    // ESPN: clincher 'e' => eliminated, 'x/y/z' => clinched (various clinch types)
+                    if clincher == "e" {
+                        statusMap[normalizedCode] = .eliminated
+                        continue
+                    }
+                    
+                    if clincher == "x" || clincher == "y" || clincher == "z" {
+                        statusMap[normalizedCode] = .clinched
+                        continue
+                    }
+                    
+                    if let seed = seedValue {
+                        statusMap[normalizedCode] = (seed <= 7) ? .alive : .bubble
+                    }
+                }
+            }
+            
+            // Keep both Washington codes in-sync
+            if let wsh = statusMap["WSH"] {
+                statusMap["WAS"] = wsh
+            } else if let was = statusMap["WAS"] {
+                statusMap["WSH"] = was
+            }
+            
+            DebugPrint(mode: .espnAPI, "🏈 ESPN standings status map loaded (\(statusMap.count) teams)")
+            return statusMap
+        } catch {
+            DebugPrint(mode: .espnAPI, "🏈 ESPN standings status map fetch failed: \(error)")
+            return [:]
         }
     }
     

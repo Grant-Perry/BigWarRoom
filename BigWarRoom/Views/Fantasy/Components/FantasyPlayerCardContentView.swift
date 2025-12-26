@@ -12,6 +12,7 @@ struct FantasyPlayerCardMainContentView: View {
     let player: FantasyPlayer
     let isPlayerLive: Bool
     let glowIntensity: Double
+    let isBench: Bool
     
     let onScoreTap: (() -> Void)?
     
@@ -28,6 +29,7 @@ struct FantasyPlayerCardMainContentView: View {
         player: FantasyPlayer,
         isPlayerLive: Bool,
         glowIntensity: Double,
+        isBench: Bool = false,
         onScoreTap: (() -> Void)? = nil,
         fantasyViewModel: FantasyViewModel? = nil,
         sleeperPlayer: SleeperPlayer? = nil,
@@ -36,6 +38,7 @@ struct FantasyPlayerCardMainContentView: View {
         self.player = player
         self.isPlayerLive = isPlayerLive
         self.glowIntensity = glowIntensity
+        self.isBench = isBench
         self.onScoreTap = onScoreTap
         self.fantasyViewModel = fantasyViewModel
         self.sleeperPlayer = sleeperPlayer
@@ -48,6 +51,7 @@ struct FantasyPlayerCardMainContentView: View {
             FantasyPlayerCardHeadshotView(
                 player: player,
                 isPlayerLive: isPlayerLive,
+                isBench: isBench,
                 sleeperPlayer: sleeperPlayer,
                 onPlayerImageTap: onPlayerImageTap
             )
@@ -167,6 +171,7 @@ struct FantasyPlayerCardMainContentView: View {
 struct FantasyPlayerCardHeadshotView: View {
     let player: FantasyPlayer
     let isPlayerLive: Bool
+    let isBench: Bool
     let sleeperPlayer: SleeperPlayer?
     let onPlayerImageTap: (() -> Void)?
     
@@ -186,6 +191,9 @@ struct FantasyPlayerCardHeadshotView: View {
                     playerHeadshot
                 }
             }
+            // Bench headshots should be black & white (only the image/logo, not badges/UI)
+            .saturation(isBench ? 0.0 : 1.0)
+            .opacity(isBench ? 0.65 : 1.0)
             .onTapGesture {
                 onPlayerImageTap?()
             }
