@@ -36,42 +36,40 @@ extension AllLivePlayersViewModel {
         isLoading = true
         errorMessage = nil
 
-        do {
-            // 🔥 ALWAYS load fresh stats from API
-            await loadPlayerStats()
-            
-            // Load matchups
-            await matchupsHubViewModel.loadAllMatchups()
-            
-            // Extract and process players
-            let playerEntries = extractAllPlayers()
-            await buildPlayerData(from: playerEntries)
-            
-            // 🔥 PHASE 3 DI: Update PlayerWatchService with initial data (service passed to extension methods)
-            await notifyPlayerWatchService(with: playerEntries)
-            
-            // Update state
-            lastLoadTime = Date()
-            dataState = allPlayers.isEmpty ? .empty : .loaded
-            isLoading = false
-            
-            // 🔥 SMART DEFAULT: On initial load, check if there are live games
-            // If no live games (e.g., Wednesday), default Active Only to NO
-            if !hasAppliedInitialActiveOnlyDefault {
-                hasAppliedInitialActiveOnlyDefault = true
-                if !hasAnyLiveGames {
-                    DebugPrint(mode: .liveUpdates, "📅 SMART DEFAULT: No live games detected - setting Active Only to NO")
-                    showActiveOnly = false
-                    applyPositionFilter() // Re-apply filters with new setting
-                } else {
-                    DebugPrint(mode: .liveUpdates, "🏈 SMART DEFAULT: Live games detected - keeping Active Only YES")
-                }
+        // Biggest latency culprit was doing these sequentially + always forcing full matchups reload.
+        // Run stats + matchups in parallel. `refreshMatchups()` handles first-load internally.
+        async let statsTask: Void = loadPlayerStats(forceRefresh: false)
+        async let matchupsTask: Void = matchupsHubViewModel.refreshMatchups()
+        
+        // Ensure matchups are ready before extracting players
+        _ = await matchupsTask
+        
+        // Extract and process players
+        let playerEntries = extractAllPlayers()
+        await buildPlayerData(from: playerEntries)
+        
+        // 🔥 PHASE 3 DI: Update PlayerWatchService with initial data (service passed to extension methods)
+        await notifyPlayerWatchService(with: playerEntries)
+
+        // Ensure stats are ready before finalizing (used to enrich views/filters)
+        _ = await statsTask
+        
+        // Update state
+        lastLoadTime = Date()
+        dataState = allPlayers.isEmpty ? .empty : .loaded
+        isLoading = false
+        
+        // 🔥 SMART DEFAULT: On initial load, check if there are live games
+        // If no live games (e.g., Wednesday), default Active Only to NO
+        if !hasAppliedInitialActiveOnlyDefault {
+            hasAppliedInitialActiveOnlyDefault = true
+            if !hasAnyLiveGames {
+                DebugPrint(mode: .liveUpdates, "📅 SMART DEFAULT: No live games detected - setting Active Only to NO")
+                showActiveOnly = false
+                applyPositionFilter() // Re-apply filters with new setting
+            } else {
+                DebugPrint(mode: .liveUpdates, "🏈 SMART DEFAULT: Live games detected - keeping Active Only YES")
             }
-            
-        } catch {
-            errorMessage = "Failed to load players: \(error.localizedDescription)"
-            dataState = .error(error.localizedDescription)
-            isLoading = false
         }
     }
     
@@ -79,7 +77,7 @@ extension AllLivePlayersViewModel {
     // 🔥 REMOVED: No longer using cached data - always fetch fresh
     
     // MARK: - Player Stats Loading
-    internal func loadPlayerStats() async {
+    internal func loadPlayerStats(forceRefresh: Bool = false) async {
         guard !Task.isCancelled else { return }
 
         // 🔥 ALWAYS reload stats - reset flag to force fresh fetch
@@ -99,7 +97,7 @@ extension AllLivePlayersViewModel {
             let freshStats = try await sharedStatsService.loadWeekStats(
                 week: selectedWeek, 
                 year: currentYear, 
-                forceRefresh: true  // 🔥 CRITICAL: Always force fresh data for live updates
+                forceRefresh: forceRefresh
             )
             
             if AppConstants.debug {
@@ -154,7 +152,7 @@ extension AllLivePlayersViewModel {
         
         // 🔥 WOODY'S FIX: Force refresh stats to bypass cache
         DebugPrint(mode: .liveUpdates, "🔥 Forcing fresh stats reload to bypass cache")
-        await loadPlayerStats()  // This now uses forceRefresh: true
+        await loadPlayerStats(forceRefresh: true)
         
         // 🔥 CRITICAL FIX: Actually refresh MatchupsHub data from APIs!
         DebugPrint(mode: .liveUpdates, "🌐 Calling MatchupsHub to fetch fresh scores from APIs...")
@@ -270,7 +268,7 @@ extension AllLivePlayersViewModel {
                 
                 // Reload stats for new week if we have players
                 if !(self.allPlayers.isEmpty) {
-                    await self.loadPlayerStats()
+                    await self.loadPlayerStats(forceRefresh: true)
                 }
                 
                 // RESTORE SEARCH STATE: Put search state back after week change
@@ -295,12 +293,12 @@ extension AllLivePlayersViewModel {
 
     func forceLoadStats() async {
         statsLoaded = false
-        await loadPlayerStats()
+        await loadPlayerStats(forceRefresh: true)
     }
 
     func loadStatsIfNeeded() {
         guard !statsLoaded else { return }
-        Task { await loadPlayerStats() }
+        Task { await loadPlayerStats(forceRefresh: false) }
     }
     
     // MARK: - PlayerWatchService Integration

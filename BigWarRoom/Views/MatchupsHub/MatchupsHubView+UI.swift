@@ -138,8 +138,10 @@ extension MatchupsHubView {
 
             // Check Chopped league elimination
             if matchup.isChoppedLeague {
-                // Filter out eliminated chopped leagues if setting is disabled
-                return showChoppedEliminated || !matchup.isMyManagerEliminated
+                // Filter out eliminated chopped leagues if setting is disabled.
+                // Source of truth for chopped elimination: the computed ranking we built.
+                let isEliminated = (matchup.myTeamRanking?.isEliminated == true)
+                return showChoppedEliminated || !isEliminated
             }
             
             return true // Show all other matchups
