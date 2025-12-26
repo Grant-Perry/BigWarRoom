@@ -184,7 +184,15 @@ final class LeagueMatchupProvider {
     
     /// Check if this is a Chopped league
     func isChoppedLeague() -> Bool {
-        return league.source == .sleeper && matchups.isEmpty && detectedAsChoppedLeague
+        guard league.source == .sleeper else { return false }
+        
+        // Prefer league settings (reliable, available at app launch).
+        if league.league.settings?.isChoppedLeague == true {
+            return true
+        }
+        
+        // Fallback: heuristic detection if settings are missing.
+        return matchups.isEmpty && detectedAsChoppedLeague
     }
     
     /// Get Chopped league summary (if applicable)
@@ -577,9 +585,32 @@ final class LeagueMatchupProvider {
     // MARK: -> Sleeper Data Fetching
     
     private func fetchSleeperData() async {
-        await fetchSleeperScoringSettings()
-        await fetchSleeperWeeklyStats()
-        await fetchSleeperUsersAndRosters()
+        // 🔥 PERF: We already have a `SleeperLeague` from `UnifiedLeagueManager.fetchAllLeagues()`.
+        // Avoid re-fetching `/league/{id}` per league when possible.
+        if sleeperLeague == nil {
+            sleeperLeague = league.league
+        }
+        if sleeperLeagueSettings == nil, let scoringSettings = league.league.scoringSettings {
+            var asAny: [String: Any] = [:]
+            for (k, v) in scoringSettings {
+                asAny[k] = v
+            }
+            sleeperLeagueSettings = asAny
+        }
+        
+        // Fallback (should be rare): fetch full league to get scoring settings if missing.
+        if sleeperLeagueSettings == nil {
+            await fetchSleeperScoringSettings()
+        }
+        
+        // 🔥 PERF: Parallelize independent pre-reqs.
+        // CRITICAL: We MUST await rosters/users before processing matchups because matchup processing
+        // needs manager names + roster->owner mapping. A previous implementation accidentally didn't
+        // await these tasks, causing intermittent "Manager 1/2" fallbacks (race condition).
+        async let statsTask: Void = fetchSleeperWeeklyStats()
+        async let usersRostersTask: Void = fetchSleeperUsersAndRosters()
+        _ = await (statsTask, usersRostersTask)
+
         await fetchSleeperMatchups()
     }
     
@@ -604,28 +635,19 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperWeeklyStats() async {
-        // 🔥 COORDINATION FIX: Only force refresh if SharedStatsService doesn't have recent data
-        // This prevents multiple concurrent LeagueMatchupProvider instances from racing
         do {
-            let hasRecentStats = SharedStatsService.shared.hasCache(week: week, year: year)
-            let shouldForceRefresh = !hasRecentStats
-            
-            if AppConstants.debug && shouldForceRefresh {
-                print("🔥 LeagueMatchupProvider: No recent stats found, forcing fresh load for week \(week)")
-            } else if AppConstants.debug {
-                print("🔥 LeagueMatchupProvider: Using cached stats for week \(week) to prevent race conditions")
-            }
-            
+            // IMPORTANT: Never force-refresh week stats from inside per-league providers.
+            // When multiple leagues load concurrently, force-refresh causes SharedStatsService to cancel
+            // in-flight requests and re-fetch repeatedly, which blows up load times.
             let sharedStats = try await SharedStatsService.shared.loadWeekStats(
                 week: week, 
                 year: year, 
-                forceRefresh: shouldForceRefresh  // 🔥 CRITICAL FIX: Only force refresh if needed
+                forceRefresh: false
             )
             playerStats = sharedStats
             
             if AppConstants.debug {
-                let freshness = shouldForceRefresh ? "FRESH" : "CACHED"
-                print("🔥 LeagueMatchupProvider: Loaded \(freshness) stats for \(sharedStats.count) players")
+                print("🔥 LeagueMatchupProvider: Loaded shared stats for \(sharedStats.count) players (week \(week))")
                 
                 // Debug: Log a few sample scores for consistency tracking
                 let samplePlayers = Array(sharedStats.prefix(3))
@@ -643,14 +665,18 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperUsersAndRosters() async {
-        // Fetch rosters
-        guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters") else { 
-            return 
+        guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters"),
+              let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users") else {
+            return
         }
         
         do {
-            let (data, _) = try await URLSession.shared.data(from: rostersURL)
-            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            // 🔥 PERF: Fetch rosters + users concurrently
+            async let rostersResponse = URLSession.shared.data(from: rostersURL)
+            async let usersResponse = URLSession.shared.data(from: usersURL)
+            let ((rostersData, _), (usersData, _)) = try await (rostersResponse, usersResponse)
+            
+            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: rostersData)
             
             // 🔥 NEW: Store rosters for record lookup
             sleeperRosters = rosters
@@ -685,9 +711,27 @@ final class LeagueMatchupProvider {
             
             rosterIDToManagerID = newRosterMapping
             DebugPrint(mode: .dataSync, limit: 5, "Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
+        
+            // NOTE: `/league/{id}/users` returns league-scoped users with team metadata.
+            // Decode as `SleeperLeagueUser` (NOT `SleeperUser`).
+            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: usersData)
             
-            // Fetch users
-            await fetchSleeperUsers()
+            var newUserIDs: [String: String] = [:]
+            var newUserAvatars: [String: URL] = [:]
+            
+            for user in users {
+                // Prefer team name, then display name, then a stable fallback
+                let resolvedName = user.teamName ?? user.displayName ?? "Team \(user.userID)"
+                newUserIDs[user.userID] = resolvedName
+                
+                if let avatar = user.avatar {
+                    let avatarURL = URL(string: "https://sleepercdn.com/avatars/\(avatar)")
+                    newUserAvatars[user.userID] = avatarURL
+                }
+            }
+            
+            userIDs = newUserIDs
+            userAvatars = newUserAvatars
             
         } catch {
             DebugPrint(mode: .sleeperAPI, "Failed to fetch Sleeper rosters: \(error)")
@@ -701,13 +745,15 @@ final class LeagueMatchupProvider {
         
         do {
             let (data, _) = try await URLSession.shared.data(from: usersURL)
-            let users = try JSONDecoder().decode([SleeperUser].self, from: data)
+            // NOTE: `/league/{id}/users` returns league-scoped users with team metadata.
+            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: data)
             
             var newUserIDs: [String: String] = [:]
             var newUserAvatars: [String: URL] = [:]
             
             for user in users {
-                newUserIDs[user.userID] = user.displayName
+                let resolvedName = user.teamName ?? user.displayName ?? "Team \(user.userID)"
+                newUserIDs[user.userID] = resolvedName
                 
                 if let avatar = user.avatar {
                     let avatarURL = URL(string: "https://sleepercdn.com/avatars/\(avatar)")

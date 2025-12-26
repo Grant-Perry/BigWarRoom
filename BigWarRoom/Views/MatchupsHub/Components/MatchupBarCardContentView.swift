@@ -25,6 +25,9 @@ struct MatchupBarCardContentView: View {
             
             // Main content
             VStack(spacing: 2) {
+                if matchup.isChoppedLeague {
+                    choppedBarContent
+                } else {
                 // Top row: Manager names
                 HStack(spacing: 12) {
                     // My manager name (left)
@@ -355,6 +358,7 @@ struct MatchupBarCardContentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 10)
+                }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -367,6 +371,61 @@ struct MatchupBarCardContentView: View {
                 )
         )
         .shadow(color: shadowColor, radius: 8, x: 0, y: 4)
+    }
+
+    // MARK: - Chopped Bar Content
+    
+    private var choppedBarContent: some View {
+        VStack(spacing: 8) {
+            // Header row
+            HStack(spacing: 12) {
+                Text(matchup.myTeam?.ownerName ?? "Unknown")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                
+                Spacer()
+                
+                Text("🔥 CHOPPED")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundColor(.orange)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            
+            // Body row
+            HStack(spacing: 12) {
+                // Left: rank/status + to play
+                VStack(alignment: .leading, spacing: 2) {
+                    if let ranking = matchup.myTeamRanking {
+                        Text("#\(ranking.rank) • \(ranking.eliminationStatus.displayName)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.secondary)
+                        
+                        Text("To play: \(toPlayCount(for: ranking.team))")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary.opacity(0.8))
+                    }
+                }
+                
+                Spacer()
+                
+                // Right: score + safety delta
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(String(format: "%.1f", matchup.myTeam?.currentScore ?? 0.0))
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                    
+                    if let ranking = matchup.myTeamRanking {
+                        Text(ranking.safetyMarginDisplay)
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(ranking.pointsFromSafety >= 0 ? .gpGreen : .gpRedPink)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+        }
     }
     
     // MARK: - Helper Methods

@@ -55,6 +55,24 @@ extension MatchupsHubViewModel {
             let availableLeagues = unifiedLeagueManager.allLeagues
             totalLeagueCount = availableLeagues.count
             DebugPrint(mode: .matchupLoading, "Step 1: Found \(availableLeagues.count) leagues")
+
+            // 🔥 PERF: Warm the shared Sleeper weekly stats cache ASAP so league loads don't all
+            // block on the very first stats request.
+            if availableLeagues.contains(where: { $0.source == .sleeper }) {
+                let currentWeek = getCurrentWeek()
+                let currentYear = getCurrentYear()
+                Task { @MainActor in
+                    do {
+                        _ = try await SharedStatsService.shared.loadWeekStats(
+                            week: currentWeek,
+                            year: currentYear,
+                            forceRefresh: false
+                        )
+                    } catch {
+                        // Silent: providers will still load (they just won't have stats)
+                    }
+                }
+            }
             
             guard !availableLeagues.isEmpty else {
                 await MainActor.run {
@@ -116,41 +134,37 @@ extension MatchupsHubViewModel {
         
         // print("🔥 SESSION \(sessionId): About to start withTaskGroup for \(totalLeagues) leagues")
         
-        // Load leagues in parallel for maximum speed
+        // Loading too many leagues concurrently causes network pileups/timeouts.
+        // Limit concurrency to keep the "longest pole" from exploding.
+        let maxParallel = maxConcurrentLoads
         await withTaskGroup(of: (UnifiedMatchup?, String).self) { group in
-            // print("🔥 SESSION \(sessionId): Inside withTaskGroup, adding tasks...")
+            var iterator = leagues.makeIterator()
             
-            for league in leagues {
-                // print("🔥 SESSION \(sessionId): Adding task for league: \(league.league.name)")
-                group.addTask {
-                    // print("🔥 SESSION \(sessionId): Starting task for league: \(league.league.name)")
-                    let matchup = await self.loadSingleLeagueMatchup(league)
-                    // print("🔥 SESSION \(sessionId): Finished task for league: \(league.league.name), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
-                    return (matchup, league.id)
+            // Seed up to N tasks
+            for _ in 0..<min(maxParallel, totalLeagues) {
+                if let league = iterator.next() {
+                    group.addTask {
+                        let matchup = await self.loadSingleLeagueMatchup(league)
+                        return (matchup, league.id)
+                    }
                 }
             }
             
             var loadedMatchups: [UnifiedMatchup] = []
             
-            // print("🔥 SESSION \(sessionId): About to iterate through task group results...")
-            
-            for await (matchup, _) in group {
+            while let (matchup, _) = await group.next() {
                 processedLeagues += 1
-                // print("🔥 SESSION \(sessionId): Processed league \(processedLeagues)/\(totalLeagues), matchup: \(matchup != nil ? "SUCCESS" : "FAILED")")
                 
                 if let matchup = matchup {
                     await MainActor.run {
                         loadedMatchups.append(matchup)
                         self.myMatchups = loadedMatchups.sorted { $0.priority > $1.priority }
                     }
-                    // print("🔥 SESSION \(sessionId): Added matchup to collection, total: \(loadedMatchups.count)")
                 }
                 
-                // 🔥 BULLETPROOF PROGRESS: Linear interpolation from 20% to 90%
                 let progressPercent = 0.20 + (Double(processedLeagues) / Double(totalLeagues)) * 0.70
-                // print("🔥 SESSION \(sessionId): Updating progress to \(progressPercent) (\(Int(progressPercent * 100))%)")
                 await updateProgress(
-                    progressPercent, 
+                    progressPercent,
                     message: "Loaded \(processedLeagues) of \(totalLeagues) leagues...",
                     sessionId: sessionId
                 )
@@ -158,9 +172,15 @@ extension MatchupsHubViewModel {
                 await MainActor.run {
                     self.loadedLeagueCount = processedLeagues
                 }
+                
+                // Start the next league task as one finishes
+                if let nextLeague = iterator.next() {
+                    group.addTask {
+                        let matchup = await self.loadSingleLeagueMatchup(nextLeague)
+                        return (matchup, nextLeague.id)
+                    }
+                }
             }
-            
-            // print("🔥 SESSION \(sessionId): Finished processing all league tasks")
         }
         
         // print("🔥 SESSION \(sessionId): Exited withTaskGroup, proceeding to finalization...")
@@ -224,12 +244,21 @@ extension MatchupsHubViewModel {
             DebugPrint(mode: .leagueProvider, "Found team ID: \(myTeamID)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.6)
 
-            // Step 2: Fetch matchups using isolated provider
-            // print("🔥 SINGLE LEAGUE: Fetching matchups for \(league.league.name)")
+            // Step 2: If this is a Sleeper Chopped/Guillotine league, route through the dedicated
+            // Chopped pipeline BEFORE fetching head-to-head matchups.
+            //
+            // IMPORTANT: Provider-based chopped detection (matchups.isEmpty) is NOT reliable.
+            // Also note: some Sleeper "leagues list" payloads omit chopped flags, so we fall back to a
+            // lightweight `/league/{id}` fetch ONLY when settings are ambiguous.
+            if await isSleeperChoppedLeagueResolved(league) {
+                DebugPrint(mode: .matchupLoading, limit: 5, "🪓 Detected Chopped league for \(league.league.name) → using Chopped pipeline")
+                return await handleChoppedLeague(league: league, myTeamID: myTeamID)
+            }
+            
+            // Step 3: Fetch matchups using isolated provider
             DebugPrint(mode: .leagueProvider, "Fetching matchups via provider.fetchMatchups()...")
             let matchups = try await provider.fetchMatchups()
             DebugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
-            // print("🔥 SINGLE LEAGUE: Fetched \(matchups.count) matchups for \(league.league.name)")
             await updateLeagueLoadingState(league.id, status: .loading, progress: 0.8)
             
             // 🔥 NEW: Cache the fully-loaded provider for later use
@@ -237,13 +266,6 @@ extension MatchupsHubViewModel {
                 // 🔥 DISABLED: Provider caching causes stale records to persist across weeks
                 // self.cacheProvider(provider, for: league, week: currentWeek, year: currentYear)
                 // Each time we load, we need FRESH providers with current week data
-            }
-            
-            // Step 3: Check for Chopped league (Sleeper only)
-            // IMPORTANT: Do NOT infer chopped from `matchups.isEmpty` alone. Use provider detection.
-            if provider.isChoppedLeague() {
-                DebugPrint(mode: .matchupLoading, limit: 3, "🪓 Detected Chopped league via provider for \(league.league.name)")
-                return await handleChoppedLeague(league: league, myTeamID: myTeamID)
             }
             
             // Step 4: Handle regular leagues
@@ -299,17 +321,9 @@ extension MatchupsHubViewModel {
             return nil
         }
         
-        // 🔥 FIX: During playoffs, fetch ALL matchups for horizontal swiping
-        let allLeagueMatchups: [FantasyMatchup]
-        
-        if isPlayoffWeek(league: league, week: currentWeek) {
-            DebugPrint(mode: .matchupLoading, "🏆 ACTIVE PLAYOFF WEEK: Fetching all playoff matchups for \(league.league.name)")
-            allLeagueMatchups = await fetchAllActivePlayoffMatchups(league: league, week: currentWeek)
-            DebugPrint(mode: .matchupLoading, "   ✅ Fetched \(allLeagueMatchups.count) total playoff matchups")
-        } else {
-            // Regular season - just use the matchups we already have (likely just yours)
-            allLeagueMatchups = matchups
-        }
+        // PERFORMANCE: `LeagueMatchupProvider.fetchMatchups()` already fetched the league's matchups for this week.
+        // Do NOT make an additional "fetch all playoff matchups" call here — that's what caused the 30s load times.
+        let allLeagueMatchups: [FantasyMatchup] = matchups
         
         // Step 5: Find user's matchup using provider
         if let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) {
@@ -400,6 +414,37 @@ extension MatchupsHubViewModel {
         let isPlayoffs = week >= playoffWeekStart
         DebugPrint(mode: .matchupLoading, limit: 10, "   Result: \(isPlayoffs ? "YES" : "NO") (week \(week) >= \(playoffWeekStart))")
         return isPlayoffs
+    }
+
+    /// Robust Chopped/Guillotine league detection for Sleeper.
+    ///
+    /// Some Sleeper "leagues list" responses omit the chopped flags, so we only hit
+    /// `/league/{id}` when the settings payload is ambiguous (type/isChopped missing).
+    private func isSleeperChoppedLeagueResolved(_ league: UnifiedLeagueManager.LeagueWrapper) async -> Bool {
+        guard league.source == .sleeper else { return false }
+
+        if let settings = league.league.settings {
+            if settings.type == 3 || settings.isChopped == true { return true }
+
+            // If we have explicit signals that it's NOT chopped, trust them.
+            // If both are nil, settings is ambiguous and we should fetch the full league.
+            if settings.type != nil || settings.isChopped != nil {
+                return false
+            }
+        }
+
+        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)") else {
+            return false
+        }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let fullLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            let settings = fullLeague.settings
+            return settings?.type == 3 || settings?.isChopped == true || (settings?.isChoppedLeague == true)
+        } catch {
+            return false
+        }
     }
 
     // MARK: - Playoff elimination filtering (winners bracket)
@@ -560,10 +605,10 @@ extension MatchupsHubViewModel {
         
         DebugPrint(mode: .matchupLoading, "   ✅ Successfully fetched eliminated team roster: \(eliminatedTeam.name) with score \(eliminatedTeam.currentScore ?? 0.0)")
         
-        // 🔥 NEW: Fetch ALL active playoff matchups in this league (not just yours)
-        DebugPrint(mode: .matchupLoading, "   🔍 Fetching ALL active playoff matchups for \(league.league.name)...")
-        let allActivePlayoffMatchups = await fetchAllActivePlayoffMatchups(league: league, week: week)
-        DebugPrint(mode: .matchupLoading, "   ✅ Found \(allActivePlayoffMatchups.count) active playoff matchups")
+        // PERFORMANCE: Don't block the critical path with an additional playoff-wide fetch.
+        // If the caller already has league matchups (e.g. "no personal matchup found" case), reuse them.
+        // Otherwise (true empty-matchups elimination), skip adding other matchups to keep load fast.
+        let allActivePlayoffMatchups = allMatchups
         
         // Create a placeholder opponent team to indicate elimination
         let placeholderOpponent = FantasyTeam(

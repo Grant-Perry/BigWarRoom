@@ -78,7 +78,9 @@ final class MatchupsHubViewModel {
     // MARK: - Loading Guards
     // 🔥 FIXED: Remove NSLock - using actor isolation instead
     internal var currentlyLoadingLeagues = Set<String>()
-    internal let maxConcurrentLoads = 3
+    // 🔥 PERF: Now that weekly stats fetching is properly shared (no per-league force refresh),
+    // we can safely raise concurrency a bit without thrashing network requests.
+    internal let maxConcurrentLoads = 5
     
     // 🔥 NEW: Actor for thread-safe loading guard (internal, not private)
     internal actor LoadingGuard {

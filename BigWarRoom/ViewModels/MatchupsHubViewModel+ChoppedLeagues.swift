@@ -15,9 +15,16 @@ extension MatchupsHubViewModel {
         // Create chopped summary using proper Sleeper data
         if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
             if let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
+                
+                DebugPrint(
+                    mode: .matchupLoading,
+                    limit: 20,
+                    "🪓 CHOPPED STATUS: \(league.league.name) rosterID=\(String(describing: myTeamRanking.team.rosterID)) rank=\(myTeamRanking.rank) status=\(myTeamRanking.eliminationStatus.rawValue) isEliminated=\(myTeamRanking.isEliminated) showElimToggle=\(UserDefaults.standard.showEliminatedChoppedLeagues)"
+                )
 
                 // If the user disabled eliminated chopped leagues, skip loading them entirely.
                 if !UserDefaults.standard.showEliminatedChoppedLeagues, myTeamRanking.isEliminated {
+                    DebugPrint(mode: .matchupLoading, limit: 20, "🪓 FILTER OUT: \(league.league.name) (chopped eliminated, toggle OFF)")
                     await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
                     return nil
                 }
@@ -58,6 +65,7 @@ extension MatchupsHubViewModel {
             let (rosterToOwnerMap, userMap, avatarMap) = createTeamMappings(rosters: rosters, users: users)
             let (activeTeams, eliminatedTeams) = createChoppedFantasyTeams(
                 matchupData: matchupData,
+                rosters: rosters,
                 rosterToOwnerMap: rosterToOwnerMap,
                 userMap: userMap,
                 avatarMap: avatarMap,
@@ -108,32 +116,43 @@ extension MatchupsHubViewModel {
     
     /// Create fantasy teams from matchup data
     private func createChoppedFantasyTeams(
-        matchupData: [SleeperMatchupResponse], 
-        rosterToOwnerMap: [Int: String], 
-        userMap: [String: String], 
+        matchupData: [SleeperMatchupResponse],
+        rosters: [SleeperRoster],
+        rosterToOwnerMap: [Int: String],
+        userMap: [String: String],
         avatarMap: [String: URL],
         league: UnifiedLeagueManager.LeagueWrapper
     ) -> (activeTeams: [FantasyTeam], eliminatedTeams: [FantasyTeam]) {
         var activeTeams: [FantasyTeam] = []
         var eliminatedTeams: [FantasyTeam] = [] // Track eliminated teams for graveyard
-        
-        for matchup in matchupData {
-            let rosterID = matchup.rosterID
-            let ownerID = rosterToOwnerMap[rosterID] ?? ""
+        let matchupByRosterID = Dictionary(uniqueKeysWithValues: matchupData.map { ($0.rosterID, $0) })
+
+        // 🔥 KEY FIX: Build teams from /rosters so eliminated guillotine teams (often players == [])
+        // still get classified correctly even if they don't show in /matchups.
+        for roster in rosters {
+            let rosterID = roster.rosterID
+            let matchup = matchupByRosterID[rosterID]
+
+            let ownerID = roster.ownerID ?? rosterToOwnerMap[rosterID] ?? ""
             let resolvedTeamName = userMap[ownerID] ?? "Team \(rosterID)"
             let avatarURL = avatarMap[ownerID]
-            
-            // 🔥 CRITICAL: In Chopped/Guillotine, eliminated teams can still have `players` present,
-            // but will have NO starters (no playable lineup). Starters is the reliable signal.
-            let hasAnyStarters = (matchup.starters?.isEmpty == false)
-            
-            // Use REAL points from the matchup data (starter-only scores)
-            let realTeamScore = matchup.points ?? 0.0
-            let projectedScore = matchup.projectedPoints ?? (realTeamScore * 1.05)
-            
-            // Create actual starter roster for All Live Players integration
-            let starterRoster = createStarterRoster(from: matchup, realTeamScore: realTeamScore, leagueID: league.league.leagueID)
-            
+
+            // Guillotine elimination signal (most reliable): roster has no players and/or no owner.
+            let hasAnyPlayers = (roster.playerIDs?.isEmpty == false)
+            let hasOwner = !ownerID.isEmpty
+
+            // Week-specific activity signal: only active teams have starters for this week.
+            let hasAnyStarters = (matchup?.starters?.isEmpty == false)
+
+            // Week score (0 if eliminated / no matchup entry)
+            let realTeamScore = matchup?.points ?? 0.0
+            let projectedScore = matchup?.projectedPoints ?? (realTeamScore * 1.05)
+
+            let starterRoster: [FantasyPlayer] = {
+                guard let matchup else { return [] }
+                return createStarterRoster(from: matchup, realTeamScore: realTeamScore, leagueID: league.league.leagueID)
+            }()
+
             let fantasyTeam = FantasyTeam(
                 id: String(rosterID),
                 name: resolvedTeamName,
@@ -142,13 +161,14 @@ extension MatchupsHubViewModel {
                 avatar: avatarURL?.absoluteString,
                 currentScore: realTeamScore,
                 projectedScore: projectedScore,
-                roster: starterRoster, // Now includes actual starter players!
+                roster: starterRoster,
                 rosterID: rosterID,
-                faabTotal: nil,  // Chopped leagues - FAAB not applicable for rankings
-                faabUsed: nil    // Chopped leagues - FAAB not applicable for rankings
+                faabTotal: nil,
+                faabUsed: nil
             )
-            
-            if hasAnyStarters && !starterRoster.isEmpty {
+
+            // Active = has owner + has players + has a playable lineup for the selected week.
+            if hasOwner && hasAnyPlayers && hasAnyStarters && !starterRoster.isEmpty {
                 activeTeams.append(fantasyTeam)
             } else {
                 eliminatedTeams.append(fantasyTeam)
