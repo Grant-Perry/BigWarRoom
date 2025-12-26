@@ -18,6 +18,10 @@ final class BettingOddsService {
     private var oddsCache: [String: (PlayerBettingOdds?, Date)] = [:]
     private let cacheExpiration: TimeInterval = 3600 // 1 hour
     
+    // Cache for game odds (spreads/totals)
+    private var gameOddsCache: [String: ([String: GameBettingOdds], Date)] = [:]
+    private let gameOddsCacheExpiration: TimeInterval = 600 // 10 minutes
+    
     // API Configuration
     private var apiKey: String {
         guard let key = Secrets.theOddsAPIKey else {
@@ -121,6 +125,44 @@ final class BettingOddsService {
         }
     }
     
+    /// Fetch game odds (spread + total) for a set of Schedule games.
+    /// Returns a dictionary keyed by `ScheduleGame.id` (e.g. "BUF@NE").
+    func fetchGameOdds(
+        for scheduleGames: [ScheduleGame],
+        week: Int,
+        year: Int? = nil
+    ) async -> [String: GameBettingOdds] {
+        
+        guard !apiKey.isEmpty else {
+            return [:]
+        }
+        
+        let actualYear = year ?? AppConstants.currentSeasonYearInt
+        let cacheKey = "schedule_games_\(week)_\(actualYear)"
+        
+        if let (cached, timestamp) = gameOddsCache[cacheKey],
+           Date().timeIntervalSince(timestamp) < gameOddsCacheExpiration {
+            return cached
+        }
+        
+        do {
+            let games = try await fetchNFLGamesMarkets(markets: ["h2h", "spreads", "totals"])
+            var mapped: [String: GameBettingOdds] = [:]
+            
+            for scheduleGame in scheduleGames {
+                if let odds = extractGameOdds(for: scheduleGame, from: games) {
+                    mapped[scheduleGame.id] = odds
+                }
+            }
+            
+            gameOddsCache[cacheKey] = (mapped, Date())
+            return mapped
+        } catch {
+            print("❌ BettingOdds: Error fetching game odds - \(error)")
+            return [:]
+        }
+    }
+    
     // MARK: - Private Implementation
     
     /// Fetch all NFL games with odds for a given week
@@ -212,6 +254,206 @@ final class BettingOddsService {
         // Return all games - we'll filter for player props when extracting for specific player
         print("✅ BettingOdds: Returning all \(games.count) games for player-specific filtering")
         return games
+    }
+    
+    /// Fetch NFL games with specific markets (e.g. h2h/spreads/totals).
+    private func fetchNFLGamesMarkets(markets: [String]) async throws -> [TheOddsGame] {
+        var components = URLComponents(string: "\(baseURL)/sports/americanfootball_nfl/odds")
+        components?.queryItems = [
+            URLQueryItem(name: "apiKey", value: apiKey),
+            URLQueryItem(name: "regions", value: "us"),
+            URLQueryItem(name: "oddsFormat", value: "american"),
+            URLQueryItem(name: "markets", value: markets.joined(separator: ","))
+        ]
+        
+        guard let url = components?.url else {
+            throw BettingOddsError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await session.data(for: request)
+        
+        if let httpResponse = response as? HTTPURLResponse {
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw BettingOddsError.httpError(httpResponse.statusCode)
+            }
+        }
+        
+        return try JSONDecoder().decode([TheOddsGame].self, from: data)
+    }
+    
+    private func extractGameOdds(for scheduleGame: ScheduleGame, from games: [TheOddsGame]) -> GameBettingOdds? {
+        // Find matching The Odds API game
+        guard let oddsGame = games.first(where: { game in
+            teamsMatch(scheduleGame.homeTeam, game.homeTeam) && teamsMatch(scheduleGame.awayTeam, game.awayTeam)
+        }) else {
+            return nil
+        }
+        
+        // Pick a reasonable sportsbook (prefer common US books)
+        let preferredBooks = ["draftkings", "fanduel", "betmgm", "caesars", "pointsbetus", "betrivers", "pinnacle"]
+        let bookmaker = oddsGame.bookmakers.first(where: { preferredBooks.contains($0.key.lowercased()) }) ?? oddsGame.bookmakers.first
+        
+        let spreadsMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "spreads" })
+        let totalsMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "totals" })
+        let h2hMarket = bookmaker?.markets.first(where: { $0.key.lowercased() == "h2h" })
+        
+        let spreadDisplay = formatSpread(
+            homeCode: scheduleGame.homeTeam,
+            awayCode: scheduleGame.awayTeam,
+            homeName: oddsGame.homeTeam,
+            awayName: oddsGame.awayTeam,
+            market: spreadsMarket
+        )
+        
+        let totalDisplay = formatTotalDisplay(market: totalsMarket)
+        let totalPoints = extractTotalPoints(market: totalsMarket)
+        
+        let moneylineDisplay = formatMoneyline(
+            homeCode: scheduleGame.homeTeam,
+            awayCode: scheduleGame.awayTeam,
+            homeName: oddsGame.homeTeam,
+            awayName: oddsGame.awayTeam,
+            market: h2hMarket
+        )
+        
+        let favoriteML = extractFavoriteMoneyline(
+            homeCode: scheduleGame.homeTeam,
+            awayCode: scheduleGame.awayTeam,
+            homeName: oddsGame.homeTeam,
+            awayName: oddsGame.awayTeam,
+            market: h2hMarket
+        )
+        
+        // Avoid returning empty objects
+        if spreadDisplay == nil && totalDisplay == nil && moneylineDisplay == nil {
+            return nil
+        }
+        
+        return GameBettingOdds(
+            gameID: scheduleGame.id,
+            homeTeamCode: scheduleGame.homeTeam,
+            awayTeamCode: scheduleGame.awayTeam,
+            spreadDisplay: spreadDisplay,
+            totalDisplay: totalDisplay,
+            favoriteMoneylineTeamCode: favoriteML?.teamCode,
+            favoriteMoneylineOdds: favoriteML?.odds,
+            totalPoints: totalPoints,
+            moneylineDisplay: moneylineDisplay,
+            sportsbook: bookmaker?.title,
+            lastUpdated: nil
+        )
+    }
+    
+    private func formatSpread(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> String? {
+        guard let market = market else { return nil }
+        
+        func point(forTeamName name: String) -> Double? {
+            let outcome = market.outcomes.first(where: { o in
+                teamsMatch(o.name, name)
+            })
+            return outcome?.point
+        }
+        
+        guard let homePoint = point(forTeamName: homeName),
+              let awayPoint = point(forTeamName: awayName) else {
+            return nil
+        }
+        
+        // Favorite is the team with negative points
+        if homePoint < awayPoint {
+            return "\(homeCode) \(formatPoint(homePoint))"
+        } else {
+            return "\(awayCode) \(formatPoint(awayPoint))"
+        }
+    }
+    
+    private func formatTotalDisplay(market: TheOddsMarket?) -> String? {
+        guard let market = market else { return nil }
+        // Totals outcomes are usually "Over" and "Under" with the same point
+        if let point = market.outcomes.first?.point {
+            return "O/U \(formatPoint(point))"
+        }
+        return nil
+    }
+    
+    private func extractTotalPoints(market: TheOddsMarket?) -> String? {
+        guard let market = market else { return nil }
+        if let point = market.outcomes.first?.point {
+            return formatPoint(point)
+        }
+        return nil
+    }
+    
+    private func formatMoneyline(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> String? {
+        guard let market = market else { return nil }
+        
+        func price(forTeamName name: String) -> String? {
+            guard let outcome = market.outcomes.first(where: { teamsMatch($0.name, name) }) else { return nil }
+            let price = Int(outcome.price)
+            return price > 0 ? "+\(price)" : "\(price)"
+        }
+        
+        guard let home = price(forTeamName: homeName),
+              let away = price(forTeamName: awayName) else {
+            return nil
+        }
+        
+        return "ML: \(awayCode) \(away) / \(homeCode) \(home)"
+    }
+    
+    private func extractFavoriteMoneyline(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> (teamCode: String, odds: String)? {
+        guard let market = market else { return nil }
+        
+        func outcome(forTeamName name: String) -> TheOddsOutcome? {
+            return market.outcomes.first(where: { teamsMatch($0.name, name) })
+        }
+        
+        guard let homeOutcome = outcome(forTeamName: homeName),
+              let awayOutcome = outcome(forTeamName: awayName) else {
+            return nil
+        }
+        
+        let homePrice = Int(homeOutcome.price)
+        let awayPrice = Int(awayOutcome.price)
+        
+        // Favorite is the more negative price; if both positive, pick lower (more favored).
+        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
+        let teamCode = homeIsFav ? homeCode : awayCode
+        let price = homeIsFav ? homePrice : awayPrice
+        let oddsString = price > 0 ? "+\(price)" : "\(price)"
+        
+        return (teamCode, oddsString)
+    }
+    
+    private func formatPoint(_ value: Double) -> String {
+        // Drop trailing .0, keep .5, etc.
+        let rounded = (value * 10).rounded() / 10
+        if rounded.truncatingRemainder(dividingBy: 1) == 0 {
+            return String(Int(rounded))
+        }
+        return String(format: "%.1f", rounded)
     }
     
     /// Find game for a specific team

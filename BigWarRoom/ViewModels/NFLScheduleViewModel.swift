@@ -21,10 +21,18 @@ final class NFLScheduleViewModel {
     var showingGameDetail = false
     var selectedGameId: String?
     
+    /// Game betting odds keyed by ScheduleGame.id (e.g. "BUF@NE")
+    var gameOddsByGameID: [String: GameBettingOdds] = [:]
+    
     // 🔥 PHASE 3 DI: Inject dependencies instead of using .shared
     private let gameDataService: NFLGameDataService
     private let weekService: NFLWeekService
     private var observationTask: Task<Void, Never>?
+    private let bettingOddsService: BettingOddsService
+    
+    @ObservationIgnored private var oddsTask: Task<Void, Never>?
+    @ObservationIgnored private var lastOddsFetchKey: String?
+    @ObservationIgnored private var lastOddsFetchAt: Date?
     
     /// Teams on bye week for current schedule
     var byeWeekTeams: [NFLTeam] {
@@ -34,9 +42,14 @@ final class NFLScheduleViewModel {
         return teams
     }
     
-    init(gameDataService: NFLGameDataService, weekService: NFLWeekService) {
+    init(
+        gameDataService: NFLGameDataService,
+        weekService: NFLWeekService,
+        bettingOddsService: BettingOddsService = .shared
+    ) {
         self.gameDataService = gameDataService
         self.weekService = weekService
+        self.bettingOddsService = bettingOddsService
         
         // 🔥 FIXED: Use WeekSelectionManager as SSOT instead of weekService.currentWeek
         self.selectedWeek = WeekSelectionManager.shared.selectedWeek
@@ -93,6 +106,7 @@ final class NFLScheduleViewModel {
     func refreshSchedule() {
         DebugPrint(mode: .weekCheck, "📅 NFLScheduleViewModel.refreshSchedule: Fetching games for week \(selectedWeek)")
         gameDataService.fetchGameData(forWeek: selectedWeek, forceRefresh: true)
+        refreshOddsIfNeeded()
     }
     
     /// Change selected week and refresh data
@@ -166,6 +180,40 @@ final class NFLScheduleViewModel {
             games = games.compactMap { existingGame in
                 processedGames.first { $0.id == existingGame.id }
             }
+        }
+        
+        // Odds are keyed off the current slate; refresh after we have games.
+        refreshOddsIfNeeded()
+    }
+    
+    private func refreshOddsIfNeeded() {
+        // Debounce: game data updates frequently; odds don't need to refetch every tick.
+        oddsTask?.cancel()
+        
+        oddsTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: 350_000_000) // 350ms debounce
+            guard !Task.isCancelled else { return }
+            
+            // Only fetch when we have a slate to match against.
+            let slate = self.games
+            guard !slate.isEmpty else { return }
+            
+            let year = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
+            let key = "\(self.selectedWeek)_\(year)"
+            
+            // 10 min local throttle (service also caches).
+            if self.lastOddsFetchKey == key,
+               let lastAt = self.lastOddsFetchAt,
+               Date().timeIntervalSince(lastAt) < 600 {
+                return
+            }
+            
+            self.lastOddsFetchKey = key
+            self.lastOddsFetchAt = Date()
+            
+            let odds = await self.bettingOddsService.fetchGameOdds(for: slate, week: self.selectedWeek, year: year)
+            self.gameOddsByGameID = odds
         }
     }
     

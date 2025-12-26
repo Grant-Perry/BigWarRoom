@@ -267,7 +267,7 @@ struct NFLScheduleView: View {
                                     matchupsHubViewModel: matchupsHubViewModel,
                                     gameData: game
                                 )) {
-                        ScheduleGameCard(game: game) {
+                        ScheduleGameCard(game: game, odds: viewModel.gameOddsByGameID[game.id]) {
                             // NavigationLink handles navigation
                         }
                         .frame(maxWidth: .infinity)

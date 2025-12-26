@@ -88,6 +88,48 @@ struct TheOddsOutcome: Codable {
     }
 }
 
+// MARK: - Processed Game Betting Odds (Spreads / Totals / Moneyline)
+
+/// Processed game betting odds for display in the NFL Schedule.
+struct GameBettingOdds: Hashable {
+    let gameID: String
+    let homeTeamCode: String
+    let awayTeamCode: String
+    
+    /// Example: "BUF -3.5" or "KC +2.5"
+    let spreadDisplay: String?
+    
+    /// Example: "O/U 46.5"
+    let totalDisplay: String?
+
+    /// Favorite moneyline formatted for Schedule (e.g. teamCode="JAX", odds="-150")
+    let favoriteMoneylineTeamCode: String?
+    let favoriteMoneylineOdds: String?
+
+    /// Raw total points (e.g. "46.5") for Schedule display next to the up/down icon
+    let totalPoints: String?
+    
+    /// Example: "ML: BUF -150 / NE +130" (optional; not currently displayed)
+    let moneylineDisplay: String?
+    
+    let sportsbook: String?
+    let lastUpdated: Date?
+    
+    /// Single-line summary for schedule cards
+    var scheduleLine: String? {
+        switch (spreadDisplay, totalDisplay) {
+        case (nil, nil):
+            return nil
+        case let (s?, nil):
+            return s
+        case let (nil, t?):
+            return t
+        case let (s?, t?):
+            return "\(t) · \(s)"
+        }
+    }
+}
+
 // MARK: - Processed Player Betting Odds
 
 /// Processed player betting odds for a specific week

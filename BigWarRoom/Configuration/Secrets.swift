@@ -36,7 +36,8 @@ enum Secrets {
     
     /// The Odds API Key for betting odds data
     static var theOddsAPIKey: String? {
-        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "pli,st"),
+        // NOTE: Must be "plist" – typo here breaks all Odds API features.
+        guard let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
               let data = try? Data(contentsOf: url),
               let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
               let dict = obj as? [String: Any],

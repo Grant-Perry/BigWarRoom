@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ScheduleGameCard: View {
     let game: ScheduleGame
+    let odds: GameBettingOdds?
     let action: () -> Void
     
     @State private var teamAssets = TeamAssetManager.shared
@@ -131,6 +132,40 @@ struct ScheduleGameCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                             .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                        
+                        if let odds,
+                           let team = odds.favoriteMoneylineTeamCode,
+                           let ml = odds.favoriteMoneylineOdds,
+                           let total = odds.totalPoints {
+                            VStack(spacing: 1) {
+                                Text("\(team) \(ml)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                        .font(.system(size: 8, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.7))
+                                    
+                                    Text(total)
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.85))
+                                }
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                            }
+                            .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
+                        } else if let line = odds?.scheduleLine {
+                            // Fallback (e.g., if a market isn't available)
+                            Text(line)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.white.opacity(0.85))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .shadow(color: .black.opacity(0.35), radius: 1, x: 0, y: 1)
+                        }
                     }
                 }
             }
@@ -308,42 +343,3 @@ struct TeamLogoView: View {
     }
 }
 
-#Preview("Schedule Game Card - Final") {
-    ScheduleGameCard(
-        game: ScheduleGame(
-            id: "DAL@PHI",
-            awayTeam: "DAL",
-            homeTeam: "PHI",
-            awayScore: 18,
-            homeScore: 27,
-            gameStatus: "final",
-            gameTime: "",
-            startDate: Date(),
-            isLive: false
-        ),
-        action: {}
-    )
-    .padding()
-    .background(Color.black)
-    .preferredColorScheme(.dark)
-}
-
-#Preview("Schedule Game Card - Upcoming") {
-    ScheduleGameCard(
-        game: ScheduleGame(
-            id: "KC@BUF",
-            awayTeam: "KC",
-            homeTeam: "BUF",
-            awayScore: 0,
-            homeScore: 0,
-            gameStatus: "pre",
-            gameTime: "",
-            startDate: Calendar.current.date(from: DateComponents(year: 2024, month: 1, day: 11))!, // Thursday
-            isLive: false
-        ),
-        action: {}
-    )
-    .padding()
-    .background(Color.black)
-    .preferredColorScheme(.dark)
-}
