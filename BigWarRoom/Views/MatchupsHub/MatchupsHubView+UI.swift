@@ -105,27 +105,41 @@ extension MatchupsHubView {
         // Filter based on settings
         return allMatchups.filter { matchup in
             // Check if this is a playoff-eliminated league (opponent = "Eliminated from Playoffs")
+            // IMPORTANT: This must run BEFORE ghost filtering because the placeholder opponent has no starters.
             let isPlayoffEliminated = matchup.opponentTeam?.name == "Eliminated from Playoffs"
-            
             if isPlayoffEliminated {
-                DebugPrint(mode: .matchupLoading, "     🔍 CHECK: \(matchup.league.league.name) - type: ELIMINATED")
-                if showPlayoffEliminated {
-                    DebugPrint(mode: .matchupLoading, "       ✅ KEEP: playoff elimination")
-                    return true
-                } else {
-                    DebugPrint(mode: .matchupLoading, "       ❌ FILTER OUT: playoff elimination (toggle OFF)")
+                return showPlayoffEliminated
+            }
+
+            // 🔒 SAFETY: If we can't resolve my team/opponent for a non-Chopped matchup,
+            // it's not a real head-to-head matchup and should never render a card.
+            if !matchup.isChoppedLeague && (matchup.myTeam == nil || matchup.opponentTeam == nil) {
+                DebugPrint(
+                    mode: .matchupLoading,
+                    limit: 10,
+                    "❌ FILTER OUT: \(matchup.league.league.name) (invalid matchup: myTeam/opponentTeam missing)"
+                )
+                return false
+            }
+
+            // 🔒 SAFETY 2: Ghost matchups often have an empty opponent name and/or no starters with team metadata.
+            if !matchup.isChoppedLeague, let opponent = matchup.opponentTeam {
+                let opponentNameEmpty = opponent.ownerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                let opponentHasAnyStarterWithTeam = opponent.roster.contains { $0.isStarter && $0.team != nil }
+                if opponentNameEmpty || !opponentHasAnyStarterWithTeam {
+                    DebugPrint(
+                        mode: .matchupLoading,
+                        limit: 10,
+                        "❌ FILTER OUT: \(matchup.league.league.name) (ghost opponent: nameEmpty=\(opponentNameEmpty), startersWithTeam=\(opponentHasAnyStarterWithTeam))"
+                    )
                     return false
                 }
             }
-            
+
             // Check Chopped league elimination
             if matchup.isChoppedLeague {
-                if !showChoppedEliminated {
-                    // Filter out eliminated chopped leagues if setting is disabled
-                    guard let myTeamRanking = matchup.myTeamRanking else { return true }
-                    return !myTeamRanking.isEliminated
-                }
-                return true // Show all chopped leagues if toggle is ON
+                // Filter out eliminated chopped leagues if setting is disabled
+                return showChoppedEliminated || !matchup.isMyManagerEliminated
             }
             
             return true // Show all other matchups

@@ -263,4 +263,5 @@ enum StatsError: LocalizedError {
 
 extension Notification.Name {
     static let weekSelectionChanged = Notification.Name("weekSelectionChanged")
+    static let missionControlFiltersChanged = Notification.Name("missionControlFiltersChanged")
 }

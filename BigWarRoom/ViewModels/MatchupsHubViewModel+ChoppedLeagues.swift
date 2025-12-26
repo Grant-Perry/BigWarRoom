@@ -7,23 +7,20 @@
 
 import Foundation
 
-// Associated object key for storing graveyard teams
-private var graveyardTeamsKey: UInt8 = 0
-
 // MARK: - Chopped League Operations
 extension MatchupsHubViewModel {
-    
-    // Store eliminated teams for graveyard
-    private var graveyardTeams: [FantasyTeam] {
-        get { objc_getAssociatedObject(self, &graveyardTeamsKey) as? [FantasyTeam] ?? [] }
-        set { objc_setAssociatedObject(self, &graveyardTeamsKey, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC) }
-    }
     
     /// Handle chopped league processing
     internal func handleChoppedLeague(league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String) async -> UnifiedMatchup? {
         // Create chopped summary using proper Sleeper data
         if let choppedSummary = await createSleeperChoppedSummary(league: league, myTeamID: myTeamID, week: getCurrentWeek()) {
             if let myTeamRanking = await findMyTeamInChoppedLeaderboard(choppedSummary, leagueID: league.league.leagueID) {
+
+                // If the user disabled eliminated chopped leagues, skip loading them entirely.
+                if !UserDefaults.standard.showEliminatedChoppedLeagues, myTeamRanking.isEliminated {
+                    await updateLeagueLoadingState(league.id, status: .completed, progress: 1.0)
+                    return nil
+                }
                 
                 let unifiedMatchup = UnifiedMatchup(
                     id: "\(league.id)_chopped",
@@ -59,10 +56,21 @@ extension MatchupsHubViewModel {
             
             // Step 4: Create team mapping and fantasy teams
             let (rosterToOwnerMap, userMap, avatarMap) = createTeamMappings(rosters: rosters, users: users)
-            let choppedTeams = createChoppedFantasyTeams(matchupData: matchupData, rosterToOwnerMap: rosterToOwnerMap, userMap: userMap, avatarMap: avatarMap, league: league)
+            let (activeTeams, eliminatedTeams) = createChoppedFantasyTeams(
+                matchupData: matchupData,
+                rosterToOwnerMap: rosterToOwnerMap,
+                userMap: userMap,
+                avatarMap: avatarMap,
+                league: league
+            )
             
             // Step 5: Process and rank teams
-            return await processChoppedTeamRankings(teams: choppedTeams, league: league, week: week)
+            return await processChoppedTeamRankings(
+                teams: activeTeams,
+                eliminatedTeams: eliminatedTeams,
+                league: league,
+                week: week
+            )
             
         } catch {
             return nil
@@ -105,7 +113,7 @@ extension MatchupsHubViewModel {
         userMap: [String: String], 
         avatarMap: [String: URL],
         league: UnifiedLeagueManager.LeagueWrapper
-    ) -> [FantasyTeam] {
+    ) -> (activeTeams: [FantasyTeam], eliminatedTeams: [FantasyTeam]) {
         var activeTeams: [FantasyTeam] = []
         var eliminatedTeams: [FantasyTeam] = [] // Track eliminated teams for graveyard
         
@@ -115,9 +123,9 @@ extension MatchupsHubViewModel {
             let resolvedTeamName = userMap[ownerID] ?? "Team \(rosterID)"
             let avatarURL = avatarMap[ownerID]
             
-            // Only check actual player count - ignore starters
-            let playerCount = matchup.players?.count ?? 0
-            let hasAnyPlayers = playerCount > 0  // ONLY this matters!
+            // 🔥 CRITICAL: In Chopped/Guillotine, eliminated teams can still have `players` present,
+            // but will have NO starters (no playable lineup). Starters is the reliable signal.
+            let hasAnyStarters = (matchup.starters?.isEmpty == false)
             
             // Use REAL points from the matchup data (starter-only scores)
             let realTeamScore = matchup.points ?? 0.0
@@ -140,18 +148,14 @@ extension MatchupsHubViewModel {
                 faabUsed: nil    // Chopped leagues - FAAB not applicable for rankings
             )
             
-            if hasAnyPlayers {
+            if hasAnyStarters && !starterRoster.isEmpty {
                 activeTeams.append(fantasyTeam)
             } else {
                 eliminatedTeams.append(fantasyTeam)
             }
         }
-        
-        // Store eliminated teams for graveyard (we'll need to modify the summary creation)
-        self.graveyardTeams = eliminatedTeams
-        
-        // Return ONLY active teams for main rankings
-        return activeTeams
+
+        return (activeTeams, eliminatedTeams)
     }
     
     /// Create starter roster from Sleeper matchup data for All Live Players integration
@@ -262,7 +266,12 @@ extension MatchupsHubViewModel {
     }
     
     /// Process team rankings and create final summary
-    private func processChoppedTeamRankings(teams: [FantasyTeam], league: UnifiedLeagueManager.LeagueWrapper, week: Int) async -> ChoppedWeekSummary {
+    private func processChoppedTeamRankings(
+        teams: [FantasyTeam],
+        eliminatedTeams: [FantasyTeam],
+        league: UnifiedLeagueManager.LeagueWrapper,
+        week: Int
+    ) async -> ChoppedWeekSummary {
         // Sort teams by REAL scores (highest to lowest) - ONLY ACTIVE TEAMS
         let sortedTeams = teams.sorted { team1, team2 in
             let score1 = team1.currentScore ?? 0.0
@@ -280,11 +289,11 @@ extension MatchupsHubViewModel {
         // Calculate summary stats
         let (avgScore, highScore, lowScore) = calculateSummaryStats(teamRankings: teamRankings)
         
-        // Get eliminated teams (bottom N teams FROM ACTIVE TEAMS)
-        let eliminatedTeams = Array(teamRankings.suffix(eliminationCount))
+        // Get "death row" teams for this week (bottom N teams FROM ACTIVE TEAMS)
+        let eliminatedThisWeek = Array(teamRankings.suffix(eliminationCount))
         
-        // CREATE GRAVEYARD: Convert eliminated teams to EliminationEvents
-        let graveyardEvents = graveyardTeams.enumerated().map { index, team in
+        // CREATE GRAVEYARD: Convert already-eliminated teams (no starters) to EliminationEvents
+        let graveyardEvents = eliminatedTeams.enumerated().map { index, team in
             
             let eliminatedRanking = FantasyTeamRanking(
                 id: team.id,
@@ -310,13 +319,13 @@ extension MatchupsHubViewModel {
             )
         }
         
-        logChoppedSummary(totalTeams: totalActiveTeams, eliminationCount: eliminationCount, eliminatedTeams: eliminatedTeams, highScore: highScore, lowScore: lowScore, avgScore: avgScore, leagueName: league.league.name)
+        logChoppedSummary(totalTeams: totalActiveTeams, eliminationCount: eliminationCount, eliminatedTeams: eliminatedThisWeek, highScore: highScore, lowScore: lowScore, avgScore: avgScore, leagueName: league.league.name)
         
         return ChoppedWeekSummary(
             id: "chopped_real_\(league.league.leagueID)_\(week)",
             week: week,
             rankings: teamRankings, // Only active teams
-            eliminatedTeam: eliminatedTeams.first, // Primary eliminated team for UI
+            eliminatedTeam: eliminatedThisWeek.first, // Primary "death row" team for UI
             cutoffScore: lowScore,
             isComplete: true, // Real data means it's complete
             totalSurvivors: teamRankings.filter { !$0.isEliminated }.count,
@@ -400,87 +409,49 @@ extension MatchupsHubViewModel {
     
     /// Find the authenticated user's team in the Chopped leaderboard using proper Sleeper user identification
     internal func findMyTeamInChoppedLeaderboard(_ choppedSummary: ChoppedWeekSummary, leagueID: String) async -> FantasyTeamRanking? {
-        // Strategy 1: For Sleeper leagues, use roster ID matching
-        if let userRosterID = await getCurrentUserRosterID(leagueID: leagueID) {
-            // First check active rankings
-            let myRanking = choppedSummary.rankings.first { ranking in
-                ranking.team.rosterID == userRosterID
-            }
-            
-            if let myRanking = myRanking {
-                return myRanking
-            }
-            
-            // Check elimination history if not found in active rankings
-            let eliminatedRanking = choppedSummary.eliminationHistory.first { elimination in
-                elimination.eliminatedTeam.team.rosterID == userRosterID
-            }
-            
-            if let eliminatedRanking = eliminatedRanking {
-                return eliminatedRanking.eliminatedTeam
-            }
+        // ✅ Only accept definitive roster-ID matching.
+        // Fuzzy fallbacks here will incorrectly "find" you in every chopped league.
+        guard let userRosterID = await getCurrentUserRosterID(leagueID: leagueID) else {
+            return nil
         }
-        
-        // Strategy 2: Fallback to username matching
-        let authenticatedUsername = sleeperCredentials.currentUsername
-        if !authenticatedUsername.isEmpty {
-            // First check active rankings
-            let myRanking = choppedSummary.rankings.first { ranking in
-                ranking.team.ownerName.lowercased() == authenticatedUsername.lowercased()
-            }
-            
-            if let myRanking = myRanking {
-                return myRanking
-            }
-            
-            // Check elimination history if not found in active rankings
-            let eliminatedRanking = choppedSummary.eliminationHistory.first { elimination in
-                elimination.eliminatedTeam.team.ownerName.lowercased() == authenticatedUsername.lowercased()
-            }
-            
-            if let eliminatedRanking = eliminatedRanking {
-                return eliminatedRanking.eliminatedTeam
-            }
+
+        if let myRanking = choppedSummary.rankings.first(where: { $0.team.rosterID == userRosterID }) {
+            return myRanking
         }
-        
-        // Strategy 3: Match by "Gp" (specific fallback)
-        // First check active rankings
-        let gpRanking = choppedSummary.rankings.first { ranking in
-            ranking.team.ownerName.lowercased().contains("gp")
+
+        if let eliminatedRanking = choppedSummary.eliminationHistory.first(where: { $0.eliminatedTeam.team.rosterID == userRosterID }) {
+            return eliminatedRanking.eliminatedTeam
         }
-        
-        if let gpRanking = gpRanking {
-            return gpRanking
-        }
-        
-        // Check elimination history for "Gp" match
-        let eliminatedGpRanking = choppedSummary.eliminationHistory.first { elimination in
-            elimination.eliminatedTeam.team.ownerName.lowercased().contains("gp")
-        }
-        
-        if let eliminatedGpRanking = eliminatedGpRanking {
-            return eliminatedGpRanking.eliminatedTeam
-        }
-        
-        // Return first team as fallback
-        return choppedSummary.rankings.first
+
+        return nil
     }
     
     /// Get the current user's roster ID in a Sleeper league (helper for Chopped leagues)
     private func getCurrentUserRosterID(leagueID: String) async -> Int? {
-        guard !sleeperCredentials.currentUserID.isEmpty else {
+        // Resolve to a Sleeper user_id first (rosters.owner_id uses user_id, not username).
+        let identifier: String? = {
+            if !sleeperCredentials.currentUserID.isEmpty { return sleeperCredentials.currentUserID }
+            if !sleeperCredentials.currentUsername.isEmpty { return sleeperCredentials.currentUsername }
+            return nil
+        }()
+
+        guard let identifier else { return nil }
+
+        let userID: String
+        do {
+            if identifier.allSatisfy({ $0.isNumber }) {
+                userID = identifier
+            } else {
+                let user = try await SleeperAPIClient.shared.fetchUser(username: identifier)
+                userID = user.userID
+            }
+        } catch {
             return nil
         }
-        
+
         do {
             let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: leagueID)
-            let userRoster = rosters.first { $0.ownerID == sleeperCredentials.currentUserID }
-            
-            if let userRoster = userRoster {
-                return userRoster.rosterID
-            } else {
-                return nil
-            }
+            return rosters.first(where: { $0.ownerID == userID })?.rosterID
         } catch {
             return nil
         }

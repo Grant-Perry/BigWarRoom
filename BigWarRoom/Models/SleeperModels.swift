@@ -759,3 +759,24 @@ struct SleeperMatchupResponse: Codable, Identifiable {
         case customPoints = "custom_points"
     }
 }
+
+// MARK: -> Playoff Bracket Matchup (Winners Bracket)
+struct SleeperPlayoffBracketMatchup: Codable, Identifiable {
+    let matchupID: Int?
+    let round: Int?
+    let team1RosterID: Int?
+    let team2RosterID: Int?
+    let winnerRosterID: Int?
+    let loserRosterID: Int?
+    
+    var id: String { "\(matchupID ?? 0)_\(round ?? 0)" }
+    
+    private enum CodingKeys: String, CodingKey {
+        case matchupID = "m"
+        case round = "r"
+        case team1RosterID = "t1"
+        case team2RosterID = "t2"
+        case winnerRosterID = "w"
+        case loserRosterID = "l"
+    }
+}

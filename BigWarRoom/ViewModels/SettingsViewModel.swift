@@ -153,11 +153,13 @@ final class SettingsViewModel {
     func updateShowEliminatedChoppedLeagues(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "showEliminatedChoppedLeagues")
         NSLog("🔧 Show eliminated chopped leagues \(enabled ? "enabled" : "disabled")")
+        NotificationCenter.default.post(name: .missionControlFiltersChanged, object: nil)
     }
     
     func updateShowEliminatedPlayoffLeagues(_ enabled: Bool) {
         UserDefaults.standard.set(enabled, forKey: "showEliminatedPlayoffLeagues")
         NSLog("🔧 Show eliminated playoff leagues \(enabled ? "enabled" : "disabled")")
+        NotificationCenter.default.post(name: .missionControlFiltersChanged, object: nil)
     }
     
     // 📱 Update keep app active setting

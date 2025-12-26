@@ -20,7 +20,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = .contention // .scoring // []
+   static var activeMode: DebugMode = .matchupLoading // .scoring // []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {

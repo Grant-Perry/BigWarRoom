@@ -127,6 +127,11 @@ struct MatchupsHubView: View {
                 onWeekSelected(newValue)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .missionControlFiltersChanged)) { _ in
+            Task { @MainActor in
+                await matchupsHubViewModel.manualRefresh()
+            }
+        }
 //        .siriAnimate(
 //            isActive: matchupsHubViewModel.isUpdating, // 🔥 Only active during 15-second updates  
 //            intensity: 0.4,

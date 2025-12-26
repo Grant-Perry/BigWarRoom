@@ -160,7 +160,9 @@ final class MatchupsHubViewModel {
     }
     
     deinit {
-        Task { @MainActor in
+        // Swift 6: `deinit` is nonisolated, but this type is `@MainActor`.
+        // Use assumeIsolated to safely touch main-actor state during teardown.
+        MainActor.assumeIsolated {
             refreshTimer?.invalidate()
             observationTask?.cancel()
         }
@@ -453,8 +455,9 @@ struct UnifiedMatchup: Identifiable, Hashable {
     
     /// Is this a Chopped league?
     var isChoppedLeague: Bool {
-        // 🔥 FIXED: Use the definitive source from SleeperLeagueSettings
-        return league.isChoppedLeague
+        // Source of truth: Mission Control treats a matchup as "chopped" only if we actually built chopped data.
+        // This prevents mis-classification if league settings are missing or inconsistent.
+        return choppedSummary != nil
     }
     
     /// Display priority for sorting (higher = shown first)
@@ -579,8 +582,7 @@ struct UnifiedMatchup: Identifiable, Hashable {
     var isMyManagerEliminated: Bool {
         // Check for playoff elimination first (opponent name check)
         if let opponentName = opponentTeam?.name, opponentName == "Eliminated from Playoffs" {
-            DebugPrint(mode: .matchupLoading, "   🔍 PLAYOFF CHECK: \(league.league.name) - opponent name: '\(opponentName)'")
-            DebugPrint(mode: .matchupLoading, "     ✅ PLAYOFF ELIMINATION DETECTED for \(league.league.name)")
+            DebugPrint(mode: .matchupLoading, limit: 10, "✅ PLAYOFF ELIMINATION DETECTED for \(league.league.name)")
             return true
         }
         
@@ -588,8 +590,7 @@ struct UnifiedMatchup: Identifiable, Hashable {
         if isChoppedLeague {
             return checkChoppedElimination()
         }
-        
-        DebugPrint(mode: .matchupLoading, "     ✅ KEEP: \(league.league.name) - not eliminated")
+
         return false
     }
     
@@ -613,8 +614,8 @@ struct UnifiedMatchup: Identifiable, Hashable {
 //            print("   - My current score: \(myTeam.currentScore ?? 0.0)")
             
             // Method 1: Check if I have 0 players and 0 score (most reliable for eliminated teams)
-            let hasZeroScore = (myTeam.currentScore ?? 0.0) == 0.0
-            let isEmpty = myTeam.roster.isEmpty
+            _ = (myTeam.currentScore ?? 0.0) == 0.0
+            _ = myTeam.roster.isEmpty
             
 //            print("   - Has zero score: \(hasZeroScore)")
 //            print("   - Roster is empty: \(isEmpty)")
@@ -689,20 +690,19 @@ struct UnifiedMatchup: Identifiable, Hashable {
     
     /// Get projected score for my team (async)
     func getMyTeamProjectedScore() async -> Double {
-        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
-        return projections?.myTeam ?? 0.0
+        let projections = await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
+        return projections.myTeam
     }
     
     /// Get projected score for opponent team (async)
     func getOpponentProjectedScore() async -> Double {
-        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
-        return projections?.opponent ?? 0.0
+        let projections = await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
+        return projections.opponent
     }
     
     /// Get both projected scores at once (more efficient)
     func getProjectedScores() async -> (myTeam: Double, opponent: Double) {
-        let projections = try? await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
-        return (projections?.myTeam ?? 0.0, projections?.opponent ?? 0.0)
+        return await ProjectedPointsManager.shared.getProjectedMatchupScores(for: self)
     }
 }
 
