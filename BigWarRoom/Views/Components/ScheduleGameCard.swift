@@ -119,38 +119,43 @@ struct ScheduleGameCard: View {
                 } else {
                     // Upcoming game
                     VStack(spacing: 2) {
-                        // Show day/time for classic mode
+                        // Show day/time (original 12/25 style when showDayTime is true)
                         if showDayTime {
                             if !game.dayName.isEmpty && game.dayName != "TBD" {
                                 Text(game.dayName.uppercased())
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .font(.system(size: 14, weight: .bold, design: .default))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.6)
+                                    .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             }
                             
                             Text(game.startTime)
-                                .font(.system(size: 16, weight: .bold))
+                                .font(.system(size: 20, weight: .bold, design: .default))
                                 .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.6)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         }
                         
-                        // Odds display
-                        if let odds = odds {
+                        // Odds display (only when odds provided AND not in classic day/time mode)
+                        if let odds = odds, !showDayTime {
                             VStack(spacing: 2) {
                                 // Moneyline
                                 if let team = odds.favoriteMoneylineTeamCode,
                                    let ml = odds.favoriteMoneylineOdds {
                                     HStack(spacing: 4) {
                                         Text(team)
-                                            .font(.system(size: showDayTime ? 12 : 16, weight: .black))
+                                            .font(.system(size: 16, weight: .black))
                                             .foregroundColor(.white)
                                         Text(ml)
-                                            .font(.system(size: showDayTime ? 12 : 16, weight: .bold))
+                                            .font(.system(size: 16, weight: .bold))
                                             .foregroundColor(.gpGreen)
                                     }
                                     .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                 } else if let spread = odds.spreadDisplay {
                                     Text(spread)
-                                        .font(.system(size: showDayTime ? 11 : 14, weight: .bold))
+                                        .font(.system(size: 14, weight: .bold))
                                         .foregroundColor(.white)
                                         .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                 }
@@ -173,7 +178,7 @@ struct ScheduleGameCard: View {
                                 }
                                 .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
                             }
-                        } else if !showDayTime {
+                        } else if !showDayTime && odds == nil {
                             // No odds and no day/time - show placeholder
                             Text("—")
                                 .font(.system(size: 20, weight: .medium))

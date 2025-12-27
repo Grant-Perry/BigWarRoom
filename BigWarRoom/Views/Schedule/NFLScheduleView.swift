@@ -26,8 +26,9 @@ struct NFLScheduleView: View {
     // 🔥 Collapsible sections - all collapsed by default
     @State private var expandedDays: Set<String> = []
     @State private var expandedTimeSlots: Set<String> = []
+    @State private var morgInitialized: Bool = false  // Track if Morg mode was initialized
     
-    // 🔥 Card style: 0 = Compact, 1 = Full, 2 = Classic (flat list, no grouping)
+    // 🔥 Card style: 0 = Compact, 1 = Full, 2 = Classic, 3 = Morg (minimal headers)
     @AppStorage("ScheduleCardStyle") private var cardStyle: Int = 2
     
     private var cardStyleLabel: String {
@@ -35,6 +36,7 @@ struct NFLScheduleView: View {
         case 0: return "Compact"
         case 1: return "Full"
         case 2: return "Classic"
+        case 3: return "Morg"
         default: return "Compact"
         }
     }
@@ -44,8 +46,14 @@ struct NFLScheduleView: View {
         case 0: return "rectangle.compress.vertical"
         case 1: return "rectangle.expand.vertical"
         case 2: return "list.bullet"
+        case 3: return "text.alignleft"
         default: return "rectangle.compress.vertical"
         }
+    }
+    
+    // Whether to show minimal headers (no backgrounds/strokes)
+    private var useMinimalHeaders: Bool {
+        cardStyle == 3
     }
     
     // 🔥 SIMPLIFIED: No params needed, use .shared internally
@@ -192,10 +200,10 @@ struct NFLScheduleView: View {
                 
                 Spacer()
                 
-                // Card style toggle (cycles: Compact -> Full -> Classic)
+                // Card style toggle (cycles: Compact -> Full -> Classic -> Morg)
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        cardStyle = (cardStyle + 1) % 3
+                        cardStyle = (cardStyle + 1) % 4
                     }
                 } label: {
                     HStack(spacing: 4) {
@@ -260,6 +268,7 @@ struct NFLScheduleView: View {
                 if cardStyle == 2 {
                     classicFlatListView(viewModel: viewModel)
                 } else {
+                    // Compact, Full, and Morg all use grouped view
                     gamesScrollView(viewModel: viewModel)
                 }
             }
@@ -315,60 +324,48 @@ struct NFLScheduleView: View {
         .padding(.top, 60)
     }
     
-    // MARK: -> Classic Flat List View (no grouping - original layout)
+    // MARK: -> Classic Flat List View (original 12/25 layout - no grouping, no odds)
     private func classicFlatListView(viewModel: NFLScheduleViewModel) -> some View {
-        let sortedGames = viewModel.games.sorted { 
-            ($0.startDate ?? Date.distantFuture) < ($1.startDate ?? Date.distantFuture)
-        }
-        
-        return ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 10) {
-                ForEach(sortedGames, id: \.id) { game in
+        ScrollView(showsIndicators: false) {
+            LazyVStack(spacing: 8) {
+                ForEach(viewModel.games, id: \.id) { game in
+                    // 🏈 Original 12/25 layout: NavigationLink with ScheduleGameCard at 80% width
+                    // Original card: no odds display, just day/time for upcoming games
                     NavigationLink(destination: TeamFilteredMatchupsView(
                         awayTeam: game.awayTeam,
                         homeTeam: game.homeTeam,
                         matchupsHubViewModel: matchupsHubViewModel,
                         gameData: game
                     )) {
-                        // Use the original full card with day/time shown
                         ScheduleGameCard(
                             game: game,
-                            odds: viewModel.gameOddsByGameID[game.id],
+                            odds: nil,  // Original had no odds
                             action: {},
                             showDayTime: true
                         )
+                        .frame(maxWidth: .infinity)
+                        .frame(width: UIScreen.main.bounds.width * 0.8)
+                        .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PlainButtonStyle())
                 }
                 
-                // BYE Week Section
+                // BYE Week Section - original layout
                 if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
                         matchupsHubViewModel: matchupsHubViewModel
                     )
-                    .padding(.top, 12)
+                    .padding(.top, 24)
+                } else if viewModel.byeWeekTeams.isEmpty {
+                    noByeWeeksBanner
+                        .padding(.top, 24)
                 }
-                
-                // FULL SLATE banner + key
-                if viewModel.byeWeekTeams.isEmpty {
-                    VStack(spacing: 10) {
-                        noByeWeeksBanner
-                        
-                        if shouldShowPlayoffKey(for: viewModel) {
-                            playoffStatusKey
-                        }
-                    }
-                    .padding(.top, 12)
-                }
-                
-                Spacer(minLength: 100)
             }
-            .padding(.horizontal, 16)
-        }
-        .refreshable {
-            await viewModel.refreshSchedule()
+            .frame(maxWidth: .infinity)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
         }
     }
     
@@ -382,7 +379,7 @@ struct NFLScheduleView: View {
         }
         
         return ScrollView(showsIndicators: false) {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: useMinimalHeaders ? 2 : 16) {
                 ForEach(sortedDays, id: \.self) { day in
                     if let timeSlots = groupedByDay[day] {
                         daySectionView(
@@ -393,13 +390,38 @@ struct NFLScheduleView: View {
                     }
                 }
                 .onAppear {
-                    // Expand first day initially (if nothing is expanded yet)
-                    if expandedDays.isEmpty, let firstDay = sortedDays.first {
+                    // Morg mode: expand everything
+                    if useMinimalHeaders && !morgInitialized {
+                        morgInitialized = true
+                        for day in sortedDays {
+                            expandedDays.insert(day)
+                            if let timeSlots = groupedByDay[day] {
+                                for time in timeSlots.keys {
+                                    expandedTimeSlots.insert("\(day)_\(time)")
+                                }
+                            }
+                        }
+                    }
+                    // Other modes: expand first day initially (if nothing is expanded yet)
+                    else if expandedDays.isEmpty, let firstDay = sortedDays.first {
                         expandedDays.insert(firstDay)
                         // Expand ALL time slots in the first day
                         if let timeSlots = groupedByDay[firstDay] {
                             for time in timeSlots.keys {
                                 expandedTimeSlots.insert("\(firstDay)_\(time)")
+                            }
+                        }
+                    }
+                }
+                .onChange(of: cardStyle) { _, newStyle in
+                    // When switching TO Morg mode, expand everything
+                    if newStyle == 3 {
+                        for day in sortedDays {
+                            expandedDays.insert(day)
+                            if let timeSlots = groupedByDay[day] {
+                                for time in timeSlots.keys {
+                                    expandedTimeSlots.insert("\(day)_\(time)")
+                                }
                             }
                         }
                     }
@@ -477,7 +499,7 @@ struct NFLScheduleView: View {
         let allGamesInDay = timeSlots.values.flatMap { $0 }
         let hasLiveGames = allGamesInDay.contains { $0.isLive }
         
-        // Only force-expand if there are LIVE games
+        // Force-expand if LIVE games
         let isDayExpanded = hasLiveGames || expandedDays.contains(day)
         let totalGames = allGamesInDay.count
         
@@ -500,9 +522,13 @@ struct NFLScheduleView: View {
                             expandedTimeSlots.remove("\(day)_\(time)")
                         }
                     } else {
-                        // 🔥 Accordion: Close all other days first
-                        expandedDays.removeAll()
-                        expandedTimeSlots.removeAll()
+                        // In Morg mode: no accordion, just expand this day
+                        // In other modes: accordion behavior
+                        if !useMinimalHeaders {
+                            // 🔥 Accordion: Close all other days first
+                            expandedDays.removeAll()
+                            expandedTimeSlots.removeAll()
+                        }
                         
                         // Now expand this day
                         expandedDays.insert(day)
@@ -525,7 +551,7 @@ struct NFLScheduleView: View {
             
             // Time Slots (if day is expanded)
             if isDayExpanded {
-                VStack(spacing: 8) {
+                VStack(spacing: useMinimalHeaders ? 0 : 8) {
                     ForEach(sortedTimeSlots, id: \.self) { time in
                         if let games = timeSlots[time] {
                             timeSlotSection(
@@ -537,27 +563,35 @@ struct NFLScheduleView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+                .padding(.horizontal, useMinimalHeaders ? 0 : 8)
+                .padding(.top, useMinimalHeaders ? 0 : 8)
+                .padding(.bottom, useMinimalHeaders ? 0 : 12)
             }
         }
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.black.opacity(0.6))
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.black.opacity(0.6))
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.gpGreen.opacity(0.5), Color.gpGreen.opacity(0.15)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    ),
-                    lineWidth: 1.5
-                )
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color.gpGreen.opacity(0.5), Color.gpGreen.opacity(0.15)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            ),
+                            lineWidth: 1.5
+                        )
+                }
+            }
         )
-        .padding(.horizontal, 12)
+        .padding(.horizontal, useMinimalHeaders ? 4 : 12)
     }
     
     // MARK: -> Day Header
@@ -569,20 +603,22 @@ struct NFLScheduleView: View {
         hasLiveGames: Bool = false
     ) -> some View {
         HStack(spacing: 12) {
-            // Chevron with gradient
+            // Chevron
             Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: useMinimalHeaders ? 16 : 20, weight: .bold))
                 .foregroundStyle(
-                    hasLiveGames 
-                        ? LinearGradient(colors: [.red, .red.opacity(0.5)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    useMinimalHeaders
+                        ? (hasLiveGames ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.white.opacity(0.7)))
+                        : (hasLiveGames 
+                            ? AnyShapeStyle(LinearGradient(colors: [.red, .red.opacity(0.5)], startPoint: .top, endPoint: .bottom))
+                            : AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)))
                 )
             
             // Day name
             Text(day.uppercased())
-                .font(.system(size: 18, weight: .black, design: .default))
+                .font(.system(size: useMinimalHeaders ? 16 : 18, weight: .black, design: .default))
                 .foregroundColor(.white)
-                .kerning(2.0)
+                .kerning(useMinimalHeaders ? 1.5 : 2.0)
             
             // Live indicator
             if hasLiveGames {
@@ -596,63 +632,77 @@ struct NFLScheduleView: View {
             
             Spacer()
             
-            // Game count badge - styled like Week 17 picker
-            Text("\(gameCount)")
-                .font(.custom("BebasNeue-Regular", size: 22))
-                .foregroundColor(.white)
-                .frame(minWidth: 32, minHeight: 32)
-                .background(
-                    Circle()
+            // Game count badge
+            if useMinimalHeaders {
+                Text("\(gameCount)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white.opacity(0.5))
+            } else {
+                Text("\(gameCount)")
+                    .font(.custom("BebasNeue-Regular", size: 22))
+                    .foregroundColor(.white)
+                    .frame(minWidth: 32, minHeight: 32)
+                    .background(
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.gpGreen.opacity(0.8), Color.blue.opacity(0.6)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.gpGreen.opacity(0.6), Color.blue.opacity(0.6)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            }
+        }
+        .padding(.horizontal, useMinimalHeaders ? 12 : 16)
+        .padding(.vertical, useMinimalHeaders ? 8 : 14)
+        .background(
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 20)
                         .fill(
                             LinearGradient(
-                                colors: [Color.gpGreen.opacity(0.8), Color.blue.opacity(0.6)],
+                                colors: [
+                                    Color.gpGreen.opacity(0.3),
+                                    Color.blue.opacity(0.3)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                )
-                .overlay(
-                    Circle()
+                }
+            }
+        )
+        .overlay(
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 20)
                         .stroke(
                             LinearGradient(
-                                colors: [Color.gpGreen.opacity(0.6), Color.blue.opacity(0.6)],
+                                colors: [
+                                    Color.gpGreen.opacity(0.6),
+                                    Color.blue.opacity(0.6)
+                                ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             ),
-                            lineWidth: 1
+                            lineWidth: 1.5
                         )
-                )
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.gpGreen.opacity(0.3),
-                            Color.blue.opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                }
+            }
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.gpGreen.opacity(0.6),
-                            Color.blue.opacity(0.6)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-        )
-        .shadow(color: Color.gpGreen.opacity(0.2), radius: 8, x: 0, y: 4)
+        .shadow(color: useMinimalHeaders ? .clear : Color.gpGreen.opacity(0.2), radius: 8, x: 0, y: 4)
     }
     
     // MARK: -> Time Slot Section
@@ -665,7 +715,7 @@ struct NFLScheduleView: View {
         let slotKey = "\(day)_\(time)"
         let hasLiveGames = games.contains { $0.isLive }
         
-        // Only force-expand if there are LIVE games
+        // Force-expand if LIVE games
         let isExpanded = hasLiveGames || expandedTimeSlots.contains(slotKey)
         
         return VStack(spacing: 0) {
@@ -693,7 +743,7 @@ struct NFLScheduleView: View {
             
             // Games (if expanded) - indented narrower than header
             if isExpanded {
-                VStack(spacing: cardStyle == 0 ? 6 : 10) {
+                VStack(spacing: useMinimalHeaders ? 4 : (cardStyle == 0 ? 6 : 10)) {
                     ForEach(games, id: \.id) { game in
                         NavigationLink(destination: TeamFilteredMatchupsView(
                             awayTeam: game.awayTeam,
@@ -717,9 +767,11 @@ struct NFLScheduleView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, cardStyle == 0 ? 20 : 12) // Less indent for full cards
-                .padding(.top, 8)
-                .padding(.bottom, 10)
+                .padding(.horizontal, useMinimalHeaders ? 0 : (cardStyle == 0 ? 20 : 12))
+                .padding(.leading, useMinimalHeaders ? 40 : 0)  // 20px time indent + 20px additional
+                .padding(.trailing, useMinimalHeaders ? 20 : 0)
+                .padding(.top, useMinimalHeaders ? 0 : 8)
+                .padding(.bottom, useMinimalHeaders ? 0 : 10)
             }
         }
     }
@@ -737,19 +789,21 @@ struct NFLScheduleView: View {
         let hasLiveGames = games.contains { $0.isLive }
         
         return HStack(spacing: 10) {
-            // Chevron with gradient
+            // Chevron
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: useMinimalHeaders ? 10 : 12, weight: .bold))
                 .foregroundStyle(
-                    hasLiveGames
-                        ? LinearGradient(colors: [.red, .red.opacity(0.4)], startPoint: .top, endPoint: .bottom)
-                        : LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    useMinimalHeaders
+                        ? (hasLiveGames ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.white.opacity(0.5)))
+                        : (hasLiveGames
+                            ? AnyShapeStyle(LinearGradient(colors: [.red, .red.opacity(0.4)], startPoint: .top, endPoint: .bottom))
+                            : AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)))
                 )
                 .frame(width: 14)
             
-            // Time text - larger
+            // Time text
             Text(time)
-                .font(.system(size: 16, weight: .bold, design: .default))
+                .font(.system(size: useMinimalHeaders ? 14 : 16, weight: .bold, design: .default))
                 .foregroundColor(.white)
             
             // Live indicator
@@ -763,8 +817,8 @@ struct NFLScheduleView: View {
                 .foregroundColor(.white.opacity(0.4))
             
             Text("\(gameCount) game\(gameCount == 1 ? "" : "s")")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
+                .font(.system(size: useMinimalHeaders ? 10 : 11, weight: .medium))
+                .foregroundColor(.white.opacity(useMinimalHeaders ? 0.4 : 0.6))
             
             Spacer()
             
@@ -773,41 +827,51 @@ struct NFLScheduleView: View {
                 miniOddsPreview(games: games, viewModel: viewModel)
             }
             
-            // Day name on trailing - same size as time, so when scrolled you know the day
+            // Day name on trailing
             Text(day.uppercased())
-                .font(.system(size: 16, weight: .bold, design: .default))
-                .foregroundColor(.white.opacity(0.7))
+                .font(.system(size: useMinimalHeaders ? 12 : 16, weight: .bold, design: .default))
+                .foregroundColor(.white.opacity(useMinimalHeaders ? 0.4 : 0.7))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, useMinimalHeaders ? 0 : 14)
+        .padding(.vertical, useMinimalHeaders ? 6 : 10)
+        .padding(.leading, useMinimalHeaders ? 20 : 0)
+        .padding(.trailing, useMinimalHeaders ? 12 : 0)
         .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.gpGreen.opacity(0.25),
-                            Color.blue.opacity(0.25)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.gpGreen.opacity(0.25),
+                                    Color.blue.opacity(0.25)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.gpGreen.opacity(0.5),
-                            Color.blue.opacity(0.5)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
+            Group {
+                if !useMinimalHeaders {
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.gpGreen.opacity(0.5),
+                                    Color.blue.opacity(0.5)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                }
+            }
         )
-        .shadow(color: Color.gpGreen.opacity(0.15), radius: 6, x: 0, y: 3)
+        .shadow(color: useMinimalHeaders ? .clear : Color.gpGreen.opacity(0.15), radius: 6, x: 0, y: 3)
     }
     
     // MARK: -> Mini Odds Preview (shown when collapsed)
