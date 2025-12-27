@@ -339,7 +339,7 @@ struct NFLScheduleView: View {
                     )) {
                         ScheduleGameCard(
                             game: game,
-                            odds: nil,  // Original had no odds
+                            odds: viewModel.gameOddsByGameID[game.id],  // Now showing moneyline
                             action: {},
                             showDayTime: true
                         )
