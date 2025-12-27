@@ -46,7 +46,7 @@ final class NFLGameMatchupViewModel {
         }
     }
 
-    func configure(for team: String, week: Int, year: Int = 2024) {
+    func configure(for team: String, week: Int, year: Int = 2025) {
         let normalizedTeam = normalizeTeamAbbreviation(team.uppercased())
         gameInfo = gameDataService.gameData[normalizedTeam]
         
@@ -83,7 +83,7 @@ final class NFLGameMatchupViewModel {
         }
     }
 
-    func refresh(week: Int, year: Int = 2024) {
+    func refresh(week: Int, year: Int = 2025) {
         gameDataService.fetchGameData(forWeek: week, year: year, forceRefresh: true)
     }
 

@@ -160,7 +160,7 @@ extension EndpointValidationService {
     func runComprehensiveValidation(
         sleeperLeagueId: String?,
         espnLeagueId: String?,
-        espnSeason: String = "2024",
+        espnSeason: String = "2025",
         espnSWID: String? = nil,
         espnS2: String? = nil
     ) async -> [ValidationResult] {

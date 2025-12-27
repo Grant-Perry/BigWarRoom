@@ -13,6 +13,7 @@ struct ScheduleGameCard: View {
     let odds: GameBettingOdds?
     let action: () -> Void
     var showDayTime: Bool = false  // For classic mode - shows day/time in center
+    var showStartTime: Bool = false  // For Morg mode - shows just start time above odds
     
     @State private var teamAssets = TeamAssetManager.shared
     @State private var standingsService = NFLStandingsService.shared
@@ -122,12 +123,12 @@ struct ScheduleGameCard: View {
                         // Show day/time (Classic mode)
                         if showDayTime {
                             // Day name
-						   let dayNameSize = 10.0
+						   let dayFontSize = 12.0
                             if !game.dayName.isEmpty && game.dayName != "TBD" {
                                 Text(game.dayName.uppercased())
 								  .font(
 									.system(
-									   size: dayNameSize,
+									   size: dayFontSize,
 									   weight: .bold,
 									   design: .default
 									)
@@ -142,7 +143,7 @@ struct ScheduleGameCard: View {
                             Text(game.startTime)
 							  .font(
 								 .system(
-									size: dayNameSize,
+									size: dayFontSize,
 									weight: .bold,
 									design: .default
 								 )
@@ -162,6 +163,60 @@ struct ScheduleGameCard: View {
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.7)
 									.padding(.top, 2)
+                            }
+                        } else if showStartTime {
+                            // Morg mode: show start time above odds
+                            Text(game.startTime)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                            
+                            // Odds below start time
+                            if let odds = odds {
+                                VStack(spacing: 2) {
+                                    // Moneyline
+                                    if let team = odds.favoriteMoneylineTeamCode,
+                                       let ml = odds.favoriteMoneylineOdds {
+                                        HStack(spacing: 4) {
+                                            Text(team)
+                                                .font(.system(size: 16, weight: .black))
+                                                .foregroundColor(.white)
+                                            Text(ml)
+                                                .font(.system(size: 16, weight: .bold))
+                                                .foregroundColor(.gpGreen)
+                                        }
+                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                                    } else if let spread = odds.spreadDisplay {
+                                        Text(spread)
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                                    }
+                                    
+                                    // O/U + sportsbook badge
+                                    HStack(spacing: 4) {
+                                        if let total = odds.totalPoints {
+                                            Image(systemName: "arrow.up.arrow.down")
+                                                .font(.system(size: 8, weight: .bold))
+                                                .foregroundColor(.white.opacity(0.6))
+                                            
+                                            Text(total)
+                                                .font(.system(size: 10, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.85))
+                                        }
+                                        
+                                        if let book = odds.sportsbookEnum {
+                                            SportsbookBadge(book: book, size: 8)
+                                        }
+                                    }
+                                    .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 1)
+                                }
+                            } else {
+                                // No odds - show placeholder
+                                Text("—")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.3))
                             }
                         } else {
                             // Non-classic mode: show odds prominently

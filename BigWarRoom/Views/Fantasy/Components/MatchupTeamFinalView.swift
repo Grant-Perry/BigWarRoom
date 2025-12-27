@@ -249,7 +249,7 @@ struct MatchupTeamFinalView: View {
         currentWeek = nflWeekService.currentWeek
         let currentYear = nflWeekService.currentYear
         
-        viewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
+        viewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2025)
     }
     
     private func normalizeTeamAbbreviation(_ team: String) -> String {

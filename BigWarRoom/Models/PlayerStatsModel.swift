@@ -1,16 +1,14 @@
 //
-//  PlayerStats2024.swift
+//  PlayerStatsModel.swift
 //  BigWarRoom
 //
-//  2024 NFL Fantasy Stats for comprehensive player analysis
-//
-// MARK: -> 2024 Player Stats
+//  NFL Fantasy Stats for comprehensive player analysis
 
 import Foundation
 import Combine
 
 // MARK: -> Player Stats Model
-struct PlayerStats2024: Codable, Identifiable {
+struct PlayerStatsModel: Codable, Identifiable {
     let playerID: String
     let name: String
     let position: String
@@ -233,7 +231,7 @@ final class PlayerStatsStore {
     }
     
     // MARK: - Observable Properties (No @Published needed with @Observable)
-    @ObservationIgnored private var stats: [String: PlayerStats2024] = [:]
+    @ObservationIgnored private var stats: [String: PlayerStatsModel] = [:]
     @ObservationIgnored private var isLoading = false
     
     // MARK: - Initialization
@@ -246,12 +244,12 @@ final class PlayerStatsStore {
     }
     
     /// Get stats for player
-    func stats(for playerID: String) -> PlayerStats2024? {
+    func stats(for playerID: String) -> PlayerStatsModel? {
         return stats[playerID]
     }
     
     /// Get stats for player by name (fuzzy match)
-    func stats(for playerName: String, position: String? = nil) -> PlayerStats2024? {
+    func stats(for playerName: String, position: String? = nil) -> PlayerStatsModel? {
         let normalized = playerName.lowercased()
         
         return stats.values.first { stat in
@@ -263,7 +261,7 @@ final class PlayerStatsStore {
     }
     
     /// Get top performers by position
-    func topPerformers(position: String, limit: Int = 20) -> [PlayerStats2024] {
+    func topPerformers(position: String, limit: Int = 20) -> [PlayerStatsModel] {
         return stats.values
             .filter { $0.position.uppercased() == position.uppercased() }
             .sorted { ($0.pprPoints ?? 0) > ($1.pprPoints ?? 0) }
@@ -289,23 +287,23 @@ final class PlayerStatsStore {
         isLoading = false
     }
     
-    private func loadFromNFLAPI() async -> [String: PlayerStats2024]? {
+    private func loadFromNFLAPI() async -> [String: PlayerStatsModel]? {
         // NFL.com stats API (if available)
         guard let url = URL(string: "https://api.nfl.com/v1/current/season/stats") else { return nil }
         
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            // Parse NFL API response and convert to PlayerStats2024
+            // Parse NFL API response and convert to PlayerStatsModel
             return parseNFLAPIData(data)
         } catch {
             return nil
         }
     }
     
-    private func loadFromESPNAPI() async -> [String: PlayerStats2024]? {
+    private func loadFromESPNAPI() async -> [String: PlayerStatsModel]? {
         // ESPN fantasy API endpoint
         let positions = ["QB", "RB", "WR", "TE", "K", "DST"]
-        var allStats: [String: PlayerStats2024] = [:]
+        var allStats: [String: PlayerStatsModel] = [:]
         
         for position in positions {
             if let positionStats = await loadESPNPosition(position) {
@@ -316,7 +314,7 @@ final class PlayerStatsStore {
         return allStats.isEmpty ? nil : allStats
     }
     
-    private func loadESPNPosition(_ position: String) async -> [String: PlayerStats2024]? {
+    private func loadESPNPosition(_ position: String) async -> [String: PlayerStatsModel]? {
         // ESPN's hidden fantasy API endpoints - use SeasonYearManager as SOT
         let season = SeasonYearManager.shared.selectedYear
         let urlString = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(season)/segments/0/leaguedefaults/3?view=kona_player_info"
@@ -331,7 +329,7 @@ final class PlayerStatsStore {
         }
     }
     
-    private func loadFromBundledRealData() async -> [String: PlayerStats2024]? {
+    private func loadFromBundledRealData() async -> [String: PlayerStatsModel]? {
         // Load from bundled real 2024 stats JSON file
         guard let url = Bundle.main.url(forResource: "nfl_2024_stats", withExtension: "json") else {
             return nil
@@ -340,7 +338,7 @@ final class PlayerStatsStore {
         do {
             let data = try Data(contentsOf: url)
             let decoder = JSONDecoder()
-            let statsArray = try decoder.decode([PlayerStats2024].self, from: data)
+            let statsArray = try decoder.decode([PlayerStatsModel].self, from: data)
             return Dictionary(uniqueKeysWithValues: statsArray.map { ($0.playerID, $0) })
         } catch {
             return nil
@@ -349,13 +347,13 @@ final class PlayerStatsStore {
     
     // MARK: -> Data Parsing
     
-    private func parseNFLAPIData(_ data: Data) -> [String: PlayerStats2024]? {
+    private func parseNFLAPIData(_ data: Data) -> [String: PlayerStatsModel]? {
         // Parse NFL.com API response format
         // This would need to be implemented based on actual NFL API structure
         return nil
     }
     
-    private func parseESPNData(_ data: Data, position: String) -> [String: PlayerStats2024]? {
+    private func parseESPNData(_ data: Data, position: String) -> [String: PlayerStatsModel]? {
         // Parse ESPN fantasy API response
         // This would need to be implemented based on ESPN's API structure
         return nil

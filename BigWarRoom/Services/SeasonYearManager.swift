@@ -78,7 +78,7 @@ final class SeasonYearManager {
     
     /// Get the current year as Int for API calls
     var selectedYearInt: Int {
-        return Int(selectedYear) ?? 2024
+        return Int(selectedYear) ?? 2025
     }
     
     /// Check if we're viewing the current calendar year

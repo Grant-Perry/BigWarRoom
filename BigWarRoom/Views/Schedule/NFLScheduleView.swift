@@ -359,8 +359,15 @@ struct NFLScheduleView: View {
                     )
                     .padding(.top, 24)
                 } else if viewModel.byeWeekTeams.isEmpty {
-                    noByeWeeksBanner
-                        .padding(.top, 24)
+                    VStack(spacing: 10) {
+                        noByeWeeksBanner
+                        
+                        // Playoff Status Key
+                        if shouldShowPlayoffKey(for: viewModel) {
+                            playoffStatusKey
+                        }
+                    }
+                    .padding(.top, 24)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -510,6 +517,9 @@ struct NFLScheduleView: View {
             return game1 < game2
         }
         
+        // Morg mode: flatten all games sorted by time
+        let allGamesSorted = sortedTimeSlots.flatMap { timeSlots[$0] ?? [] }
+        
         return VStack(spacing: 0) {
             // Day Header
             Button {
@@ -549,23 +559,49 @@ struct NFLScheduleView: View {
             }
             .buttonStyle(.plain)
             
-            // Time Slots (if day is expanded)
+            // Content when day is expanded
             if isDayExpanded {
-                VStack(spacing: useMinimalHeaders ? 0 : 8) {
-                    ForEach(sortedTimeSlots, id: \.self) { time in
-                        if let games = timeSlots[time] {
-                            timeSlotSection(
-                                time: time,
-                                day: day,
-                                games: games,
-                                viewModel: viewModel
-                            )
+                if useMinimalHeaders {
+                    // 🔥 Morg mode: No time headers, just game cards with start time shown
+                    VStack(spacing: 4) {
+                        ForEach(allGamesSorted, id: \.id) { game in
+                            NavigationLink(destination: TeamFilteredMatchupsView(
+                                awayTeam: game.awayTeam,
+                                homeTeam: game.homeTeam,
+                                matchupsHubViewModel: matchupsHubViewModel,
+                                gameData: game
+                            )) {
+                                ScheduleGameCard(
+                                    game: game,
+                                    odds: viewModel.gameOddsByGameID[game.id],
+                                    action: {},
+                                    showStartTime: true  // Show start time above odds
+                                )
+                                .padding(.horizontal, 40)  // 40px indent on each side
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                } else {
+                    // Compact/Full mode: Time slot sections with headers
+                    VStack(spacing: 8) {
+                        ForEach(sortedTimeSlots, id: \.self) { time in
+                            if let games = timeSlots[time] {
+                                timeSlotSection(
+                                    time: time,
+                                    day: day,
+                                    games: games,
+                                    viewModel: viewModel
+                                )
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
                 }
-                .padding(.horizontal, useMinimalHeaders ? 0 : 8)
-                .padding(.top, useMinimalHeaders ? 0 : 8)
-                .padding(.bottom, useMinimalHeaders ? 0 : 12)
             }
         }
         .background(
@@ -634,7 +670,7 @@ struct NFLScheduleView: View {
             
             // Game count badge
             if useMinimalHeaders {
-                Text("\(gameCount)")
+                Text("\(gameCount) game\(gameCount == 1 ? "" : "s")")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white.opacity(0.5))
             } else {
@@ -945,62 +981,74 @@ struct NFLScheduleView: View {
     private var playoffStatusKey: some View {
         VStack(spacing: 12) {
             // Playoff Status Section - styled like FULL SLATE
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "flag.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                    
-                    Text("PLAYOFF STATUS")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundColor(.white)
-                        .kerning(1.2)
-                    
-                    Spacer()
-                }
-                
-                playoffStatusKeyExplanation
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
-                    )
-            )
+            playoffStatusSection
             
-            // Sportsbook Legend Section - styled like FULL SLATE
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: "dollarsign.circle.fill")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                    
-                    Text("ODDS SOURCE")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundColor(.white)
-                        .kerning(1.2)
-                    
-                    Spacer()
-                }
-                
-                sportsbookLegend
+            // Sportsbook Legend Section - only show for non-Classic views
+            if cardStyle != 2 {
+                oddsSourceSection
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.06))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
-                    )
-            )
         }
         .padding(.horizontal, 20)
+    }
+    
+    // MARK: -> Playoff Status Section (standalone)
+    private var playoffStatusSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "flag.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.gpGreen)
+                
+                Text("PLAYOFF STATUS")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundColor(.white)
+                    .kerning(1.2)
+                
+                Spacer()
+            }
+            
+            playoffStatusKeyExplanation
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
+                )
+        )
+    }
+    
+    // MARK: -> Odds Source Section (standalone)
+    private var oddsSourceSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "dollarsign.circle.fill")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.gpGreen)
+                
+                Text("ODDS SOURCE")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundColor(.white)
+                    .kerning(1.2)
+                
+                Spacer()
+            }
+            
+            sportsbookLegend
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.gpGreen.opacity(0.6), lineWidth: 1.5)
+                )
+        )
     }
     
     private var playoffStatusKeyExplanation: some View {

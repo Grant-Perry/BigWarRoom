@@ -328,7 +328,7 @@ final class SettingsViewModel {
         // Reset local state
         debugModeEnabled = false
         autoRefreshEnabled = true
-        selectedYear = "2024"
+        selectedYear = "2025"
     }
     
     func confirmClearAction() {

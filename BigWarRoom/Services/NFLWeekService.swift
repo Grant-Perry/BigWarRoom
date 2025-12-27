@@ -32,7 +32,7 @@ final class NFLWeekService {
     
     // MARK: -> Observable Properties (Available to all ViewModels)
     var currentWeek: Int
-    var currentYear: String = "2024"
+    var currentYear: String = "2025"
     var seasonType: String = "regular" // "pre", "regular", "post"
     var isLoading: Bool = false
     var lastUpdated: Date?

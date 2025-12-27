@@ -273,7 +273,7 @@ class FantasyPlayerViewModel {
         currentWeek = nflWeekService.currentWeek
         let currentYear = nflWeekService.currentYear
         
-        gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2024)
+        gameViewModel.configure(for: team, week: currentWeek, year: Int(currentYear) ?? 2025)
     }
     
     private func startLiveAnimations() {
