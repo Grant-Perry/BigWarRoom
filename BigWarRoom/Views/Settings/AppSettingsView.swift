@@ -22,6 +22,23 @@ struct AppSettingsView: View {
     // 🎰 Preferred sportsbook for odds display
     @AppStorage("PreferredSportsbook") private var preferredSportsbookRaw: String = Sportsbook.bestLine.rawValue
     
+    // 📊 Win Probability SD - local binding for proper SwiftUI observation
+    @AppStorage("WinProbabilitySD") private var winProbabilitySD: Double = 40.0
+    
+    // 📊 Win Probability SD description
+    private var winProbabilityDescription: String {
+        let sd = winProbabilitySD
+        if sd <= 20 {
+            return "Aggressive (big leads = high %)"
+        } else if sd <= 35 {
+            return "Moderate"
+        } else if sd <= 50 {
+            return "ESPN-like (balanced)"
+        } else {
+            return "Conservative (stays near 50%)"
+        }
+    }
+    
     var body: some View {
         NavigationView {
             List {
@@ -446,6 +463,82 @@ struct AppSettingsView: View {
                                     .foregroundColor(.secondary)
                                 Spacer()
                                 Text("100%")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.horizontal, 28)
+                    }
+                    .padding(.vertical, 8)
+                    
+                    // 📊 Win Probability Standard Deviation
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "chart.bar.fill")
+                                .foregroundColor(.purple)
+                                .frame(width: 24)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Win Probability Model")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                
+                                Text("SD: \(Int(winProbabilitySD)) – \(winProbabilityDescription)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            // Reset button
+                            Button(action: {
+                                winProbabilitySD = 40.0
+                            }) {
+                                Text("Reset")
+                                    .font(.caption)
+                                    .foregroundColor(.gpBlue)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.gpBlue.opacity(0.1))
+                                    .cornerRadius(6)
+                            }
+                            .opacity(winProbabilitySD == 40.0 ? 0.5 : 1.0)
+                            .disabled(winProbabilitySD == 40.0)
+                        }
+                        
+                        // Slider with current value badge
+                        VStack(spacing: 8) {
+                            HStack {
+                                Slider(value: $winProbabilitySD, in: 10...80, step: 1)
+                                    .tint(.purple)
+                                
+                                // Current value badge
+                                Text("\(Int(winProbabilitySD))")
+                                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 28)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color.purple)
+                                    )
+                            }
+                            
+                            HStack {
+                                Text("10")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text("Aggressive")
+                                    .font(.caption2)
+                                    .foregroundColor(.gpGreen)
+                                Spacer()
+                                Text("40")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("Conservative")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                                Text("80")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }

@@ -44,6 +44,9 @@ struct FantasyDetailHeaderView: View {
     @State private var homeYetToPlayProjected: Double = 0.0
     @State private var awayYetToPlayProjected: Double = 0.0
     
+    // 📊 Win Probability SD - local binding for live updates
+    @AppStorage("WinProbabilitySD") private var winProbabilitySD: Double = 40.0
+    
     // 🔥 PHASE 3 DI: Add initializer with watchService
     init(
         leagueName: String,
@@ -645,10 +648,61 @@ struct FantasyDetailHeaderView: View {
         .frame(width: 100)
     }
     
+    /// Calculate win probability using normal distribution model
+    /// - Parameters:
+    ///   - myProj: My team's projected score
+    ///   - oppProj: Opponent's projected score
+    /// - Returns: Win probability as CGFloat (0.0 to 1.0)
+    ///
+    /// This uses a statistical model: P(myScore > oppScore) where both scores
+    /// are assumed to be normally distributed around their projections.
+    /// Fantasy team scores typically have SD of ~20-25 points.
     private func projectedPercentage(_ myProj: Double, _ oppProj: Double) -> CGFloat {
         let total = myProj + oppProj
         guard total > 0 else { return 0.5 }
-        return CGFloat(myProj / total)
+        
+        // Lead/deficit in projected points
+        let lead = myProj - oppProj
+        
+        // 🔥 STATISTICAL MODEL: Use live SD from @AppStorage
+        let combinedSD = winProbabilitySD * sqrt(2.0)
+        
+        // Z-score: how many standard deviations is the lead?
+        let zScore = lead / combinedSD
+        
+        // Convert Z-score to probability using normal CDF approximation
+        let winProbability = normalCDF(zScore)
+        
+        // Clamp to reasonable bounds (never show 0% or 100%)
+        let clampedProbability = min(max(winProbability, 0.05), 0.95)
+        
+        return CGFloat(clampedProbability)
+    }
+    
+    /// Approximation of the standard normal cumulative distribution function
+    /// Uses the Abramowitz and Stegun approximation (accurate to ~1.5×10⁻⁷)
+    private func normalCDF(_ x: Double) -> Double {
+        // Handle extreme values
+        if x < -8.0 { return 0.0 }
+        if x > 8.0 { return 1.0 }
+        
+        // Constants for approximation
+        let a1 =  0.254829592
+        let a2 = -0.284496736
+        let a3 =  1.421413741
+        let a4 = -1.453152027
+        let a5 =  1.061405429
+        let p  =  0.3275911
+        
+        // Save the sign of x
+        let sign = x < 0 ? -1.0 : 1.0
+        let absX = abs(x)
+        
+        // Abramowitz and Stegun formula 7.1.26
+        let t = 1.0 / (1.0 + p * absX)
+        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-absX * absX / 2.0)
+        
+        return 0.5 * (1.0 + sign * y)
     }
     
     private func winPercentageText(_ myProj: Double, _ oppProj: Double) -> String {

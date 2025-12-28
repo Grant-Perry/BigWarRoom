@@ -739,21 +739,16 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         .onChange(of: showYetToPlayOnly) { _, _ in
             updateCachedRosters()
         }
-        // 🔥 FIX: Live data refresh - update when scores change
-        .onChange(of: matchup.homeTeam.currentScore) { _, _ in
-            updateCachedRosters()
-        }
-        .onChange(of: matchup.awayTeam.currentScore) { _, _ in
-            updateCachedRosters()
-        }
     }
     
     private var homeActiveRoster: [FantasyPlayer] {
-        return cachedHomeRoster
+        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
+        return getFilteredRoster(for: matchup, teamIndex: 1, isBench: false)
     }
     
     private var awayActiveRoster: [FantasyPlayer] {
-        return cachedAwayRoster
+        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
+        return getFilteredRoster(for: matchup, teamIndex: 0, isBench: false)
     }
     
     private func updateCachedRosters() {
@@ -1002,21 +997,16 @@ struct FantasyMatchupBenchSectionFiltered: View {
         .onChange(of: showYetToPlayOnly) { _, _ in
             updateCachedRosters()
         }
-        // 🔥 FIX: Live data refresh - update when scores change
-        .onChange(of: matchup.homeTeam.currentScore) { _, _ in
-            updateCachedRosters()
-        }
-        .onChange(of: matchup.awayTeam.currentScore) { _, _ in
-            updateCachedRosters()
-        }
     }
     
     private var homeBenchRoster: [FantasyPlayer] {
-        return cachedHomeBench
+        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
+        return getFilteredRoster(for: matchup, teamIndex: 1, isBench: true)
     }
     
     private var awayBenchRoster: [FantasyPlayer] {
-        return cachedAwayBench
+        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
+        return getFilteredRoster(for: matchup, teamIndex: 0, isBench: true)
     }
     
     private func updateCachedRosters() {

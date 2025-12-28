@@ -15,6 +15,9 @@ struct MatchupBarCardContentView: View {
     let opponentProjected: Double
     let projectionsLoaded: Bool
     
+    // 📊 Win Probability SD - local binding for live updates
+    @AppStorage("WinProbabilitySD") private var winProbabilitySD: Double = 40.0
+    
     var body: some View {
         ZStack {
             // Background
@@ -430,10 +433,46 @@ struct MatchupBarCardContentView: View {
     
     // MARK: - Helper Methods
     
+    /// Calculate win probability using normal distribution model
+    /// Uses statistical approach: P(myScore > oppScore) where scores are normally distributed
     private var projectedPercentage: CGFloat {
         let total = myProjected + opponentProjected
         guard total > 0 else { return 0.5 }
-        return CGFloat(myProjected / total)
+        
+        // Lead/deficit in projected points
+        let lead = myProjected - opponentProjected
+        
+        // 🔥 STATISTICAL MODEL: Use live SD from @AppStorage
+        let combinedSD = winProbabilitySD * sqrt(2.0)
+        
+        // Z-score: how many standard deviations is the lead?
+        let zScore = lead / combinedSD
+        
+        // Convert to probability using normal CDF
+        let winProbability = normalCDF(zScore)
+        
+        // Clamp to reasonable bounds (never show 0% or 100%)
+        return CGFloat(min(max(winProbability, 0.05), 0.95))
+    }
+    
+    /// Approximation of the standard normal CDF (Abramowitz and Stegun)
+    private func normalCDF(_ x: Double) -> Double {
+        if x < -8.0 { return 0.0 }
+        if x > 8.0 { return 1.0 }
+        
+        let a1 =  0.254829592
+        let a2 = -0.284496736
+        let a3 =  1.421413741
+        let a4 = -1.453152027
+        let a5 =  1.061405429
+        let p  =  0.3275911
+        
+        let sign = x < 0 ? -1.0 : 1.0
+        let absX = abs(x)
+        let t = 1.0 / (1.0 + p * absX)
+        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-absX * absX / 2.0)
+        
+        return 0.5 * (1.0 + sign * y)
     }
     
     private var winPercentageText: String {

@@ -188,6 +188,8 @@ struct FantasyMatchupDetailView: View {
                         showActiveOnly: showActiveOnly,
                         showYetToPlayOnly: showYetToPlayOnly
                     )
+                    // 🔥 FIX: Force rebuild when hub data updates
+                    .id("active-\(matchupsHubViewModel.lastUpdateTime)")
                     
                     FantasyMatchupBenchSectionFiltered(
                         matchup: latestMatchup,
@@ -198,6 +200,8 @@ struct FantasyMatchupDetailView: View {
                         showActiveOnly: showActiveOnly,
                         showYetToPlayOnly: showYetToPlayOnly
                     )
+                    // 🔥 FIX: Force rebuild when hub data updates
+                    .id("bench-\(matchupsHubViewModel.lastUpdateTime)")
                 } else {
                     // Fallback content when no view model is available
                     simplifiedRosterView

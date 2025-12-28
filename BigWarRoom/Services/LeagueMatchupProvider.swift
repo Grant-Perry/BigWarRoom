@@ -1071,9 +1071,39 @@ final class LeagueMatchupProvider {
         return totalScore
     }
     
+    /// Calculate win probability using normal distribution model
+    /// Based on current score difference, accounts for remaining game variance
     private func calculateWinProbability(homeScore: Double, awayScore: Double) -> Double? {
-        let difference = homeScore - awayScore
-        return 0.5 + (difference / 100.0) * 0.3
+        let lead = homeScore - awayScore
+        
+        // 🔥 STATISTICAL MODEL: Use centralized SD from AppConstants
+        let combinedSD = AppConstants.WinProbabilitySD * sqrt(2.0)
+        
+        let zScore = lead / combinedSD
+        let probability = normalCDF(zScore)
+        
+        // Clamp to reasonable bounds
+        return min(max(probability, 0.05), 0.95)
+    }
+    
+    /// Approximation of the standard normal CDF (Abramowitz and Stegun)
+    private func normalCDF(_ x: Double) -> Double {
+        if x < -8.0 { return 0.0 }
+        if x > 8.0 { return 1.0 }
+        
+        let a1 =  0.254829592
+        let a2 = -0.284496736
+        let a3 =  1.421413741
+        let a4 = -1.453152027
+        let a5 =  1.061405429
+        let p  =  0.3275911
+        
+        let sign = x < 0 ? -1.0 : 1.0
+        let absX = abs(x)
+        let t = 1.0 / (1.0 + p * absX)
+        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-absX * absX / 2.0)
+        
+        return 0.5 * (1.0 + sign * y)
     }
     
     private func positionString(_ lineupSlotId: Int) -> String {
