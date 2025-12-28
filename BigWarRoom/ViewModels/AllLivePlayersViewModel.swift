@@ -98,6 +98,8 @@ final class AllLivePlayersViewModel {
         self.weekSelectionManager = weekSelectionManager
         // MatchupsHub already has auto-refresh, we'll observe it directly via onChange
         setupAutoRefresh()
+        // 🔥 FIX: Actually call setupObservation to enable live updates
+        setupObservation()
     }
     
     // MARK: - Cleanup

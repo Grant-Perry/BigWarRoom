@@ -70,7 +70,7 @@ struct BigWarRoomModified: View {
                 MatchupsHubView()
                     .tabItem {
                         Image(systemName: "target")
-                        Text("Mission Control")
+                        Text("Matchups")
                     }
                     .tag(0)
                 

@@ -131,6 +131,13 @@ struct FantasyPlayerCard: View {
                 viewModel?.configurePlayer(player)
             }
         }
+        // 🔥 FIX: Live data refresh - update card when player data changes
+        .onChange(of: player.currentPoints) { _, newPoints in
+            viewModel?.configurePlayer(player)
+        }
+        .onChange(of: player.isLive) { _, _ in
+            viewModel?.configurePlayer(player)
+        }
         .sheet(isPresented: $showingScoreBreakdown) {
             buildScoreBreakdownSheet()
         }

@@ -384,7 +384,7 @@ struct MainTabView: View {
                 }
                 .tabItem {
                     Image(systemName: "target")
-                    Text("Mission Control")
+                    Text("Matchups")
                 }
                 .tag(0)
                 

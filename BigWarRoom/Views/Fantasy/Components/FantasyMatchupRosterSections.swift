@@ -739,6 +739,13 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         .onChange(of: showYetToPlayOnly) { _, _ in
             updateCachedRosters()
         }
+        // 🔥 FIX: Live data refresh - update when scores change
+        .onChange(of: matchup.homeTeam.currentScore) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: matchup.awayTeam.currentScore) { _, _ in
+            updateCachedRosters()
+        }
     }
     
     private var homeActiveRoster: [FantasyPlayer] {
@@ -993,6 +1000,13 @@ struct FantasyMatchupBenchSectionFiltered: View {
             updateCachedRosters()
         }
         .onChange(of: showYetToPlayOnly) { _, _ in
+            updateCachedRosters()
+        }
+        // 🔥 FIX: Live data refresh - update when scores change
+        .onChange(of: matchup.homeTeam.currentScore) { _, _ in
+            updateCachedRosters()
+        }
+        .onChange(of: matchup.awayTeam.currentScore) { _, _ in
             updateCachedRosters()
         }
     }

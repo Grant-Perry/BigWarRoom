@@ -299,6 +299,13 @@ struct FantasyDetailHeaderView: View {
                                 .fill(Color.black.opacity(0.4))
                         )
                 }
+                
+                // 🔥 NEW: Countdown timer (only during live games)
+                if SmartRefreshManager.shared.hasLiveGames {
+                    RefreshCountdownTimerView()
+                        .scaleEffect(0.8)
+                        .padding(.top, 4)
+                }
             }
             .frame(width: 60)
             
