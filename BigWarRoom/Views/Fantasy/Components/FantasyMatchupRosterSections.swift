@@ -210,6 +210,7 @@ struct FantasyMatchupBenchSection: View {
                         )
                     }
                     
+                    // Away team bench score with projections
                     let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
@@ -232,6 +233,7 @@ struct FantasyMatchupBenchSection: View {
                         )
                     }
                     
+                    // Home team bench score with projections
                     let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
@@ -251,24 +253,31 @@ struct FantasyMatchupBenchSection: View {
     @ViewBuilder
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
-            Text("\(label): \(String(format: "%.2f", score)) | (\(String(format: "%.1f", projected)))")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+            HStack(spacing: 4) {
+                Text("\(label): \(String(format: "%.2f", score))")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                
+                Text("| (\(String(format: "%.1f", projected)))")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                    )
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         } else {
             Text("\(label): \(String(format: "%.2f", score))")
                 .font(.subheadline)
@@ -486,6 +495,19 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 let team1 = player1.team?.lowercased() ?? ""
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
+                
+            case .recentActivity:
+                // Live players first, then sort by score (most active = highest scoring)
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1 // Live players come first
+                }
+                // Secondary sort by score (highest first)
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
     }
@@ -540,7 +562,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                     teamScoreCard(
                         score: benchTotal,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
                 
@@ -561,7 +583,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                     teamScoreCard(
                         score: benchTotal,
                         isWinning: false,
-                        label: "Bench Total"
+                        label: "Total"
                     )
                 }
             }
@@ -624,6 +646,18 @@ struct FantasyMatchupBenchSectionSorted: View {
                 let team1 = player1.team?.lowercased() ?? ""
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
+                
+            case .recentActivity:
+                // Live players first, then sort by score
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1
+                }
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
     }
@@ -657,31 +691,72 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     let showActiveOnly: Bool
     let showYetToPlayOnly: Bool
     
+    // 🔥 FIX: Local @State copies of filter values to prevent reset during parent re-renders
+    // These are snapshots that persist across view updates, immune to parent render timing issues
+    @State private var localSelectedPosition: FantasyPosition = .all
+    @State private var localShowActiveOnly: Bool = false
+    @State private var localShowYetToPlayOnly: Bool = false
+    
+    // 🔥 LIVE UPDATES: Observe hub for score changes
+    private var matchupsHub: MatchupsHubViewModel { MatchupsHubViewModel.shared }
+    
+    // 🔥 LIVE UPDATES: Get fresh matchup data from hub (not stale parameter)
+    private var currentMatchup: FantasyMatchup {
+        // Debug: Log what we're looking for
+        let targetID = matchup.id
+        let hubMatchupCount = matchupsHub.myMatchups.count
+        let hubMatchupIDs = matchupsHub.myMatchups.compactMap { $0.fantasyMatchup?.id }
+        
+        DebugPrint(mode: .matchupLoading, "🔍 LOOKUP: Looking for matchup.id='\(targetID)' in \(hubMatchupCount) hub matchups")
+        DebugPrint(mode: .matchupLoading, "🔍 AVAILABLE IDs: \(hubMatchupIDs)")
+        
+        if let updated = matchupsHub.myMatchups.first(where: { $0.fantasyMatchup?.id == matchup.id })?.fantasyMatchup {
+            // Debug: Compare hub data vs parameter data
+            if let hubPlayer = updated.homeTeam.roster.first, let paramPlayer = matchup.homeTeam.roster.first {
+                DebugPrint(mode: .matchupLoading, "✅ FOUND! Hub=\(hubPlayer.fullName):\(hubPlayer.currentPoints ?? -1) vs Param=\(paramPlayer.fullName):\(paramPlayer.currentPoints ?? -1)")
+            }
+            return updated
+        }
+        DebugPrint(mode: .matchupLoading, "❌ FALLBACK: Matchup '\(targetID)' not found - using stale data!")
+        return matchup
+    }
+    
     @State private var cachedHomeRoster: [FantasyPlayer] = []
     @State private var cachedAwayRoster: [FantasyPlayer] = []
     @State private var lastFilterUpdate = Date.distantPast
     @State private var homeProjected: Double = 0.0
     @State private var awayProjected: Double = 0.0
     @State private var projectionsLoaded = false
+    @State private var lastHubUpdate = Date.distantPast
+    
+    // 🔥 POLLING FIX: Store hub update time locally to trigger view updates
+    @State private var observedHubUpdateTime = Date.distantPast
+    @State private var pollingTask: Task<Void, Never>?
     
     var body: some View {
+        // 🔥 CRITICAL: Read observedHubUpdateTime to establish SwiftUI dependency
+        // This triggers re-render when polling updates, but WITHOUT .id() we don't destroy views
+        let _ = observedHubUpdateTime
+        
         VStack(alignment: .leading, spacing: 12) {
             
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Active Roster (Left column - to match header)
                 VStack(spacing: 20) {
-                    ForEach(homeActiveRoster, id: \.id) { player in
+                    // 🔥 FIX: Use cachedHomeRoster which has all filters applied (Active Only, Yet to Play, etc.)
+                    // Polling updates cachedHomeRoster → SwiftUI diffs changes without recreating views
+                    ForEach(cachedHomeRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 1,
                             isBench: false
                         )
                     }
                     
-                    let homeScore = fantasyViewModel.getScore(for: matchup, teamIndex: 1)
-                    let awayScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
+                    let homeScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 1)
+                    let awayScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 0)
                     let homeWinning = homeScore > awayScore
                     
                     teamScoreCard(
@@ -694,18 +769,19 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 
                 // Away Team Active Roster (Right column - to match header)
                 VStack(spacing: 20) {
-                    ForEach(awayActiveRoster, id: \.id) { player in
+                    // 🔥 FIX: Use cachedAwayRoster which has all filters applied
+                    ForEach(cachedAwayRoster, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 0,
                             isBench: false
                         )
                     }
                     
-                    let homeScore = fantasyViewModel.getScore(for: matchup, teamIndex: 1)
-                    let awayScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
+                    let homeScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 1)
+                    let awayScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 0)
                     let awayWinning = awayScore > homeScore
                     
                     teamScoreCard(
@@ -719,10 +795,19 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             .padding(.horizontal, 16)
         }
         .onAppear {
+            // 🔥 FIX: Initialize local filter copies from parameters
+            syncLocalFilters()
             updateCachedRosters()
             Task {
                 await loadProjectedScores()
             }
+            // 🔥 POLLING FIX: Start polling task to observe hub changes (like AllLivePlayersViewModel)
+            startPollingTask()
+        }
+        .onDisappear {
+            // 🔥 POLLING FIX: Cancel polling when view disappears
+            pollingTask?.cancel()
+            pollingTask = nil
         }
         .onChange(of: sortMethod) { _, _ in
             updateCachedRosters()
@@ -730,36 +815,85 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         .onChange(of: highToLow) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: selectedPosition) { _, _ in
+        .onChange(of: selectedPosition) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localSelectedPosition = newValue
             updateCachedRosters()
         }
-        .onChange(of: showActiveOnly) { _, _ in
+        .onChange(of: showActiveOnly) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localShowActiveOnly = newValue
             updateCachedRosters()
         }
-        .onChange(of: showYetToPlayOnly) { _, _ in
+        .onChange(of: showYetToPlayOnly) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localShowYetToPlayOnly = newValue
             updateCachedRosters()
+        }
+    }
+    
+    // 🔥 FIX: Sync local filter copies from parameters
+    private func syncLocalFilters() {
+        localSelectedPosition = selectedPosition
+        localShowActiveOnly = showActiveOnly
+        localShowYetToPlayOnly = showYetToPlayOnly
+    }
+    
+    // 🔥 POLLING FIX: Poll for hub updates (same pattern as AllLivePlayersViewModel)
+    private func startPollingTask() {
+        pollingTask?.cancel()
+        pollingTask = Task { @MainActor in
+            var lastObserved = observedHubUpdateTime
+            
+            while !Task.isCancelled {
+                let currentHubTime = MatchupsHubViewModel.shared.lastUpdateTime
+                
+                if currentHubTime > lastObserved {
+                    DebugPrint(mode: .matchupLoading, "🔄 POLLING: Hub updated from \(lastObserved) to \(currentHubTime)")
+                    lastObserved = currentHubTime
+                    observedHubUpdateTime = currentHubTime // This triggers @State update → view refresh
+                    updateCachedRosters()
+                }
+                
+                try? await Task.sleep(for: .milliseconds(500))
+            }
         }
     }
     
     private var homeActiveRoster: [FantasyPlayer] {
-        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
-        return getFilteredRoster(for: matchup, teamIndex: 1, isBench: false)
+        // 🔥 LIVE UPDATES: Use currentMatchup to get fresh data from hub
+        let roster = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: false)
+        // Debug: Log a sample player score
+        if let firstPlayer = roster.first {
+            DebugPrint(mode: .matchupLoading, "🏠 HOME ROSTER: \(firstPlayer.fullName) score=\(firstPlayer.currentPoints ?? -1)")
+        }
+        return roster
     }
     
     private var awayActiveRoster: [FantasyPlayer] {
-        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
-        return getFilteredRoster(for: matchup, teamIndex: 0, isBench: false)
+        // 🔥 LIVE UPDATES: Use currentMatchup to get fresh data from hub
+        return getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: false)
     }
     
     private func updateCachedRosters() {
-        cachedHomeRoster = getFilteredRoster(for: matchup, teamIndex: 1, isBench: false)
-        cachedAwayRoster = getFilteredRoster(for: matchup, teamIndex: 0, isBench: false)
+        let newHome = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: false)
+        let newAway = getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: false)
+        
+        // Debug: Compare old vs new scores
+        if let oldFirst = cachedHomeRoster.first, let newFirst = newHome.first {
+            DebugPrint(mode: .matchupLoading, "🔄 UPDATE ROSTERS: \(newFirst.fullName) OLD=\(oldFirst.currentPoints ?? -1) NEW=\(newFirst.currentPoints ?? -1)")
+        }
+        
+        cachedHomeRoster = newHome
+        cachedAwayRoster = newAway
         lastFilterUpdate = Date()
+        
+        DebugPrint(mode: .matchupLoading, "✅ CACHED ROSTERS UPDATED: home=\(cachedHomeRoster.count) away=\(cachedAwayRoster.count)")
     }
     
     private func loadProjectedScores() async {
-        let homeProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.homeTeam)
-        let awayProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: matchup.awayTeam)
+        let homeProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: currentMatchup.homeTeam)
+        let awayProj = await ProjectedPointsManager.shared.getProjectedTeamScore(for: currentMatchup.awayTeam)
         
         await MainActor.run {
             self.homeProjected = homeProj
@@ -824,10 +958,11 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        if selectedPosition != .all {
+        // 🔥 FIX: Use local @State copies instead of parameters to avoid reset during parent re-renders
+        if localSelectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
-                let filterPosition = selectedPosition.rawValue.uppercased()
+                let filterPosition = localSelectedPosition.rawValue.uppercased()
                 
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
@@ -837,7 +972,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        if showActiveOnly {
+        if localShowActiveOnly {
             let liveTeams = Set(NFLGameDataService.shared.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
@@ -848,7 +983,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             }
         }
         
-        if showYetToPlayOnly {
+        if localShowYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
                     playerTeam: player.team,
@@ -885,6 +1020,18 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 let team1 = player1.team?.lowercased() ?? ""
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
+                
+            case .recentActivity:
+                // Live players first, then sort by score
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1
+                }
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
         
@@ -917,14 +1064,40 @@ struct FantasyMatchupBenchSectionFiltered: View {
     let showActiveOnly: Bool
     let showYetToPlayOnly: Bool
     
+    // 🔥 FIX: Local @State copies of filter values to prevent reset during parent re-renders
+    // These are snapshots that persist across view updates, immune to parent render timing issues
+    @State private var localSelectedPosition: FantasyPosition = .all
+    @State private var localShowActiveOnly: Bool = false
+    @State private var localShowYetToPlayOnly: Bool = false
+    
+    // 🔥 LIVE UPDATES: Observe hub for score changes
+    private var matchupsHub: MatchupsHubViewModel { MatchupsHubViewModel.shared }
+    
+    // 🔥 LIVE UPDATES: Get fresh matchup data from hub (not stale parameter)
+    private var currentMatchup: FantasyMatchup {
+        if let updated = matchupsHub.myMatchups.first(where: { $0.fantasyMatchup?.id == matchup.id })?.fantasyMatchup {
+            return updated
+        }
+        return matchup
+    }
+    
     @State private var cachedHomeBench: [FantasyPlayer] = []
     @State private var cachedAwayBench: [FantasyPlayer] = []
     @State private var lastFilterUpdate = Date.distantPast
     @State private var homeBenchProjected: Double = 0.0
     @State private var awayBenchProjected: Double = 0.0
     @State private var projectionsLoaded = false
+    @State private var lastHubUpdate = Date.distantPast
+    
+    // 🔥 POLLING FIX: Store hub update time locally to trigger view updates
+    @State private var observedHubUpdateTime = Date.distantPast
+    @State private var pollingTask: Task<Void, Never>?
     
     var body: some View {
+        // 🔥 CRITICAL: Read observedHubUpdateTime to establish SwiftUI dependency
+        // This triggers re-render when polling updates, but WITHOUT .id() we don't destroy views
+        let _ = observedHubUpdateTime
+        
         VStack(alignment: .leading, spacing: 12) {
             Text("Bench")
                 .font(.headline)
@@ -934,17 +1107,19 @@ struct FantasyMatchupBenchSectionFiltered: View {
             HStack(alignment: .top, spacing: 24) {
                 // Home Team Bench (Left column - to match header)
                 VStack(spacing: 20) {
-                    ForEach(homeBenchRoster, id: \.id) { player in
+                    // 🔥 FIX: Use cachedHomeBench which has all filters applied
+                    // Polling updates cachedHomeBench → SwiftUI diffs changes without recreating views
+                    ForEach(cachedHomeBench, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 1,
                             isBench: true
                         )
                     }
                     
-                    let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    let benchTotal = cachedHomeBench.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
                         projected: homeBenchProjected,
@@ -955,17 +1130,18 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 
                 // Away Team Bench (Right column - to match header)
                 VStack(spacing: 20) {
-                    ForEach(awayBenchRoster, id: \.id) { player in
+                    // 🔥 FIX: Use cachedAwayBench which has all filters applied
+                    ForEach(cachedAwayBench, id: \.id) { player in
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 0,
                             isBench: true
                         )
                     }
                     
-                    let benchTotal = awayBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    let benchTotal = cachedAwayBench.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
                     teamScoreCard(
                         score: benchTotal,
                         projected: awayBenchProjected,
@@ -977,10 +1153,19 @@ struct FantasyMatchupBenchSectionFiltered: View {
             .padding(.horizontal, 16)
         }
         .onAppear {
+            // 🔥 FIX: Initialize local filter copies from parameters
+            syncLocalFilters()
             updateCachedRosters()
             Task {
                 await loadBenchProjectedScores()
             }
+            // 🔥 POLLING FIX: Start polling task to observe hub changes
+            startPollingTask()
+        }
+        .onDisappear {
+            // 🔥 POLLING FIX: Cancel polling when view disappears
+            pollingTask?.cancel()
+            pollingTask = nil
         }
         .onChange(of: sortMethod) { _, _ in
             updateCachedRosters()
@@ -988,30 +1173,64 @@ struct FantasyMatchupBenchSectionFiltered: View {
         .onChange(of: highToLow) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: selectedPosition) { _, _ in
+        .onChange(of: selectedPosition) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localSelectedPosition = newValue
             updateCachedRosters()
         }
-        .onChange(of: showActiveOnly) { _, _ in
+        .onChange(of: showActiveOnly) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localShowActiveOnly = newValue
             updateCachedRosters()
         }
-        .onChange(of: showYetToPlayOnly) { _, _ in
+        .onChange(of: showYetToPlayOnly) { _, newValue in
+            // 🔥 FIX: Sync local copy when parameter changes
+            localShowYetToPlayOnly = newValue
             updateCachedRosters()
+        }
+    }
+    
+    // 🔥 FIX: Sync local filter copies from parameters
+    private func syncLocalFilters() {
+        localSelectedPosition = selectedPosition
+        localShowActiveOnly = showActiveOnly
+        localShowYetToPlayOnly = showYetToPlayOnly
+    }
+    
+    // 🔥 POLLING FIX: Poll for hub updates (same pattern as AllLivePlayersViewModel)
+    private func startPollingTask() {
+        pollingTask?.cancel()
+        pollingTask = Task { @MainActor in
+            var lastObserved = observedHubUpdateTime
+            
+            while !Task.isCancelled {
+                let currentHubTime = MatchupsHubViewModel.shared.lastUpdateTime
+                
+                if currentHubTime > lastObserved {
+                    DebugPrint(mode: .matchupLoading, "🔄 BENCH POLLING: Hub updated from \(lastObserved) to \(currentHubTime)")
+                    lastObserved = currentHubTime
+                    observedHubUpdateTime = currentHubTime // This triggers @State update → view refresh
+                    updateCachedRosters()
+                }
+                
+                try? await Task.sleep(for: .milliseconds(500))
+            }
         }
     }
     
     private var homeBenchRoster: [FantasyPlayer] {
-        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
-        return getFilteredRoster(for: matchup, teamIndex: 1, isBench: true)
+        // 🔥 LIVE UPDATES: Use currentMatchup to get fresh data from hub
+        return getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: true)
     }
     
     private var awayBenchRoster: [FantasyPlayer] {
-        // 🔥 FIX: Return fresh data directly instead of cached (parent forces rebuild via .id())
-        return getFilteredRoster(for: matchup, teamIndex: 0, isBench: true)
+        // 🔥 LIVE UPDATES: Use currentMatchup to get fresh data from hub
+        return getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: true)
     }
     
     private func updateCachedRosters() {
-        cachedHomeBench = getFilteredRoster(for: matchup, teamIndex: 1, isBench: true)
-        cachedAwayBench = getFilteredRoster(for: matchup, teamIndex: 0, isBench: true)
+        cachedHomeBench = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: true)
+        cachedAwayBench = getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: true)
         lastFilterUpdate = Date()
     }
     
@@ -1086,10 +1305,10 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             LinearGradient(
                                 gradient: Gradient(colors: [Color(.secondarySystemBackground), Color.clear]),
                                 startPoint: .top,
-                                endPoint: .bottom
-                            )
+                            endPoint: .bottom
                         )
-                )
+                    )
+            )
         }
     }
     
@@ -1100,10 +1319,11 @@ struct FantasyMatchupBenchSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        if selectedPosition != .all {
+        // 🔥 FIX: Use local @State copies instead of parameters to avoid reset during parent re-renders
+        if localSelectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
-                let filterPosition = selectedPosition.rawValue.uppercased()
+                let filterPosition = localSelectedPosition.rawValue.uppercased()
                 
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
@@ -1113,7 +1333,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        if showActiveOnly {
+        if localShowActiveOnly {
             let liveTeams = Set(NFLGameDataService.shared.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
@@ -1124,7 +1344,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        if showYetToPlayOnly {
+        if localShowYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
                     playerTeam: player.team,
@@ -1161,6 +1381,18 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 let team1 = player1.team?.lowercased() ?? ""
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
+                
+            case .recentActivity:
+                // Live players first, then sort by score
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1
+                }
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
         

@@ -506,6 +506,23 @@ struct EnhancedNFLTeamRosterView: View {
                 let rhsTeam = rhs.team ?? ""
                 return sortHighToLow ? lhsTeam > rhsTeam : lhsTeam < rhsTeam
             }
+        case .recentActivity:
+            // Sort by live teams first, then by score
+            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+                .filter { $0.isLive }
+                .flatMap { [$0.homeTeam, $0.awayTeam] })
+            
+            return players.sorted { lhs, rhs in
+                let lhsLive = liveTeams.contains(lhs.team ?? "")
+                let rhsLive = liveTeams.contains(rhs.team ?? "")
+                
+                if lhsLive != rhsLive {
+                    return lhsLive
+                }
+                let lhsPoints = viewModel.getPlayerPoints(for: lhs) ?? 0.0
+                let rhsPoints = viewModel.getPlayerPoints(for: rhs) ?? 0.0
+                return lhsPoints > rhsPoints
+            }
         }
     }
     
@@ -924,7 +941,3 @@ struct EnhancedNFLPlayerCard: View {
     }
 }
 
-#Preview("Enhanced NFL Team Roster") {
-    EnhancedNFLTeamRosterView(teamCode: "KC")
-        .preferredColorScheme(.dark)
-}

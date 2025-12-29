@@ -54,7 +54,7 @@ struct PlayerSortingService {
                     return name1 < name2
                 }
                 
-            case .team: // NEW: Team sorting
+            case .team:
                 let team1 = player1.team ?? ""
                 let team2 = player2.team ?? ""
                 if highToLow {
@@ -62,6 +62,18 @@ struct PlayerSortingService {
                 } else {
                     return team1 < team2
                 }
+                
+            case .recentActivity:
+                // Live players first, then sort by score
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1
+                }
+                let points1 = getPlayerPoints?(player1) ?? player1.currentPoints ?? 0.0
+                let points2 = getPlayerPoints?(player2) ?? player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
         

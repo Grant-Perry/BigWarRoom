@@ -14,41 +14,9 @@ import SwiftUI
 extension FantasyViewModel {
     
     /// Calculate win probability based on scores
-    /// Calculate win probability using normal distribution model
-    /// Based on current score difference, accounts for remaining game variance
+    /// Uses WinProbabilityEngine SSOT for consistent calculations
     func calculateWinProbability(homeScore: Double, awayScore: Double) -> Double {
-        if homeScore == 0 && awayScore == 0 { return 0.5 }
-        
-        let lead = homeScore - awayScore
-        
-        // 🔥 STATISTICAL MODEL: Use centralized SD from AppConstants
-        let combinedSD = AppConstants.WinProbabilitySD * sqrt(2.0)
-        
-        let zScore = lead / combinedSD
-        let probability = normalCDF(zScore)
-        
-        // Clamp to reasonable bounds
-        return min(max(probability, 0.05), 0.95)
-    }
-    
-    /// Approximation of the standard normal CDF (Abramowitz and Stegun)
-    private func normalCDF(_ x: Double) -> Double {
-        if x < -8.0 { return 0.0 }
-        if x > 8.0 { return 1.0 }
-        
-        let a1 =  0.254829592
-        let a2 = -0.284496736
-        let a3 =  1.421413741
-        let a4 = -1.453152027
-        let a5 =  1.061405429
-        let p  =  0.3275911
-        
-        let sign = x < 0 ? -1.0 : 1.0
-        let absX = abs(x)
-        let t = 1.0 / (1.0 + p * absX)
-        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * exp(-absX * absX / 2.0)
-        
-        return 0.5 * (1.0 + sign * y)
+        return WinProbabilityEngine.shared.calculateWinProbability(myScore: homeScore, opponentScore: awayScore)
     }
     
     /// Get score for a team in a matchup
@@ -227,6 +195,18 @@ extension FantasyViewModel {
                 let team1 = player1.team?.lowercased() ?? ""
                 let team2 = player2.team?.lowercased() ?? ""
                 return highToLow ? team1 > team2 : team1 < team2
+                
+            case .recentActivity:
+                // Live players first, then sort by score
+                let live1 = player1.isLive
+                let live2 = player2.isLive
+                
+                if live1 != live2 {
+                    return live1
+                }
+                let points1 = player1.currentPoints ?? 0.0
+                let points2 = player2.currentPoints ?? 0.0
+                return points1 > points2
             }
         }
     }

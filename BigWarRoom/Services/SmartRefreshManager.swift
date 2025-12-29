@@ -56,6 +56,9 @@ final class SmartRefreshManager {
         let calendar = Calendar.current
         let weekday = calendar.component(.weekday, from: now)
         
+        // Track previous state to detect changes
+        let previousHasLiveGames = hasLiveGames
+        
         // Check if it's a "no-game" day (Tuesday = 3, Wednesday = 4)
         if isNoGameDay(weekday: weekday, date: now) {
             currentRefreshInterval = dormantRefreshInterval
@@ -63,6 +66,7 @@ final class SmartRefreshManager {
             hasLiveGames = false
             refreshReason = "No games today (Tue/Wed)"
             DebugPrint(mode: .globalRefresh, "🔋 SMART REFRESH: No-game day - 1 hour interval, timer hidden")
+            notifyIdleTimerIfNeeded(previousHasLiveGames: previousHasLiveGames)
             return
         }
         
@@ -104,6 +108,16 @@ final class SmartRefreshManager {
             hasLiveGames = false
             refreshReason = "No games today"
             DebugPrint(mode: .globalRefresh, "😴 SMART REFRESH: No games today - 1 hour interval, timer hidden")
+        }
+        
+        notifyIdleTimerIfNeeded(previousHasLiveGames: previousHasLiveGames)
+    }
+    
+    /// Notifies AppLifecycleManager when live game status changes
+    private func notifyIdleTimerIfNeeded(previousHasLiveGames: Bool) {
+        if hasLiveGames != previousHasLiveGames {
+            DebugPrint(mode: .globalRefresh, "📱 Live game status changed: \(previousHasLiveGames) → \(hasLiveGames)")
+            AppLifecycleManager.shared.refreshIdleTimerForLiveGames()
         }
     }
     

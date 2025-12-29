@@ -124,18 +124,39 @@ final class AppLifecycleManager {
     
     // MARK: - Idle Timer Management
     
-    /// Updates the idle timer state based on app phase and user setting
+    /// Updates the idle timer state based on app phase, user setting, AND live games
+    /// Only keeps screen awake when there are actually live games happening
     private func updateIdleTimerState() {
-        let shouldDisableIdleTimer = isActive && keepAppActiveEnabled
+        // During initial app launch, SmartRefreshManager may not be ready yet
+        // Default to false (allow auto-lock) until services are initialized
+        let hasLiveGames = isServicesReady ? SmartRefreshManager.shared.hasLiveGames : false
+        let shouldDisableIdleTimer = isActive && keepAppActiveEnabled && hasLiveGames
         
         #if os(iOS)
         UIApplication.shared.isIdleTimerDisabled = shouldDisableIdleTimer
         
         if shouldDisableIdleTimer {
-            DebugPrint(mode: .lifecycle, "📱 Idle timer DISABLED - app will stay awake")
+            DebugPrint(mode: .lifecycle, "📱 Idle timer DISABLED - live games active, app will stay awake")
+        } else if keepAppActiveEnabled && !hasLiveGames {
+            DebugPrint(mode: .lifecycle, "📱 Idle timer ENABLED - no live games, allowing auto-lock")
         } else {
             DebugPrint(mode: .lifecycle, "📱 Idle timer ENABLED - normal auto-lock behavior")
         }
         #endif
+    }
+    
+    /// Flag to track if dependent services are ready
+    private var isServicesReady: Bool = false
+    
+    /// Called once services are initialized to enable full idle timer logic
+    func markServicesReady() {
+        isServicesReady = true
+        DebugPrint(mode: .lifecycle, "📱 Services ready - updating idle timer state")
+        updateIdleTimerState()
+    }
+    
+    /// Call this when live game status changes to update idle timer
+    func refreshIdleTimerForLiveGames() {
+        updateIdleTimerState()
     }
 }

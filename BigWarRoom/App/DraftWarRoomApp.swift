@@ -123,6 +123,9 @@ struct DraftWarRoomApp: App {
         )
         CentralizedAppLoader.setSharedInstance(centralizedLoader)
         
+        // Mark services as ready for AppLifecycleManager idle timer logic
+        AppLifecycleManager.shared.markServicesReady()
+        
         print("✅ HYBRID DI: All services initialized with proper dependency injection")
     }
 }

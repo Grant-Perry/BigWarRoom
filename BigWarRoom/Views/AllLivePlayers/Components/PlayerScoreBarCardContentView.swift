@@ -22,6 +22,11 @@ struct PlayerScoreBarCardContentView: View {
     @State private var showingScoreBreakdown = false
     @State private var isLoadingOverlayVisible = false
     
+    // 🔥 SSOT: Projected scores for win probability thermometer (matches Matchups Hub)
+    @State private var myProjected: Double = 0.0
+    @State private var opponentProjected: Double = 0.0
+    @State private var projectionsLoaded = false
+    
     // 🔥 PHASE 3 DI: Initializer accepts all dependencies
     init(
         playerEntry: AllLivePlayersViewModel.LivePlayerEntry,
@@ -136,6 +141,15 @@ struct PlayerScoreBarCardContentView: View {
                             )
                         }
                         .buttonStyle(PlainButtonStyle())
+                    }
+                    
+                    // 🔥 SSOT: Win probability thermometer using PROJECTED scores (matches Matchups Hub)
+                    if projectionsLoaded && myProjected > 0 && opponentProjected > 0 {
+                        CompactWinThermometer(
+                            myScore: myProjected,
+                            opponentScore: opponentProjected
+                        )
+                        .frame(width: 100)
                     }
                     
                     Spacer()
@@ -289,6 +303,21 @@ struct PlayerScoreBarCardContentView: View {
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(.clear)
+        }
+        // 🔥 SSOT: Load projected scores for win probability (matches Matchups Hub)
+        .task {
+            await loadProjectedScores()
+        }
+    }
+    
+    // 🔥 SSOT: Load projected scores - same pattern as MatchupBarCardView
+    private func loadProjectedScores() async {
+        guard !projectionsLoaded else { return }
+        let projections = try? await playerEntry.matchup.getProjectedScores()
+        await MainActor.run {
+            self.myProjected = projections?.myTeam ?? 0.0
+            self.opponentProjected = projections?.opponent ?? 0.0
+            self.projectionsLoaded = true
         }
     }
     
@@ -562,6 +591,49 @@ struct ScoreBreakdownLoaderView: View {
             .presentationDetents([.height(500)])
             .presentationDragIndicator(.hidden)
             .presentationBackground(.clear)
+    }
+}
+
+// MARK: - Compact Win Thermometer
+
+/// Compact win probability thermometer for Live Players cards
+/// Uses WinProbabilityEngine SSOT for consistent calculations
+struct CompactWinThermometer: View {
+    let myScore: Double
+    let opponentScore: Double
+    
+    private var winProbability: Double {
+        WinProbabilityEngine.shared.calculateWinProbability(myScore: myScore, opponentScore: opponentScore)
+    }
+    
+    private var isWinning: Bool {
+        myScore >= opponentScore
+    }
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            // Win percentage text
+            Text("\(Int(winProbability * 100))%")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+            
+            // Thermometer bar
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background bar
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 4)
+                    
+                    // Fill bar
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(isWinning ? Color.gpGreen : Color.gpRedPink)
+                        .frame(width: geometry.size.width * CGFloat(winProbability), height: 4)
+                        .animation(.easeInOut(duration: 0.5), value: winProbability)
+                }
+            }
+            .frame(height: 4)
+        }
     }
 }
 

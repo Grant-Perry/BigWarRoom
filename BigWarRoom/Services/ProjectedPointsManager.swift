@@ -114,19 +114,134 @@ final class ProjectedPointsManager {
         let starters = team.roster.filter { $0.isStarter }
         
         for player in starters {
-            // If player has already played/is playing, use current score
-            if let currentScore = player.currentPoints, currentScore > 0 {
-                total += currentScore
-                DebugPrint(mode: .liveUpdates, "🎯 CURRENT: \(player.fullName) already scored \(currentScore)")
-            } 
-            // If player hasn't played yet, use projection
-            else if let projection = await getProjectedPoints(for: player, scoringFormat: scoringFormat) {
-                total += projection
-                DebugPrint(mode: .liveUpdates, "🎯 PROJECTION: \(player.fullName) projected \(projection)")
-            }
+            let expectedScore = await getLiveExpectedScore(for: player, scoringFormat: scoringFormat)
+            total += expectedScore
         }
         
         return total
+    }
+    
+    // MARK: - Live Expected Score Calculation
+    
+    /// Calculate expected final score for a player based on current score + remaining projection
+    /// This creates smooth transitions instead of jarring drops when games start
+    ///
+    /// Formula: expected = current_score + (projection × remaining_game_percentage)
+    ///
+    /// Examples:
+    /// - Pre-game (0% complete): 0 + (20 × 1.0) = 20 pts
+    /// - Q1 (25% done), 2 pts: 2 + (20 × 0.75) = 17 pts
+    /// - Halftime (50% done), 8 pts: 8 + (20 × 0.5) = 18 pts
+    /// - Final, 15 pts: 15 + (20 × 0.0) = 15 pts
+    private func getLiveExpectedScore(
+        for player: FantasyPlayer,
+        scoringFormat: String = "ppr"
+    ) async -> Double {
+        let currentScore = player.currentPoints ?? 0.0
+        
+        // Get game info for this player's team
+        guard let team = player.team else {
+            // No team = can't determine game status, use projection
+            if let projection = await getProjectedPoints(for: player, scoringFormat: scoringFormat) {
+                DebugPrint(mode: .liveUpdates, "🎯 NO_TEAM: \(player.fullName) using projection \(projection)")
+                return projection
+            }
+            return currentScore
+        }
+        
+        // Get game progress
+        let gameProgress = getGameProgress(for: team)
+        let remainingPercentage = 1.0 - gameProgress
+        
+        // Get projection for remaining calculation
+        guard let projection = await getProjectedPoints(for: player, scoringFormat: scoringFormat) else {
+            // No projection available, just use current score
+            DebugPrint(mode: .liveUpdates, "🎯 NO_PROJ: \(player.fullName) using current \(currentScore)")
+            return currentScore
+        }
+        
+        // Calculate remaining expected points
+        let remainingExpected = projection * remainingPercentage
+        let expectedTotal = currentScore + remainingExpected
+        
+        DebugPrint(mode: .liveUpdates, "🎯 LIVE_PROJ: \(player.fullName) = \(String(format: "%.1f", currentScore)) + (\(String(format: "%.1f", projection)) × \(String(format: "%.0f%%", remainingPercentage * 100))) = \(String(format: "%.1f", expectedTotal))")
+        
+        return expectedTotal
+    }
+    
+    /// Calculate game progress percentage (0.0 = not started, 1.0 = finished)
+    /// Uses quarter and time remaining to estimate progress
+    private func getGameProgress(for team: String) -> Double {
+        let gameService = NFLGameDataService.shared
+        
+        guard let gameInfo = gameService.getGameInfo(for: team) else {
+            // No game info = assume not started
+            return 0.0
+        }
+        
+        // Game finished = 100% complete
+        if gameInfo.isCompleted {
+            return 1.0
+        }
+        
+        // Game not started = 0% complete
+        if !gameInfo.isLive {
+            return 0.0
+        }
+        
+        // Parse the display time to get quarter and time
+        let displayTime = gameInfo.displayTime.uppercased()
+        
+        // Handle special cases
+        if displayTime.contains("HALFTIME") || displayTime.contains("HALF") {
+            return 0.5
+        }
+        if displayTime.contains("FINAL") {
+            return 1.0
+        }
+        if displayTime.contains("PREGAME") {
+            return 0.0
+        }
+        
+        // Parse quarter (Q1, Q2, Q3, Q4, OT)
+        var quarterProgress: Double = 0.0
+        
+        if displayTime.contains("Q1") || displayTime.contains("1ST") {
+            quarterProgress = 0.0  // 0-25%
+        } else if displayTime.contains("Q2") || displayTime.contains("2ND") {
+            quarterProgress = 0.25  // 25-50%
+        } else if displayTime.contains("Q3") || displayTime.contains("3RD") {
+            quarterProgress = 0.5  // 50-75%
+        } else if displayTime.contains("Q4") || displayTime.contains("4TH") {
+            quarterProgress = 0.75  // 75-100%
+        } else if displayTime.contains("OT") {
+            quarterProgress = 0.9  // OT = nearly done
+        }
+        
+        // Try to parse time remaining in quarter (e.g., "Q2 14:15" → 14:15 remaining)
+        // Each quarter is 15 minutes, so time remaining tells us progress within quarter
+        let timePattern = #"(\d{1,2}):(\d{2})"#
+        if let regex = try? NSRegularExpression(pattern: timePattern),
+           let match = regex.firstMatch(in: displayTime, range: NSRange(displayTime.startIndex..., in: displayTime)) {
+            
+            if let minutesRange = Range(match.range(at: 1), in: displayTime),
+               let secondsRange = Range(match.range(at: 2), in: displayTime),
+               let minutes = Double(displayTime[minutesRange]),
+               let seconds = Double(displayTime[secondsRange]) {
+                
+                // Time remaining in quarter (max 15:00)
+                let timeRemaining = minutes + (seconds / 60.0)
+                let quarterLength = 15.0
+                
+                // Progress within this quarter (0 = just started quarter, 1 = quarter ending)
+                let withinQuarterProgress = max(0, min(1, (quarterLength - timeRemaining) / quarterLength))
+                
+                // Add within-quarter progress (each quarter is 25% of game)
+                quarterProgress += withinQuarterProgress * 0.25
+            }
+        }
+        
+        return min(1.0, max(0.0, quarterProgress))
     }
     
     /// Get projected scores for both teams in a matchup

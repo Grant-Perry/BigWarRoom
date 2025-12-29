@@ -23,7 +23,8 @@ struct FantasyMatchupDetailView: View {
     @State private var livePlayersViewModel: AllLivePlayersViewModel
     
     // 🔥 NEW: Observe global matchups for auto-refresh
-    @State private var matchupsHubViewModel: MatchupsHubViewModel = MatchupsHubViewModel.shared
+    // NOTE: Do NOT use @State with @Observable classes - it breaks observation!
+    private var matchupsHubViewModel: MatchupsHubViewModel { MatchupsHubViewModel.shared }
 
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position
@@ -70,6 +71,9 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Body
 
     var body: some View {
+        // 🔥 CRITICAL: Force SwiftUI to track hub changes by reading lastUpdateTime in body
+        let _ = matchupsHubViewModel.lastUpdateTime
+        
         let awayTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 0) ?? latestMatchup.awayTeam.currentScore ?? 0.0
         let homeTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 1) ?? latestMatchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
@@ -136,7 +140,8 @@ struct FantasyMatchupDetailView: View {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         sortingMethod = method
                         // Reset sort direction to logical default for each method
-                        sortHighToLow = (method == .score) // Score: High-Low, others: A-Z
+                        // Score & Recent Activity: High-Low, others: A-Z
+                        sortHighToLow = (method == .score || method == .recentActivity)
                     }
                 },
                 onSortDirectionChanged: {
@@ -188,8 +193,6 @@ struct FantasyMatchupDetailView: View {
                         showActiveOnly: showActiveOnly,
                         showYetToPlayOnly: showYetToPlayOnly
                     )
-                    // 🔥 FIX: Force rebuild when hub data updates
-                    .id("active-\(matchupsHubViewModel.lastUpdateTime)")
                     
                     FantasyMatchupBenchSectionFiltered(
                         matchup: latestMatchup,
@@ -200,8 +203,6 @@ struct FantasyMatchupDetailView: View {
                         showActiveOnly: showActiveOnly,
                         showYetToPlayOnly: showYetToPlayOnly
                     )
-                    // 🔥 FIX: Force rebuild when hub data updates
-                    .id("bench-\(matchupsHubViewModel.lastUpdateTime)")
                 } else {
                     // Fallback content when no view model is available
                     simplifiedRosterView
@@ -265,9 +266,10 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Private Methods
 
     private func handleViewAppearance() {
-        // Always load stats when this view appears
+        // 🔥 FIXED: Trigger hub refresh to get live scores (not just AllLivePlayersViewModel)
+        // This ensures the matchup data is fresh when the view appears
         Task {
-            await livePlayersViewModel.forceLoadStats()
+            await matchupsHubViewModel.manualRefresh()
         }
     }
 

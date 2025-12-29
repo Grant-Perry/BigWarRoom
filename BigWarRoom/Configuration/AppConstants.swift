@@ -29,7 +29,7 @@ struct AppConstants {
     /// Lower SD = more extreme probabilities
     /// SD ~40 gives results similar to ESPN's win probability model
     /// Range: 10 (aggressive) to 80 (conservative)
-    @AppStorage("WinProbabilitySD") static var WinProbabilitySD: Double = 40.0  
+    @AppStorage("WinProbabilitySD") static var WinProbabilitySD: Double = 40.0
 
     // LEGACY: Keep these for backward compatibility but they're now managed by ESPNCredentialsManager
     // These are Gp's original credentials - users will set their own in ESPNSetupView

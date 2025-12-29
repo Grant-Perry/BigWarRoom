@@ -83,6 +83,17 @@ extension MatchupsHubViewModel {
         // 🔥 TODO: We'll need to inject WeekSelectionManager too
         let selectedWeek = WeekSelectionManager.shared.selectedWeek
         
+        // 🔥 WOODY'S FIX: Force refresh player stats ONCE before rebuilding all matchups
+        // This ensures LeagueMatchupProvider instances get fresh scores from the now-updated cache
+        // Without this, each provider uses cached/stale stats even after "refresh"
+        do {
+            let year = String(Calendar.current.component(.year, from: Date()))
+            _ = try await SharedStatsService.shared.forceRefreshWeekStats(week: selectedWeek, year: year)
+            DebugPrint(mode: .liveUpdates, "✅ Stats cache refreshed before matchup rebuild")
+        } catch {
+            DebugPrint(mode: .liveUpdates, "⚠️ Stats refresh failed: \(error) - matchups may have stale scores")
+        }
+        
         // Refresh all matchups and WAIT for completion before returning
         await withTaskGroup(of: Void.self) { group in
             for matchup in myMatchups {
@@ -271,6 +282,15 @@ extension MatchupsHubViewModel {
             DebugPrint(mode: .weekCheck, "📅 MatchupsHub.refreshInBackground: Using user-selected week \(selectedWeek)")
             
             NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear, forceRefresh: true)
+            
+            // 🔥 WOODY'S FIX: Force refresh player stats BEFORE rebuilding matchups
+            // This ensures fresh fantasy scores, not cached stale data
+            do {
+                _ = try await SharedStatsService.shared.forceRefreshWeekStats(week: selectedWeek, year: String(currentYear))
+                DebugPrint(mode: .liveUpdates, "✅ Background: Stats cache refreshed")
+            } catch {
+                DebugPrint(mode: .liveUpdates, "⚠️ Background: Stats refresh failed: \(error)")
+            }
             
             // Step 1: Refresh available leagues quietly
             // 🔥 PHASE 2: Use injected credentials instead of .shared

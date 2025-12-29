@@ -336,7 +336,7 @@ struct UnifiedSortingControls: View {
     /// Dynamic sort direction text based on current method and direction
     private var sortDirectionText: String {
         switch sortingMethod {
-        case .score:
+        case .score, .recentActivity:
             return sortHighToLow ? "↓" : "↑"
         case .name, .position, .team:
             return sortHighToLow ? "Z-A" : "A-Z"
