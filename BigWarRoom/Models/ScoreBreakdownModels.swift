@@ -118,31 +118,37 @@ struct ScoreBreakdownFactory {
     
     /// **STANDARDIZED METHOD** - Use this for all new code
     /// Creates a score breakdown with automatic stats lookup and league scoring detection
+    /// 🔥 PHASE 4 DI: Now requires services to be passed in
     static func createBreakdown(
         for player: FantasyPlayer,
         week: Int? = nil,
         localStatsProvider: LocalStatsProvider? = nil,
         leagueContext: LeagueContext? = nil,
-        allLivePlayersViewModel: AllLivePlayersViewModel? = nil
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil,
+        weekSelectionManager: WeekSelectionManager,
+        idCanonicalizer: ESPNSleeperIDCanonicalizer,
+        playerDirectoryStore: PlayerDirectoryStore,
+        playerStatsCache: PlayerStatsCache,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown {
         
-        // Get the week, defaulting to current selected week
-        let effectiveWeek = week ?? WeekSelectionManager.shared.selectedWeek
+        // Get the week, defaulting to current selected week from injected manager
+        let effectiveWeek = week ?? weekSelectionManager.selectedWeek
         
         DebugPrint(mode: .scoring, "🔍 ScoreBreakdown: Creating breakdown for \(player.fullName) (ESPN ID: \(player.id)), week \(effectiveWeek)")
         
-        // 🎯 NEW: Use canonical ESPN→Sleeper ID mapping
-        let canonicalSleeperID = ESPNSleeperIDCanonicalizer.shared.getCanonicalSleeperID(forESPNID: player.id)
+        // 🎯 Use injected canonical ESPN→Sleeper ID mapping
+        let canonicalSleeperID = idCanonicalizer.getCanonicalSleeperID(forESPNID: player.id)
         DebugPrint(mode: .scoring, "🔍 ScoreBreakdown: Canonical Sleeper ID: \(canonicalSleeperID)")
         
-        // 🔥 NEW: Try direct lookup first using the player.sleeperID if available
-        var sleeperPlayer: SleeperPlayer? = PlayerDirectoryStore.shared.player(for: canonicalSleeperID)
+        // 🔥 Try direct lookup first using injected player directory
+        var sleeperPlayer: SleeperPlayer? = playerDirectoryStore.player(for: canonicalSleeperID)
         
         // 🔥 FALLBACK: If canonical mapping didn't work, try searching by name
         if sleeperPlayer == nil {
             DebugPrint(mode: .scoring, "⚠️ ScoreBreakdown: No mapping found, searching by name: \(player.fullName)")
             let normalizedSearchName = player.fullName.lowercased()
-            sleeperPlayer = PlayerDirectoryStore.shared.players.values.first { sleeperPlayer in
+            sleeperPlayer = playerDirectoryStore.players.values.first { sleeperPlayer in
                 sleeperPlayer.fullName.lowercased() == normalizedSearchName
             }
             
@@ -158,13 +164,13 @@ struct ScoreBreakdownFactory {
         
         DebugPrint(mode: .scoring, "✅ ScoreBreakdown: Found SleeperPlayer: \(sleeperPlayer.fullName), playerID: \(sleeperPlayer.playerID)")
         
-        // 🔥 FIX: Pass PlayerStatsCache to StatsFacade so it can check cache
+        // 🔥 Use injected PlayerStatsCache
         guard let stats = StatsFacade.getPlayerStats(
             playerID: sleeperPlayer.playerID,
             week: effectiveWeek,
             localStatsProvider: localStatsProvider,
             allLivePlayersViewModel: allLivePlayersViewModel,
-            playerStatsCache: PlayerStatsCache.shared
+            playerStatsCache: playerStatsCache
         ) else {
             DebugPrint(mode: .scoring, "❌ ScoreBreakdown: No stats found for playerID \(sleeperPlayer.playerID), week \(effectiveWeek)")
             return createEmptyBreakdown(player: player, week: effectiveWeek)
@@ -177,13 +183,15 @@ struct ScoreBreakdownFactory {
             player: player,
             stats: stats,
             week: effectiveWeek,
-            leagueContext: leagueContext
+            leagueContext: leagueContext,
+            scoringSettingsManager: scoringSettingsManager
         )
     }
     
     // MARK: - Legacy Interface (For Backward Compatibility)
     
     /// **LEGACY METHOD** - Kept for backward compatibility, but prefer the standardized method above
+    /// 🔥 PHASE 4 DI: Now requires ScoringSettingsManager to be passed in
     static func createBreakdown(
         for player: FantasyPlayer,
         stats: [String: Double],
@@ -191,9 +199,10 @@ struct ScoreBreakdownFactory {
         scoringSystem: ScoringSystem = .ppr,
         isChoppedLeague: Bool = false,
         leagueScoringSettings: [String: Double]? = nil,
-        espnScoringSettings: [String: Double]? = nil,  // Deprecated
+        espnScoringSettings: [String: Double]? = nil,
         leagueID: String? = nil,
-        leagueSource: LeagueSource? = nil
+        leagueSource: LeagueSource? = nil,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown {
         
         // Convert to new interface
@@ -220,7 +229,8 @@ struct ScoreBreakdownFactory {
             player: player,
             stats: stats,
             week: week,
-            leagueContext: leagueContext
+            leagueContext: leagueContext,
+            scoringSettingsManager: scoringSettingsManager
         )
     }
     
@@ -233,7 +243,8 @@ struct ScoreBreakdownFactory {
         leagueID: String,
         leagueSource: LeagueSource,
         isChoppedLeague: Bool,
-        customScoringSettings: [String: Double]?
+        customScoringSettings: [String: Double]?,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown {
         
         var items: [ScoreBreakdownItem] = []
@@ -246,8 +257,8 @@ struct ScoreBreakdownFactory {
             hasRealScoringData = true
             print("Using custom chopped league scoring (\(customScoring.count) rules)")
         }
-        // Priority 2: Use unified scoring manager
-        else if let unifiedScoring = ScoringSettingsManager.shared.getScoringSettings(for: leagueID, source: leagueSource) {
+        // Priority 2: Use injected scoring manager
+        else if let unifiedScoring = scoringSettingsManager.getScoringSettings(for: leagueID, source: leagueSource) {
             scoringSettings = unifiedScoring
             hasRealScoringData = true
             print("Using unified \(leagueSource) scoring (\(unifiedScoring.count) rules)")
@@ -274,7 +285,7 @@ struct ScoreBreakdownFactory {
                 
                 // Only create breakdown items for stats that actually score points
                 if totalPoints != 0 {
-                    let pointsPerStat = totalPoints / statValue // Calculate effective rate
+                    let pointsPerStat = totalPoints / statValue
                     let statDisplayName = getStatDisplayName(for: statKey)
                     
                     items.append(ScoreBreakdownItem(
@@ -304,7 +315,8 @@ struct ScoreBreakdownFactory {
         player: FantasyPlayer,
         stats: [String: Double],
         week: Int,
-        leagueContext: LeagueContext?
+        leagueContext: LeagueContext?,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown {
         
         if let context = leagueContext {
@@ -315,7 +327,8 @@ struct ScoreBreakdownFactory {
                 leagueID: context.leagueID,
                 leagueSource: context.source,
                 isChoppedLeague: context.isChopped,
-                customScoringSettings: context.customScoringSettings
+                customScoringSettings: context.customScoringSettings,
+                scoringSettingsManager: scoringSettingsManager
             )
         } else {
             return createWithEstimatedScoring(player: player, stats: stats, week: week)
@@ -705,12 +718,14 @@ struct ScoreBreakdownFactory {
     
     /// Create transparent breakdown using authoritative total (Option 2 approach)
     /// Shows stats breakdown with point calculations for reference, but uses official total
+    /// 🔥 PHASE 4 DI: Now requires ScoringSettingsManager to be passed in
     static func createTransparentBreakdown(
         for player: FantasyPlayer,
         week: Int,
         authoritativeTotal: Double,
         localStatsProvider: LocalStatsProvider? = nil,
-        leagueContext: LeagueContext
+        leagueContext: LeagueContext,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown? {
         
         // Get player stats (for display calculation)
@@ -730,7 +745,7 @@ struct ScoreBreakdownFactory {
         
         if let customScoring = leagueContext.customScoringSettings {
             scoringSettings = customScoring
-        } else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(for: leagueContext.leagueID, source: leagueContext.source) {
+        } else if let leagueScoring = scoringSettingsManager.getScoringSettings(for: leagueContext.leagueID, source: leagueContext.source) {
             scoringSettings = leagueScoring
         } else {
             // Fallback to estimated scoring
@@ -758,16 +773,16 @@ struct ScoreBreakdownFactory {
                 totalPoints: calculatedPoints
             )
         }
-        .filter { $0.pointsPerStat > 0.0 } // Only show stats that have scoring rules
-        .sorted { abs($0.totalPoints) > abs($1.totalPoints) } // Sort by points value
+        .filter { $0.pointsPerStat > 0.0 }
+        .sorted { abs($0.totalPoints) > abs($1.totalPoints) }
         
         return PlayerScoreBreakdown(
             player: player,
             week: week,
             items: breakdownItems,
-            totalScore: authoritativeTotal, // USE AUTHORITATIVE TOTAL ONLY
+            totalScore: authoritativeTotal,
             isChoppedLeague: leagueContext.isChopped,
-            hasRealScoringData: false // Mark as reference only
+            hasRealScoringData: false
         )
     }
     
@@ -776,21 +791,21 @@ struct ScoreBreakdownFactory {
         player: FantasyPlayer,
         stats: [String: Double],
         week: Int,
-        leagueContext: LeagueContext?
+        leagueContext: LeagueContext?,
+        scoringSettingsManager: ScoringSettingsManager
     ) -> PlayerScoreBreakdown {
         
         var items: [ScoreBreakdownItem] = []
         var scoringSettings: [String: Double] = [:]
-        // Note: confidenceLevel tracking removed - was never used
         
         // Try to get actual league scoring settings
         if let context = leagueContext {
-            // Priority 1 - Use customScoringSettings if provided (regardless of league type)
+            // Priority 1 - Use customScoringSettings if provided
             if let customScoring = context.customScoringSettings, !customScoring.isEmpty {
                 scoringSettings = customScoring
             }
-            // Priority 2 - Try ScoringSettingsManager as fallback
-            else if let leagueScoring = ScoringSettingsManager.shared.getScoringSettings(
+            // Priority 2 - Use injected ScoringSettingsManager
+            else if let leagueScoring = scoringSettingsManager.getScoringSettings(
                 for: context.leagueID, 
                 source: context.source
             ) {
@@ -807,10 +822,8 @@ struct ScoreBreakdownFactory {
         for (statKey, statValue) in stats {
             guard statValue != 0 else { continue }
             
-            // Get points per stat (fallback to 0 if not found)
             let pointsPerStat = scoringSettings[statKey] ?? 0.0
             
-            // Only include stats that have scoring rules OR are important display stats
             guard pointsPerStat != 0.0 || isImportantDisplayStat(statKey) else { continue }
             
             let totalPoints = calculateStatPoints(
@@ -832,18 +845,18 @@ struct ScoreBreakdownFactory {
         // Sort by points value (highest first)
         items.sort { abs($0.totalPoints) > abs($1.totalPoints) }
         
-        // Always use player's authoritative total, not our calculation
+        // Always use player's authoritative total
         let authoritativeTotal = player.currentPoints ?? 0.0
         
         return PlayerScoreBreakdown(
             player: player,
             week: week,
             items: items,
-            totalScore: authoritativeTotal, // Always use API total
+            totalScore: authoritativeTotal,
             isChoppedLeague: leagueContext?.isChopped ?? false,
-            hasRealScoringData: true, // Always show full breakdown format
+            hasRealScoringData: true,
             leagueContext: leagueContext,
-            leagueName: nil // Will be set by caller
+            leagueName: nil
         )
     }
     

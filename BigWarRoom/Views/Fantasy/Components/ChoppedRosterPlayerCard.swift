@@ -21,6 +21,9 @@ struct ChoppedRosterPlayerCard: View {
     @State private var allLivePlayersViewModel: AllLivePlayersViewModel?
     @State private var playerDirectory = PlayerDirectoryStore.shared
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+    
     // 🔥 PURE DI: allLivePlayersViewModel is OPTIONAL for Chopped views (they don't need it)
     init(
         player: FantasyPlayer,
@@ -224,7 +227,7 @@ struct ChoppedRosterPlayerCard: View {
             // BYE border matches green live border style
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    viewModel.player.isOnBye ?
+                    viewModel.player.isOnBye(gameDataService: nflGameDataService) ?
                         // BYE: Pink border with glassy gradient like green
                         LinearGradient(
                             colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
@@ -232,15 +235,15 @@ struct ChoppedRosterPlayerCard: View {
                             endPoint: .bottomTrailing
                         ) :
                         // LIVE: Green/blue glassy gradient
-                        (viewModel.player.isLive ?
+                        (viewModel.player.isLive(gameDataService: nflGameDataService) ?
                             LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
                             LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing)),
-                    lineWidth: (viewModel.player.isOnBye || viewModel.player.isLive) ? 3 : 2
+                    lineWidth: (viewModel.player.isOnBye(gameDataService: nflGameDataService) || viewModel.player.isLive(gameDataService: nflGameDataService)) ? 3 : 2
                 )
-                .opacity((viewModel.player.isOnBye || viewModel.player.isLive) ? 0.8 : 0.6)
+                .opacity((viewModel.player.isOnBye(gameDataService: nflGameDataService) || viewModel.player.isLive(gameDataService: nflGameDataService)) ? 0.8 : 0.6)
                 .shadow(
-                    color: viewModel.player.isOnBye ? .gpPink.opacity(0.8) : (viewModel.player.isLive ? .gpGreen.opacity(0.8) : .clear),
-                    radius: (viewModel.player.isOnBye || viewModel.player.isLive) ? 15 : 0,
+                    color: viewModel.player.isOnBye(gameDataService: nflGameDataService) ? .gpPink.opacity(0.8) : (viewModel.player.isLive(gameDataService: nflGameDataService) ? .gpGreen.opacity(0.8) : .clear),
+                    radius: (viewModel.player.isOnBye(gameDataService: nflGameDataService) || viewModel.player.isLive(gameDataService: nflGameDataService)) ? 15 : 0,
                     x: 0,
                     y: 0
                 )
@@ -461,12 +464,12 @@ struct ChoppedRosterPlayerCard: View {
     private var gameStatusText: String {
         // Get actual game status from NFLGameDataService
         if let team = viewModel.player.team,
-           let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+           let gameInfo = nflGameDataService.getGameInfo(for: team) {
             return gameInfo.statusBadgeText
         }
         
         // Fallback to simple check
-        if viewModel.player.isLive {
+        if viewModel.player.isLive(gameDataService: nflGameDataService) {
             return "LIVE"
         } else {
             return "FINAL"
@@ -476,12 +479,12 @@ struct ChoppedRosterPlayerCard: View {
     private var gameStatusColor: Color {
         // Get actual game status color from NFLGameDataService
         if let team = viewModel.player.team,
-           let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+           let gameInfo = nflGameDataService.getGameInfo(for: team) {
             return gameInfo.statusColor
         }
         
         // Fallback
-        return viewModel.player.isLive ? .red : .gray
+        return viewModel.player.isLive(gameDataService: nflGameDataService) ? .red : .gray
     }
     
     private var simpleStatsDisplay: String {
@@ -590,7 +593,12 @@ struct ChoppedRosterPlayerCard: View {
             week: rosterWeek,
             localStatsProvider: localStatsProvider,
             leagueContext: leagueContext,
-            allLivePlayersViewModel: allLivePlayersViewModel
+            allLivePlayersViewModel: allLivePlayersViewModel,
+            weekSelectionManager: WeekSelectionManager.shared,
+            idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+            playerDirectoryStore: PlayerDirectoryStore.shared,
+            playerStatsCache: PlayerStatsCache.shared,
+            scoringSettingsManager: ScoringSettingsManager.shared
         ).withLeagueName("Chopped League")
         
         return PlayerScoreBreakdown(

@@ -388,7 +388,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
     
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
-    
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Active Roster")
@@ -513,8 +514,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 
             case .recentActivity:
                 // Live players first, then sort by score (most active = highest scoring)
-                let live1 = player1.isLive
-                let live2 = player2.isLive
+                let live1 = player1.isLive(gameDataService: nflGameDataService)
+                let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
                     return live1 // Live players come first
@@ -554,7 +555,8 @@ struct FantasyMatchupBenchSectionSorted: View {
     
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
-    
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Bench")
@@ -669,8 +671,8 @@ struct FantasyMatchupBenchSectionSorted: View {
                 
             case .recentActivity:
                 // Live players first, then sort by score
-                let live1 = player1.isLive
-                let live2 = player2.isLive
+                let live1 = player1.isLive(gameDataService: nflGameDataService)
+                let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
                     return live1
@@ -706,7 +708,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
-    
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     let sortMethod: MatchupSortingMethod
@@ -975,7 +978,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         }
         
         if localShowActiveOnly {
-            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+            let liveTeams = Set(nflGameDataService.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
             
@@ -1024,12 +1027,14 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                let live1 = player1.isLive
-                let live2 = player2.isLive
+                // Live players first, then sort by score (most active = highest scoring)
+                let live1 = player1.isLive(gameDataService: nflGameDataService)
+                let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
-                    return live1
+                    return live1 // Live players come first
                 }
+                // Secondary sort by score (highest first)
                 let points1 = player1.currentPoints ?? 0.0
                 let points2 = player2.currentPoints ?? 0.0
                 return points1 > points2
@@ -1060,7 +1065,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
-    
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     let sortMethod: MatchupSortingMethod
@@ -1318,7 +1324,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
         }
         
         if localShowActiveOnly {
-            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+            let liveTeams = Set(nflGameDataService.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
             
@@ -1367,8 +1373,9 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                let live1 = player1.isLive
-                let live2 = player2.isLive
+                // Live players first, then sort by score
+                let live1 = player1.isLive(gameDataService: nflGameDataService)
+                let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
                     return live1

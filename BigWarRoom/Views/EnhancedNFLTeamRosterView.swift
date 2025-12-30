@@ -23,8 +23,8 @@ struct EnhancedNFLTeamRosterView: View {
     @Environment(\.dismiss) private var dismiss
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLGameDataService.self) private var nflGameDataService
     @State private var viewModel: NFLTeamRosterViewModel?
-    @State private var nflGameService = NFLGameDataService.shared
     
     // UI State
     @State private var sortingMethod: MatchupSortingMethod = .position
@@ -76,7 +76,7 @@ struct EnhancedNFLTeamRosterView: View {
                 viewModel = NFLTeamRosterViewModel(
                     teamCode: teamCode,
                     coordinator: TeamRosterCoordinator(livePlayersViewModel: allLivePlayersViewModel),
-                    nflGameService: nflGameService
+                    nflGameService: nflGameDataService
                 )
             }
             
@@ -521,7 +521,7 @@ struct EnhancedNFLTeamRosterView: View {
             }
         case .recentActivity:
             // Sort by live teams first, then by score
-            let liveTeams = Set(NFLGameDataService.shared.gameData.values
+            let liveTeams = Set(nflGameDataService.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
             
@@ -560,7 +560,7 @@ struct EnhancedNFLTeamRosterView: View {
     }
     
     private func getGameInfo() -> GameDisplayInfo? {
-        if let gameInfo = nflGameService.getGameInfo(for: teamCode) {
+        if let gameInfo = nflGameDataService.getGameInfo(for: teamCode) {
             let opponent = teamCode == gameInfo.awayTeam ? gameInfo.homeTeam : gameInfo.awayTeam
             
             return GameDisplayInfo(
@@ -934,7 +934,13 @@ struct EnhancedNFLPlayerCard: View {
                 source: .sleeper,
                 isChopped: false,
                 customScoringSettings: nil
-            )
+            ),
+            allLivePlayersViewModel: nil,
+            weekSelectionManager: WeekSelectionManager.shared,
+            idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+            playerDirectoryStore: PlayerDirectoryStore.shared,
+            playerStatsCache: PlayerStatsCache.shared,
+            scoringSettingsManager: ScoringSettingsManager.shared
         )
         
         // Create a corrected breakdown with the authoritative total

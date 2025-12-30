@@ -178,6 +178,7 @@ private struct LeagueRowView: View {
     let gameStatusService = GameStatusService.shared
     let sharedStatsService = SharedStatsService.shared
     let weekSelectionManager = WeekSelectionManager.shared
+    let nflGameDataService = NFLGameDataService.shared
     
     let sleeperClient = SleeperAPIClient()
     let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
@@ -200,7 +201,8 @@ private struct LeagueRowView: View {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     
     NavigationView {

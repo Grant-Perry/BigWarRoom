@@ -162,7 +162,7 @@ extension MatchupsHubViewModel {
         
         DebugPrint(mode: .weekCheck, "📅 MatchupsHub: Fetching NFL game data for user-selected week \(selectedWeek)")
         
-        NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, year: currentYear)
+        gameDataService.fetchGameData(forWeek: selectedWeek, year: currentYear)
     }
     
     // MARK: - 🔥 SINGLE SOURCE OF TRUTH: Snapshot → UnifiedMatchup Conversion
@@ -193,7 +193,8 @@ extension MatchupsHubViewModel {
             myTeamRanking: nil,  // TODO: Handle chopped ranking
             myIdentifiedTeamID: snapshot.myTeam.info.teamID,
             authenticatedUsername: sleeperCredentials.currentUsername,
-            allLeagueMatchups: nil  // TODO: Handle horizontal scrolling
+            allLeagueMatchups: nil,  // TODO: Handle horizontal scrolling
+            gameDataService: gameDataService
         )
     }
     

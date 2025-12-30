@@ -37,6 +37,9 @@ struct FantasyDetailHeaderView: View {
     // 🔥 PHASE 3 DI: Accept GameStatusService for "yet to play" calculations  
     let gameStatusService: GameStatusService?
     
+    // 🔥 PHASE 4 DI: Accept NFLGameDataService from environment
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+    
     // Projected scores state
     @State private var homeProjected: Double = 0.0
     @State private var awayProjected: Double = 0.0
@@ -633,7 +636,8 @@ struct FantasyDetailHeaderView: View {
             myTeamRanking: nil,
             myIdentifiedTeamID: isHomeTeam ? matchup.homeTeam.id : matchup.awayTeam.id,
             authenticatedUsername: "",
-            allLeagueMatchups: nil
+            allLeagueMatchups: nil,
+            gameDataService: nflGameDataService
         )
 
         // Use actual probability

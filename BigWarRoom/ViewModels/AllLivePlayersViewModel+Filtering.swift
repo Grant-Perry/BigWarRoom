@@ -33,14 +33,14 @@ extension AllLivePlayersViewModel {
         applyPositionFilter()
         
         // Load game data in background if needed
-        if showActive && NFLGameDataService.shared.gameData.isEmpty {
+        if showActive && nflGameDataService.gameData.isEmpty {
             Task { @MainActor in
                 // 🔥 CRITICAL FIX: Use WeekSelectionManager.selectedWeek (user's chosen week) instead of getCurrentWeek
-                let selectedWeek = WeekSelectionManager.shared.selectedWeek
+                let selectedWeek = weekSelectionManager.selectedWeek
                 
                 DebugPrint(mode: .weekCheck, "📅 AllLivePlayers: Fetching NFL game data for user-selected week \(selectedWeek)")
                 
-                NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, forceRefresh: false)
+                nflGameDataService.fetchGameData(forWeek: selectedWeek, forceRefresh: false)
             }
         }
     }
@@ -190,8 +190,8 @@ extension AllLivePlayersViewModel {
             // Step 2: Active-only filter (SIMPLIFIED)
             if showActiveOnly {
                 players = players.filter { player in
-                    // 🔥 MODEL-BASED CP: Use isInActiveGame for lightweight live detection
-                    return player.player.isInActiveGame
+                    // 🔥 PHASE 4 DI: Use method instead of computed property
+                    return player.player.isInActiveGame(gameDataService: nflGameDataService)
                 }
             }
         }

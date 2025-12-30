@@ -79,7 +79,10 @@ struct BigWarRoom: View {
         idCanonicalizer = ESPNSleeperIDCanonicalizer(playerDirectory: playerDirectory!)
         
         // 2. NFL Game Services
-        nflGameDataService = NFLGameDataService()
+        nflGameDataService = NFLGameDataService(
+            weekSelectionManager: weekSelectionManager!,
+            appLifecycleManager: AppLifecycleManager.shared
+        )
         gameStatusService = GameStatusService(nflGameDataService: nflGameDataService!)
         nflStandingsService = NFLStandingsService()
         teamAssetManager = TeamAssetManager()
@@ -128,7 +131,8 @@ struct BigWarRoom: View {
             playerDirectory: playerDirectory!,
             gameStatusService: gameStatusService!,
             sharedStatsService: sharedStatsService!,
-            matchupDataStore: matchupDataStore
+            matchupDataStore: matchupDataStore,
+            gameDataService: nflGameDataService!
         )
         
         // Create FantasyViewModel with dependencies
@@ -136,7 +140,8 @@ struct BigWarRoom: View {
             matchupDataStore: matchupDataStore,
             unifiedLeagueManager: unifiedLeagueManager,
             sleeperCredentials: sleeperCredentials!,
-            playerDirectoryStore: playerDirectory!
+            playerDirectoryStore: playerDirectory!,
+            nflGameService: nflGameDataService!
         )
         
         // Create AllLivePlayersViewModel with dependencies
@@ -145,11 +150,13 @@ struct BigWarRoom: View {
             playerDirectory: playerDirectory!,
             gameStatusService: gameStatusService!,
             sharedStatsService: sharedStatsService!,
-            weekSelectionManager: weekSelectionManager!
+            weekSelectionManager: weekSelectionManager!,
+            nflGameDataService: nflGameDataService!
         )
         
         playerWatchService = PlayerWatchService(
             weekManager: weekSelectionManager!,
+            gameDataService: nflGameDataService!,
             allLivePlayersViewModel: allLivePlayersViewModel
         )
         

@@ -30,16 +30,19 @@ struct MatchupCardsGridView: View {
         if let storedMatchups = matchup.allLeagueMatchups, !storedMatchups.isEmpty {
             // Convert FantasyMatchup array to UnifiedMatchup array
             return storedMatchups.map { fantasyMatchup in
-                UnifiedMatchup(
-                    id: "\(matchup.league.id)_\(fantasyMatchup.id)",
+                let updatedMatchup = UnifiedMatchup(
+                    id: matchup.id,
                     league: matchup.league,
                     fantasyMatchup: fantasyMatchup,
                     choppedSummary: nil,
                     lastUpdated: matchup.lastUpdated,
                     myTeamRanking: nil,
                     myIdentifiedTeamID: matchup.myIdentifiedTeamID,
-                    authenticatedUsername: "" // Not needed for display
+                    authenticatedUsername: "",
+                    allLeagueMatchups: nil,
+                    gameDataService: NFLGameDataService.shared
                 )
+                return updatedMatchup
             }
         }
         

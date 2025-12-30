@@ -268,7 +268,7 @@ final class NFLGameDataService {
         _shared = instance
     }
     
-    var gameData: [String: NFLGameInfo] = [:] // Team -> GameInfo mapping
+    var gameData: [String: NFLGameInfo] = [:]
     var isLoading = false
     var errorMessage: String?
 
@@ -276,15 +276,25 @@ final class NFLGameDataService {
     @ObservationIgnored private var cancellable: AnyCancellable?
     @ObservationIgnored private var cache: NFLScoreboardResponse?
     @ObservationIgnored private var cacheTimestamp: Date?
-    @ObservationIgnored private let cacheExpiration: TimeInterval = 300 // 5 minutes
+    @ObservationIgnored private let cacheExpiration: TimeInterval = 300
     
     // Request deduplication to prevent API spam
     @ObservationIgnored private var pendingRequests: Set<String> = []
     @ObservationIgnored private var lastRequestTimestamp: Date?
-    @ObservationIgnored private let minimumRequestInterval: TimeInterval = 2.0 // Minimum 2 seconds between requests
+    @ObservationIgnored private let minimumRequestInterval: TimeInterval = 2.0
     
-    // 🔥 PHASE 3 DI: Public init for dependency injection
-    init() {}
+    // 🔥 PHASE 4 DI: Injected dependencies
+    private let weekSelectionManager: WeekSelectionManager
+    private let appLifecycleManager: AppLifecycleManager
+    
+    // 🔥 PHASE 4 DI: Init now requires dependencies
+    init(
+        weekSelectionManager: WeekSelectionManager,
+        appLifecycleManager: AppLifecycleManager
+    ) {
+        self.weekSelectionManager = weekSelectionManager
+        self.appLifecycleManager = appLifecycleManager
+    }
     
     /// Fetch real NFL game data from ESPN API with deduplication and throttling
     func fetchGameData(forWeek week: Int, year: Int? = nil, forceRefresh: Bool = false) {
@@ -440,8 +450,8 @@ final class NFLGameDataService {
         
         // If no data and not currently loading, trigger a fetch
         if gameInfo == nil && !isLoading {
-            // 🔥 FIXED: Use WeekSelectionManager.selectedWeek (user's chosen week)
-            let selectedWeek = WeekSelectionManager.shared.selectedWeek
+            // 🔥 PHASE 4 DI: Use injected WeekSelectionManager
+            let selectedWeek = weekSelectionManager.selectedWeek
             
             DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.getGameInfo: No data for team \(normalizedTeam), fetching week \(selectedWeek)")
             
@@ -471,8 +481,8 @@ final class NFLGameDataService {
         Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                // 🔋 BATTERY FIX: Only refresh if app is active AND we have live games
-                guard await AppLifecycleManager.shared.isActive else { return }
+                // 🔥 PHASE 4 DI: Use injected AppLifecycleManager
+                guard await self.appLifecycleManager.isActive else { return }
                 
                 let hasLiveGames = self.gameData.values.contains { $0.isLive }
                 if hasLiveGames {

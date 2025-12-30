@@ -67,6 +67,7 @@ final class AllLivePlayersViewModel {
     internal let gameStatusService: GameStatusService
     internal let sharedStatsService: SharedStatsService
     internal let weekSelectionManager: WeekSelectionManager
+    internal let nflGameDataService: NFLGameDataService
     
     // MARK: - Internal State (not published)
     internal var debounceTask: Task<Void, Never>?
@@ -89,13 +90,15 @@ final class AllLivePlayersViewModel {
         playerDirectory: PlayerDirectoryStore,
         gameStatusService: GameStatusService,
         sharedStatsService: SharedStatsService,
-        weekSelectionManager: WeekSelectionManager
+        weekSelectionManager: WeekSelectionManager,
+        nflGameDataService: NFLGameDataService
     ) {
         self.matchupsHubViewModel = matchupsHubViewModel
         self.playerDirectory = playerDirectory
         self.gameStatusService = gameStatusService
         self.sharedStatsService = sharedStatsService
         self.weekSelectionManager = weekSelectionManager
+        self.nflGameDataService = nflGameDataService
         // 🔥 REMOVED: No more timers or polling
         // setupAutoRefresh()
         // setupObservation()

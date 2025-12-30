@@ -37,12 +37,15 @@ final class ChoppedTeamRosterViewModel {
     private let leagueID: String
     private let week: Int
     
+    private let gameDataService: NFLGameDataService
+    
     // MARK: - Initialization
     
-    init(teamRanking: FantasyTeamRanking, leagueID: String, week: Int) {
+    init(teamRanking: FantasyTeamRanking, leagueID: String, week: Int, gameDataService: NFLGameDataService) {
         self.teamRanking = teamRanking
         self.leagueID = leagueID
         self.week = week
+        self.gameDataService = gameDataService
     }
     
     // MARK: - Public Interface
@@ -96,7 +99,7 @@ final class ChoppedTeamRosterViewModel {
     func loadNFLGameData() async {
         guard !gameDataLoaded else { return }
         
-        NFLGameDataService.shared.fetchGameData(forWeek: week, year: AppConstants.currentSeasonYearInt)
+        gameDataService.fetchGameData(forWeek: week, year: AppConstants.currentSeasonYearInt)
         gameDataLoaded = true
     }
     
@@ -264,7 +267,8 @@ final class ChoppedTeamRosterViewModel {
             highToLow: highToLow,
             getPlayerPoints: { [weak self] player in
                 return self?.getActualPlayerPoints(for: player)
-            }
+            },
+            gameDataService: gameDataService
         )
     }
     

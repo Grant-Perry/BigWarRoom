@@ -357,6 +357,26 @@ struct ByeWeekImpactItem: Identifiable {
     let team: NFLTeam
 }
 
+// 🔥 PHASE 4: Preview disabled during DI migration
+/*
+#Preview {
+    @Previewable @State var isPresented = true
+    
+    let sampleTeams = ["BUF", "MIA", "NYJ", "NE"].map { team in
+        ByeWeekTeam(
+            abbreviation: team,
+            name: "Team \(team)",
+            logo: nil,
+            impactedPlayers: []
+        )
+    }
+    
+    let espnCredentials = ESPNCredentialsManager()
+    let sleeperAPIClient = SleeperAPIClient()
+    ...
+}
+*/
+
 #Preview("Schedule Bye Week Section") {
     let sampleTeams = [
         NFLTeam.team(for: "KC")!,
@@ -371,7 +391,10 @@ struct ByeWeekImpactItem: Identifiable {
     let sleeperAPIClient = SleeperAPIClient()
     let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
     let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
-    let nflGameDataService = NFLGameDataService()
+    let nflGameDataService = NFLGameDataService(
+        weekSelectionManager: WeekSelectionManager(nflWeekService: NFLWeekService(apiClient: sleeperAPIClient)),
+        appLifecycleManager: AppLifecycleManager.shared
+    )
     let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
     let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
     let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
@@ -405,10 +428,11 @@ struct ByeWeekImpactItem: Identifiable {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     
-    return ZStack {
+    ZStack {
         Color.black.ignoresSafeArea()
         
         ScheduleByeWeekSection(

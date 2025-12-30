@@ -501,7 +501,11 @@ final class ESPNAPIClient: DraftAPIClient {
         
         // Convert teams to rosters with proper owner name mapping
         let rosters = teams.map { team in
-            return team.toSleeperRoster(leagueID: leagueID, league: espnLeague)
+            return team.toSleeperRoster(
+                leagueID: leagueID, 
+                league: espnLeague,
+                idCanonicalizer: ESPNSleeperIDCanonicalizer.shared
+            )
         }
     
         return rosters

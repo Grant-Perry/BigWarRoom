@@ -49,7 +49,7 @@ struct PlayerScoreBarCardView: View {
             // BYE border matches green live border style
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    playerEntry.player.isOnBye ?
+                    playerEntry.player.isOnBye(gameDataService: viewModel.nflGameDataService) ?
                         // BYE: Pink border with glassy gradient like green
                         LinearGradient(
                             colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
@@ -57,15 +57,15 @@ struct PlayerScoreBarCardView: View {
                             endPoint: .bottomTrailing
                         ) :
                         // LIVE: Green/blue glassy gradient
-                        (playerEntry.player.isLive ?
+                        (playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService) ?
                             LinearGradient(colors: [.blue, .gpGreen], startPoint: .topLeading, endPoint: .bottomTrailing) :
                             LinearGradient(colors: [.gpYellow], startPoint: .topLeading, endPoint: .bottomTrailing)),
-                    lineWidth: (playerEntry.player.isOnBye || playerEntry.player.isLive) ? 3 : 2
+                    lineWidth: (playerEntry.player.isOnBye(gameDataService: viewModel.nflGameDataService) || playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService)) ? 3 : 2
                 )
-                .opacity((playerEntry.player.isOnBye || playerEntry.player.isLive) ? 0.8 : 0.6)
+                .opacity((playerEntry.player.isOnBye(gameDataService: viewModel.nflGameDataService) || playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService)) ? 0.8 : 0.6)
                 .shadow(
-                    color: playerEntry.player.isOnBye ? .gpPink.opacity(0.8) : (playerEntry.player.isLive ? .gpGreen.opacity(0.8) : .clear),
-                    radius: (playerEntry.player.isOnBye || playerEntry.player.isLive) ? 15 : 0,
+                    color: playerEntry.player.isOnBye(gameDataService: viewModel.nflGameDataService) ? .gpPink.opacity(0.8) : (playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService) ? .gpGreen.opacity(0.8) : .clear),
+                    radius: (playerEntry.player.isOnBye(gameDataService: viewModel.nflGameDataService) || playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService)) ? 15 : 0,
                     x: 0,
                     y: 0
                 )

@@ -254,11 +254,12 @@ struct FantasyPlayer: Identifiable, Codable {
     // MARK: -> COMPUTED PROPERTIES FOR LIGHTWEIGHT CHECKS
     
     /// Check if player's game has finished this week
-    var hasPlayedThisWeek: Bool {
+    /// 🔥 PHASE 4 DI: Now requires NFLGameDataService to be passed in
+    func hasPlayedThisWeek(gameDataService: NFLGameDataService) -> Bool {
         guard let team = self.team else { return false }
         
-        // Check NFLGameDataService for game status
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+        // Use injected service instead of .shared
+        if let gameInfo = gameDataService.getGameInfo(for: team) {
             let status = gameInfo.gameStatus.lowercased()
             return status.contains("final") || 
                    status == "f" || 
@@ -271,35 +272,36 @@ struct FantasyPlayer: Identifiable, Codable {
     }
     
     /// Check if player's team is on bye this week
-    var isOnBye: Bool {
+    /// 🔥 PHASE 4 DI: Now requires NFLGameDataService to be passed in
+    func isOnBye(gameDataService: NFLGameDataService) -> Bool {
         guard let team = self.team else { return false }
         
-        // Check NFLGameDataService - if no game info exists, might be bye
-        let hasGameInfo = NFLGameDataService.shared.getGameInfo(for: team) != nil
+        // Use injected service - if no game info exists, might be bye
+        let hasGameInfo = gameDataService.getGameInfo(for: team) != nil
         return !hasGameInfo
     }
     
     /// Check if player is currently in an active (not finished) game
-    var isInActiveGame: Bool {
-        return !hasPlayedThisWeek && !isOnBye && isLive
+    /// 🔥 PHASE 4 DI: Now requires NFLGameDataService to be passed in
+    func isInActiveGame(gameDataService: NFLGameDataService) -> Bool {
+        return !hasPlayedThisWeek(gameDataService: gameDataService) && 
+               !isOnBye(gameDataService: gameDataService) && 
+               isLive(gameDataService: gameDataService)
     }
     
     // MARK: -> CENTRALIZED LIVE DETECTION - CLEAN & RELIABLE 🔥
     
     /// Single source of truth for live status using NFLGameDataService
-    var isLive: Bool {
+    /// 🔥 PHASE 4 DI: Now requires NFLGameDataService to be passed in
+    func isLive(gameDataService: NFLGameDataService) -> Bool {
         guard let team = self.team else { 
-//            print("🚨 DEBUG isLive: No team for player \(fullName)")
             return false 
         }
         
-        // Use NFLGameDataService as the authoritative source
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
-//            print("🚨 DEBUG isLive: \(fullName) (\(team)) - Game Status: '\(gameInfo.gameStatus)', isLive: \(gameInfo.isLive)")
+        // Use injected service as the authoritative source
+        if let gameInfo = gameDataService.getGameInfo(for: team) {
             return gameInfo.isLive
         } else {
-//            print("🚨 DEBUG isLive: \(fullName) (\(team)) - NO GAME INFO FOUND")
-//            print("🚨 DEBUG isLive: Available teams in gameData: \(Array(NFLGameDataService.shared.gameData.keys))")
             return false
         }
     }

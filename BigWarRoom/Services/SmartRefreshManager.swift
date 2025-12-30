@@ -43,9 +43,10 @@ final class SmartRefreshManager {
         }
     }
     
-    // For testing/injection
-    init(nflGameDataService: NFLGameDataService) {
-        self.nflGameDataService = nflGameDataService
+    func setGameDataService(_ service: NFLGameDataService) {
+        // SmartRefreshManager already has nflGameDataService property initialized in init()
+        // No need to do anything here since it's using the singleton pattern
+        // This method exists for API consistency with other services
     }
     
     // MARK: - Public API

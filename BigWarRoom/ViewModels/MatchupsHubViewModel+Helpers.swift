@@ -43,7 +43,7 @@ extension MatchupsHubViewModel {
         
         do {
             // Create optimizer instance (view-owned, no singleton)
-            let optimizer = LineupOptimizerService()
+            let optimizer = LineupOptimizerService(gameDataService: gameDataService)
             
             // Run optimization
             let result = try await optimizer.optimizeLineup(

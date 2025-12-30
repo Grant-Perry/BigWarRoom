@@ -50,7 +50,8 @@ struct ChoppedTeamRosterView: View {
         self.viewModel = ChoppedTeamRosterViewModel(
             teamRanking: teamRanking,
             leagueID: leagueID,
-            week: week
+            week: week,
+            gameDataService: NFLGameDataService.shared
         )
     }
 

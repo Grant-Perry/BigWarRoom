@@ -472,8 +472,8 @@ extension AllLivePlayersViewModel {
             // Apply active-only filter
             if showActiveOnly {
                 players = players.filter { player in
-                    // 🔥 MODEL-BASED CP: Use isInActiveGame for lightweight live detection
-                    return player.player.isInActiveGame
+                    // 🔥 PHASE 4 DI: Use method with injected service
+                    return player.player.isInActiveGame(gameDataService: nflGameDataService)
                 }
             }
         }

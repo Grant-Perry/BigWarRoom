@@ -8,12 +8,13 @@
 import SwiftUI
 
 struct PlayerComparisonView: View {
-    @State private var viewModel = PlayerComparisonViewModel()
+    @State private var viewModel: PlayerComparisonViewModel?
     @State private var showPlayer1Search = false
     @State private var showPlayer2Search = false
     @State private var searchText1 = ""
     @State private var searchText2 = ""
     @State private var isPlayerSelectionCollapsed = false
+    @Environment(NFLGameDataService.self) private var nflGameDataService
     
     @Environment(\.dismiss) var dismiss
     
@@ -34,7 +35,7 @@ struct PlayerComparisonView: View {
                     // Player Selection Panel (Collapsible - contains both players)
                     VStack(spacing: 0) {
                         // Collapsible header
-                        if viewModel.recommendation != nil {
+                        if viewModel?.recommendation != nil {
                             Button(action: {
                                 withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
                                     isPlayerSelectionCollapsed.toggle()
@@ -66,31 +67,31 @@ struct PlayerComparisonView: View {
                             VStack(spacing: 24) {
                                 // Player 1
                                 playerSelectionSection(
-                                    player: viewModel.player1,
+                                    player: viewModel?.player1,
                                     searchText: $searchText1,
                                     placeholder: "Search Player 1...",
                                     showSearch: $showPlayer1Search,
-                                    onSelect: { viewModel.selectPlayer1($0) },
-                                    onClear: { viewModel.clearPlayer1() },
+                                    onSelect: { viewModel?.selectPlayer1($0) },
+                                    onClear: { viewModel?.clearPlayer1() },
                                     playerNumber: 1
                                 )
                                 
                                 // Player 2
-                                if viewModel.player1 != nil {
+                                if viewModel?.player1 != nil {
                                     playerSelectionSection(
-                                        player: viewModel.player2,
+                                        player: viewModel?.player2,
                                         searchText: $searchText2,
                                         placeholder: "Search Player 2...",
                                         showSearch: $showPlayer2Search,
-                                        onSelect: { viewModel.selectPlayer2($0) },
-                                        onClear: { viewModel.clearPlayer2() },
+                                        onSelect: { viewModel?.selectPlayer2($0) },
+                                        onClear: { viewModel?.clearPlayer2() },
                                         playerNumber: 2
                                     )
                                     .transition(.move(edge: .top).combined(with: .opacity))
                                 }
                                 
                                 // Comparison Button (Smaller, Sexier)
-                                if viewModel.player1 != nil && viewModel.player2 != nil {
+                                if viewModel?.player1 != nil && viewModel?.player2 != nil {
                                     Button(action: {
                                         // Collapse the panel
                                         withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
@@ -99,7 +100,7 @@ struct PlayerComparisonView: View {
                                         
                                         // Perform comparison
                                         Task {
-                                            await viewModel.performComparison()
+                                            await viewModel?.performComparison()
                                         }
                                     }) {
                                         HStack(spacing: 8) {
@@ -124,9 +125,9 @@ struct PlayerComparisonView: View {
                                         .clipShape(Capsule())
                                         .shadow(color: .blue.opacity(0.5), radius: 8, x: 0, y: 4)
                                     }
-                                    .disabled(viewModel.isLoading)
-                                    .scaleEffect(viewModel.isLoading ? 0.95 : 1.0)
-                                    .animation(.easeInOut(duration: 0.3), value: viewModel.isLoading)
+                                    .disabled(viewModel?.isLoading ?? true)
+                                    .scaleEffect(viewModel?.isLoading ?? true ? 0.95 : 1.0)
+                                    .animation(.easeInOut(duration: 0.3), value: viewModel?.isLoading ?? true)
                                 }
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
@@ -134,19 +135,19 @@ struct PlayerComparisonView: View {
                     }
                     
                     // Comparison Results
-                    if let recommendation = viewModel.recommendation {
+                    if let recommendation = viewModel?.recommendation {
                         comparisonResultsSection(recommendation: recommendation)
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                     
                     // Loading State
-                    if viewModel.isLoading {
+                    if viewModel?.isLoading ?? false {
                         ProgressView()
                             .padding()
                     }
                     
                     // Error State
-                    if let error = viewModel.errorMessage {
+                    if let error = viewModel?.errorMessage {
                         errorCard(message: error)
                     }
                 }
@@ -154,9 +155,9 @@ struct PlayerComparisonView: View {
 				.padding()
                 .padding(.horizontal, 45)
                 .padding(.vertical, 20)
-                .animation(.easeInOut(duration: 0.4), value: viewModel.player1)
-                .animation(.easeInOut(duration: 0.4), value: viewModel.player2)
-                .animation(.easeInOut(duration: 0.5), value: viewModel.recommendation)
+                .animation(.easeInOut(duration: 0.4), value: viewModel?.player1)
+                .animation(.easeInOut(duration: 0.4), value: viewModel?.player2)
+                .animation(.easeInOut(duration: 0.5), value: viewModel?.recommendation)
             }
             .scrollIndicators(.hidden)
         }
@@ -169,7 +170,7 @@ struct PlayerComparisonView: View {
             }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Clear") {
-                    viewModel.clearBoth()
+                    viewModel?.clearBoth()
                     searchText1 = ""
                     searchText2 = ""
                     // Reset UI state to show player selection
@@ -181,8 +182,11 @@ struct PlayerComparisonView: View {
             }
         }
         .onAppear {
+            if viewModel == nil {
+                viewModel = PlayerComparisonViewModel(nflGameService: nflGameDataService)
+            }
             // Restore last comparison so a relaunched app brings the user back where they left off
-            viewModel.restoreLastComparison()
+            viewModel?.restoreLastComparison()
         }
     }
     
@@ -427,7 +431,7 @@ struct PlayerComparisonView: View {
     private var compareButton: some View {
         Button(action: {
             Task {
-                await viewModel.performComparison()
+                await viewModel?.performComparison()
             }
         }) {
             HStack {
@@ -443,7 +447,7 @@ struct PlayerComparisonView: View {
             )
             .foregroundColor(.white)
         }
-        .disabled(viewModel.isLoading)
+        .disabled(viewModel?.isLoading ?? true)
     }
     
     // MARK: - Comparison Results
@@ -1077,4 +1081,3 @@ struct KeyFactorsView: View {
         }
     }
 }
-

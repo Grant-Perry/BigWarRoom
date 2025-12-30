@@ -150,7 +150,11 @@ struct FantasyMatchupDetailView: View {
                 selectedPosition: $selectedPosition,
                 showActiveOnly: $showActiveOnly,
                 showYetToPlayOnly: $showYetToPlayOnly,
-                watchService: PlayerWatchService(weekManager: WeekSelectionManager.shared, allLivePlayersViewModel: livePlayersViewModel), // 🔥 PHASE 3 DI: Create instance
+                watchService: PlayerWatchService(
+                    weekManager: WeekSelectionManager.shared,
+                    gameDataService: livePlayersViewModel.nflGameDataService,
+                    allLivePlayersViewModel: livePlayersViewModel
+                ),
                 gameStatusService: GameStatusService.shared
             )
             .padding(.horizontal, 16)

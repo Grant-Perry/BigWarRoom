@@ -143,11 +143,14 @@ struct PlayerScoreBarCardContentView: View {
                         .buttonStyle(PlainButtonStyle())
                     }
                     
-                    // 🔥 SSOT: Win probability thermometer using PROJECTED scores (matches Matchups Hub)
-                    if projectionsLoaded && myProjected > 0 && opponentProjected > 0 {
+                    // 🔥 SSOT: Win probability thermometer using matchup's calculated win probability
+                    if let winProb = playerEntry.matchup.myWinProbability,
+                       let myTeam = playerEntry.matchup.myTeam,
+                       let oppTeam = playerEntry.matchup.opponentTeam {
+                        let isWinning = (myTeam.currentScore ?? 0) >= (oppTeam.currentScore ?? 0)
                         CompactWinThermometer(
-                            myScore: myProjected,
-                            opponentScore: opponentProjected
+                            winProbability: winProb,
+                            isWinning: isWinning
                         )
                         .frame(width: 100)
                     }
@@ -291,33 +294,23 @@ struct PlayerScoreBarCardContentView: View {
                 isChopped: playerEntry.matchup.isChoppedLeague
             )
             
-            // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
+            // 🔥 FIX: Pass all required services to ScoreBreakdownFactory
             let breakdown = ScoreBreakdownFactory.createBreakdown(
                 for: playerEntry.player,
-                week: WeekSelectionManager.shared.selectedWeek,
+                week: viewModel.weekSelectionManager.selectedWeek,
                 leagueContext: leagueContext,
-                allLivePlayersViewModel: viewModel
+                allLivePlayersViewModel: viewModel,
+                weekSelectionManager: viewModel.weekSelectionManager,
+                idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+                playerDirectoryStore: viewModel.playerDirectory,
+                playerStatsCache: PlayerStatsCache.shared,
+                scoringSettingsManager: ScoringSettingsManager.shared
             ).withLeagueName(playerEntry.leagueName)
             
             ScoreBreakdownView(breakdown: breakdown)
                 .presentationDetents([.height(500)])
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(.clear)
-        }
-        // 🔥 SSOT: Load projected scores for win probability (matches Matchups Hub)
-        .task {
-            await loadProjectedScores()
-        }
-    }
-    
-    // 🔥 SSOT: Load projected scores - same pattern as MatchupBarCardView
-    private func loadProjectedScores() async {
-        guard !projectionsLoaded else { return }
-        let projections = try? await playerEntry.matchup.getProjectedScores()
-        await MainActor.run {
-            self.myProjected = projections?.myTeam ?? 0.0
-            self.opponentProjected = projections?.opponent ?? 0.0
-            self.projectionsLoaded = true
         }
     }
     
@@ -579,12 +572,17 @@ struct ScoreBreakdownLoaderView: View {
             isChopped: playerEntry.matchup.isChoppedLeague
         )
         
-        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
+        // 🔥 FIX: Pass all required services to ScoreBreakdownFactory
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: playerEntry.player,
-            week: WeekSelectionManager.shared.selectedWeek,
+            week: viewModel.weekSelectionManager.selectedWeek,
             leagueContext: leagueContext,
-            allLivePlayersViewModel: viewModel
+            allLivePlayersViewModel: viewModel,
+            weekSelectionManager: viewModel.weekSelectionManager,
+            idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+            playerDirectoryStore: viewModel.playerDirectory,
+            playerStatsCache: PlayerStatsCache.shared,
+            scoringSettingsManager: ScoringSettingsManager.shared
         ).withLeagueName(playerEntry.leagueName)
         
         return ScoreBreakdownView(breakdown: breakdown)
@@ -597,18 +595,10 @@ struct ScoreBreakdownLoaderView: View {
 // MARK: - Compact Win Thermometer
 
 /// Compact win probability thermometer for Live Players cards
-/// Uses WinProbabilityEngine SSOT for consistent calculations
+/// Pure view component - receives calculated probability from parent
 struct CompactWinThermometer: View {
-    let myScore: Double
-    let opponentScore: Double
-    
-    private var winProbability: Double {
-        WinProbabilityEngine.shared.calculateWinProbability(myScore: myScore, opponentScore: opponentScore)
-    }
-    
-    private var isWinning: Bool {
-        myScore >= opponentScore
-    }
+    let winProbability: Double
+    let isWinning: Bool
     
     var body: some View {
         VStack(spacing: 2) {

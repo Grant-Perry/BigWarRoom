@@ -19,6 +19,7 @@ struct AppEntryView: View {
     @State private var gameStatusService = GameStatusService.shared
     @State private var sharedStatsService = SharedStatsService.shared
     @State private var weekSelectionManager = WeekSelectionManager.shared
+    @State private var nflGameDataService = NFLGameDataService.shared
     
     // 🔥 PHASE 3 DI: Create UnifiedLeagueManager with proper dependencies
     @State private var unifiedLeagueManager: UnifiedLeagueManager?
@@ -89,7 +90,8 @@ struct AppEntryView: View {
                 playerDirectory: playerDirectory,
                 gameStatusService: gameStatusService,
                 sharedStatsService: sharedStatsService,
-                matchupDataStore: getOrCreateMatchupDataStore()
+                matchupDataStore: getOrCreateMatchupDataStore(),
+                gameDataService: nflGameDataService
             )
         }
         return matchupsHub!
@@ -102,7 +104,8 @@ struct AppEntryView: View {
                 playerDirectory: playerDirectory,
                 gameStatusService: gameStatusService,
                 sharedStatsService: sharedStatsService,
-                weekSelectionManager: weekSelectionManager
+                weekSelectionManager: weekSelectionManager,
+                nflGameDataService: nflGameDataService
             )
         }
         return allLivePlayersViewModel!
@@ -245,6 +248,7 @@ struct BigWarRoomModified: View {
     let gameStatusService = GameStatusService.shared
     let sharedStatsService = SharedStatsService.shared
     let weekSelectionManager = WeekSelectionManager.shared
+    let nflGameDataService = NFLGameDataService.shared
     
     let sleeperClient = SleeperAPIClient()
     let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
@@ -267,14 +271,16 @@ struct BigWarRoomModified: View {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     let allLivePlayersViewModel = AllLivePlayersViewModel(
         matchupsHubViewModel: matchupsHub,
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        nflGameDataService: nflGameDataService
     )
     
     BigWarRoomWithConditionalStart(
@@ -291,6 +297,7 @@ struct BigWarRoomModified: View {
     let gameStatusService = GameStatusService.shared
     let sharedStatsService = SharedStatsService.shared
     let weekSelectionManager = WeekSelectionManager.shared
+    let nflGameDataService = NFLGameDataService.shared
     
     let sleeperClient = SleeperAPIClient()
     let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
@@ -313,14 +320,16 @@ struct BigWarRoomModified: View {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     let allLivePlayersViewModel = AllLivePlayersViewModel(
         matchupsHubViewModel: matchupsHub,
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        nflGameDataService: nflGameDataService
     )
     
     BigWarRoomWithConditionalStart(

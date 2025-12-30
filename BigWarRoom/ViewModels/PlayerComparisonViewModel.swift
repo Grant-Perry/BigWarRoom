@@ -26,7 +26,11 @@ class PlayerComparisonViewModel {
     // MARK: - Dependencies
     private let playerDirectory = PlayerDirectoryStore.shared
     private let statsService = SharedStatsService.shared
-    private let nflGameService = NFLGameDataService.shared
+    private var nflGameService: NFLGameDataService
+    
+    init(nflGameService: NFLGameDataService) {
+        self.nflGameService = nflGameService
+    }
     
     // MARK: - Current Week
     var currentWeek: Int {
@@ -880,4 +884,3 @@ class PlayerComparisonViewModel {
         }
     }
 }
-

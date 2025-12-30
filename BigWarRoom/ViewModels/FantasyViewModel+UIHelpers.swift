@@ -204,8 +204,9 @@ extension FantasyViewModel {
                 
             case .recentActivity:
                 // Live players first, then sort by score
-                let live1 = player1.isLive
-                let live2 = player2.isLive
+                // 🔥 PHASE 4 DI: Use method with nflGameService from FantasyViewModel
+                let live1 = player1.isLive(gameDataService: nflGameService)
+                let live2 = player2.isLive(gameDataService: nflGameService)
                 
                 if live1 != live2 {
                     return live1

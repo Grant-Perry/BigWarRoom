@@ -746,16 +746,20 @@ struct TeamFilteredMatchupsView: View {
     */
 }
 
-
+// 🔥 PHASE 4: Previews disabled during DI migration
+/*
 #Preview("Team Filtered Matchups - With Data") {
     let espnCredentials = ESPNCredentialsManager()
     let sleeperAPIClient = SleeperAPIClient()
     let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
     let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
-    let nflGameDataService = NFLGameDataService()
-    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
     let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
     let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    let nflGameDataService = NFLGameDataService(
+        weekSelectionManager: weekSelectionManager,
+        appLifecycleManager: AppLifecycleManager.shared
+    )
+    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
     let seasonYearManager = SeasonYearManager()
     let playerStatsCache = PlayerStatsCache()
     let sharedStatsService = SharedStatsService(
@@ -779,16 +783,19 @@ struct TeamFilteredMatchupsView: View {
         weekSelectionManager: weekSelectionManager
     )
     
+    let nflGameDataService = NFLGameDataService.shared
+    
     let matchupsHub = MatchupsHubViewModel(
         espnCredentials: espnCredentials,
         sleeperCredentials: sleeperCredentials,
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     
-    return TeamFilteredMatchupsView(
+    TeamFilteredMatchupsView(
         awayTeam: "WSH", 
         homeTeam: "GB",
         matchupsHubViewModel: matchupsHub,
@@ -813,10 +820,13 @@ struct TeamFilteredMatchupsView: View {
     let sleeperAPIClient = SleeperAPIClient()
     let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
     let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
-    let nflGameDataService = NFLGameDataService()
-    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
     let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
     let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    let nflGameDataService = NFLGameDataService(
+        weekSelectionManager: weekSelectionManager,
+        appLifecycleManager: AppLifecycleManager.shared
+    )
+    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
     let seasonYearManager = SeasonYearManager()
     let playerStatsCache = PlayerStatsCache()
     let sharedStatsService = SharedStatsService(
@@ -840,19 +850,22 @@ struct TeamFilteredMatchupsView: View {
         weekSelectionManager: weekSelectionManager
     )
     
-    let matchupsHub = MatchupsHubViewModel(
+    let nflGameDataService2 = NFLGameDataService.shared
+    
+    let matchupsHub2 = MatchupsHubViewModel(
         espnCredentials: espnCredentials,
         sleeperCredentials: sleeperCredentials,
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService2
     )
     
-    return TeamFilteredMatchupsView(
+    TeamFilteredMatchupsView(
         awayTeam: "JAX",
         homeTeam: "TEN", 
-        matchupsHubViewModel: matchupsHub,
+        matchupsHubViewModel: matchupsHub2,
         standingsService: standingsService,
         gameData: ScheduleGame(
             id: "JAX@TEN",
@@ -867,4 +880,4 @@ struct TeamFilteredMatchupsView: View {
         )
     )
     .preferredColorScheme(.dark)
-}
+}*/

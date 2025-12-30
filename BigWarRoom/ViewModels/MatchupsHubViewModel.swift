@@ -60,6 +60,7 @@ final class MatchupsHubViewModel {
     private let gameStatusService: GameStatusService
     private let sharedStatsService: SharedStatsService
     internal let matchupDataStore: MatchupDataStore  // 🔥 CHANGED: Make internal for extensions
+    internal let gameDataService: NFLGameDataService
     
     // 🔥 PHASE 3: Replace Combine with observation task
     private var observationTask: Task<Void, Never>?
@@ -97,7 +98,8 @@ final class MatchupsHubViewModel {
         playerDirectory: PlayerDirectoryStore,
         gameStatusService: GameStatusService,
         sharedStatsService: SharedStatsService,
-        matchupDataStore: MatchupDataStore  // 🔥 NEW: Inject store
+        matchupDataStore: MatchupDataStore,  // 🔥 NEW: Inject store
+        gameDataService: NFLGameDataService
     ) {
         self.espnCredentials = espnCredentials
         self.sleeperCredentials = sleeperCredentials
@@ -105,6 +107,7 @@ final class MatchupsHubViewModel {
         self.gameStatusService = gameStatusService
         self.sharedStatsService = sharedStatsService
         self.matchupDataStore = matchupDataStore  // 🔥 NEW: Store reference
+        self.gameDataService = gameDataService
         
         // 🔥 PHASE 3 DI: Create UnifiedLeagueManager with proper dependency injection
         // We need to create API clients here - this is a bit complex but proper
@@ -281,7 +284,7 @@ final class MatchupsHubViewModel {
             let starters = myTeam.roster.filter { $0.isStarter }
             return starters.contains { player in
                 // 🔥 MODEL-BASED CP: Use isInActiveGame for lightweight live detection
-                player.isInActiveGame
+                player.isInActiveGame(gameDataService: self.gameDataService)
             }
         }.count
     }
@@ -423,8 +426,9 @@ struct UnifiedMatchup: Identifiable, Hashable {
     let myIdentifiedTeamID: String? // 🔥 NEW: Store the correctly identified team ID
     private let authenticatedUsername: String
     let allLeagueMatchups: [FantasyMatchup]? // 🔥 NEW: All matchups in this league for horizontal scrolling
+    let gameDataService: NFLGameDataService
     
-    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil, authenticatedUsername: String, allLeagueMatchups: [FantasyMatchup]? = nil) {
+    init(id: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyMatchup: FantasyMatchup?, choppedSummary: ChoppedWeekSummary?, lastUpdated: Date, myTeamRanking: FantasyTeamRanking? = nil, myIdentifiedTeamID: String? = nil, authenticatedUsername: String, allLeagueMatchups: [FantasyMatchup]? = nil, gameDataService: NFLGameDataService) {
         self.id = id
         self.league = league
         self.fantasyMatchup = fantasyMatchup
@@ -434,6 +438,7 @@ struct UnifiedMatchup: Identifiable, Hashable {
         self.myIdentifiedTeamID = myIdentifiedTeamID
         self.authenticatedUsername = authenticatedUsername
         self.allLeagueMatchups = allLeagueMatchups
+        self.gameDataService = gameDataService
     }
     
     /// Is this a Chopped league?
@@ -578,11 +583,11 @@ struct UnifiedMatchup: Identifiable, Hashable {
         }
         
         // Check if any starter on either team is in a live game
-        if let myTeam = myTeam, myTeam.roster.filter({ $0.isStarter && $0.isLive }).count > 0 {
+        if let myTeam = myTeam, myTeam.roster.filter({ $0.isStarter && $0.isLive(gameDataService: gameDataService) }).count > 0 {
             return true
         }
         
-        if let opponentTeam = opponentTeam, opponentTeam.roster.filter({ $0.isStarter && $0.isLive }).count > 0 {
+        if let opponentTeam = opponentTeam, opponentTeam.roster.filter({ $0.isStarter && $0.isLive(gameDataService: gameDataService) }).count > 0 {
             return true
         }
         

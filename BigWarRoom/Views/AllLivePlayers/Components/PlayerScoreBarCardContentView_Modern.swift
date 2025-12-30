@@ -393,7 +393,7 @@ struct PlayerScoreBarCardContentView_Modern: View {
     }
     
     private var gameStatusColor: Color {
-        if playerEntry.player.isLive {
+        if playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService) {
             return .gpGreen
         }
         return .gray.opacity(0.5)
@@ -495,7 +495,7 @@ struct PlayerScoreBarCardContentView_Modern: View {
     }
     
     private var borderColor: Color {
-        if playerEntry.player.isLive {
+        if playerEntry.player.isLive(gameDataService: viewModel.nflGameDataService) {
             return .gpGreen.opacity(0.6)
         }
         return Color.white.opacity(0.15)
@@ -562,11 +562,17 @@ struct PlayerScoreBarCardContentView_Modern: View {
             isChopped: playerEntry.matchup.isChoppedLeague
         )
         
+        // 🔥 FIX: Pass all required services to ScoreBreakdownFactory
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: playerEntry.player,
-            week: WeekSelectionManager.shared.selectedWeek,
+            week: viewModel.weekSelectionManager.selectedWeek,
             leagueContext: leagueContext,
-            allLivePlayersViewModel: viewModel
+            allLivePlayersViewModel: viewModel,
+            weekSelectionManager: viewModel.weekSelectionManager,
+            idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+            playerDirectoryStore: viewModel.playerDirectory,
+            playerStatsCache: PlayerStatsCache.shared,
+            scoringSettingsManager: ScoringSettingsManager.shared
         ).withLeagueName(playerEntry.leagueName)
         
         return ScoreBreakdownView(breakdown: breakdown)
@@ -645,4 +651,3 @@ struct PlayerScoreBarCardContentView_Modern: View {
         }
     }
 }
-

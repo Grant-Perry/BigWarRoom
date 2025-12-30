@@ -219,8 +219,8 @@ final class PlayerStatsStore {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
-        let instance = PlayerStatsStore()
+        // Create temporary shared instance with .shared dependencies
+        let instance = PlayerStatsStore(seasonYearManager: SeasonYearManager.shared)
         _shared = instance
         return instance
     }
@@ -234,10 +234,14 @@ final class PlayerStatsStore {
     @ObservationIgnored private var stats: [String: PlayerStatsModel] = [:]
     @ObservationIgnored private var isLoading = false
     
+    // 🔥 PHASE 4 DI: Injected dependency
+    private let seasonYearManager: SeasonYearManager
+    
     // MARK: - Initialization
     
-    // 🔥 PHASE 2.5: Make init public for dependency injection
-    init() {
+    // 🔥 PHASE 4 DI: Init now requires SeasonYearManager
+    init(seasonYearManager: SeasonYearManager) {
+        self.seasonYearManager = seasonYearManager
         Task {
             await loadRealStats()
         }
@@ -315,8 +319,8 @@ final class PlayerStatsStore {
     }
     
     private func loadESPNPosition(_ position: String) async -> [String: PlayerStatsModel]? {
-        // ESPN's hidden fantasy API endpoints - use SeasonYearManager as SOT
-        let season = SeasonYearManager.shared.selectedYear
+        // 🔥 PHASE 4 DI: Use injected SeasonYearManager
+        let season = seasonYearManager.selectedYear
         let urlString = "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(season)/segments/0/leaguedefaults/3?view=kona_player_info"
         
         guard let url = URL(string: urlString) else { return nil }

@@ -55,7 +55,7 @@ struct FantasyPlayerCard: View {
                             cornerRadius: 15,
                             showBorder: false,
                             isLive: vm.isPlayerLive(player),
-                            isOnBye: player.isOnBye
+                            isOnBye: player.isOnBye(gameDataService: vm.nflGameDataService)
                         )
                     )
                     
@@ -92,7 +92,7 @@ struct FantasyPlayerCard: View {
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ) :
-                                player.isOnBye ?
+                                player.isOnBye(gameDataService: vm.nflGameDataService) ?
                                     LinearGradient(
                                         colors: [.gpPink, .gpPink.opacity(0.8), .gpRedPink.opacity(0.6), .gpPink.opacity(0.9), .gpPink],
                                         startPoint: .topLeading,
@@ -103,13 +103,13 @@ struct FantasyPlayerCard: View {
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
-                            lineWidth: (vm.isPlayerLive(player) || player.isOnBye) ? 4 : 2
+                            lineWidth: (vm.isPlayerLive(player) || player.isOnBye(gameDataService: vm.nflGameDataService)) ? 4 : 2
                         )
-                        .opacity((vm.isPlayerLive(player) || player.isOnBye) ? 0.7 : 0.5)
+                        .opacity((vm.isPlayerLive(player) || player.isOnBye(gameDataService: vm.nflGameDataService)) ? 0.7 : 0.5)
                 )
                 .shadow(
-                    color: vm.isPlayerLive(player) ? .gpGreen.opacity(0.5) : player.isOnBye ? .gpPink.opacity(0.5) : .clear,
-                    radius: (vm.isPlayerLive(player) || player.isOnBye) ? 10 : 0
+                    color: vm.isPlayerLive(player) ? .gpGreen.opacity(0.5) : player.isOnBye(gameDataService: vm.nflGameDataService) ? .gpPink.opacity(0.5) : .clear,
+                    radius: (vm.isPlayerLive(player) || player.isOnBye(gameDataService: vm.nflGameDataService)) ? 10 : 0
                 )
                 // 🔥 NEW: Navigation via state change
                 .navigationDestination(item: $selectedPlayerForNavigation) { sleeperPlayer in
@@ -305,7 +305,12 @@ struct FantasyPlayerCard: View {
             week: selectedWeek,
             localStatsProvider: nil,
             leagueContext: leagueContext,
-            allLivePlayersViewModel: vm.livePlayersViewModel
+            allLivePlayersViewModel: vm.livePlayersViewModel,
+            weekSelectionManager: WeekSelectionManager.shared,
+            idCanonicalizer: ESPNSleeperIDCanonicalizer.shared,
+            playerDirectoryStore: PlayerDirectoryStore.shared,
+            playerStatsCache: PlayerStatsCache.shared,
+            scoringSettingsManager: ScoringSettingsManager.shared
         )
         
         return leagueName != nil ? breakdown.withLeagueName(leagueName!) : breakdown

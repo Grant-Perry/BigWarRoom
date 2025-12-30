@@ -14,11 +14,28 @@ import Observation
 final class ProjectedPointsManager {
     
     // MARK: - Singleton (for convenience, but can be injected)
-    static let shared = ProjectedPointsManager()
+    // static let shared = ProjectedPointsManager()
+    
+    private static var _shared: ProjectedPointsManager?
+    static var shared: ProjectedPointsManager {
+        if _shared == nil {
+            _shared = ProjectedPointsManager(
+                sleeperProjectionsService: SleeperProjectionsService(),
+                weekManager: WeekSelectionManager.shared,
+                gameDataService: NFLGameDataService.shared
+            )
+        }
+        return _shared!
+    }
+    
+    static func setSharedInstance(_ instance: ProjectedPointsManager) {
+        _shared = instance
+    }
     
     // MARK: - Dependencies
     private let sleeperProjectionsService: SleeperProjectionsService
     private let weekManager: WeekSelectionManager
+    private let gameDataService: NFLGameDataService
     
     // MARK: - Cache
     @ObservationIgnored private var playerProjectionsCache: [String: Double] = [:]
@@ -29,15 +46,12 @@ final class ProjectedPointsManager {
     
     init(
         sleeperProjectionsService: SleeperProjectionsService,
-        weekManager: WeekSelectionManager
+        weekManager: WeekSelectionManager,
+        gameDataService: NFLGameDataService
     ) {
         self.sleeperProjectionsService = sleeperProjectionsService
         self.weekManager = weekManager
-    }
-    
-    init() {
-        self.sleeperProjectionsService = SleeperProjectionsService()
-        self.weekManager = WeekSelectionManager.shared
+        self.gameDataService = gameDataService
     }
     
     // MARK: - Public API
@@ -150,7 +164,7 @@ final class ProjectedPointsManager {
         }
         
         // Get game progress
-        let gameProgress = getGameProgress(for: team)
+        let gameProgress = getGameProgress(for: team, gameDataService: gameDataService)
         let remainingPercentage = 1.0 - gameProgress
         
         // Get projection for remaining calculation
@@ -171,10 +185,8 @@ final class ProjectedPointsManager {
     
     /// Calculate game progress percentage (0.0 = not started, 1.0 = finished)
     /// Uses quarter and time remaining to estimate progress
-    private func getGameProgress(for team: String) -> Double {
-        let gameService = NFLGameDataService.shared
-        
-        guard let gameInfo = gameService.getGameInfo(for: team) else {
+    private func getGameProgress(for team: String, gameDataService: NFLGameDataService) -> Double {
+        guard let gameInfo = gameDataService.getGameInfo(for: team) else {
             // No game info = assume not started
             return 0.0
         }

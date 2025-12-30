@@ -10,6 +10,9 @@ import SwiftUI
 struct ScoreBreakdownView: View {
     let breakdown: PlayerScoreBreakdown
     @Environment(\.dismiss) private var dismiss
+    
+    // 🔥 PURE DI: Inject from environment
+    @Environment(NFLGameDataService.self) private var nflGameDataService
 
     // Get team color for gradient styling
     private var teamColor: Color {
@@ -414,7 +417,7 @@ struct ScoreBreakdownView: View {
     private var gameStatusView: some View {
         Group {
             if let team = breakdown.player.team {
-                if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+                if let gameInfo = nflGameDataService.getGameInfo(for: team) {
                     // Show actual game matchup
                     VStack(spacing: 4) {
                         Text(gameInfo.matchupString)

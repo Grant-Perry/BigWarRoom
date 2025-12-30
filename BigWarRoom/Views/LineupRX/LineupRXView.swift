@@ -12,6 +12,8 @@ struct LineupRXView: View {
     
     @Environment(\.dismiss) private var dismiss
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
+    // 🔥 PURE DI: Inject from environment
+    @Environment(NFLGameDataService.self) private var nflGameDataService
     @State private var isInitialLoad = true // 🔥 NEW: Track first load vs refresh
     @State private var isLoading = false // 🔥 CHANGED: Don't start as true
     @State private var isRefreshing = false // 🔥 NEW: Track refresh state
@@ -23,7 +25,7 @@ struct LineupRXView: View {
     @State private var currentWeek: Int = WeekSelectionManager.shared.selectedWeek
     
     // 🔥 NEW: View owns its own optimizer instance - NO SINGLETON
-    @State private var optimizer = LineupOptimizerService()
+    @State private var optimizer: LineupOptimizerService?
     
     // Performance caches
     @State private var sleeperPlayerCache: [String: SleeperPlayer] = [:]
@@ -104,6 +106,10 @@ struct LineupRXView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            if optimizer == nil {
+                optimizer = LineupOptimizerService(gameDataService: nflGameDataService)
+            }
+            
             currentWeek = WeekSelectionManager.shared.selectedWeek
             Task {
                 await loadData()
@@ -471,7 +477,7 @@ struct LineupRXView: View {
                 let cacheKey = "\(team)_\(player.position)"
                 
                 if matchupInfoCache[cacheKey] == nil {
-                    if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+                    if let gameInfo = nflGameDataService.getGameInfo(for: team) {
                         let isHome = gameInfo.homeTeam == team
                         let opponent = isHome ? "vs \(gameInfo.awayTeam)" : "@ \(gameInfo.homeTeam)"
                         let opponentTeam = isHome ? gameInfo.awayTeam : gameInfo.homeTeam
@@ -524,7 +530,7 @@ struct LineupRXView: View {
             }
             
             if !isOnBye, let team = player.team {
-                if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+                if let gameInfo = nflGameDataService.getGameInfo(for: team) {
                     if gameInfo.gameStatus.lowercased() == "bye" {
                         isOnBye = true
                     }
@@ -643,6 +649,10 @@ struct LineupRXView: View {
                 throw LineupRXError.noTeamData
             }
             
+            guard let optimizer = optimizer else {
+                throw LineupRXError.noTeamData
+            }
+            
             let scoringFormat = "ppr"
             
             // 🔥 FAST PATH: Load lineup optimization
@@ -662,7 +672,7 @@ struct LineupRXView: View {
             // 🔥 BACKGROUND: Load waiver recs without blocking
             Task.detached(priority: .userInitiated) { @MainActor in
                 do {
-                    let waiver = try await self.optimizer.getWaiverRecommendations(
+                    let waiver = try await optimizer.getWaiverRecommendations(
                         for: self.currentMatchup,
                         week: week,
                         year: year,

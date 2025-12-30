@@ -17,16 +17,24 @@ import Foundation
 /// - Easy to extend with new sorting methods
 struct PlayerSortingService {
     
-    /// Sort fantasy players based on method and direction
+    /// DRY sorting logic for player lists
+    /// - Parameters:
+    ///   - players: Array of FantasyPlayer to sort
+    ///   - sortingMethod: Method to sort by
+    ///   - highToLow: Sort in descending order if true
+    ///   - getPlayerPoints: Optional closure to retrieve player's actual points (for ChoppedTeamRosterView)
+    ///   - gameDataService: Injected NFLGameDataService for live status checks
+    /// - Returns: Sorted array of FantasyPlayer
     static func sortPlayers(
-        _ players: [FantasyPlayer], 
-        by method: MatchupSortingMethod, 
+        _ players: [FantasyPlayer],
+        by sortingMethod: MatchupSortingMethod,
         highToLow: Bool,
-        getPlayerPoints: ((FantasyPlayer) -> Double?)? = nil
+        getPlayerPoints: ((FantasyPlayer) -> Double?)? = nil,
+        gameDataService: NFLGameDataService
     ) -> [FantasyPlayer] {
         
         let sorted = players.sorted { player1, player2 in
-            switch method {
+            switch sortingMethod {
             case .position:
                 let pos1 = player1.position
                 let pos2 = player2.position
@@ -68,8 +76,10 @@ struct PlayerSortingService {
                 let live1 = player1.isLive
                 let live2 = player2.isLive
                 
-                if live1 != live2 {
-                    return live1
+                let live1Val = live1(gameDataService)
+                let live2Val = live2(gameDataService)
+                if live1Val != live2Val {
+                    return live2Val && !live1Val
                 }
                 let points1 = getPlayerPoints?(player1) ?? player1.currentPoints ?? 0.0
                 let points2 = getPlayerPoints?(player2) ?? player2.currentPoints ?? 0.0

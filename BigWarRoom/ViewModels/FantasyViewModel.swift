@@ -29,7 +29,7 @@ final class FantasyViewModel {
     var isLoadingChoppedData: Bool = false
     var hasActiveRosters: Bool = false
     var detectedAsChoppedLeague: Bool = false
-    var nflGameService = NFLGameDataService.shared
+    var nflGameService: NFLGameDataService
     
     // MARK: -> Instance tracking for debugging
     private let instanceID = UUID().uuidString.prefix(8)
@@ -102,12 +102,14 @@ final class FantasyViewModel {
         matchupDataStore: MatchupDataStore,
         unifiedLeagueManager: UnifiedLeagueManager,
         sleeperCredentials: SleeperCredentialsManager,
-        playerDirectoryStore: PlayerDirectoryStore
+        playerDirectoryStore: PlayerDirectoryStore,
+        nflGameService: NFLGameDataService
     ) {
         self.matchupDataStore = matchupDataStore
         self.unifiedLeagueManager = unifiedLeagueManager
         self.sleeperCredentials = sleeperCredentials
         self.playerDirectoryStore = playerDirectoryStore
+        self.nflGameService = nflGameService
         
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1

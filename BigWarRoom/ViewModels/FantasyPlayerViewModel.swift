@@ -25,6 +25,7 @@ class FantasyPlayerViewModel {
     // MARK: - Dependencies (injected)
     private let gameViewModel: NFLGameMatchupViewModel
     private let nflWeekService: NFLWeekService
+    internal let nflGameDataService: NFLGameDataService  // 🔥 PHASE 4 DI: Make internal for views
     // 🔥 PHASE 3 DI: Make livePlayersViewModel internal so FantasyPlayerCard can access it
     internal let livePlayersViewModel: AllLivePlayersViewModel
     // 🔥 PHASE 3 DI: Inject PlayerDirectoryStore
@@ -43,8 +44,9 @@ class FantasyPlayerViewModel {
     ) {
         self.livePlayersViewModel = livePlayersViewModel
         self.playerDirectory = playerDirectory
-        self.gameViewModel = NFLGameMatchupViewModel(gameDataService: nflGameDataService)
+        self.nflGameDataService = nflGameDataService
         self.nflWeekService = nflWeekService
+        self.gameViewModel = NFLGameMatchupViewModel(gameDataService: nflGameDataService)
         self.currentWeek = nflWeekService.currentWeek
         startObservingDependencies()
     }
@@ -83,7 +85,8 @@ class FantasyPlayerViewModel {
     
     /// Determines if the player is currently in a live game
     func isPlayerLive(_ player: FantasyPlayer) -> Bool {
-        return player.isLive
+        // 🔥 PHASE 4 DI: Use method with stored service
+        return player.isLive(gameDataService: nflGameDataService)
     }
     
     /// Gets appropriate border colors based on live status

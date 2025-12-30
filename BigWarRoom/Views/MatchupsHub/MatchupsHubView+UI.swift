@@ -167,7 +167,8 @@ extension MatchupsHubView {
                     lastUpdated: matchup.lastUpdated,
                     myTeamRanking: nil,
                     myIdentifiedTeamID: matchup.myIdentifiedTeamID,
-                    authenticatedUsername: ""
+                    authenticatedUsername: "",
+                    gameDataService: matchup.gameDataService
                 )
             }
         } else {

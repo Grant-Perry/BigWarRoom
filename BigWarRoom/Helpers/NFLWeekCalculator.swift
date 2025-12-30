@@ -17,11 +17,11 @@ struct NFLWeekCalculator {
     }
     
     /// Setup real NFL game data for the calculated current week
-    static func setupCurrentWeekGameData() {
+    static func setupCurrentWeekGameData(gameDataService: NFLGameDataService) {
         let currentWeek = getCurrentWeek()
         let currentYear = Calendar.current.component(.year, from: Date())
         
-        NFLGameDataService.shared.fetchGameData(forWeek: currentWeek, year: currentYear)
+        gameDataService.fetchGameData(forWeek: currentWeek, year: currentYear)
     }
     
     /// Get current NFL season year

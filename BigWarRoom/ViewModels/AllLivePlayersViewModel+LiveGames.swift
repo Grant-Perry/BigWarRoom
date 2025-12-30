@@ -39,8 +39,8 @@ extension AllLivePlayersViewModel {
     // 🔥 DEPRECATED: This function is no longer needed - use player.isInActiveGame instead
     // Keeping for backward compatibility during migration
     internal func isPlayerInLiveGame(_ player: FantasyPlayer) -> Bool {
-        // 🔥 MODEL-BASED CP: Delegate to the model's computed property
-        return player.isInActiveGame
+        // 🔥 PHASE 4 DI: Use method with injected service
+        return player.isInActiveGame(gameDataService: nflGameDataService)
     }
     
     // MARK: - Cache Management
@@ -56,18 +56,18 @@ extension AllLivePlayersViewModel {
         // Trigger background load of fresh game data
         Task { @MainActor in
             // 🔥 CRITICAL FIX: Use WeekSelectionManager.selectedWeek (user's chosen week) instead of getCurrentWeek
-            let selectedWeek = WeekSelectionManager.shared.selectedWeek
+            let selectedWeek = weekSelectionManager.selectedWeek
             
             DebugPrint(mode: .weekCheck, "📅 AllLivePlayers.refreshLiveGameData: Using user-selected week \(selectedWeek)")
             
-            NFLGameDataService.shared.fetchGameData(forWeek: selectedWeek, forceRefresh: true)
+            nflGameDataService.fetchGameData(forWeek: selectedWeek, forceRefresh: true)
         }
     }
     
     // MARK: - Live Game Status Helpers
     
     var activeLiveGamesCount: Int {
-        return NFLGameDataService.shared.gameData.values.filter { gameInfo in
+        return nflGameDataService.gameData.values.filter { gameInfo in
             gameInfo.gameStatus.lowercased() == "in" && gameInfo.isLive
         }.count / 2 // Divide by 2 since each game has 2 teams
     }
@@ -77,7 +77,7 @@ extension AllLivePlayersViewModel {
     }
     
     func getLiveGameStatus(for team: String) -> String? {
-        guard let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) else {
+        guard let gameInfo = nflGameDataService.getGameInfo(for: team) else {
             return nil
         }
         

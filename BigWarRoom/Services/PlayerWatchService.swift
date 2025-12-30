@@ -56,13 +56,19 @@ final class PlayerWatchService {
     
     // MARK: - Dependencies
     private let weekManager: WeekSelectionManager
-    private weak var allLivePlayersViewModel: AllLivePlayersViewModel? // 🔥 NEW: Weak reference to avoid retain cycle
+    private weak var allLivePlayersViewModel: AllLivePlayersViewModel?
+    private let gameDataService: NFLGameDataService  // 🔥 PHASE 4 DI: Add NFLGameDataService
     
     // MARK: - Initialization
     
-    // 🔥 ONLY initializer: Dependency injection
-    init(weekManager: WeekSelectionManager, allLivePlayersViewModel: AllLivePlayersViewModel? = nil) {
+    // 🔥 PHASE 4 DI: Updated initializer
+    init(
+        weekManager: WeekSelectionManager,
+        gameDataService: NFLGameDataService,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil
+    ) {
         self.weekManager = weekManager
+        self.gameDataService = gameDataService
         self.allLivePlayersViewModel = allLivePlayersViewModel
         loadWatchedPlayers()
         loadSettings()
@@ -247,7 +253,8 @@ final class PlayerWatchService {
             if let currentPlayer = opponentPlayers.first(where: { $0.player.id == watchedPlayers[i].playerID }) {
                 let previousScore = watchedPlayers[i].currentScore
                 watchedPlayers[i].currentScore = currentPlayer.currentScore
-                watchedPlayers[i].isLive = currentPlayer.player.isLive
+                // 🔥 PHASE 4 DI: Use method instead of computed property
+                watchedPlayers[i].isLive = currentPlayer.player.isLive(gameDataService: gameDataService)
                 
                 // Check for notification triggers
                 if previousScore != currentPlayer.currentScore {

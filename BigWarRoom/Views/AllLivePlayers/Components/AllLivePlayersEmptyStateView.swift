@@ -12,6 +12,9 @@ struct AllLivePlayersEmptyStateView: View {
     @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     let onAnimationReset: () -> Void
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+    
     var body: some View {
         VStack(spacing: 24) {
             // Icon and title based on state
@@ -61,12 +64,12 @@ struct AllLivePlayersEmptyStateView: View {
                     .multilineTextAlignment(.center)
                 
                 // 🔥 NEW: Show game status info
-                if NFLGameDataService.shared.gameData.isEmpty {
+                if nflGameDataService.gameData.isEmpty {
                     Text("🔄 Loading game data...")
                         .font(.caption)
                         .foregroundColor(.orange)
                 } else {
-                    let liveGameCount = NFLGameDataService.shared.gameData.values.filter { $0.isLive }.count / 2 // Divide by 2 since each game has 2 teams
+                    let liveGameCount = nflGameDataService.gameData.values.filter { $0.isLive }.count / 2 // Divide by 2 since each game has 2 teams
                     if liveGameCount > 0 {
                         Text("📡 \(liveGameCount) games currently live")
                             .font(.caption)

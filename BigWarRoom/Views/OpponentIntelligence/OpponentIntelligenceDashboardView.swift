@@ -566,6 +566,7 @@ struct OpponentIntelligenceDashboardView: View {
     let gameStatusService = GameStatusService.shared
     let sharedStatsService = SharedStatsService.shared
     let weekSelectionManager = WeekSelectionManager.shared
+    let nflGameDataService = NFLGameDataService.shared
     
     let sleeperClient = SleeperAPIClient()
     let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
@@ -588,7 +589,8 @@ struct OpponentIntelligenceDashboardView: View {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore
+        matchupDataStore: matchupDataStore,
+        gameDataService: nflGameDataService
     )
     
     let allLivePlayersViewModel = AllLivePlayersViewModel(
@@ -596,7 +598,8 @@ struct OpponentIntelligenceDashboardView: View {
         playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        nflGameDataService: nflGameDataService
     )
     
     OpponentIntelligenceDashboardView()

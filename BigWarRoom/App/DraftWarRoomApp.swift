@@ -90,7 +90,10 @@ final class AppContainer {
         ESPNSleeperIDCanonicalizer.setSharedInstance(idCanonicalizer)
         
         // MARK: - Game Services
-        let nflGameDataService = NFLGameDataService()
+        let nflGameDataService = NFLGameDataService(
+            weekSelectionManager: weekSelectionManager,
+            appLifecycleManager: AppLifecycleManager.shared
+        )
         NFLGameDataService.setSharedInstance(nflGameDataService)
         
         let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
@@ -128,7 +131,8 @@ final class AppContainer {
             playerDirectory: playerDirectory,
             gameStatusService: gameStatusService,
             sharedStatsService: sharedStatsService,
-            matchupDataStore: matchupDataStore
+            matchupDataStore: matchupDataStore,
+            gameDataService: nflGameDataService
         )
         
         // MARK: - 🔥 PHASE 4: FantasyViewModel with DI (NO BRIDGE)
@@ -142,7 +146,8 @@ final class AppContainer {
             matchupDataStore: matchupDataStore,
             unifiedLeagueManager: unifiedLeagueManagerForFantasy,
             sleeperCredentials: sleeperCredentials,
-            playerDirectoryStore: playerDirectory
+            playerDirectoryStore: playerDirectory,
+            nflGameService: nflGameDataService
         )
         
         // MARK: - AllLivePlayersViewModel with DI
@@ -151,13 +156,15 @@ final class AppContainer {
             playerDirectory: playerDirectory,
             gameStatusService: gameStatusService,
             sharedStatsService: sharedStatsService,
-            weekSelectionManager: weekSelectionManager
+            weekSelectionManager: weekSelectionManager,
+            nflGameDataService: nflGameDataService
         )
         AllLivePlayersViewModel.setSharedInstance(allLivePlayersViewModel)
         
         // MARK: - Supporting Services
         let playerWatchService = PlayerWatchService(
             weekManager: weekSelectionManager,
+            gameDataService: nflGameDataService,
             allLivePlayersViewModel: allLivePlayersViewModel
         )
         PlayerWatchService.setSharedInstance(playerWatchService)

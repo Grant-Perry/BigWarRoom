@@ -17,6 +17,8 @@ final class OpponentIntelligenceService {
     
     // MARK: - Private Properties
     
+    private var gameDataService: NFLGameDataService?
+    
     private var cachedIntelligence: [OpponentIntelligence] = []
     private var cacheTimestamp: Date?
     private let cacheExpiration: TimeInterval = 5.0 // Reduced to 5 seconds for faster injury updates
@@ -26,6 +28,10 @@ final class OpponentIntelligenceService {
     var onInjuryLoadingStateChanged: ((Bool) -> Void)?
     
     private init() {}
+    
+    func setGameDataService(_ service: NFLGameDataService) {
+        self.gameDataService = service
+    }
     
     // MARK: - Public Interface
     
@@ -274,9 +280,9 @@ final class OpponentIntelligenceService {
             let isByeWeek = checkIfPlayerOnBye(player: playerEntry.player)
             let sleeperInjuryStatus = getSleeperInjuryStatus(for: playerEntry.player)
             
-            // 🔥 NEW: Skip players whose games are already completed - no point in injury alerts for finished games
             if let team = playerEntry.player.team,
-               let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+               let gameDataService = gameDataService,
+               let gameInfo = gameDataService.getGameInfo(for: team) {
                 if gameInfo.isCompleted && gameInfo.gameStatus.lowercased() == "post" {
                     continue
                 }
@@ -434,8 +440,11 @@ final class OpponentIntelligenceService {
             return false 
         }
         
-        // Use NFLGameDataService to check if team is on bye
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+        guard let gameDataService = gameDataService else {
+            return false
+        }
+        
+        if let gameInfo = gameDataService.getGameInfo(for: team) {
             let isBye = gameInfo.gameStatus.lowercased() == "bye"
             return isBye
         }
@@ -744,8 +753,12 @@ final class OpponentIntelligenceService {
             return .neutral
         }
         
+        guard let gameDataService = gameDataService else {
+            return .neutral
+        }
+        
         // 2. Get player's opponent this week from NFL game data
-        guard let gameInfo = NFLGameDataService.shared.getGameInfo(for: playerTeam) else {
+        guard let gameInfo = gameDataService.getGameInfo(for: playerTeam) else {
             return .neutral
         }
         

@@ -19,6 +19,8 @@ final class LineupOptimizerService {
     private let projectionsService = SleeperProjectionsService()
     private let availablePlayersService: AvailablePlayersService
     
+    private let gameDataService: NFLGameDataService
+    
     // MARK: - Models
     
     struct OptimizationResult {
@@ -109,8 +111,11 @@ final class LineupOptimizerService {
     
     // MARK: - Initialization
     
-    init() {
-        // 🔥 NEW: Initialize availablePlayersService with projectionsService dependency
+    init(gameDataService: NFLGameDataService) {
+        // Store injected dependency
+        self.gameDataService = gameDataService
+        
+        // Initialize other services
         self.availablePlayersService = AvailablePlayersService(projectionsService: projectionsService)
         DebugPrint(mode: .lineupRX, "💊 OPTIMIZER: New instance created (view-owned)")
     }
@@ -479,7 +484,7 @@ final class LineupOptimizerService {
         
         for player in roster {
             // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek instead of helper function
-            if player.hasPlayedThisWeek {
+            if player.hasPlayedThisWeek(gameDataService: gameDataService) {
                 lockedPlayers.append(player)
                 lockedPlayerIDs.insert(player.id)
                 DebugPrint(mode: .lineupRX, "🔒 LOCKED PLAYER: \(player.fullName) in \(player.lineupSlot ?? "?") - game is FINAL")
@@ -689,7 +694,7 @@ final class LineupOptimizerService {
                 let points: Double
                 
                 // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek for finished games
-                if player.hasPlayedThisWeek, let actualPoints = player.currentPoints {
+                if player.hasPlayedThisWeek(gameDataService: gameDataService), let actualPoints = player.currentPoints {
                     points = actualPoints
                 } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
                     points = projection
@@ -724,7 +729,7 @@ final class LineupOptimizerService {
             let points: Double
             
             // 🔥 MODEL-BASED CP: Use hasPlayedThisWeek for finished games
-            if player.hasPlayedThisWeek, let actualPoints = player.currentPoints {
+            if player.hasPlayedThisWeek(gameDataService: gameDataService), let actualPoints = player.currentPoints {
                 points = actualPoints
                 DebugPrint(mode: .lineupRX, "💊 CURRENT LINEUP: \(player.fullName) (\(player.lineupSlot ?? "?")) - \(String(format: "%.1f", points)) pts [ACTUAL]")
             } else if let sleeperID = player.sleeperID, let projection = projections[sleeperID] {
@@ -786,7 +791,7 @@ final class LineupOptimizerService {
         // 🔥 CRITICAL: Build list of ALL players whose games are FINAL (locked - can't be moved)
         var lockedPlayerIDs = Set<String>()
         for player in currentRoster {
-            if player.hasPlayedThisWeek {
+            if player.hasPlayedThisWeek(gameDataService: gameDataService) {
                 lockedPlayerIDs.insert(player.id)
                 DebugPrint(mode: .lineupRX, "🔒 LOCKED: \(player.fullName) - game is FINAL, cannot be moved")
             }
@@ -1005,8 +1010,7 @@ final class LineupOptimizerService {
             return false 
         }
         
-        // Use NFLGameDataService to check if team is on bye
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: team) {
+        if let gameInfo = gameDataService.getGameInfo(for: team) {
             let isBye = gameInfo.gameStatus.lowercased() == "bye"
             if isBye {
                 DebugPrint(mode: .lineupRX, "🚨 BYE WEEK: \(player.fullName) (\(team)) is on BYE")
