@@ -141,26 +141,27 @@ struct MatchupBarCardContentView: View {
                                             .fill(Color.white.opacity(0.1))
                                             .frame(height: 8)
                                         
-                                        // Filled portion (my team's percentage)
+                                        // 🔥 FIX: Use actual win probability, not projected score ratio
+                                        // Filled portion (my team's win probability)
                                         RoundedRectangle(cornerRadius: 4)
                                             .fill(
                                                 LinearGradient(
                                                     colors: [
-                                                        projectedPercentage >= 0.5 ? Color.gpGreen : Color.gpRedPink,
-                                                        projectedPercentage >= 0.5 ? Color.gpGreen.opacity(0.7) : Color.gpRedPink.opacity(0.7)
+                                                        winProbabilityValue >= 0.5 ? Color.gpGreen : Color.gpRedPink,
+                                                        winProbabilityValue >= 0.5 ? Color.gpGreen.opacity(0.7) : Color.gpRedPink.opacity(0.7)
                                                     ],
                                                     startPoint: .leading,
                                                     endPoint: .trailing
                                                 )
                                             )
-                                            .frame(width: geometry.size.width * projectedPercentage, height: 8)
+                                            .frame(width: geometry.size.width * winProbabilityValue, height: 8)
                                         
                                         // Win percentage in center
                                         HStack {
                                             Spacer()
-                                            Text(winPercentageText)
+                                            Text(actualWinPercentageText)
                                                 .font(.system(size: 9, weight: .black))
-                                                .foregroundColor(projectedPercentage >= 0.5 ? .gpGreen : .gpRedPink)
+                                                .foregroundColor(winProbabilityValue >= 0.5 ? .gpGreen : .gpRedPink)
                                                 .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
                                             Spacer()
                                         }
@@ -172,13 +173,13 @@ struct MatchupBarCardContentView: View {
                                 HStack(spacing: 0) {
                                     Text(String(format: "%.1f", myProjected))
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(projectedPercentage >= 0.5 ? .gpGreen : .gpRedPink)
+                                        .foregroundColor(winProbabilityValue >= 0.5 ? .gpGreen : .gpRedPink)
                                     
                                     Spacer()
                                     
                                     Text(String(format: "%.1f", opponentProjected))
                                         .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(projectedPercentage >= 0.5 ? .gpRedPink : .gpGreen)
+                                        .foregroundColor(winProbabilityValue >= 0.5 ? .gpRedPink : .gpGreen)
                                 }
                             }
                             .frame(width: 120)
@@ -371,14 +372,20 @@ struct MatchupBarCardContentView: View {
     
     // MARK: - Helper Methods
     
-    private var projectedPercentage: CGFloat {
-        let total = myProjected + opponentProjected
-        guard total > 0 else { return 0.5 }
-        return CGFloat(myProjected / total)
+    // 🔥 FIX: Use actual win probability instead of projected score ratio
+    /// Get actual win probability value (0.0 to 1.0)
+    private var winProbabilityValue: CGFloat {
+        // Use matchup's win probability (which has deterministic logic)
+        if let winProb = matchup.myWinProbability {
+            return CGFloat(winProb)
+        }
+        // Fallback to 50-50 if unavailable
+        return 0.5
     }
     
-    private var winPercentageText: String {
-        let percentage = Int(projectedPercentage * 100)
+    /// Get win percentage text from actual win probability
+    private var actualWinPercentageText: String {
+        let percentage = Int(winProbabilityValue * 100)
         return "\(percentage)%"
     }
     

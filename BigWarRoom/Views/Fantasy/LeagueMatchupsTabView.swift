@@ -22,7 +22,8 @@ struct LeagueMatchupsTabView: View {
     @State private var isNavigating = false
     @State private var navigatingDirection: NavigationDirection? = nil
     @State private var hasScrolledToInitialPosition = false
-    @State private var isLoadingNeighbors = false  // 🔥 NEW: Track background neighbor loading
+    @State private var isLoadingNeighbors = false
+    @State private var userHasNavigated = false
     @Environment(\.dismiss) private var dismiss
     
     // FIX: Add animation trigger that actually changes
@@ -37,13 +38,20 @@ struct LeagueMatchupsTabView: View {
         self.allMatchups = allMatchups
         self.startingMatchup = startingMatchup
         self.leagueName = leagueName
-        self.league = league  // 🔥 NEW: Store league
+        self.league = league
         self.fantasyViewModel = fantasyViewModel
+        
+        DebugPrint(mode: .navigation, "🏈 LEAGUE MATCHUPS INIT:")
+        DebugPrint(mode: .navigation, "   Starting matchup ID: \(startingMatchup.id)")
+        DebugPrint(mode: .navigation, "   All matchups count: \(allMatchups.count)")
+        DebugPrint(mode: .navigation, "   All matchup IDs: \(allMatchups.map { $0.id })")
         
         // Find the starting index of the matchup user tapped
         let startIndex = allMatchups.firstIndex { matchup in
             matchup.id == startingMatchup.id
         } ?? 0
+        
+        DebugPrint(mode: .navigation, "   Found starting index: \(startIndex)")
         
         self._selectedIndex = State(initialValue: startIndex)
         self._fetchedAllMatchups = State(initialValue: allMatchups)
@@ -95,11 +103,11 @@ struct LeagueMatchupsTabView: View {
             // Main content with ScrollView/tab stuff
             VStack(spacing: 0) {
                 Color.clear.frame(height: 100)
+                
                 paginatedScrollView
                     .overlay(
                         Group {
                             if isLoadingAllMatchups {
-                                // Show loading overlay OVER the scroll view instead of replacing it
                                 Color.black.opacity(0.55)
                                     .ignoresSafeArea(.all)
                                     .overlay(
@@ -172,6 +180,7 @@ struct LeagueMatchupsTabView: View {
                 // Previous matchup button
                 if !isLoadingAllMatchups && hasPreviousMatchup {
                     Button(action: {
+                        userHasNavigated = true  // 🔥 FIX: Mark user navigation
                         isNavigating = true
                         withAnimation(.easeInOut(duration: 0.3)) {
                             if let prevID = previousMatchupID {
@@ -198,6 +207,7 @@ struct LeagueMatchupsTabView: View {
                 // Next matchup button
                 if !isLoadingAllMatchups && hasNextMatchup {
                     Button(action: {
+                        userHasNavigated = true  // 🔥 FIX: Mark user navigation
                         isNavigating = true
                         withAnimation(.easeInOut(duration: 0.3)) {
                             if let nextID = nextMatchupID {
@@ -233,7 +243,7 @@ struct LeagueMatchupsTabView: View {
                     await fetchAllLeagueMatchups()
                 }
             } else if fetchedAllMatchups.count == 1 {
-                // We only have the starting matchup - load neighbors in background
+                // 🔥 FIX: Don't show the ScrollView yet - wait for all data
                 isLoadingNeighbors = true
                 Task {
                     await fetchNeighborMatchupsInBackground()
@@ -406,21 +416,19 @@ struct LeagueMatchupsTabView: View {
                             leagueName: leagueName,
                             livePlayersViewModel: AllLivePlayersViewModel.shared
                         )
-                        .containerRelativeFrame(.horizontal) // Fill container width minus margins
-                        .id(matchup.id) // For programmatic scrolling (use the ID)
+                        .containerRelativeFrame(.horizontal)
+                        .id(matchup.id)
                     }
                 }
-                .scrollTargetLayout() // Tell ScrollView to snap to these children
+                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned) // Snap to views, not pages
-            .contentMargins(.horizontal, 20, for: .scrollContent) // Create peek spacing
+            .scrollTargetBehavior(.viewAligned)
+            .contentMargins(.horizontal, 20, for: .scrollContent)
             .scrollIndicators(.hidden)
-            .scrollPosition(id: $selectedMatchupID, anchor: .center) // Bind to matchup ID with center anchor!
+            .scrollPosition(id: $selectedMatchupID, anchor: .center)
             .onChange(of: isLoadingAllMatchups) { oldValue, newValue in
-                // When loading completes and we haven't scrolled yet, force scroll to starting matchup
                 if oldValue == true && newValue == false && !hasScrolledToInitialPosition {
                     if let targetID = selectedMatchupID {
-                        // Delay to ensure ScrollView is fully laid out
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             withAnimation(.easeOut(duration: 0.3)) {
                                 proxy.scrollTo(targetID, anchor: .center)
@@ -471,40 +479,53 @@ struct LeagueMatchupsTabView: View {
     
     /// 🔥 NEW: Fetch neighbor matchups in background without blocking UI
     private func fetchNeighborMatchupsInBackground() async {
-        // 🔥 FIX: Use the passed-in league directly instead of selectedLeague
         let currentWeek = NFLWeekService.shared.currentWeek
         let currentYear = String(Calendar.current.component(.year, from: Date()))
         let provider = LeagueMatchupProvider(
-            league: league,  // 🔥 Use passed-in league, not fantasyViewModel.selectedLeague
+            league: league,
             week: currentWeek,
             year: currentYear
         )
 
         do {
             let allLeagueMatchups = try await provider.fetchMatchups()
-            await MainActor.run {
-                fetchedAllMatchups = allLeagueMatchups
-                
-                // Preserve the starting matchup ID
-                if allLeagueMatchups.contains(where: { $0.id == startingMatchup.id }) {
-                    selectedMatchupID = startingMatchup.id
-                } else if let first = allLeagueMatchups.first {
-                    selectedMatchupID = first.id
+            
+            DebugPrint(mode: .navigation, "🏈 NEIGHBOR LOAD COMPLETE:")
+            DebugPrint(mode: .navigation, "   Starting matchup ID: \(startingMatchup.id)")
+            DebugPrint(mode: .navigation, "   Fetched \(allLeagueMatchups.count) matchups")
+            DebugPrint(mode: .navigation, "   Fetched IDs (before sort): \(allLeagueMatchups.map { $0.id })")
+            
+            // 🔥 FIX: Sort so starting matchup is always first
+            let sortedMatchups = allLeagueMatchups.sorted { matchup1, matchup2 in
+                if matchup1.id == startingMatchup.id {
+                    return true // Starting matchup comes first
+                } else if matchup2.id == startingMatchup.id {
+                    return false // Starting matchup comes first
+                } else {
+                    return matchup1.id < matchup2.id // Stable sort for others
                 }
+            }
+            
+            DebugPrint(mode: .navigation, "   Fetched IDs (after sort): \(sortedMatchups.map { $0.id })")
+            
+            await MainActor.run {
+                // Update with sorted matchups - starting matchup stays at index 0
+                fetchedAllMatchups = sortedMatchups
+                
+                DebugPrint(mode: .navigation, "🏈 UPDATE COMPLETE:")
+                DebugPrint(mode: .navigation, "   selectedMatchupID: \(selectedMatchupID ?? "nil")")
+                DebugPrint(mode: .navigation, "   displayMatchups count: \(displayMatchups.count)")
+                DebugPrint(mode: .navigation, "   Position: \(currentMatchupPosition) of \(displayMatchups.count)")
                 
                 isLoadingNeighbors = false
-                print("✅ Loaded \(allLeagueMatchups.count) matchups for \(leagueName) in background")
             }
         } catch {
-            print("❌ Failed to fetch neighbor matchups for \(leagueName): \(error)")
+            DebugPrint(mode: .navigation, "❌ NEIGHBOR LOAD FAILED: \(error)")
             await MainActor.run {
                 isLoadingNeighbors = false
             }
         }
     }
-    
-    /// 🔥 REMOVED: No longer needed - we have the league directly
-    // private func fetchMatchupsWithoutSelectedLeague() async { ... }
     
     /// Fetch all matchups for the current league and week
     private func fetchAllLeagueMatchups() async {
@@ -530,14 +551,15 @@ struct LeagueMatchupsTabView: View {
             await MainActor.run {
                 fetchedAllMatchups = allLeagueMatchups
 
-                // --- MATCHUP SELECTION FIX ---
-                // Preserve the starting matchup ID so scroll position works
-                if allLeagueMatchups.contains(where: { $0.id == startingMatchup.id }) {
-                    selectedMatchupID = startingMatchup.id
-                } else if let first = allLeagueMatchups.first {
-                    selectedMatchupID = first.id
-                } else {
-                    selectedMatchupID = nil
+                // 🔥 FIX: Only set selectedMatchupID on initial full load when needed
+                // Don't override if user has already navigated
+                if !userHasNavigated && selectedMatchupID == nil {
+                    // Only set if we don't have a selection yet
+                    if allLeagueMatchups.contains(where: { $0.id == startingMatchup.id }) {
+                        selectedMatchupID = startingMatchup.id
+                    } else if let first = allLeagueMatchups.first {
+                        selectedMatchupID = first.id
+                    }
                 }
             }
         } catch {
@@ -545,7 +567,9 @@ struct LeagueMatchupsTabView: View {
             await MainActor.run {
                 // Fall back to the passed-in starting matchup
                 fetchedAllMatchups = [startingMatchup]
-                selectedMatchupID = startingMatchup.id
+                if !userHasNavigated && selectedMatchupID == nil {
+                    selectedMatchupID = startingMatchup.id
+                }
             }
         }
     }

@@ -84,6 +84,7 @@ struct NonMicroMatchupContent: View {
             
             // Win probability with score delta
             if let winProb = matchup.myWinProbability {
+                let _ = DebugPrint(mode: .winProb, limit: 2, "📊 RENDERING WIN PROB: \(Int(winProb * 100))% for \(matchup.league.league.name)")
                 NonMicroWinProbability(
                     winProb: winProb,
                     scoreDelta: matchup.scoreDifferential,
@@ -92,6 +93,8 @@ struct NonMicroMatchupContent: View {
                     onRXTap: onRXTap,
                     isLineupOptimized: isLineupOptimized
                 )
+            } else {
+                let _ = DebugPrint(mode: .winProb, limit: 2, "⚠️ WIN PROB IS NIL for \(matchup.league.league.name)")
             }
             
             Spacer(minLength: 0)

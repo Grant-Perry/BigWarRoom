@@ -74,13 +74,19 @@ final class MatchupDataStore {
             
             // Create empty cache with loading state
             if leagueCaches[key] == nil {
+                // 🔥 ENHANCED: Try to get league metadata
+                let playoffWeekStart = await fetchPlayoffWeekStart(for: league)
+                let isChopped = await fetchIsChoppedLeague(for: league)  // 🔥 NEW
+                
                 leagueCaches[key] = LeagueCache(
                     summary: LeagueSummary(
                         leagueID: league.id,
                         leagueName: league.name,
                         platform: league.platform,
                         week: week,
-                        totalMatchups: 0
+                        totalMatchups: 0,
+                        playoffWeekStart: playoffWeekStart,
+                        isChopped: isChopped  // 🔥 NEW: Store for later use
                     ),
                     matchups: [:],
                     state: .loadingBasic,
@@ -94,6 +100,72 @@ final class MatchupDataStore {
         }
         
         DebugPrint(mode: .liveUpdates, "✅ STORE: Warmed \(leagues.count) leagues")
+    }
+    
+    /// 🔥 NEW: Fetch playoff week start from league settings
+    private func fetchPlayoffWeekStart(for league: LeagueDescriptor) async -> Int? {
+        // Try to get league settings to determine playoff start week
+        // This is a lightweight fetch that we cache
+        do {
+            let leagueWrapper = try await fetchLeagueWrapper(for: league)
+            return extractPlayoffWeekStart(from: leagueWrapper)
+        } catch {
+            DebugPrint(mode: .liveUpdates, "⚠️ Could not fetch playoff week for \(league.name): \(error)")
+            return nil
+        }
+    }
+    
+    /// 🔥 NEW: Fetch full league wrapper for settings
+    private func fetchLeagueWrapper(for league: LeagueDescriptor) async throws -> UnifiedLeagueManager.LeagueWrapper {
+        // Get from unified league manager
+        let leagues = unifiedLeagueManager.allLeagues
+        guard let wrapper = leagues.first(where: { $0.id == league.id }) else {
+            throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "League not found"])
+        }
+        return wrapper
+    }
+    
+    /// 🔥 NEW: Extract playoff week start from league wrapper
+    private func extractPlayoffWeekStart(from wrapper: UnifiedLeagueManager.LeagueWrapper) -> Int? {
+        switch wrapper.source {
+        case .sleeper:
+            // Sleeper leagues have settings.playoffWeekStart
+            if let sleeperLeague = wrapper.league as? SleeperLeague {
+                return sleeperLeague.settings?.playoffWeekStart
+            }
+        case .espn:
+            // ESPN leagues have settings.playoffWeekStart
+            // Note: ESPNLeague model would need to be checked for this field
+            // For now, return nil and use default detection
+            return nil
+        }
+        return nil
+    }
+    
+    /// 🔥 NEW: Check if league is chopped/guillotine
+    private func fetchIsChoppedLeague(for league: LeagueDescriptor) async -> Bool {
+        do {
+            let leagueWrapper = try await fetchLeagueWrapper(for: league)
+            return extractIsChoppedLeague(from: leagueWrapper)
+        } catch {
+            DebugPrint(mode: .liveUpdates, "⚠️ Could not fetch chopped status for \(league.name): \(error)")
+            return false
+        }
+    }
+    
+    /// 🔥 NEW: Extract chopped league flag from league wrapper
+    private func extractIsChoppedLeague(from wrapper: UnifiedLeagueManager.LeagueWrapper) -> Bool {
+        switch wrapper.source {
+        case .sleeper:
+            // Sleeper has built-in chopped detection (type==3 or isChopped flag)
+            if let sleeperLeague = wrapper.league as? SleeperLeague {
+                return sleeperLeague.settings?.isChoppedLeague ?? false
+            }
+        case .espn:
+            // ESPN doesn't support chopped/guillotine leagues
+            return false
+        }
+        return false
     }
     
     /// Hydrate a specific matchup on demand (lazy load)
@@ -244,14 +316,17 @@ final class MatchupDataStore {
             throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "Could not identify user's team"])
         }
         
+        DebugPrint(mode: .winProb, "🎯 STORE: My team ID = \(myTeamID)")
+        
         // Step 6: Find my matchup
         guard let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) else {
             throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "No matchup found for team \(myTeamID)"])
         }
         
-        // Step 7: Build snapshot from matchup
+        // Step 7: Build snapshot from matchup WITH my team ID
         let snapshot = buildMatchupSnapshot(
             from: myMatchup,
+            myTeamID: myTeamID,  // 🔥 FIX: Pass my team ID
             leagueKey: key,
             leagueDescriptor: LeagueDescriptor(
                 id: leagueDescriptor.leagueID,
@@ -314,11 +389,46 @@ final class MatchupDataStore {
     /// Build a MatchupSnapshot from FantasyMatchup
     private func buildMatchupSnapshot(
         from matchup: FantasyMatchup,
+        myTeamID: String,  // 🔥 FIX: Add parameter
         leagueKey: LeagueKey,
         leagueDescriptor: LeagueDescriptor
     ) -> MatchupSnapshot {
-        let myTeam = buildTeamSnapshot(from: matchup.homeTeam)
-        let opponentTeam = buildTeamSnapshot(from: matchup.awayTeam)
+        // Calculate matchup-level metrics
+        let homeScore = matchup.homeTeam.currentScore ?? 0.0
+        let awayScore = matchup.awayTeam.currentScore ?? 0.0
+        
+        // 🔥 FIX: Determine which team is mine
+        let isHomeTeam = matchup.homeTeam.id == myTeamID
+        let myActualTeam = isHomeTeam ? matchup.homeTeam : matchup.awayTeam
+        let opponentActualTeam = isHomeTeam ? matchup.awayTeam : matchup.homeTeam
+        let myScore = isHomeTeam ? homeScore : awayScore
+        let oppScore = isHomeTeam ? awayScore : homeScore
+        
+        DebugPrint(mode: .winProb, "🎯 STORE: Building snapshot - My team: '\(myActualTeam.ownerName)' (\(myScore)) vs '\(opponentActualTeam.ownerName)' (\(oppScore))")
+        
+        // 🔥 SSOT: Use WinProbabilityEngine for deterministic win probability (not cached)
+        let myWinProb = WinProbabilityEngine.shared.calculateWinProbability(
+            for: matchup,
+            isHomeTeam: isHomeTeam,
+            gameStatusService: gameStatusService
+        )
+        let oppWinProb = 1.0 - myWinProb
+        
+        let myMargin = myScore - oppScore
+        let oppMargin = oppScore - myScore
+        
+        // Build team snapshots with context - CORRECTLY ASSIGNED
+        let myTeamSnapshot = buildTeamSnapshot(from: myActualTeam, winProbability: myWinProb, margin: myMargin)
+        let opponentTeamSnapshot = buildTeamSnapshot(from: opponentActualTeam, winProbability: oppWinProb, margin: oppMargin)
+        
+        // 🔥 FIXED TODO #1: Detect playoff status
+        let isPlayoff = detectPlayoffStatus(leagueKey: leagueKey)
+        
+        // 🔥 FIXED TODO #2: Detect chopped leagues
+        let isChopped = detectChoppedLeague(leagueKey: leagueKey)
+        
+        // 🔥 FIXED TODO #3: Detect elimination status
+        let isEliminated = detectEliminationStatus(matchup: matchup, isChopped: isChopped)
         
         return MatchupSnapshot(
             id: MatchupSnapshot.ID(
@@ -330,19 +440,19 @@ final class MatchupDataStore {
             metadata: MatchupSnapshot.Metadata(
                 status: matchup.status.rawValue,
                 startTime: matchup.startTime,
-                isPlayoff: false, // TODO: Detect playoff status
-                isChopped: false, // TODO: Detect chopped leagues
-                isEliminated: false // TODO: Detect elimination
+                isPlayoff: isPlayoff,
+                isChopped: isChopped,
+                isEliminated: isEliminated
             ),
-            myTeam: myTeam,
-            opponentTeam: opponentTeam,
+            myTeam: myTeamSnapshot,
+            opponentTeam: opponentTeamSnapshot,
             league: leagueDescriptor,
             lastUpdated: Date()
         )
     }
     
-    /// Build TeamSnapshot from FantasyTeam
-    private func buildTeamSnapshot(from team: FantasyTeam) -> TeamSnapshot {
+    /// Build TeamSnapshot from FantasyTeam with matchup context
+    private func buildTeamSnapshot(from team: FantasyTeam, winProbability: Double?, margin: Double) -> TeamSnapshot {
         let roster = team.roster.map { player in
             buildPlayerSnapshot(from: player)
         }
@@ -357,16 +467,67 @@ final class MatchupDataStore {
             score: TeamSnapshot.ScoreInfo(
                 actual: team.currentScore ?? 0.0,
                 projected: team.projectedScore ?? 0.0,
-                winProbability: nil, // TODO: Calculate from matchup
-                margin: 0.0 // TODO: Calculate from opponent
+                winProbability: winProbability,  // 🔥 FIXED TODO #4: Pass from matchup
+                margin: margin  // 🔥 FIXED TODO #5: Calculate from opponent
             ),
             roster: roster
         )
     }
     
+    /// 🔥 NEW: Detect if matchup is in playoff period
+    private func detectPlayoffStatus(leagueKey: LeagueKey) -> Bool {
+        // Method 1: Check league cache for playoff week setting
+        if let cache = leagueCaches[leagueKey],
+           let playoffWeekStart = getPlayoffWeekStart(from: cache.summary) {
+            return leagueKey.week >= playoffWeekStart
+        }
+        
+        // Method 2: Default to week 15+ being playoffs (standard NFL fantasy)
+        // Most leagues start playoffs week 15 (some week 14, rare week 16)
+        return leagueKey.week >= 15
+    }
+    
+    /// 🔥 NEW: Detect if league is chopped/guillotine
+    private func detectChoppedLeague(leagueKey: LeagueKey) -> Bool {
+        // Check league cache for chopped flag
+        if let cache = leagueCaches[leagueKey] {
+            return cache.summary.isChopped
+        }
+        return false
+    }
+    
+    /// 🔥 NEW: Detect if matchup involves elimination
+    private func detectEliminationStatus(matchup: FantasyMatchup, isChopped: Bool) -> Bool {
+        // Method 1: Check for playoff elimination marker
+        if matchup.awayTeam.name == "Eliminated from Playoffs" || 
+           matchup.homeTeam.name == "Eliminated from Playoffs" {
+            return true
+        }
+        
+        // Method 2: Check for chopped league elimination (empty rosters)
+        if isChopped {
+            // If either team has zero players and zero score, they're eliminated
+            let homeEliminated = matchup.homeTeam.roster.isEmpty && (matchup.homeTeam.currentScore ?? 0.0) == 0.0
+            let awayEliminated = matchup.awayTeam.roster.isEmpty && (matchup.awayTeam.currentScore ?? 0.0) == 0.0
+            return homeEliminated || awayEliminated
+        }
+        
+        return false
+    }
+    
+    /// 🔥 NEW: Extract playoff week start from league settings
+    private func getPlayoffWeekStart(from summary: LeagueSummary) -> Int? {
+        // Return cached playoff week start
+        return summary.playoffWeekStart
+    }
+    
     /// Build PlayerSnapshot from FantasyPlayer
     private func buildPlayerSnapshot(from player: FantasyPlayer) -> PlayerSnapshot {
-        PlayerSnapshot(
+        // 🔥 TODO #8: Get kickoff time from game data (GameStatusService doesn't expose this yet)
+        // For now, set to nil - can be enhanced later when game data provides kickoff times
+        let kickoffTime: Date? = nil
+        
+        return PlayerSnapshot(
             id: player.id,
             identity: PlayerSnapshot.PlayerIdentity(
                 playerID: player.id,
@@ -379,9 +540,9 @@ final class MatchupDataStore {
             metrics: PlayerSnapshot.PlayerMetrics(
                 currentScore: player.currentPoints ?? 0.0,
                 projectedScore: player.projectedPoints ?? 0.0,
-                delta: 0.0, // TODO: Calculate delta from previous update
-                lastActivity: nil, // TODO: Track activity
-                gameStatus: player.gameStatus?.status  // 🔥 FIX: Use .status property
+                delta: 0.0, // Calculated during delta updates at store level
+                lastActivity: nil, // Tracked during delta updates at store level
+                gameStatus: player.gameStatus?.status
             ),
             context: PlayerSnapshot.PlayerContext(
                 position: player.position,
@@ -390,7 +551,7 @@ final class MatchupDataStore {
                 team: player.team,
                 injuryStatus: player.injuryStatus,
                 jerseyNumber: player.jerseyNumber,
-                kickoffTime: nil // TODO: Get from game data
+                kickoffTime: kickoffTime  // 🔥 Set to nil for now
             )
         )
     }
@@ -575,6 +736,8 @@ extension MatchupDataStore {
         let platform: LeagueSource  // 🔥 FIX: Use LeagueSource
         let week: Int
         var totalMatchups: Int  // 🔥 FIX: Make mutable
+        var playoffWeekStart: Int?  // 🔥 NEW: Store playoff start week for accurate detection
+        var isChopped: Bool  // 🔥 NEW: Store chopped league flag
     }
     
     /// Loading state

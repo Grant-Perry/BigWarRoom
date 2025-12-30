@@ -20,7 +20,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [] //.matchupLoading // .scoring // []
+   static var activeMode: DebugMode = .navigation // .scoring // []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -60,6 +60,7 @@ struct DebugMode: OptionSet {
     static let playerIDMapping    	= DebugMode(rawValue: 1 << 23)  // 8388608
     static let draft              	= DebugMode(rawValue: 1 << 24)  // 16777216
     static let contention         	= DebugMode(rawValue: 1 << 25)  // 33554432
+    static let winProb            	= DebugMode(rawValue: 1 << 26)  // 67108864
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -90,7 +91,8 @@ struct DebugMode: OptionSet {
         .fantasy,
         .playerIDMapping,
         .draft,
-        .contention
+        .contention,
+        .winProb
     ]
 }
 

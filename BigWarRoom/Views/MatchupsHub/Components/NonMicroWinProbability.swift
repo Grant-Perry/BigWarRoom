@@ -135,9 +135,16 @@ struct NonMicroWinProbability: View {
                         .frame(height: 4)
                     
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.gpGreen)
+                        .fill(isWinning ? Color.gpGreen : Color.gpRedPink)
                         .frame(width: geometry.size.width * winProb, height: 4)
                         .animation(.easeInOut(duration: 1.0), value: winProb)
+                    
+                    // 🔥 LARGER: Win probability percentage text on thermometer
+                    Text("\(Int(winProb * 100))%")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                        .position(x: geometry.size.width / 2, y: 2)
                 }
             }
             .frame(height: 4)

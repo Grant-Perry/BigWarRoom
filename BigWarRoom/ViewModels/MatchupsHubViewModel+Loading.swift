@@ -65,7 +65,7 @@ extension MatchupsHubViewModel {
             let currentWeek = getCurrentWeek()
             await matchupDataStore.warmLeagues(leagueDescriptors, week: currentWeek)
             
-            // Step 3: Hydrate each matchup lazily - 30% -> 90% progress
+            // Step 3: Hydrate each matchup lazily - 40% -> 90% progress
             await updateProgress(0.40, message: "Loading matchups...", sessionId: "STORE")
             
             var loadedMatchups: [UnifiedMatchup] = []
@@ -73,7 +73,11 @@ extension MatchupsHubViewModel {
             var processedLeagues = 0
             
             for league in availableLeagues {
-                processedLeagues += 1
+                // Calculate base progress for this league
+                let baseProgress = 0.40 + (Double(processedLeagues) / Double(totalLeagues)) * 0.45
+                
+                // Show we're starting this league (no sub-progress, just clear milestone)
+                await updateProgress(baseProgress, message: "Loading \(league.league.name)...", sessionId: "STORE")
                 
                 // Create snapshot ID
                 let snapshotID = MatchupSnapshot.ID(
@@ -83,26 +87,39 @@ extension MatchupsHubViewModel {
                     week: currentWeek
                 )
                 
-                // Try to hydrate from store
+                // 🔥 FIX: Add timeout to hydration (max 2 seconds per league)
                 do {
-                    let snapshot = try await matchupDataStore.hydrateMatchup(snapshotID)
+                    let snapshot = try await withTimeout(seconds: 2.0) {
+                        try await self.matchupDataStore.hydrateMatchup(snapshotID)
+                    }
                     
                     // 🔥 SINGLE CONVERSION POINT: Snapshot → UnifiedMatchup
                     let unifiedMatchup = convertSnapshotToUnifiedMatchup(snapshot, league: league)
                     loadedMatchups.append(unifiedMatchup)
                     
+                } catch is TimeoutError {
+                    DebugPrint(mode: .matchupLoading, "⏱️ Timeout hydrating \(league.league.name) - skipping")
                 } catch {
                     DebugPrint(mode: .matchupLoading, "❌ Failed to hydrate \(league.league.name): \(error)")
                 }
                 
-                let progress = 0.40 + (Double(processedLeagues) / Double(totalLeagues)) * 0.50
-                await updateProgress(progress, message: "Loaded \(processedLeagues) of \(totalLeagues)...", sessionId: "STORE")
+                // 🔥 CRITICAL: Always increment, even if hydration failed
+                processedLeagues += 1
+                let progress = 0.40 + (Double(processedLeagues) / Double(totalLeagues)) * 0.45
+                await updateProgress(progress, message: "Loaded \(processedLeagues) of \(totalLeagues) leagues", sessionId: "STORE")
             }
             
             // Update UI with loaded matchups
             await MainActor.run {
                 self.myMatchups = loadedMatchups.sorted { $0.priority > $1.priority }
             }
+            
+            // 🔥 NEW: Explicit progress milestones to ensure smooth completion
+            await updateProgress(0.90, message: "Finalizing data...", sessionId: "STORE")
+            try? await Task.sleep(for: .milliseconds(100)) // Brief pause for UI
+            
+            await updateProgress(0.95, message: "Almost ready...", sessionId: "STORE")
+            try? await Task.sleep(for: .milliseconds(100))
             
             // Finalize - 100% progress
             await updateProgress(1.0, message: "Complete!", sessionId: "STORE")
@@ -242,5 +259,30 @@ extension MatchupsHubViewModel {
         default:
             return .upcoming
         }
+    }
+}
+
+// MARK: - Helper: Timeout Wrapper
+/// Timeout error type
+fileprivate struct TimeoutError: Error {}
+
+/// Run an async operation with a timeout
+fileprivate func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        // Add the actual operation
+        group.addTask {
+            try await operation()
+        }
+        
+        // Add a timeout task
+        group.addTask {
+            try await Task.sleep(for: .seconds(seconds))
+            throw TimeoutError()
+        }
+        
+        // Return the first result (either success or timeout)
+        let result = try await group.next()!
+        group.cancelAll() // Cancel the other task
+        return result
     }
 }

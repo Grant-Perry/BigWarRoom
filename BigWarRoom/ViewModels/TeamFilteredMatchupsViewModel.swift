@@ -81,18 +81,21 @@ final class TeamFilteredMatchupsViewModel {
         DebugPrint(mode: .navigation, "🎯 TEAM FILTER: Filtering requested for game ID: \(game.id)")
         DebugPrint(mode: .navigation, "   isReadyToFilter: \(isReadyToFilter), Hub matchups: \(matchupsHubViewModel.myMatchups.count)")
 
-        // Clear filtered matchups to force empty state while loading
-        filteredMatchups = []
+        // 🔥 FIX: DON'T clear filtered matchups - let them persist if already filtered for this game
+        // Only clear if switching to a different game
+        let normalizedAway = normalizeTeamCode(game.awayTeam)
+        let normalizedHome = normalizeTeamCode(game.homeTeam)
+        
+        if lastFilteredAwayTeam != normalizedAway || lastFilteredHomeTeam != normalizedHome {
+            // Different game - clear and reload
+            filteredMatchups = []
+            lastFilteredAwayTeam = ""
+            lastFilteredHomeTeam = ""
+            isLoading = true
+        }
 
         // Use the game object to set the state
         self.gameData = game
-
-        // Reset last filtered to force loading state for new selection
-        lastFilteredAwayTeam = ""
-        lastFilteredHomeTeam = ""
-
-        // Explicitly set loading state
-        isLoading = true
 
         DebugPrint(mode: .navigation, "   Set loading state - isLoading: \(isLoading)")
 
@@ -296,15 +299,5 @@ final class TeamFilteredMatchupsViewModel {
             // The rest map to themselves by default
         ]
         return map[upper] ?? upper
-    }
-    
-    /// 🔥 Clear filter state to prevent stale data on next sheet open
-    func clearFilterState() {
-        DebugPrint(mode: .navigation, "🎯 TEAM FILTER: Clearing filter state")
-        filteredMatchups = []
-        gameData = nil
-        isLoading = false
-        lastFilteredAwayTeam = ""
-        lastFilteredHomeTeam = ""
     }
 }

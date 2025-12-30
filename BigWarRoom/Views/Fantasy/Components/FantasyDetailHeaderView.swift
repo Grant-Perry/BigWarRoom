@@ -598,9 +598,48 @@ struct FantasyDetailHeaderView: View {
     
     /// Projected thermometer view
     private func projectedThermometerView(myProjected: Double, opponentProjected: Double, isHomeTeam: Bool) -> some View {
-        let winPercentage = projectedPercentage(myProjected, opponentProjected)
-        let isWinning = winPercentage >= 0.5
-        
+        // Use SSOT: Always get the win probability from actual engine (via a correctly constructed UnifiedMatchup)
+        // If detail screen doesn't already have a UnifiedMatchup, create a local one for this matchup
+
+        // Minimal league struct to satisfy required fields. Replace with real league object whenever possible.
+        let fakeSleeperLeague = SleeperLeague(
+            leagueID: "detail",
+            name: leagueName,
+            status: .inSeason,
+            sport: "nfl",
+            season: Calendar.current.component(.year, from: Date()).description,
+            seasonType: "regular",
+            totalRosters: 0,
+            draftID: nil,
+            avatar: nil,
+            settings: nil,
+            scoringSettings: nil,
+            rosterPositions: nil
+        )
+
+        let leagueWrapper = UnifiedLeagueManager.LeagueWrapper(
+            id: "detail",
+            league: fakeSleeperLeague,
+            source: .sleeper, // or .espn if you wish
+            client: SleeperAPIClient()
+        )
+
+        let matchupForProb = UnifiedMatchup(
+            id: matchup.id,
+            league: leagueWrapper,
+            fantasyMatchup: matchup,
+            choppedSummary: nil,
+            lastUpdated: Date(),
+            myTeamRanking: nil,
+            myIdentifiedTeamID: isHomeTeam ? matchup.homeTeam.id : matchup.awayTeam.id,
+            authenticatedUsername: "",
+            allLeagueMatchups: nil
+        )
+
+        // Use actual probability
+        let winProb: Double = matchupForProb.myWinProbability ?? 0.5
+        let isWinning: Bool = winProb >= 0.5
+
         return VStack(spacing: 2) {
             // Thermometer bar with win %
             GeometryReader { geometry in
@@ -609,8 +648,8 @@ struct FantasyDetailHeaderView: View {
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(0.1))
                         .frame(height: 6)
-                    
-                    // Filled portion
+
+                    // Filled portion from win probability, not projections
                     RoundedRectangle(cornerRadius: 3)
                         .fill(
                             LinearGradient(
@@ -622,12 +661,12 @@ struct FantasyDetailHeaderView: View {
                                 endPoint: .trailing
                             )
                         )
-                        .frame(width: geometry.size.width * winPercentage, height: 6)
-                    
-                    // Win percentage in center
+                        .frame(width: geometry.size.width * CGFloat(winProb), height: 6)
+
+                    // Win probability percent in center (integer, SSOT)
                     HStack {
                         Spacer()
-                        Text(winPercentageText(myProjected, opponentProjected))
+                        Text("\(Int(winProb * 100))%")
                             .font(.system(size: 8, weight: .black))
                             .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
                             .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 0)
@@ -636,28 +675,13 @@ struct FantasyDetailHeaderView: View {
                 }
             }
             .frame(height: 6)
-            
-            // Projected score
-            Text(String(format: "%.1f", myProjected))
+
+            // Show actual score, not projections, under bar
+            Text(String(format: "%.1f", isHomeTeam ? (matchup.homeTeam.currentScore ?? 0) : (matchup.awayTeam.currentScore ?? 0)))
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
         }
         .frame(width: 100)
-    }
-    
-    /// Calculate win probability using normal distribution model
-    /// - Parameters:
-    ///   - myProj: My team's projected score
-    ///   - oppProj: Opponent's projected score
-    /// - Returns: Win probability as CGFloat (0.0 to 1.0)
-    ///
-    /// Uses WinProbabilityEngine SSOT for consistent calculations across the app
-    private func projectedPercentage(_ myProj: Double, _ oppProj: Double) -> CGFloat {
-        return CGFloat(WinProbabilityEngine.shared.calculateWinProbability(myScore: myProj, opponentScore: oppProj))
-    }
-    
-    private func winPercentageText(_ myProj: Double, _ oppProj: Double) -> String {
-        return "\(WinProbabilityEngine.shared.calculateWinPercentage(myScore: myProj, opponentScore: oppProj))%"
     }
     
     private func loadProjectedScores() async {

@@ -68,10 +68,6 @@ struct TeamFilteredMatchupsView: View {
         }
         .navigationTitle("")
         .navigationBarHidden(true)
-        // 🔥 NUCLEAR FIX: Remove onAppear/onDisappear to prevent navigation conflicts
-        // These async operations might be causing immediate navigation resets
-        // .onAppear { ... }
-        // .onDisappear { ... }
         .onAppear {
             DebugPrint(mode: .navigation, "🎯 TEAM FILTER VIEW: Appeared")
             DebugPrint(mode: .navigation, "🎯 TEAM FILTER VIEW: Away team: \(awayTeam), Home team: \(homeTeam)")

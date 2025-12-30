@@ -23,6 +23,8 @@ struct NonMicroCardView: View {
     @State private var eliminatedPulse: Bool = false
     
     var body: some View {
+        let _ = DebugPrint(mode: .winProb, limit: 2, "🎴 CARD: Rendering NonMicroCardView for \(matchup.league.league.name)")
+        
         VStack {
             // Conditional content: Show eliminated state or regular card
             if matchup.isMyManagerEliminated {

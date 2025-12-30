@@ -58,7 +58,59 @@ final class WinProbabilityEngine {
     }
     
     /// Calculate win probability for a fantasy matchup
+    /// 🔥 ENHANCED: Now handles deterministic outcomes (0 players left = 100%/0%)
+    func calculateWinProbability(for matchup: FantasyMatchup, isHomeTeam: Bool, gameStatusService: GameStatusService) -> Double {
+        let myTeam = isHomeTeam ? matchup.homeTeam : matchup.awayTeam
+        let oppTeam = isHomeTeam ? matchup.awayTeam : matchup.homeTeam
+        let myScore = myTeam.currentScore ?? 0
+        let oppScore = oppTeam.currentScore ?? 0
+        
+        // 🔥 NEW: Check players yet to play using GameStatusService
+        let myYetToPlay = myTeam.playersYetToPlay(gameStatusService: gameStatusService)
+        let oppYetToPlay = oppTeam.playersYetToPlay(gameStatusService: gameStatusService)
+        
+        // CASE 1: Both teams done playing - DETERMINISTIC
+        if myYetToPlay == 0 && oppYetToPlay == 0 {
+            if myScore > oppScore {
+                return 1.0  // 100% win
+            } else if myScore < oppScore {
+                return 0.0  // 0% win (100% loss)
+            } else {
+                return 0.5  // Tie
+            }
+        }
+        
+        // CASE 2: I'm done, opponent has players left
+        if myYetToPlay == 0 && oppYetToPlay > 0 {
+            // Calculate if opponent can catch up
+            // Conservative estimate: 25 points per remaining player (reasonable max)
+            let oppMaxPossible = oppScore + (Double(oppYetToPlay) * 25.0)
+            if myScore >= oppMaxPossible {
+                return 1.0  // I've already won (opponent mathematically eliminated)
+            }
+            // Otherwise calculate probability with opponent's upside
+        }
+        
+        // CASE 3: Opponent done, I have players left
+        if myYetToPlay > 0 && oppYetToPlay == 0 {
+            if myScore > oppScore {
+                return 1.0  // I've already won (ahead with no chance of opponent scoring)
+            }
+            // If behind, calculate comeback probability
+            let myMaxPossible = myScore + (Double(myYetToPlay) * 25.0)
+            if myMaxPossible < oppScore {
+                return 0.0  // Mathematically eliminated
+            }
+        }
+        
+        // CASE 4: Both teams have players left - use statistical model
+        return calculateWinProbability(myScore: myScore, opponentScore: oppScore)
+    }
+    
+    /// 🔥 DEPRECATED: Old method without game status - kept for backward compatibility
+    /// Use the version with gameStatusService parameter for accurate results
     func calculateWinProbability(for matchup: FantasyMatchup, isHomeTeam: Bool) -> Double {
+        // Fallback to statistical calculation without deterministic check
         let myScore = isHomeTeam ? matchup.homeTeam.currentScore ?? 0 : matchup.awayTeam.currentScore ?? 0
         let oppScore = isHomeTeam ? matchup.awayTeam.currentScore ?? 0 : matchup.homeTeam.currentScore ?? 0
         return calculateWinProbability(myScore: myScore, opponentScore: oppScore)

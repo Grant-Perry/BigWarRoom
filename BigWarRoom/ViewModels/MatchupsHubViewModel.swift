@@ -298,16 +298,22 @@ final class MatchupsHubViewModel {
     
     /// 🔥 SIMPLE CHOPPED LOGIC: Get winning status for a matchup - not in last place = winning
     func getWinningStatusForMatchup(_ matchup: UnifiedMatchup) -> Bool {
+        let result: Bool
+        
         if matchup.isChoppedLeague {
             // 🔥 SIMPLE CHOPPED LOGIC: Win if NOT in chopping block (last place or bottom 2)
             guard let ranking = matchup.myTeamRanking,
                   let choppedSummary = matchup.choppedSummary else {
-                return false
+                result = false
+                DebugPrint(mode: .winProb, limit: 3, "🎯 isWinning[\(matchup.league.league.name)]: false (chopped, no ranking)")
+                return result
             }
             
             // If I'm already eliminated from this league, it's definitely a loss
             if matchup.isMyManagerEliminated {
-                return false
+                result = false
+                DebugPrint(mode: .winProb, limit: 3, "🎯 isWinning[\(matchup.league.league.name)]: false (eliminated)")
+                return result
             }
             
             let totalTeams = choppedSummary.rankings.count
@@ -318,23 +324,31 @@ final class MatchupsHubViewModel {
             // - All other leagues: Bottom 1 gets chopped = rank totalTeams is losing
             if totalTeams >= 32 {
                 // Bottom 2 positions are losing (last 2 places)
-                return myRank <= (totalTeams - 2)
+                result = myRank <= (totalTeams - 2)
             } else {
                 // Bottom 1 position is losing (last place)
-                return myRank < totalTeams
+                result = myRank < totalTeams
             }
+            
+            DebugPrint(mode: .winProb, limit: 3, "🎯 isWinning[\(matchup.league.league.name)]: \(result) (rank \(myRank)/\(totalTeams))")
+            return result
             
         } else {
             // Regular matchup logic - simple score comparison
             guard let myTeam = matchup.myTeam,
                   let opponentTeam = matchup.opponentTeam else {
-                return false
+                result = false
+                DebugPrint(mode: .winProb, limit: 3, "🎯 isWinning[\(matchup.league.league.name)]: false (no teams)")
+                return result
             }
             
             let myScore = myTeam.currentScore ?? 0
             let opponentScore = opponentTeam.currentScore ?? 0
             
-            return myScore > opponentScore
+            result = myScore > opponentScore
+            
+            DebugPrint(mode: .winProb, limit: 3, "🎯 isWinning[\(matchup.league.league.name)]: \(result) | MY TEAM: '\(myTeam.ownerName)' (\(myScore)) vs OPP: '\(opponentTeam.ownerName)' (\(opponentScore))")
+            return result
         }
     }
     
@@ -512,20 +526,48 @@ struct UnifiedMatchup: Identifiable, Hashable {
     
     /// Win probability for my team (nil for Chopped leagues)
     var myWinProbability: Double? {
+        DebugPrint(mode: .winProb, "🎯 myWinProbability ACCESSED for league: \(league.league.name)")
+        
         // Chopped leagues don't have win probabilities against opponents
         if isChoppedLeague {
+            DebugPrint(mode: .winProb, "   ⏭️ SKIP: Chopped league")
             return nil
         }
         
-        guard let matchup = fantasyMatchup, let myTeam = myTeam else { return nil }
-        
-        // If I'm the home team, use the existing win probability
-        if matchup.homeTeam.id == myTeam.id {
-            return matchup.winProbability
-        } else {
-            // If I'm the away team, return 1 - home team win probability
-            return matchup.winProbability.map { 1.0 - $0 }
+        // 🔥 SSOT: Calculate win probability on-the-fly using WinProbabilityEngine
+        // This ensures Mission Control cards show the SAME deterministic values as Matchup Detail
+        guard let matchup = fantasyMatchup else {
+            DebugPrint(mode: .winProb, "   ⏭️ SKIP: No fantasyMatchup")
+            return nil
         }
+        
+        guard let myTeam = myTeam else {
+            DebugPrint(mode: .winProb, "   ⏭️ SKIP: No myTeam")
+            return nil
+        }
+        
+        // Determine if I'm the home team
+        let isHomeTeam = matchup.homeTeam.id == myTeam.id
+        
+        // 🔥 DEBUG: Check players yet to play BEFORE calling engine
+        let myYetToPlay = myTeam.playersYetToPlay(gameStatusService: GameStatusService.shared)
+        let oppYetToPlay = opponentTeam?.playersYetToPlay(gameStatusService: GameStatusService.shared) ?? 0
+        let myScore = myTeam.currentScore ?? 0
+        let oppScore = opponentTeam?.currentScore ?? 0
+        
+        DebugPrint(mode: .winProb, "   My: \(myTeam.ownerName) | Score: \(myScore) | Yet to play: \(myYetToPlay)")
+        DebugPrint(mode: .winProb, "   Opp: \(opponentTeam?.ownerName ?? "?") | Score: \(oppScore) | Yet to play: \(oppYetToPlay)")
+        
+        // Use WinProbabilityEngine with GameStatusService for deterministic logic
+        let winProb = WinProbabilityEngine.shared.calculateWinProbability(
+            for: matchup,
+            isHomeTeam: isHomeTeam,
+            gameStatusService: GameStatusService.shared
+        )
+        
+        DebugPrint(mode: .winProb, "   ➡️ Calculated: \(winProb) (\(Int(winProb * 100))%)")
+        
+        return winProb
     }
     
     /// Single source of truth for matchup live status

@@ -63,10 +63,15 @@ final class LeagueMatchupProvider {
     
     /// Identify the authenticated user's team ID in this league (robust to async races)
     func identifyMyTeamID() async -> String? {
+        DebugPrint(mode: .winProb, "🔍 identifyMyTeamID() called for league: \(league.league.name)")
+        
         if league.source == .sleeper {
             guard let username = sleeperCredentials.getUserIdentifier() else {
+                DebugPrint(mode: .winProb, "   ❌ No Sleeper username")
                 return nil
             }
+            
+            DebugPrint(mode: .winProb, "   Sleeper username: \(username)")
 
             let resolvedUserID: String
             do {
@@ -76,32 +81,48 @@ final class LeagueMatchupProvider {
                     let user = try await SleeperAPIClient.shared.fetchUser(username: username)
                     resolvedUserID = user.userID
                 }
+                DebugPrint(mode: .winProb, "   Resolved to user ID: \(resolvedUserID)")
             } catch {
+                DebugPrint(mode: .winProb, "   ❌ Failed to resolve user ID")
                 return nil
             }
 
             // 💡 FIX: Only use *loaded* rosters (already fetched/set earlier)
             if !sleeperRosters.isEmpty, 
                let myRoster = sleeperRosters.first(where: { $0.ownerID == resolvedUserID }) {
-                return String(myRoster.rosterID)
+                let teamID = String(myRoster.rosterID)
+                DebugPrint(mode: .winProb, "   ✅ Found my roster: ID=\(teamID)")
+                return teamID
             }
 
-            // Fallback: If not already loaded (shouldn’t happen!), do blocking load
+            DebugPrint(mode: .winProb, "   ⚠️ Rosters not loaded yet, fetching...")
+            
+            // Fallback: If not already loaded (shouldn't happen!), do blocking load
             do {
                 let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
                 if let userRoster = rosters.first(where: { $0.ownerID == resolvedUserID }) {
-                    return String(userRoster.rosterID)
+                    let teamID = String(userRoster.rosterID)
+                    DebugPrint(mode: .winProb, "   ✅ Fetched my roster: ID=\(teamID)")
+                    return teamID
                 } else {
+                    DebugPrint(mode: .winProb, "   ❌ My roster not found in league")
                     return nil
                 }
             } catch {
+                DebugPrint(mode: .winProb, "   ❌ Failed to fetch rosters: \(error)")
                 return nil
             }
         } else if league.source == .espn {
             if let teamID = await getESPNUserTeamID() {
+                DebugPrint(mode: .winProb, "   ✅ ESPN team ID: \(teamID)")
                 return teamID
+            } else {
+                DebugPrint(mode: .winProb, "   ❌ ESPN team ID not found")
+                return nil
             }
         }
+        
+        DebugPrint(mode: .winProb, "   ❌ Unknown league source")
         return nil
     }
     
@@ -303,14 +324,21 @@ final class LeagueMatchupProvider {
 
     /// Find user's matchup by team ID
     func findMyMatchup(myTeamID: String) -> FantasyMatchup? {
+        DebugPrint(mode: .winProb, "🔍 findMyMatchup() looking for team ID: \(myTeamID)")
+        
         for (index, matchup) in matchups.enumerated() {
+            DebugPrint(mode: .winProb, "   Matchup \(index): Home=\(matchup.homeTeam.id) '\(matchup.homeTeam.ownerName)' vs Away=\(matchup.awayTeam.id) '\(matchup.awayTeam.ownerName)'")
+            
             if matchup.homeTeam.id == myTeamID {
+                DebugPrint(mode: .winProb, "   ✅ FOUND: I'm the HOME team (\(matchup.homeTeam.ownerName))")
                 return matchup
             } else if matchup.awayTeam.id == myTeamID {
+                DebugPrint(mode: .winProb, "   ✅ FOUND: I'm the AWAY team (\(matchup.awayTeam.ownerName))")
                 return matchup
             }
         }
         
+        DebugPrint(mode: .winProb, "   ❌ NOT FOUND: No matchup contains team ID \(myTeamID)")
         return nil
     }
     
@@ -444,7 +472,7 @@ final class LeagueMatchupProvider {
                 homeTeam: homeFantasyTeam,
                 awayTeam: awayFantasyTeam,
                 status: .live,
-                winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore),
+                winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore, homeTeam: homeFantasyTeam, awayTeam: awayFantasyTeam),  // 🔥 FIXED: Pass teams for deterministic check
                 startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
                 sleeperMatchups: nil
             )
@@ -853,7 +881,7 @@ final class LeagueMatchupProvider {
                 homeTeam: homeTeam,
                 awayTeam: awayTeam,
                 status: .live,
-                winProbability: calculateWinProbability(homeScore: team2.points ?? 0, awayScore: team1.points ?? 0),
+                winProbability: calculateWinProbability(homeScore: team2.points ?? 0, awayScore: team1.points ?? 0, homeTeam: homeTeam, awayTeam: awayTeam),  // 🔥 FIXED: Pass teams for deterministic check
                 startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
                 sleeperMatchups: nil
             )
@@ -874,6 +902,9 @@ final class LeagueMatchupProvider {
         managerName: String,
         avatarURL: URL?
     ) -> FantasyTeam {
+        let teamID = String(matchupResponse.rosterID)
+        DebugPrint(mode: .winProb, "🏗️ Creating Sleeper team: ID=\(teamID), Name='\(managerName)'")
+        
         var fantasyPlayers: [FantasyPlayer] = []
         
         // 🔥 KEY FIX: Get roster_positions from league to map starters to slots
@@ -985,7 +1016,7 @@ final class LeagueMatchupProvider {
         }()
         
         return FantasyTeam(
-            id: String(matchupResponse.rosterID),
+            id: teamID,
             name: managerName,
             ownerName: managerName,
             record: rosterRecord,
@@ -1023,7 +1054,46 @@ final class LeagueMatchupProvider {
     }
     
     /// Calculate win probability using WinProbabilityEngine SSOT
-    private func calculateWinProbability(homeScore: Double, awayScore: Double) -> Double? {
+    /// 🔥 ENHANCED: Now checks for deterministic outcomes (0 players left = 100%)
+    private func calculateWinProbability(homeScore: Double, awayScore: Double, homeTeam: FantasyTeam? = nil, awayTeam: FantasyTeam? = nil) -> Double? {
+        // If we have full team context, use enhanced calculation
+        if let homeTeam = homeTeam, let awayTeam = awayTeam {
+            // Check players yet to play
+            let homeYetToPlay = homeTeam.roster.filter { $0.isStarter && ($0.currentPoints ?? 0) == 0 && $0.gameStatus == nil }.count
+            let awayYetToPlay = awayTeam.roster.filter { $0.isStarter && ($0.currentPoints ?? 0) == 0 && $0.gameStatus == nil }.count
+            
+            // CASE 1: Both teams done - DETERMINISTIC
+            if homeYetToPlay == 0 && awayYetToPlay == 0 {
+                if homeScore > awayScore {
+                    return 1.0  // Home wins 100%
+                } else if homeScore < awayScore {
+                    return 0.0  // Away wins 100% (home loses)
+                } else {
+                    return 0.5  // Tie
+                }
+            }
+            
+            // CASE 2: Home done, away has players
+            if homeYetToPlay == 0 && awayYetToPlay > 0 {
+                let awayMaxPossible = awayScore + (Double(awayYetToPlay) * 25.0)
+                if homeScore >= awayMaxPossible {
+                    return 1.0  // Home already won
+                }
+            }
+            
+            // CASE 3: Away done, home has players
+            if homeYetToPlay > 0 && awayYetToPlay == 0 {
+                if homeScore > awayScore {
+                    return 1.0  // Home already won
+                }
+                let homeMaxPossible = homeScore + (Double(homeYetToPlay) * 25.0)
+                if homeMaxPossible < awayScore {
+                    return 0.0  // Home mathematically eliminated
+                }
+            }
+        }
+        
+        // Fallback to statistical model
         return WinProbabilityEngine.shared.calculateWinProbability(myScore: homeScore, opponentScore: awayScore)
     }
     
