@@ -10,6 +10,8 @@ import SwiftUI
 /// Scrollable list of fantasy matchups and bye week teams
 struct FantasyMatchupsList: View {
     let fantasyViewModel: FantasyViewModel
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     var body: some View {
         ScrollView {
@@ -20,7 +22,7 @@ struct FantasyMatchupsList: View {
                         matchup: matchup,
                         fantasyViewModel: fantasyViewModel,
                         leagueName: fantasyViewModel.selectedLeague?.league.name ?? "League",
-                        livePlayersViewModel: AllLivePlayersViewModel.shared
+                        livePlayersViewModel: allLivePlayersViewModel
                     )) {
                         FantasyMatchupCard(matchup: matchup)
                     }

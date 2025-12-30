@@ -148,10 +148,12 @@ struct PlayerStatsCardView: View {
                     )
                         .padding(.horizontal, 24)
                     
+                    // 🔥 PURE DI: Pass environment dependency
                     TeamDepthChartView(
                         depthChartData: viewModel.depthChartData,
                         team: currentTeam,
-                        onPlayerTap: updateCurrentPlayer
+                        onPlayerTap: updateCurrentPlayer,
+                        allLivePlayersViewModel: livePlayersViewModel
                     )
                     .padding(.horizontal, 24)
                     

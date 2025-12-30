@@ -15,6 +15,9 @@ struct FantasySingleLeagueContentView: View {
     let fantasyMatchupListViewModel: FantasyMatchupListViewModel
     @Binding var forceChoppedMode: Bool
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
     var body: some View {
         VStack(spacing: 0) {
             // Connection status header
@@ -43,7 +46,11 @@ struct FantasySingleLeagueContentView: View {
             } else if fantasyViewModel.matchups.isEmpty && !fantasyViewModel.hasActiveRosters {
                 FantasyEmptyStateView()
             } else {
-                FantasyMatchupsList(fantasyViewModel: fantasyViewModel)
+                // 🔥 PURE DI: Pass injected instance
+                FantasyMatchupsList(
+                    fantasyViewModel: fantasyViewModel,
+                    allLivePlayersViewModel: allLivePlayersViewModel
+                )
             }
         }
     }

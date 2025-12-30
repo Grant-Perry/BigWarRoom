@@ -226,12 +226,14 @@ struct FantasyMatchupDetailView: View {
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
                     ForEach(latestMatchup.homeTeam.roster.filter { $0.isStarter }) { player in
+                        // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
                             matchup: latestMatchup,
                             teamIndex: 1,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: livePlayersViewModel
                         )
                         .padding(.horizontal, 8)
                     }
@@ -247,12 +249,14 @@ struct FantasyMatchupDetailView: View {
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
                     ForEach(latestMatchup.awayTeam.roster.filter { $0.isStarter }) { player in
+                        // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
                             matchup: latestMatchup,
                             teamIndex: 0,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: livePlayersViewModel
                         )
                         .padding(.horizontal, 8)
                     }

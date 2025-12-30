@@ -49,8 +49,7 @@ struct ChoppedStartingLineupSection: View {
             if showStartingLineup {
                 VStack(spacing: 8) {
                     ForEach(starters) { player in
-                        // TODO: Replace ChoppedRosterPlayerCard with PlayerScoreBarCardView
-                        // For now, keeping the original cards until we can properly convert the data
+                        // Use All Live Players design cards
                         ChoppedRosterPlayerCard(
                             player: player,
                             isStarter: true,

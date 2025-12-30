@@ -11,6 +11,8 @@ import SwiftUI
 struct OpponentDetailSheet: View {
     let intelligence: OpponentIntelligence
     @Environment(\.dismiss) private var dismiss
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     var body: some View {
         NavigationView {
@@ -239,7 +241,11 @@ struct OpponentDetailSheet: View {
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(intelligence.players.sorted { $0.currentScore > $1.currentScore }) { player in
-                        OpponentPlayerCard(player: player)
+                        // 🔥 PURE DI: Pass injected instance
+                        OpponentPlayerCard(
+                            player: player,
+                            allLivePlayersViewModel: allLivePlayersViewModel
+                        )
                     }
                 }
             }

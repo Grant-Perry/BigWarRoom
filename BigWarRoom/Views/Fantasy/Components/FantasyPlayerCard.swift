@@ -18,6 +18,8 @@ struct FantasyPlayerCard: View {
     let matchup: FantasyMatchup?
     let teamIndex: Int?
     let isBench: Bool
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     @State private var viewModel: FantasyPlayerViewModel?
     @State private var watchService = PlayerWatchService.shared
@@ -25,19 +27,21 @@ struct FantasyPlayerCard: View {
     @State private var showingScoreBreakdown = false
     @State private var selectedPlayerForNavigation: SleeperPlayer? = nil // 🔥 NEW: Navigation trigger
     
-    // 🔥 SIMPLIFIED: Just take the essentials, create ViewModel in onAppear
+    // 🔥 PURE DI: Add allLivePlayersViewModel parameter
     init(
         player: FantasyPlayer,
         fantasyViewModel: FantasyViewModel,
         matchup: FantasyMatchup?,
         teamIndex: Int?,
-        isBench: Bool
+        isBench: Bool,
+        allLivePlayersViewModel: AllLivePlayersViewModel
     ) {
         self.player = player
         self.fantasyViewModel = fantasyViewModel
         self.matchup = matchup
         self.teamIndex = teamIndex
         self.isBench = isBench
+        self.allLivePlayersViewModel = allLivePlayersViewModel
     }
 
     var body: some View {
@@ -120,10 +124,10 @@ struct FantasyPlayerCard: View {
             }
         }
         .onAppear {
-            // 🔥 CREATE ViewModel with .shared dependencies
+            // 🔥 PURE DI: Create ViewModel with passed instance
             if viewModel == nil {
                 viewModel = FantasyPlayerViewModel(
-                    livePlayersViewModel: AllLivePlayersViewModel.shared,
+                    livePlayersViewModel: allLivePlayersViewModel,
                     playerDirectory: PlayerDirectoryStore.shared,
                     nflGameDataService: NFLGameDataService.shared,
                     nflWeekService: NFLWeekService.shared
@@ -295,7 +299,7 @@ struct FantasyPlayerCard: View {
             leagueName = selectedLeague.league.name
         }
         
-        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
+        // 🔥 PURE DI: Already using vm.livePlayersViewModel (no .shared)
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: player,
             week: selectedWeek,

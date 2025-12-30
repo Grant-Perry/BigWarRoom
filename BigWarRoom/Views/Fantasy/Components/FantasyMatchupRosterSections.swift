@@ -17,6 +17,9 @@ struct FantasyMatchupActiveRosterSection: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
     @State private var homeProjected: Double = 0.0
     @State private var awayProjected: Double = 0.0
     @State private var projectionsLoaded = false
@@ -38,7 +41,8 @@ struct FantasyMatchupActiveRosterSection: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 0,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -60,7 +64,8 @@ struct FantasyMatchupActiveRosterSection: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 1,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -185,6 +190,9 @@ struct FantasyMatchupBenchSection: View {
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
     @State private var homeBenchProjected: Double = 0.0
     @State private var awayBenchProjected: Double = 0.0
     @State private var projectionsLoaded = false
@@ -206,7 +214,8 @@ struct FantasyMatchupBenchSection: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 0,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -229,7 +238,8 @@ struct FantasyMatchupBenchSection: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 1,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -376,6 +386,9 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
     let sortMethod: MatchupSortingMethod
     let highToLow: Bool
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Active Roster")
@@ -393,7 +406,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 1,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -417,7 +431,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 0,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -537,6 +552,9 @@ struct FantasyMatchupBenchSectionSorted: View {
     let sortMethod: MatchupSortingMethod
     let highToLow: Bool
     
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("Bench")
@@ -554,7 +572,8 @@ struct FantasyMatchupBenchSectionSorted: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 1,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -575,7 +594,8 @@ struct FantasyMatchupBenchSectionSorted: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: matchup,
                             teamIndex: 0,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -684,6 +704,8 @@ struct FantasyMatchupBenchSectionSorted: View {
 /// **Active Roster Section with Full Filtering Capabilities**
 struct FantasyMatchupActiveRosterSectionFiltered: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -743,7 +765,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: currentMatchup,
                             teamIndex: 1,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -767,7 +790,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: currentMatchup,
                             teamIndex: 0,
-                            isBench: false
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -1034,6 +1058,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
 /// **Bench Section with Full Filtering Capabilities**
 struct FantasyMatchupBenchSectionFiltered: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -1083,7 +1109,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: currentMatchup,
                             teamIndex: 1,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     
@@ -1104,7 +1131,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             fantasyViewModel: fantasyViewModel,
                             matchup: currentMatchup,
                             teamIndex: 0,
-                            isBench: true
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel
                         )
                     }
                     

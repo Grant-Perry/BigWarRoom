@@ -12,6 +12,8 @@ struct TeamDepthChartView: View {
     let depthChartData: [String: DepthChartData]
     let team: NFLTeam?
     let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Callback for player selection
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     @State private var teamAssets = TeamAssetManager.shared
     @State private var isExpanded: Bool = true // 🏈 UX: Changed to true for initial expanded state
@@ -88,7 +90,8 @@ struct TeamDepthChartView: View {
                     DepthChartPositionGroupView(
                         positionData: positionData,
                         team: team,
-                        onPlayerTap: onPlayerTap // 🏈 PLAYER NAVIGATION: Pass callback down
+                        onPlayerTap: onPlayerTap, // 🏈 PLAYER NAVIGATION: Pass callback down
+                        allLivePlayersViewModel: allLivePlayersViewModel // 🔥 PURE DI: Pass down
                     )
                 }
             }
@@ -157,6 +160,8 @@ private struct DepthChartPositionGroupView: View {
     let positionData: DepthChartData
     let team: NFLTeam?
     let onPlayerTap: ((SleeperPlayer) -> Void)? // 🏈 PLAYER NAVIGATION: Accept callback
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     @State private var isExpanded: Bool = true // Changed to true for initial expanded state
     
@@ -195,6 +200,7 @@ private struct DepthChartPositionGroupView: View {
                         DepthChartPlayerRowView(
                             depthPlayer: depthPlayer,
                             team: team,
+                            allLivePlayersViewModel: allLivePlayersViewModel, // 🔥 PURE DI: Pass down
                             onTap: onPlayerTap != nil ? { onPlayerTap!(depthPlayer.player) } : nil // 🏈 PLAYER NAVIGATION: Convert to player callback
                         )
                     }

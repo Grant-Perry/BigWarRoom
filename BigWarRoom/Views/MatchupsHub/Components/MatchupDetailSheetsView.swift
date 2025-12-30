@@ -13,6 +13,7 @@ struct MatchupDetailSheetsView: View {
     let allLeagueMatchups: [UnifiedMatchup]? // 🔥 NEW: Pass all matchups from same league
     
     @Environment(FantasyViewModel.self) private var fantasyViewModel
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     // Default initializer for backward compatibility
     init(matchup: UnifiedMatchup) {
@@ -34,7 +35,8 @@ struct MatchupDetailSheetsView: View {
                 RegularMatchupDetailSheet(
                     matchup: matchup, 
                     allLeagueMatchups: allLeagueMatchups,
-                    fantasyViewModel: fantasyViewModel
+                    fantasyViewModel: fantasyViewModel,
+                    allLivePlayersViewModel: allLivePlayersViewModel
                 )
             }
         }
@@ -63,6 +65,7 @@ private struct RegularMatchupDetailSheet: View {
     let matchup: UnifiedMatchup
     let allLeagueMatchups: [UnifiedMatchup]?
     let fantasyViewModel: FantasyViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     var body: some View {
         // 🔥 FIXED: Extract all FantasyMatchups from allLeagueMatchups
@@ -83,7 +86,8 @@ private struct RegularMatchupDetailSheet: View {
                     startingMatchup: fantasyMatchup,
                     leagueName: matchup.league.league.name,
                     league: matchup.league,  // 🔥 NEW: Pass the LeagueWrapper
-                    fantasyViewModel: fantasyViewModel
+                    fantasyViewModel: fantasyViewModel,
+                    allLivePlayersViewModel: allLivePlayersViewModel
                 )
             } else {
                 matchupErrorView

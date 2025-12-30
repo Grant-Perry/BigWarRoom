@@ -2,16 +2,16 @@
 //  AllLivePlayersView.swift
 //  BigWarRoom
 //
-//  🔥 FIXED: Proper caching and navigation state management to prevent excessive refreshes
+//  🔥 PURE DI: No more .shared - uses @Environment injection
 //
 
 import SwiftUI
 
 struct AllLivePlayersView: View {
-    // 🔥 HYBRID PATTERN: Use @State to create ViewModel with .shared services
-    @Bindable private var allLivePlayersViewModel: AllLivePlayersViewModel
-    private let watchService: PlayerWatchService
-    private let weekManager: WeekSelectionManager
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(PlayerWatchService.self) private var watchService
+    @Environment(WeekSelectionManager.self) private var weekManager
     
     // 🔥 UI STATE ONLY - No business logic
     @State private var animatedPlayers: [String] = []
@@ -29,24 +29,6 @@ struct AllLivePlayersView: View {
     // 🔥 PROPER: Clean state management without band-aids
     @State private var hasPerformedInitialLoad = false
     
-    // 🔥 HYBRID PATTERN: Default init uses .shared, but DI init still available
-    init() {
-        self.allLivePlayersViewModel = AllLivePlayersViewModel.shared
-        self.watchService = PlayerWatchService.shared
-        self.weekManager = WeekSelectionManager.shared
-    }
-    
-    // 🔥 PHASE 2.5: Dependency injection initializer (for testing/BigWarRoom.swift)
-    init(
-        allLivePlayersViewModel: AllLivePlayersViewModel,
-        watchService: PlayerWatchService,
-        weekManager: WeekSelectionManager
-    ) {
-        self.allLivePlayersViewModel = allLivePlayersViewModel
-        self.watchService = watchService
-        self.weekManager = weekManager
-    }
-    
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -58,7 +40,7 @@ struct AllLivePlayersView: View {
                     .ignoresSafeArea(.all)
                 
                 VStack(spacing: 0) {
-                    // 🔥 PHASE 2.5: Pass dependencies to header
+                    // 🔥 PURE DI: Pass environment objects to header
                     AllLivePlayersHeaderView(
                         allLivePlayersViewModel: allLivePlayersViewModel,
                         sortHighToLow: $sortHighToLow,
@@ -75,12 +57,6 @@ struct AllLivePlayersView: View {
                 }
             }
         }
-//        .siriAnimate(
-//            isActive: allLivePlayersViewModel.isUpdating, // 🔥 Only active during 15-second updates
-//            intensity: 0.4, // 🔥 Good balance of movement and visibility
-//            speed: 0.8,
-//            baseColors: [.gpBlue, .gpGreen, .purple]
-//        )
         .navigationTitle(allLivePlayersViewModel.showActiveOnly ? "All Rostered Players - LIVE" : "All Rostered Players")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -172,8 +148,6 @@ struct AllLivePlayersView: View {
         .onChange(of: allLivePlayersViewModel.sortChangeID) { _, _ in
             resetAnimations()
         }
-        // 🔥 NEW: Provide AllLivePlayersViewModel to navigation environment
-        .environment(allLivePlayersViewModel)
     }
     
     // MARK: - Content View Selection (Reverted to Working Logic)

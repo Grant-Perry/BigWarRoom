@@ -14,6 +14,9 @@ import SwiftUI
 /// **After:** Use UnifiedPlayerCardBackground + existing components
 struct OpponentPlayerCard: View {
     let player: OpponentPlayer
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
+    
     @State private var watchService = PlayerWatchService.shared
     @State private var fantasyPlayerViewModel: FantasyPlayerViewModel?
     
@@ -54,9 +57,10 @@ struct OpponentPlayerCard: View {
             )
         )
         .onAppear {
+            // 🔥 PURE DI: Create ViewModel with passed instance
             if fantasyPlayerViewModel == nil {
                 fantasyPlayerViewModel = FantasyPlayerViewModel(
-                    livePlayersViewModel: AllLivePlayersViewModel.shared,
+                    livePlayersViewModel: allLivePlayersViewModel,
                     playerDirectory: PlayerDirectoryStore.shared,
                     nflGameDataService: NFLGameDataService.shared,
                     nflWeekService: NFLWeekService.shared

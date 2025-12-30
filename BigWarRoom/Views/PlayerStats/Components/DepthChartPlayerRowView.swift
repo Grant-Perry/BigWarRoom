@@ -11,6 +11,8 @@ import SwiftUI
 struct DepthChartPlayerRowView: View {
     let depthPlayer: DepthChartPlayer
     let team: NFLTeam?
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     // 🏈 PLAYER NAVIGATION: Use callback instead of NavigationLink to prevent nested navigation
     let onTap: (() -> Void)?
     
@@ -31,7 +33,7 @@ struct DepthChartPlayerRowView: View {
                 // Enhanced player info section - use component
                 DepthChartPlayerRowInfoSectionView(
                     depthPlayer: depthPlayer,
-                    livePlayersViewModel: AllLivePlayersViewModel.shared
+                    livePlayersViewModel: allLivePlayersViewModel
                 )
                 
                 Spacer(minLength: 0)
@@ -111,6 +113,7 @@ struct DepthChartPlayerRowView: View {
                 isCurrentPlayer: true
             ),
             team: nil,
+            allLivePlayersViewModel: AllLivePlayersViewModel.shared,
             onTap: nil
         )
         .padding()

@@ -14,6 +14,8 @@ struct LeagueMatchupsTabView: View {
     let leagueName: String
     let league: UnifiedLeagueManager.LeagueWrapper  // 🔥 NEW: Pass full league for provider creation
     let fantasyViewModel: FantasyViewModel
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     @State private var selectedIndex: Int = 0
     @State private var selectedMatchupID: FantasyMatchup.ID? = nil
@@ -34,12 +36,21 @@ struct LeagueMatchupsTabView: View {
         case left, right
     }
     
-    init(allMatchups: [FantasyMatchup], startingMatchup: FantasyMatchup, leagueName: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyViewModel: FantasyViewModel) {
+    // 🔥 PURE DI: Add allLivePlayersViewModel parameter
+    init(
+        allMatchups: [FantasyMatchup], 
+        startingMatchup: FantasyMatchup, 
+        leagueName: String, 
+        league: UnifiedLeagueManager.LeagueWrapper, 
+        fantasyViewModel: FantasyViewModel,
+        allLivePlayersViewModel: AllLivePlayersViewModel
+    ) {
         self.allMatchups = allMatchups
         self.startingMatchup = startingMatchup
         self.leagueName = leagueName
         self.league = league
         self.fantasyViewModel = fantasyViewModel
+        self.allLivePlayersViewModel = allLivePlayersViewModel
         
         DebugPrint(mode: .navigation, "🏈 LEAGUE MATCHUPS INIT:")
         DebugPrint(mode: .navigation, "   Starting matchup ID: \(startingMatchup.id)")
@@ -414,7 +425,7 @@ struct LeagueMatchupsTabView: View {
                             matchup: matchup,
                             fantasyViewModel: fantasyViewModel,
                             leagueName: leagueName,
-                            livePlayersViewModel: AllLivePlayersViewModel.shared
+                            livePlayersViewModel: allLivePlayersViewModel
                         )
                         .containerRelativeFrame(.horizontal)
                         .id(matchup.id)

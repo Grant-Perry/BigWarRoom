@@ -21,7 +21,9 @@ struct EnhancedNFLTeamRosterView: View {
     let rootDismiss: (() -> Void)? // 🔥 NEW: Optional root dismiss action
     
     @Environment(\.dismiss) private var dismiss
-    @State private var viewModel: NFLTeamRosterViewModel
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @State private var viewModel: NFLTeamRosterViewModel?
     @State private var nflGameService = NFLGameDataService.shared
     
     // UI State
@@ -34,11 +36,6 @@ struct EnhancedNFLTeamRosterView: View {
     init(teamCode: String, rootDismiss: (() -> Void)? = nil) {
         self.teamCode = teamCode
         self.rootDismiss = rootDismiss
-        self.viewModel = NFLTeamRosterViewModel(
-            teamCode: teamCode,
-            coordinator: TeamRosterCoordinator(livePlayersViewModel: AllLivePlayersViewModel.shared),
-            nflGameService: NFLGameDataService.shared
-        )
     }
     
     var body: some View {
@@ -47,12 +44,17 @@ struct EnhancedNFLTeamRosterView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            if viewModel.isLoading {
-                enhancedLoadingView
-            } else if !viewModel.filteredPlayers.isEmpty {
-                enhancedRosterContentView
+            if let vm = viewModel {
+                if vm.isLoading {
+                    enhancedLoadingView
+                } else if !vm.filteredPlayers.isEmpty {
+                    enhancedRosterContentView
+                } else {
+                    enhancedErrorView
+                }
             } else {
-                enhancedErrorView
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
             }
         }
         .navigationTitle("")
@@ -69,10 +71,19 @@ struct EnhancedNFLTeamRosterView: View {
         }
         .preferredColorScheme(.dark)
         .onAppear {
+            // 🔥 PURE DI: Create viewModel with injected instance
+            if viewModel == nil {
+                viewModel = NFLTeamRosterViewModel(
+                    teamCode: teamCode,
+                    coordinator: TeamRosterCoordinator(livePlayersViewModel: allLivePlayersViewModel),
+                    nflGameService: nflGameService
+                )
+            }
+            
             // 🔥 FIX: Use onAppear instead of .task to prevent navigation conflicts
             print("🏈 ROSTER DEBUG: EnhancedNFLTeamRosterView appeared for team \(teamCode)")
             Task {
-                await viewModel.loadTeamRoster()
+                await viewModel?.loadTeamRoster()
             }
         }
         .onDisappear {
@@ -151,21 +162,23 @@ struct EnhancedNFLTeamRosterView: View {
                 .padding(.top, 10)
                 
                 // Enhanced team header
-                enhancedTeamHeaderCard
-                    .padding(.horizontal, 16)
-                
-                // FIXED: Tighter spacing - combine sort controls and players into one section
-                VStack(spacing: 8) { // Reduced spacing between controls and players
-                    // Sorting controls
-                    PlayerSortingControlsView(
-                        sortingMethod: $sortingMethod, 
-                        sortHighToLow: $sortHighToLow
-                    )
+                if let vm = viewModel {
+                    enhancedTeamHeaderCard(vm: vm)
+                        .padding(.horizontal, 16)
                     
-                    // Players section (no extra padding)
-                    enhancedPlayersSection
+                    // FIXED: Tighter spacing - combine sort controls and players into one section
+                    VStack(spacing: 8) { // Reduced spacing between controls and players
+                        // Sorting controls
+                        PlayerSortingControlsView(
+                            sortingMethod: $sortingMethod, 
+                            sortHighToLow: $sortHighToLow
+                        )
+                        
+                        // Players section (no extra padding)
+                        enhancedPlayersSection(vm: vm)
+                    }
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
             }
             .padding(.vertical, 12)
         }
@@ -180,7 +193,7 @@ struct EnhancedNFLTeamRosterView: View {
     
     // MARK: - Enhanced Team Header Card
     
-    private var enhancedTeamHeaderCard: some View {
+    private func enhancedTeamHeaderCard(vm: NFLTeamRosterViewModel) -> some View {
         VStack(spacing: 20) {
             HStack(spacing: 20) {
                 // Team logo with enhanced styling
@@ -199,7 +212,7 @@ struct EnhancedNFLTeamRosterView: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(viewModel.teamInfo?.teamName ?? getTeamName())
+                    Text(vm.teamInfo?.teamName ?? getTeamName())
                         .font(.title)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -210,7 +223,7 @@ struct EnhancedNFLTeamRosterView: View {
                     
                     HStack(spacing: 20) {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("\(viewModel.filteredPlayers.count)")
+                            Text("\(vm.filteredPlayers.count)")
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
@@ -324,7 +337,7 @@ struct EnhancedNFLTeamRosterView: View {
     
     // MARK: - Enhanced Players Section
     
-    private var enhancedPlayersSection: some View {
+    private func enhancedPlayersSection(vm: NFLTeamRosterViewModel) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             // Section header with dynamic team name
             Button {
@@ -342,7 +355,7 @@ struct EnhancedNFLTeamRosterView: View {
                     Spacer()
                     
                     HStack(spacing: 8) {
-                        Text("\(getSortedPlayers().count) players")
+                        Text("\(getSortedPlayers(vm: vm).count) players")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -356,11 +369,11 @@ struct EnhancedNFLTeamRosterView: View {
             // Players list with enhanced cards
             if showContributingPlayers {
                 VStack(spacing: 12) {
-                    ForEach(getSortedPlayers(), id: \.playerID) { player in
+                    ForEach(getSortedPlayers(vm: vm), id: \.playerID) { player in
                         EnhancedNFLPlayerCard(
                             player: player,
                             teamCode: teamCode,
-                            viewModel: viewModel
+                            viewModel: vm
                         )
                     }
                 }
@@ -421,7 +434,7 @@ struct EnhancedNFLTeamRosterView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                 
-                if let error = viewModel.errorMessage {
+                if let error = viewModel?.errorMessage {
                     Text(error)
                         .font(.body)
                         .foregroundColor(.secondary)
@@ -454,7 +467,7 @@ struct EnhancedNFLTeamRosterView: View {
                 // Try Again button  
                 Button("Try Again") {
                     Task {
-                        await viewModel.loadTeamRoster()
+                        await viewModel?.loadTeamRoster()
                     }
                 }
                 .padding(.horizontal, 24)
@@ -472,8 +485,8 @@ struct EnhancedNFLTeamRosterView: View {
     
     // MARK: - Helper Functions
     
-    private func getSortedPlayers() -> [SleeperPlayer] {
-        let players = viewModel.filteredPlayers
+    private func getSortedPlayers(vm: NFLTeamRosterViewModel) -> [SleeperPlayer] {
+        let players = vm.filteredPlayers
         
         switch sortingMethod {
         case .position:
@@ -484,14 +497,14 @@ struct EnhancedNFLTeamRosterView: View {
                     return lhsOrder < rhsOrder
                 }
                 // Secondary sort by points
-                let lhsPoints = viewModel.getPlayerPoints(for: lhs) ?? 0.0
-                let rhsPoints = viewModel.getPlayerPoints(for: rhs) ?? 0.0
+                let lhsPoints = vm.getPlayerPoints(for: lhs) ?? 0.0
+                let rhsPoints = vm.getPlayerPoints(for: rhs) ?? 0.0
                 return lhsPoints > rhsPoints
             }
         case .score:
             return players.sorted { lhs, rhs in
-                let lhsPoints = viewModel.getPlayerPoints(for: lhs) ?? 0.0
-                let rhsPoints = viewModel.getPlayerPoints(for: rhs) ?? 0.0
+                let lhsPoints = vm.getPlayerPoints(for: lhs) ?? 0.0
+                let rhsPoints = vm.getPlayerPoints(for: rhs) ?? 0.0
                 return sortHighToLow ? lhsPoints > rhsPoints : lhsPoints < rhsPoints
             }
         case .name:
@@ -519,8 +532,8 @@ struct EnhancedNFLTeamRosterView: View {
                 if lhsLive != rhsLive {
                     return lhsLive
                 }
-                let lhsPoints = viewModel.getPlayerPoints(for: lhs) ?? 0.0
-                let rhsPoints = viewModel.getPlayerPoints(for: rhs) ?? 0.0
+                let lhsPoints = vm.getPlayerPoints(for: lhs) ?? 0.0
+                let rhsPoints = vm.getPlayerPoints(for: rhs) ?? 0.0
                 return lhsPoints > rhsPoints
             }
         }
@@ -940,4 +953,3 @@ struct EnhancedNFLPlayerCard: View {
         return correctedBreakdown
     }
 }
-

@@ -16,18 +16,20 @@ struct ChoppedRosterPlayerCard: View {
     let compact: Bool
     
     @State private var showingScoreBreakdown = false
-    // 🔥 PHASE 3 DI: Remove .shared assignment, will be passed from parent
+    // 🔥 PURE DI: Accept from parent, no more .shared
     @State private var watchService: PlayerWatchService
+    @State private var allLivePlayersViewModel: AllLivePlayersViewModel?
     @State private var playerDirectory = PlayerDirectoryStore.shared
     
-    // 🔥 PHASE 3 DI: Add watchService parameter
+    // 🔥 PURE DI: allLivePlayersViewModel is OPTIONAL for Chopped views (they don't need it)
     init(
         player: FantasyPlayer,
         isStarter: Bool,
         parentViewModel: ChoppedTeamRosterViewModel,
         onPlayerTap: @escaping (SleeperPlayer) -> Void,
         compact: Bool = false,
-        watchService: PlayerWatchService
+        watchService: PlayerWatchService,
+        allLivePlayersViewModel: AllLivePlayersViewModel? = nil
     ) {
         self.viewModel = ChoppedPlayerCardViewModel(
             player: player,
@@ -37,6 +39,7 @@ struct ChoppedRosterPlayerCard: View {
         self.onPlayerTap = onPlayerTap
         self.compact = compact
         self._watchService = State(initialValue: watchService)
+        self._allLivePlayersViewModel = State(initialValue: allLivePlayersViewModel)
     }
     
     private let cardHeight: Double = 110.0 // Match All Live Players height
@@ -564,7 +567,7 @@ struct ChoppedRosterPlayerCard: View {
         }
     }
     
-    // MARK: - Score Breakdown Methods (keeping existing implementation)
+    // MARK: - Score Breakdown Methods
     
     private func createScoreBreakdown() -> PlayerScoreBreakdown? {
         guard viewModel.sleeperPlayer != nil else { return nil }
@@ -581,13 +584,13 @@ struct ChoppedRosterPlayerCard: View {
         
         let localStatsProvider: LocalStatsProvider = viewModel.parentViewModel
         
-        // 🔥 FIX: Pass AllLivePlayersViewModel to ScoreBreakdownFactory
+        // 🔥 PURE DI: Pass optional allLivePlayersViewModel (nil for Chopped views)
         let breakdown = ScoreBreakdownFactory.createBreakdown(
             for: viewModel.player,
             week: rosterWeek,
             localStatsProvider: localStatsProvider,
             leagueContext: leagueContext,
-            allLivePlayersViewModel: AllLivePlayersViewModel.shared
+            allLivePlayersViewModel: allLivePlayersViewModel
         ).withLeagueName("Chopped League")
         
         return PlayerScoreBreakdown(

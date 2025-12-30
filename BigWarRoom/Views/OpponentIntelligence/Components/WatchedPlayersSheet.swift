@@ -12,6 +12,8 @@ struct WatchedPlayersSheet: View {
     @Bindable var watchService: PlayerWatchService
     @Environment(\.dismiss) private var dismiss
     @Environment(\.editMode) private var editMode
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     var body: some View {
         NavigationStack {
@@ -36,10 +38,14 @@ struct WatchedPlayersSheet: View {
                         // Native SwiftUI List with .onMove for smooth drag & drop
                         List {
                             ForEach(watchService.displayOrderWatchedPlayers, id: \.id) { watchedPlayer in
-                                WatchedPlayerCard(watchedPlayer: watchedPlayer)
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
-                                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                                // 🔥 PURE DI: Pass injected instance
+                                WatchedPlayerCard(
+                                    watchedPlayer: watchedPlayer,
+                                    allLivePlayersViewModel: allLivePlayersViewModel
+                                )
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                             }
                             .onMove(perform: moveWatchedPlayers)
                         }
@@ -245,14 +251,11 @@ struct WatchedPlayersSheet: View {
 
 struct WatchedPlayerCard: View {
     let watchedPlayer: WatchedPlayer
+    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     @State private var watchService = PlayerWatchService.shared
-    @State private var fantasyPlayerViewModel = FantasyPlayerViewModel(
-        livePlayersViewModel: AllLivePlayersViewModel.shared,
-        playerDirectory: PlayerDirectoryStore.shared,
-        nflGameDataService: NFLGameDataService.shared,
-        nflWeekService: NFLWeekService.shared
-    )
+    @State private var fantasyPlayerViewModel: FantasyPlayerViewModel?
     @State private var playerDirectory = PlayerDirectoryStore.shared
     
     // Computed properties to break up complex ViewBuilder
@@ -311,6 +314,17 @@ struct WatchedPlayerCard: View {
         }
         .frame(height: 130)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .onAppear {
+            // 🔥 PURE DI: Create ViewModel with passed instance
+            if fantasyPlayerViewModel == nil {
+                fantasyPlayerViewModel = FantasyPlayerViewModel(
+                    livePlayersViewModel: allLivePlayersViewModel,
+                    playerDirectory: PlayerDirectoryStore.shared,
+                    nflGameDataService: NFLGameDataService.shared,
+                    nflWeekService: NFLWeekService.shared
+                )
+            }
+        }
     }
     
     // MARK: - Component Views

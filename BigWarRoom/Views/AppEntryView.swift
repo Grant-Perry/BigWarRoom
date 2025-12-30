@@ -152,21 +152,21 @@ struct BigWarRoomModified: View {
             TabView(selection: $selectedTab) {
                 // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
                 MatchupsHubView()
-                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "target")
                         Text("Matchups")
                     }
                     .tag(0)
+                    .environment(matchupsHub)
                 
                 // TEAM ROSTERS TAB
                 TeamRostersView()
-                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "person.3.fill")
                         Text("Team Rosters")
                     }
                     .tag(1)
+                    .environment(matchupsHub)
                 
                 // NFL SCHEDULE TAB
                 NavigationStack {
@@ -180,27 +180,26 @@ struct BigWarRoomModified: View {
                 .tag(2)
                 
                 // All Live Players Tab
-                // 🔥 PHASE 3 DI: Pass dependencies instead of using .shared
-                AllLivePlayersView(
-                    allLivePlayersViewModel: allLivePlayersViewModel,
-                    watchService: playerWatchService,
-                    weekManager: weekManager
-                )
-                .environment(matchupsHub)
-                .tabItem {
-                    Image(systemName: "chart.bar.fill")
-                    Text("Rost Players")
-                }
-                .tag(3)
+                // 🔥 PURE DI: AllLivePlayersView now uses @Environment injection
+                AllLivePlayersView()
+                    .tabItem {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Rost Players")
+                    }
+                    .tag(3)
+                    .environment(allLivePlayersViewModel)
+                    .environment(playerWatchService)
+                    .environment(weekManager)
+                    .environment(matchupsHub)
                 
                 // MORE TAB
                 MoreTabView(viewModel: viewModel)
-                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "ellipsis")
                         Text("More")
                     }
                     .tag(4)
+                    .environment(matchupsHub)
             }
             .id("tabview-\(SmartRefreshManager.shared.hasLiveGames)")
             .tint(SmartRefreshManager.shared.hasLiveGames ? .gpGreen : .blue)

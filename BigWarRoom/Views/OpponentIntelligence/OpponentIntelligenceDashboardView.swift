@@ -503,7 +503,11 @@ struct OpponentIntelligenceDashboardView: View {
         ) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.filteredOpponentPlayers.prefix(20)) { player in
-                    OpponentPlayerCard(player: player)
+                    // 🔥 PURE DI: Pass injected instance
+                    OpponentPlayerCard(
+                        player: player,
+                        allLivePlayersViewModel: allLivePlayersViewModel
+                    )
                 }
             }
         }

@@ -169,115 +169,45 @@ struct BigWarRoom: View {
         ZStack(alignment: .bottomTrailing) {
             TabView(selection: $selectedTab) {
                 // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
-                Group {
-                    if let weekManager = weekSelectionManager,
-                       let espnCreds = espnCredentials,
-                       let sleeperCreds = sleeperCredentials,
-                       let matchupsVM = matchupsHubViewModel,
-                       let allLiveVM = allLivePlayersViewModel {
-                        MatchupsHubView(
-                            weekManager: weekManager,
-                            espnCredentials: espnCreds,
-                            sleeperCredentials: sleeperCreds
-                        )
-                        .environment(matchupsVM)
-                        .environment(allLiveVM)
-                        .environment(weekManager)
-                    } else {
-                        Text("Loading services...")
+                // 🔥 FIX: Remove Group wrapper - TabView requires direct children with .tabItem()
+                matchupsHubTab
+                    .tabItem {
+                        Image(systemName: "target")
+                        Text("Matchups")
                     }
-                }
-                .tabItem {
-                    Image(systemName: "target")
-                    Text("Matchups")
-                }
-                .tag(0)
+                    .tag(0)
                 
                 // NFL SCHEDULE TAB - PRIORITIZED FOR VISIBILITY
-                Group {
-                    if let matchupsVM = matchupsHubViewModel,
-                       let weekManager = weekSelectionManager,
-                       let standingsService = nflStandingsService,
-                       let teamAssets = teamAssetManager,
-                       let nflGameData = nflGameDataService,
-                       let nflWeek = nflWeekService,
-                       let espnCreds = espnCredentials {
-                        NFLScheduleView()
-                            .environment(matchupsVM)
-                            .environment(weekManager)
-                            .environment(standingsService)
-                            .environment(teamAssets)
-                            .environment(nflGameData)
-                            .environment(nflWeek)
-                            .environment(espnCreds)
-                    } else {
-                        Text("Loading services...")
+                nflScheduleTab
+                    .tabItem {
+                        Image(systemName: "calendar.circle.fill")
+                        Text("Schedule")
                     }
-                }
-                .tabItem {
-                    Image(systemName: "calendar.circle.fill")
-                    Text("Schedule")
-                }
-                .tag(1)
+                    .tag(1)
                 
                 // Fantasy Tab 
-                Group {
-                    if let matchupsVM = matchupsHubViewModel,
-                       let fantasyVM = fantasyViewModel,
-                       let weekManager = weekSelectionManager {
-                        FantasyMatchupListView(draftRoomViewModel: draftRoomViewModel)
-                            .environment(matchupsVM)
-                            .environment(fantasyVM)
-                            .environment(weekManager)
-                    } else {
-                        Text("Loading services...")
+                fantasyTab
+                    .tabItem {
+                        Image(systemName: "football")
+                        Text("Fantasy")
                     }
-                }
-                .tabItem {
-                    Image(systemName: "football")
-                    Text("Fantasy")
-                }
-                .tag(2)
+                    .tag(2)
                 
                 // All Live Players Tab
-                Group {
-                    if let watchService = playerWatchService,
-                       let weekManager = weekSelectionManager,
-                       let viewModel = allLivePlayersViewModel,
-                       let matchupsVM = matchupsHubViewModel {
-                        AllLivePlayersView(
-                            allLivePlayersViewModel: viewModel,
-                            watchService: watchService,
-                            weekManager: weekManager
-                        )
-                        .environment(matchupsVM)
-                        .environment(weekManager)
-                    } else {
-                        Text("Loading services...")
+                allLivePlayersTab
+                    .tabItem {
+                        Image(systemName: "chart.bar.fill")
+                        Text("Live Players")
                     }
-                }
-                .tabItem {
-                    Image(systemName: "chart.bar.fill")
-                    Text("Live Players")
-                }
-                .tag(3)
+                    .tag(3)
                 
                 // Settings Tab
-                Group {
-                    if let matchupsVM = matchupsHubViewModel,
-                       let weekManager = weekSelectionManager {
-                        OnBoardingView()
-                            .environment(matchupsVM)
-                            .environment(weekManager)
-                    } else {
-                        Text("Loading services...")
+                settingsTab
+                    .tabItem {
+                        Image(systemName: "gearshape")
+                        Text("Settings")
                     }
-                }
-                .tabItem {
-                    Image(systemName: "gearshape")
-                    Text("Settings")
-                }
-                .tag(4)
+                    .tag(4)
             }
             
             // Version display in bottom safe area
@@ -295,6 +225,93 @@ struct BigWarRoom: View {
                 }
             }
             .ignoresSafeArea(edges: .bottom)
+        }
+    }
+    
+    // MARK: - Tab Views
+    
+    @ViewBuilder
+    private var matchupsHubTab: some View {
+        if let weekManager = weekSelectionManager,
+           let espnCreds = espnCredentials,
+           let sleeperCreds = sleeperCredentials,
+           let matchupsVM = matchupsHubViewModel,
+           let allLiveVM = allLivePlayersViewModel {
+            MatchupsHubView(
+                weekManager: weekManager,
+                espnCredentials: espnCreds,
+                sleeperCredentials: sleeperCreds
+            )
+            .environment(matchupsVM)
+            .environment(allLiveVM)
+            .environment(weekManager)
+        } else {
+            Text("Loading services...")
+        }
+    }
+    
+    @ViewBuilder
+    private var nflScheduleTab: some View {
+        if let matchupsVM = matchupsHubViewModel,
+           let weekManager = weekSelectionManager,
+           let standingsService = nflStandingsService,
+           let teamAssets = teamAssetManager,
+           let nflGameData = nflGameDataService,
+           let nflWeek = nflWeekService,
+           let espnCreds = espnCredentials {
+            NFLScheduleView()
+                .environment(matchupsVM)
+                .environment(weekManager)
+                .environment(standingsService)
+                .environment(teamAssets)
+                .environment(nflGameData)
+                .environment(nflWeek)
+                .environment(espnCreds)
+        } else {
+            Text("Loading services...")
+        }
+    }
+    
+    @ViewBuilder
+    private var fantasyTab: some View {
+        if let matchupsVM = matchupsHubViewModel,
+           let fantasyVM = fantasyViewModel,
+           let weekManager = weekSelectionManager {
+            FantasyMatchupListView(draftRoomViewModel: draftRoomViewModel)
+                .environment(matchupsVM)
+                .environment(fantasyVM)
+                .environment(weekManager)
+        } else {
+            Text("Loading services...")
+        }
+    }
+    
+    @ViewBuilder
+    private var allLivePlayersTab: some View {
+        if let watchService = playerWatchService,
+           let weekManager = weekSelectionManager,
+           let viewModel = allLivePlayersViewModel,
+           let matchupsVM = matchupsHubViewModel {
+            // 🔥 PURE DI: AllLivePlayersView now uses @Environment injection - NO PARAMETERS
+            AllLivePlayersView()
+                .environment(viewModel)
+                .environment(watchService)
+                .environment(weekManager)
+                .environment(matchupsVM)
+        } else {
+            Text("Loading services...")
+        }
+    }
+    
+    @ViewBuilder
+    private var settingsTab: some View {
+        if let matchupsVM = matchupsHubViewModel,
+           let weekManager = weekSelectionManager {
+            OnBoardingView()
+                .environment(matchupsVM)
+                .environment(weekManager)
+        } else {
+            Text("Loading services...")
         }
     }
 }

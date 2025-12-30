@@ -19,17 +19,14 @@ struct NFLTeamRosterView: View {
     let teamCode: String
     
     @Environment(\.dismiss) private var dismiss
-    @State private var viewModel: NFLTeamRosterViewModel
+    // 🔥 PURE DI: Inject from environment
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @State private var viewModel: NFLTeamRosterViewModel?
     
     // MARK: - Initialization
     
     init(teamCode: String) {
         self.teamCode = teamCode
-        self.viewModel = NFLTeamRosterViewModel(
-            teamCode: teamCode,
-            coordinator: TeamRosterCoordinator(livePlayersViewModel: AllLivePlayersViewModel.shared),
-            nflGameService: NFLGameDataService.shared
-        )
     }
     
     var body: some View {
@@ -37,12 +34,17 @@ struct NFLTeamRosterView: View {
             ZStack {
                 Color.black.ignoresSafeArea()
                 
-                if viewModel.isLoading {
-                    loadingView
-                } else if !viewModel.filteredPlayers.isEmpty {
-                    rosterContentView
+                if let vm = viewModel {
+                    if vm.isLoading {
+                        loadingView
+                    } else if !vm.filteredPlayers.isEmpty {
+                        rosterContentView
+                    } else {
+                        errorView
+                    }
                 } else {
-                    errorView
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
                 }
             }
             .navigationTitle("")
@@ -58,8 +60,19 @@ struct NFLTeamRosterView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task {
-            await viewModel.loadTeamRoster()
+        .onAppear {
+            // 🔥 PURE DI: Create viewModel with injected instance
+            if viewModel == nil {
+                viewModel = NFLTeamRosterViewModel(
+                    teamCode: teamCode,
+                    coordinator: TeamRosterCoordinator(livePlayersViewModel: allLivePlayersViewModel),
+                    nflGameService: NFLGameDataService.shared
+                )
+                
+                Task {
+                    await viewModel?.loadTeamRoster()
+                }
+            }
         }
     }
     
@@ -86,12 +99,14 @@ struct NFLTeamRosterView: View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 // Team header
-                teamHeaderCard
-                    .padding(.horizontal, 16)
-                
-                // Players list
-                playersListView
-                    .padding(.horizontal, 16)
+                if let vm = viewModel {
+                    teamHeaderCard(vm: vm)
+                        .padding(.horizontal, 16)
+                    
+                    // Players list
+                    playersListView(vm: vm)
+                        .padding(.horizontal, 16)
+                }
             }
             .padding(.vertical, 8)
         }
@@ -99,7 +114,7 @@ struct NFLTeamRosterView: View {
     
     // MARK: - Team Header Card
     
-    private var teamHeaderCard: some View {
+    private func teamHeaderCard(vm: NFLTeamRosterViewModel) -> some View {
         VStack(spacing: 16) {
             HStack(spacing: 16) {
                 // Team logo
@@ -107,11 +122,11 @@ struct NFLTeamRosterView: View {
                     .clipShape(Circle())
                     .overlay(
                         Circle()
-                            .stroke(viewModel.teamInfo?.primaryColor ?? Color.white, lineWidth: 3)
+                            .stroke(vm.teamInfo?.primaryColor ?? Color.white, lineWidth: 3)
                     )
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(viewModel.teamInfo?.teamName ?? teamCode)
+                    Text(vm.teamInfo?.teamName ?? teamCode)
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -122,10 +137,10 @@ struct NFLTeamRosterView: View {
                     
                     // Player count with filtering info
                     HStack(spacing: 16) {
-                        Text("\(viewModel.filteredPlayers.count)")
+                        Text("\(vm.filteredPlayers.count)")
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(viewModel.teamInfo?.primaryColor ?? .white)
+                            .foregroundColor(vm.teamInfo?.primaryColor ?? .white)
                         
                         Text("CONTRIBUTING PLAYERS")
                             .font(.caption)
@@ -142,7 +157,7 @@ struct NFLTeamRosterView: View {
                 .fill(
                     LinearGradient(
                         colors: [
-                            viewModel.teamInfo?.primaryColor.opacity(0.2) ?? Color.white.opacity(0.1),
+                            vm.teamInfo?.primaryColor.opacity(0.2) ?? Color.white.opacity(0.1),
                             Color.black.opacity(0.8)
                         ],
                         startPoint: .topLeading,
@@ -151,14 +166,14 @@ struct NFLTeamRosterView: View {
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 16)
-                        .stroke(viewModel.teamInfo?.primaryColor.opacity(0.3) ?? Color.white.opacity(0.2), lineWidth: 1)
+                        .stroke(vm.teamInfo?.primaryColor.opacity(0.3) ?? Color.white.opacity(0.2), lineWidth: 1)
                 )
         )
     }
     
     // MARK: - Players List View
     
-    private var playersListView: some View {
+    private func playersListView(vm: NFLTeamRosterViewModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             // Section Header
             HStack {
@@ -178,10 +193,10 @@ struct NFLTeamRosterView: View {
             
             // Players
             VStack(spacing: 8) {
-                ForEach(viewModel.filteredPlayers, id: \.playerID) { player in
+                ForEach(vm.filteredPlayers, id: \.playerID) { player in
                     NFLPlayerCard(
                         player: player,
-                        viewModel: viewModel,
+                        viewModel: vm,
                         onPlayerTap: nil
                     )
                 }
@@ -211,7 +226,7 @@ struct NFLTeamRosterView: View {
                 .font(.title3)
                 .foregroundColor(.white)
             
-            if let error = viewModel.errorMessage {
+            if let vm = viewModel, let error = vm.errorMessage {
                 Text(error)
                     .font(.body)
                     .foregroundColor(.secondary)
@@ -227,7 +242,7 @@ struct NFLTeamRosterView: View {
             
             Button("Try Again") {
                 Task {
-                    await viewModel.loadTeamRoster()
+                    await viewModel?.loadTeamRoster()
                 }
             }
             .padding()
