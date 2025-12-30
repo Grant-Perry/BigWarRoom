@@ -18,7 +18,7 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - ViewModels
     @State private var viewModel: TeamFilteredMatchupsViewModel
-    @State private var standingsService = NFLStandingsService.shared
+    let standingsService: NFLStandingsService
     @Environment(\.dismiss) private var dismiss
     
     // MARK: - UI State (reusing Mission Control patterns)
@@ -33,9 +33,17 @@ struct TeamFilteredMatchupsView: View {
     // @State private var showingTeamRoster: String?
     
     // MARK: - Initialization
-    init(awayTeam: String, homeTeam: String, matchupsHubViewModel: MatchupsHubViewModel, gameData: ScheduleGame? = nil, rootDismiss: (() -> Void)? = nil) {
+    init(
+        awayTeam: String, 
+        homeTeam: String, 
+        matchupsHubViewModel: MatchupsHubViewModel, 
+        standingsService: NFLStandingsService,
+        gameData: ScheduleGame? = nil, 
+        rootDismiss: (() -> Void)? = nil
+    ) {
         self.awayTeam = awayTeam
         self.homeTeam = homeTeam
+        self.standingsService = standingsService
         self.gameData = gameData // 🔥 NEW: Store actual game data
         self.rootDismiss = rootDismiss // 🔥 NEW: Store root dismiss closure
         self._viewModel = State(wrappedValue: TeamFilteredMatchupsViewModel(matchupsHubViewModel: matchupsHubViewModel))
@@ -603,22 +611,14 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - Helper to check if game is live
     private var isGameLive: Bool {
-        // 🔥 FIXED: Use passed gameData first, then fallback to service lookup
-        if let gameData = gameData {
-            return gameData.isLive
-        }
-        
-        // Fallback to service lookup (original behavior)
-        if let gameInfo = NFLGameDataService.shared.getGameInfo(for: awayTeam) {
-            return gameInfo.isLive
-        }
-        return false
+        // 🔥 FIXED: Use passed gameData only (no fallback to service)
+        return gameData?.isLive ?? false
     }
     
     // MARK: - Game Info Display - REVERTED TO ORIGINAL
     private func buildGameInfo() -> some View {
         Group {
-            // 🔥 FIXED: Use passed gameData first, then fallback to service lookup
+            // 🔥 FIXED: Use passed gameData only
             if let gameData = gameData {
                 VStack(spacing: 2) {
                     // Score display (if game has started)
@@ -648,40 +648,6 @@ struct TeamFilteredMatchupsView: View {
                         .padding(.vertical, 2)
                         .background(
                             gameData.isLive ? 
-                            AnyView(Capsule().fill(Color.red.opacity(0.2))) :
-                            AnyView(Color.clear)
-                        )
-                }
-            } else if let gameInfo = NFLGameDataService.shared.getGameInfo(for: awayTeam) {
-                // Fallback to service lookup (original behavior)
-                VStack(spacing: 2) {
-                    // Score display (if game has started)
-                    if gameInfo.awayScore > 0 || gameInfo.homeScore > 0 {
-                        HStack(spacing: 6) {
-                            // Away team score
-                            Text("\(gameInfo.awayScore)")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(gameInfo.awayScore > gameInfo.homeScore ? .gpGreen : .white)
-                            
-                            Text("-")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                            
-                            // Home team score  
-                            Text("\(gameInfo.homeScore)")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(gameInfo.homeScore > gameInfo.awayScore ? .gpGreen : .white)
-                        }
-                    }
-                    
-                    // Game status/time
-                    Text(gameInfo.displayTime)
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(gameInfo.isLive ? .red : .white.opacity(0.8))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(
-                            gameInfo.isLive ? 
                             AnyView(Capsule().fill(Color.red.opacity(0.2))) :
                             AnyView(Color.clear)
                         )
@@ -786,11 +752,51 @@ struct TeamFilteredMatchupsView: View {
 
 
 #Preview("Team Filtered Matchups - With Data") {
-    TeamFilteredMatchupsView(
+    let espnCredentials = ESPNCredentialsManager()
+    let sleeperAPIClient = SleeperAPIClient()
+    let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+    let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+    let nflGameDataService = NFLGameDataService()
+    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
+    let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+    let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    let seasonYearManager = SeasonYearManager()
+    let playerStatsCache = PlayerStatsCache()
+    let sharedStatsService = SharedStatsService(
+        weekSelectionManager: weekSelectionManager,
+        seasonYearManager: seasonYearManager,
+        playerStatsCache: playerStatsCache
+    )
+    let standingsService = NFLStandingsService()
+    
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    
+    return TeamFilteredMatchupsView(
         awayTeam: "WSH", 
         homeTeam: "GB",
-        // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-        matchupsHubViewModel: MatchupsHubViewModel.shared,
+        matchupsHubViewModel: matchupsHub,
+        standingsService: standingsService,
         gameData: ScheduleGame(
             id: "WSH@GB",
             awayTeam: "WSH",
@@ -807,11 +813,51 @@ struct TeamFilteredMatchupsView: View {
 }
 
 #Preview("Team Filtered Matchups - Empty") {
-    TeamFilteredMatchupsView(
+    let espnCredentials = ESPNCredentialsManager()
+    let sleeperAPIClient = SleeperAPIClient()
+    let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+    let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+    let nflGameDataService = NFLGameDataService()
+    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
+    let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+    let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    let seasonYearManager = SeasonYearManager()
+    let playerStatsCache = PlayerStatsCache()
+    let sharedStatsService = SharedStatsService(
+        weekSelectionManager: weekSelectionManager,
+        seasonYearManager: seasonYearManager,
+        playerStatsCache: playerStatsCache
+    )
+    let standingsService = NFLStandingsService()
+    
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    
+    return TeamFilteredMatchupsView(
         awayTeam: "JAX",
         homeTeam: "TEN", 
-        // 🔥 FIXED: Use shared MatchupsHubViewModel to ensure data consistency
-        matchupsHubViewModel: MatchupsHubViewModel.shared,
+        matchupsHubViewModel: matchupsHub,
+        standingsService: standingsService,
         gameData: ScheduleGame(
             id: "JAX@TEN",
             awayTeam: "JAX",

@@ -13,8 +13,7 @@ import Observation
 @MainActor
 @Observable
 final class FantasyViewModel {
-    // MARK: -> Singleton
-    static let shared = FantasyViewModel()
+    // MARK: -> 🔥 NO SINGLETON - Pure DI with @Observable
     
     // MARK: -> 🔥 PHASE 3: @Observable State Properties (no @Published needed)
     var matchups: [FantasyMatchup] = []
@@ -36,7 +35,7 @@ final class FantasyViewModel {
     private let instanceID = UUID().uuidString.prefix(8)
     private static var instanceCount = 0 {
         didSet {
-            // print("📊 FantasyViewModel instance count: \(instanceCount)")
+            print("📊 FantasyViewModel instance count: \(instanceCount)")
         }
     }
     
@@ -83,19 +82,12 @@ final class FantasyViewModel {
     let availableWeeks = Array(1...18)
     let availableYears = AppConstants.availableYears
     
-    // MARK: -> Dependencies
-    private let unifiedLeagueManager: UnifiedLeagueManager = {
-        let sleeperClient = SleeperAPIClient()
-        let espnCreds = ESPNCredentialsManager()
-        let espnClient = ESPNAPIClient(credentialsManager: espnCreds)
-        return UnifiedLeagueManager(
-            sleeperClient: sleeperClient,
-            espnClient: espnClient,
-            espnCredentials: espnCreds
-        )
-    }()
-    private let sleeperCredentials = SleeperCredentialsManager.shared // 🔥 NEW: Add Sleeper credentials manager
-    let playerDirectoryStore = PlayerDirectoryStore.shared
+    // MARK: -> Dependencies (All Injected)
+    private let unifiedLeagueManager: UnifiedLeagueManager
+    private let sleeperCredentials: SleeperCredentialsManager
+    private let playerDirectoryStore: PlayerDirectoryStore
+    internal let matchupDataStore: MatchupDataStore // 🔥 PHASE 4: Internal for extensions
+    
     var sharedDraftRoomViewModel: DraftRoomViewModel?
     var refreshTimer: Timer?
     
@@ -105,11 +97,21 @@ final class FantasyViewModel {
     // MARK: -> Refresh control to prevent cascading
     private var isRefreshing = false
     
-    // MARK: -> Initialization (Made public for navigation instances)
-    init() {
+    // MARK: -> Initialization with Full DI
+    init(
+        matchupDataStore: MatchupDataStore,
+        unifiedLeagueManager: UnifiedLeagueManager,
+        sleeperCredentials: SleeperCredentialsManager,
+        playerDirectoryStore: PlayerDirectoryStore
+    ) {
+        self.matchupDataStore = matchupDataStore
+        self.unifiedLeagueManager = unifiedLeagueManager
+        self.sleeperCredentials = sleeperCredentials
+        self.playerDirectoryStore = playerDirectoryStore
+        
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1
-            // print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")
+            print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")
         }
         
         setupAutoRefresh()
@@ -120,7 +122,7 @@ final class FantasyViewModel {
     deinit {
         Task { @MainActor in
             FantasyViewModel.instanceCount -= 1
-            // print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
+            print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
             refreshTimer?.invalidate()
             observationTask?.cancel()
         }
@@ -241,7 +243,7 @@ final class FantasyViewModel {
         self.myTeamID = myTeamID
         clearAllData()
         
-        // x Print("🎯 LEAGUE SELECTION: Selected league \(league.league.name) with myTeamID: \(myTeamID ?? "nil")")
+        DebugPrint(mode: .fantasy, "🎯 LEAGUE SELECTION: Selected league \(league.league.name) with myTeamID: \(myTeamID ?? "nil")")
         
         Task {
             await fetchMatchups()
@@ -289,19 +291,7 @@ final class FantasyViewModel {
         
         // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
         // Individual ViewModels should not have their own refresh timers to prevent conflicts
-        // Only MatchupsHubViewModel.shared should control the global refresh cycle
-        
-        // Don't auto-refresh if MatchupsHub is controlling
-        // if autoRefresh && !isControlledByMatchupsHub {
-        //     let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
-        //     refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { _ in
-        //         Task { @MainActor in
-        //             if UIApplication.shared.applicationState == .active {
-        //                 await self.refreshMatchups()
-        //             }
-        //         }
-        //     }
-        // }
+        // Only MatchupsHubViewModel should control the global refresh cycle
     }
     
     // MARK: -> Week Selection (DEPRECATED - Now handled by WeekSelectionManager)
@@ -378,54 +368,39 @@ final class FantasyViewModel {
             return nil
         }
         
-//        print("🐛 DEBUG: Found currentESPNLeague: \(espnLeague.displayName)")
-        
         // 🔥 UPDATED: Check both root level and nested scoring settings
         var scoringSettings: ESPNScoringSettings?
         
         // First try root level scoring settings
         if let rootScoring = espnLeague.scoringSettings {
-//            print("🐛 DEBUG: Found root level scoringSettings")
             scoringSettings = rootScoring
         }
         // Then try nested scoring settings in league settings
         else if let nestedScoring = espnLeague.settings?.scoringSettings {
-//            print("🐛 DEBUG: Found nested scoringSettings in league settings")
             scoringSettings = nestedScoring
         } else {
-//            print("🐛 DEBUG: No scoringSettings found in ESPN league (checked root and nested)")
             return nil
         }
-        
-//        print("🐛 DEBUG: Using scoringSettings from: \(espnLeague.scoringSettings != nil ? "root" : "nested")")
         
         guard let finalScoringSettings = scoringSettings,
               let scoringItems = finalScoringSettings.scoringItems else {
-//            print("🐛 DEBUG: No scoringItems in ESPN scoring settings")
             return nil
         }
-        
-//        print("🐛 DEBUG: Found \(scoringItems.count) ESPN scoring items")
         
         var scoringMap: [String: Double] = [:]
         
         for item in scoringItems {
             guard let statId = item.statId,
                   let points = item.points else { 
-//                print("🐛 DEBUG: Skipping item with missing statId or points")
                 continue 
             }
             
             // 🔥 FIX: Use direct ESPN stat ID to Sleeper key mapping instead of display names
             if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                 scoringMap[sleeperKey] = points
-//                print("🐛 DEBUG: ESPN Scoring - \(sleeperKey) (stat \(statId)) = \(points) points")
-            } else {
-//                print("🐛 DEBUG: No mapping for ESPN stat ID \(statId)")
             }
         }
         
-//        print("🐛 DEBUG: Final ESPN scoring map has \(scoringMap.count) entries")
         return scoringMap.isEmpty ? nil : scoringMap
     }
     
@@ -478,9 +453,8 @@ final class FantasyViewModel {
         do {
             let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
             currentESPNLeague = espnLeague
-//            print("✅ ESPN: Loaded league data for scoring breakdown")
         } catch {
-//            print("❌ ESPN: Failed to load league data: \(error)")
+            DebugPrint(mode: .espnAPI, "❌ ESPN: Failed to load league data: \(error)")
         }
     }
 }

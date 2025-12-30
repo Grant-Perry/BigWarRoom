@@ -12,6 +12,8 @@ struct MatchupDetailSheetsView: View {
     let matchup: UnifiedMatchup
     let allLeagueMatchups: [UnifiedMatchup]? // 🔥 NEW: Pass all matchups from same league
     
+    @Environment(FantasyViewModel.self) private var fantasyViewModel
+    
     // Default initializer for backward compatibility
     init(matchup: UnifiedMatchup) {
         self.matchup = matchup
@@ -29,7 +31,11 @@ struct MatchupDetailSheetsView: View {
             if matchup.isChoppedLeague {
                 ChoppedLeagueDetailSheet(matchup: matchup)
             } else {
-                RegularMatchupDetailSheet(matchup: matchup, allLeagueMatchups: allLeagueMatchups)
+                RegularMatchupDetailSheet(
+                    matchup: matchup, 
+                    allLeagueMatchups: allLeagueMatchups,
+                    fantasyViewModel: fantasyViewModel
+                )
             }
         }
     }
@@ -56,6 +62,7 @@ private struct ChoppedLeagueDetailSheet: View {
 private struct RegularMatchupDetailSheet: View {
     let matchup: UnifiedMatchup
     let allLeagueMatchups: [UnifiedMatchup]?
+    let fantasyViewModel: FantasyViewModel
     
     var body: some View {
         // 🔥 FIXED: Extract all FantasyMatchups from allLeagueMatchups
@@ -71,13 +78,12 @@ private struct RegularMatchupDetailSheet: View {
         
         return Group {
             if let fantasyMatchup = matchup.fantasyMatchup {
-                let configuredViewModel = matchup.createConfiguredFantasyViewModel()
-                
                 LeagueMatchupsTabView(
                     allMatchups: allFantasyMatchups,
                     startingMatchup: fantasyMatchup,
                     leagueName: matchup.league.league.name,
-                    fantasyViewModel: configuredViewModel
+                    league: matchup.league,  // 🔥 NEW: Pass the LeagueWrapper
+                    fantasyViewModel: fantasyViewModel
                 )
             } else {
                 matchupErrorView

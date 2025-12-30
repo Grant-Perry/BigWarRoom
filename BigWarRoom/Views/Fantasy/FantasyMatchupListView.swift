@@ -8,38 +8,52 @@ import SwiftUI
 
 struct FantasyMatchupListView: View {
     let draftRoomViewModel: DraftRoomViewModel
-    @State private var viewModel = FantasyViewModel.shared
+    @Environment(FantasyViewModel.self) private var fantasyViewModel
+    @Environment(MatchupsHubViewModel.self) private var matchupsHub
     @State private var weekManager = WeekSelectionManager.shared
-    @State private var fantasyMatchupListViewModel: FantasyMatchupListViewModel
+    @State private var fantasyMatchupListViewModel: FantasyMatchupListViewModel?
     
     init(draftRoomViewModel: DraftRoomViewModel) {
         self.draftRoomViewModel = draftRoomViewModel
-        // 🔥 PHASE 3: Use @State for @Observable ViewModels
-        self._fantasyMatchupListViewModel = State(wrappedValue: FantasyMatchupListViewModel())
     }
 
     var body: some View {
         NavigationView {
             mainContent
-                .navigationTitle(fantasyMatchupListViewModel.shouldHideTitle() ? "" : (viewModel.selectedLeague?.league.name ?? "Fantasy"))
-                .navigationBarTitleDisplayMode(fantasyMatchupListViewModel.shouldHideTitle() ? .inline : .large)
+                .navigationTitle(fantasyMatchupListViewModel?.shouldHideTitle() == true ? "" : (fantasyViewModel.selectedLeague?.league.name ?? "Fantasy"))
+                .navigationBarTitleDisplayMode(fantasyMatchupListViewModel?.shouldHideTitle() == true ? .inline : .large)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         weekButton
                     }
                 }
                 .preferredColorScheme(.dark)
-                .sheet(isPresented: $viewModel.showWeekSelector) {
+                .sheet(isPresented: Binding(
+                    get: { fantasyViewModel.showWeekSelector },
+                    set: { fantasyViewModel.showWeekSelector = $0 }
+                )) {
                     weekPickerSheet
                 }
-                .sheet(isPresented: $fantasyMatchupListViewModel.showDraftPositionPicker) {
+                .sheet(isPresented: Binding(
+                    get: { fantasyMatchupListViewModel?.showDraftPositionPicker == true },
+                    set: { if !$0 { fantasyMatchupListViewModel?.showDraftPositionPicker = false } }
+                )) {
                     draftPositionSheet
                 }
                 .task {
+                    // Lazy initialization with dependencies from @Environment
+                    if fantasyMatchupListViewModel == nil {
+                        fantasyMatchupListViewModel = FantasyMatchupListViewModel(
+                            matchupsHubViewModel: matchupsHub,
+                            weekManager: weekManager,
+                            fantasyViewModel: fantasyViewModel
+                        )
+                    }
+                    
                     // Only run once on initial load
-                    if !fantasyMatchupListViewModel.hasInitializedSmartMode {
-                        await fantasyMatchupListViewModel.smartModeDetection()
-                        fantasyMatchupListViewModel.hasInitializedSmartMode = true
+                    if fantasyMatchupListViewModel?.hasInitializedSmartMode == false {
+                        await fantasyMatchupListViewModel?.smartModeDetection()
+                        fantasyMatchupListViewModel?.hasInitializedSmartMode = true
                     }
                 }
                 .onChange(of: draftRoomViewModel.selectedLeagueWrapper) { _, newLeague in
@@ -65,10 +79,10 @@ struct FantasyMatchupListView: View {
                 .ignoresSafeArea()
             
             // Smart Mode Content
-            if fantasyMatchupListViewModel.shouldShowLeaguePicker {
+            if fantasyMatchupListViewModel?.shouldShowLeaguePicker == true {
                 // ALL LEAGUES MODE: Show gorgeous picker overlay
                 Color.clear // Transparent background for overlay
-            } else if fantasyMatchupListViewModel.shouldShowDraftPositionPicker {
+            } else if fantasyMatchupListViewModel?.shouldShowDraftPositionPicker == true {
                 // DRAFT POSITION MODE: Show position picker
                 Color.clear // Transparent background for sheet
             } else {
@@ -81,21 +95,26 @@ struct FantasyMatchupListView: View {
     
     @ViewBuilder
     private var singleLeagueContent: some View {
-        FantasySingleLeagueContentView(
-            draftRoomViewModel: draftRoomViewModel,
-            weekManager: weekManager,
-            fantasyViewModel: viewModel,
-            fantasyMatchupListViewModel: fantasyMatchupListViewModel,
-            forceChoppedMode: $fantasyMatchupListViewModel.forceChoppedMode
-        )
-        .padding(.horizontal, 24) // Increased from 20 to bring it in more
-        .padding(.top, 10) // Added top padding
+        if let vm = fantasyMatchupListViewModel {
+            FantasySingleLeagueContentView(
+                draftRoomViewModel: draftRoomViewModel,
+                weekManager: weekManager,
+                fantasyViewModel: fantasyViewModel,
+                fantasyMatchupListViewModel: vm,
+                forceChoppedMode: Binding(
+                    get: { vm.forceChoppedMode },
+                    set: { vm.forceChoppedMode = $0 }
+                )
+            )
+            .padding(.horizontal, 24) // Increased from 20 to bring it in more
+            .padding(.top, 10) // Added top padding
+        }
     }
     
     @ViewBuilder
     private var weekButton: some View {
         Button("Week \(weekManager.selectedWeek)") {
-            viewModel.presentWeekSelector()
+            fantasyViewModel.presentWeekSelector()
         }
         .font(.headline)
         .foregroundColor(.blue)
@@ -105,22 +124,29 @@ struct FantasyMatchupListView: View {
     private var weekPickerSheet: some View {
         WeekPickerView(
             weekManager: weekManager,
-            isPresented: $viewModel.showWeekSelector
+            isPresented: Binding(
+                get: { fantasyViewModel.showWeekSelector },
+                set: { fantasyViewModel.showWeekSelector = $0 }
+            )
         )
     }
     
     @ViewBuilder
     private var draftPositionSheet: some View {
-        if let league = fantasyMatchupListViewModel.selectedLeagueForPosition {
+        if let league = fantasyMatchupListViewModel?.selectedLeagueForPosition,
+           let vm = fantasyMatchupListViewModel {
             ESPNDraftPickSelectionSheet.forDraft(
                 leagueName: league.league.name,
                 maxTeams: league.league.totalRosters,
-                selectedPosition: $fantasyMatchupListViewModel.selectedDraftPosition,
+                selectedPosition: Binding(
+                    get: { vm.selectedDraftPosition },
+                    set: { vm.selectedDraftPosition = $0 }
+                ),
                 onConfirm: { position in
-                    fantasyMatchupListViewModel.confirmDraftPosition(league, position: position)
+                    vm.confirmDraftPosition(league, position: position)
                 },
                 onCancel: {
-                    fantasyMatchupListViewModel.cancelDraftPositionSelection()
+                    vm.cancelDraftPositionSelection()
                 }
             )
         }
@@ -128,14 +154,15 @@ struct FantasyMatchupListView: View {
     
     @ViewBuilder
     private var leaguePickerOverlay: some View {
-        if fantasyMatchupListViewModel.showLeaguePicker {
+        if fantasyMatchupListViewModel?.showLeaguePicker == true,
+           let vm = fantasyMatchupListViewModel {
             LeaguePickerOverlay(
-                leagues: fantasyMatchupListViewModel.availableLeagues,
+                leagues: vm.availableLeagues,
                 onLeagueSelected: { selectedLeague in
-                    fantasyMatchupListViewModel.selectLeagueFromPicker(selectedLeague)
+                    vm.selectLeagueFromPicker(selectedLeague)
                 },
                 onDismiss: {
-                    fantasyMatchupListViewModel.showLeaguePicker = false
+                    vm.showLeaguePicker = false
                 }
             )
             .zIndex(1000) // Ensure it's on top
@@ -146,7 +173,7 @@ struct FantasyMatchupListView: View {
     
     private func handleLeagueChange(_ newLeague: UnifiedLeagueManager.LeagueWrapper?) {
         // Only react to actual changes, not repeat values
-        guard !fantasyMatchupListViewModel.isSettingUpLeague else {
+        guard fantasyMatchupListViewModel?.isSettingUpLeague == false else {
             print("🔄 LEAGUE CHANGE: Ignoring during setup")
             return
         }
@@ -156,15 +183,15 @@ struct FantasyMatchupListView: View {
         // Debounce this call to prevent rapid fire
         Task {
             try? await Task.sleep(for: .milliseconds(100))
-            if !fantasyMatchupListViewModel.isDetectingSmartMode && !fantasyMatchupListViewModel.isSettingUpLeague {
-                await fantasyMatchupListViewModel.smartModeDetection()
+            if fantasyMatchupListViewModel?.isDetectingSmartMode == false && fantasyMatchupListViewModel?.isSettingUpLeague == false {
+                await fantasyMatchupListViewModel?.smartModeDetection()
             }
         }
     }
     
     private func setupViewModels() {
         // Pass the shared DraftRoomViewModel to both ViewModels
-        fantasyMatchupListViewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
-        viewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
+        fantasyMatchupListViewModel?.setSharedDraftRoomViewModel(draftRoomViewModel)
+        // FantasyViewModel is now from @Environment, no need to call setSharedDraftRoomViewModel
     }
 }

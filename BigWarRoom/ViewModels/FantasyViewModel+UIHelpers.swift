@@ -26,7 +26,8 @@ extension FantasyViewModel {
     }
     
     // 🔥 NEW: Get corrected score for individual player (for Fantasy Player Cards)
-    func getCorrectedPlayerScore(for player: FantasyPlayer) -> Double {
+    // 🔥 PHASE 3 DI: Accept matchupsHubViewModel as parameter instead of using .shared
+    func getCorrectedPlayerScore(for player: FantasyPlayer, matchupsHubViewModel: MatchupsHubViewModel) -> Double {
         guard let selectedLeague = selectedLeague else {
             return player.currentPoints ?? 0.0
         }
@@ -35,8 +36,8 @@ extension FantasyViewModel {
         let currentWeek = WeekSelectionManager.shared.selectedWeek
         let currentYear = AppConstants.currentSeasonYear
         
-        // Get cached provider from MatchupsHubViewModel
-        if let cachedProvider = MatchupsHubViewModel.shared.getCachedProvider(
+        // Get cached provider from MatchupsHubViewModel (now passed as parameter)
+        if let cachedProvider = matchupsHubViewModel.getCachedProvider(
             for: selectedLeague,
             week: currentWeek,
             year: currentYear
@@ -65,19 +66,24 @@ extension FantasyViewModel {
                 }
             }
             
-            // For Sleeper leagues, use the calculated score if available
-            if selectedLeague.source == .sleeper && cachedProvider.hasPlayerScores() {
-                let calculatedScore = cachedProvider.getPlayerScore(playerId: player.id)
-                
-                // 🔥 DEBUG: Log when we're using calculated vs cached scores
-                if let cachedScore = player.currentPoints, abs(calculatedScore - cachedScore) > 0.01 {
-                    DebugPrint(mode: .sleeperAPI, "🎯 SLEEPER CORRECTED SCORE: \(player.fullName)")
-                    DebugPrint(mode: .sleeperAPI, "   Cached Score: \(cachedScore)")
-                    DebugPrint(mode: .sleeperAPI, "   Calculated Score: \(calculatedScore)")
-                    DebugPrint(mode: .sleeperAPI, "   Using calculated score from cached provider")
+            // For Sleeper leagues, use the direct score from the matchup
+            // We no longer need hasPlayerScores() or getPlayerScore() since the scores are already
+            // calculated and present in the matchup data
+            for matchup in matchups {
+                let teams = [matchup.awayTeam, matchup.homeTeam]
+                for team in teams {
+                    if let freshPlayer = team.roster.first(where: { $0.id == player.id || $0.sleeperID == player.sleeperID }) {
+                        // 🔥 DEBUG: Log when we're using calculated vs cached scores
+                        if let cachedScore = player.currentPoints, abs(freshPlayer.currentPoints ?? 0.0 - cachedScore) > 0.01 {
+                            DebugPrint(mode: .sleeperAPI, "🎯 SLEEPER CORRECTED SCORE: \(player.fullName)")
+                            DebugPrint(mode: .sleeperAPI, "   Cached Score: \(cachedScore)")
+                            DebugPrint(mode: .sleeperAPI, "   Fresh Score: \(freshPlayer.currentPoints ?? 0.0)")
+                            DebugPrint(mode: .sleeperAPI, "   Using fresh score from cached matchup")
+                        }
+                        
+                        return freshPlayer.currentPoints ?? 0.0
+                    }
                 }
-                
-                return calculatedScore
             }
         }
         

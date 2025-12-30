@@ -11,10 +11,12 @@ import SwiftUI
 /// 
 /// Strategic opponent analysis across all leagues
 struct OpponentIntelligenceDashboardView: View {
-    @State private var viewModel = OpponentIntelligenceViewModel(
-        matchupsHubViewModel: MatchupsHubViewModel.shared,
-        allLivePlayersViewModel: AllLivePlayersViewModel.shared
-    )
+    // 🔥 PHASE 3 DI: Use @Environment for ViewModels instead of creating with .shared
+    @Environment(MatchupsHubViewModel.self) private var matchupsHub
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    
+    // 🔥 PHASE 3 DI: Create ViewModel using @State
+    @State private var viewModel: OpponentIntelligenceViewModel?
     @State private var watchService = PlayerWatchService.shared
     @State private var showingFilters = false
     @State private var selectedIntelligence: OpponentIntelligence?
@@ -38,7 +40,8 @@ struct OpponentIntelligenceDashboardView: View {
     
     // Computed properties for display values
     private var currentThreatLevelDisplay: String {
-        switch viewModel.selectedThreatLevel {
+        guard let vm = viewModel else { return "All" }
+        switch vm.selectedThreatLevel {
         case .critical: return "Critical"
         case .high: return "High" 
         case .medium: return "Medium"
@@ -48,11 +51,11 @@ struct OpponentIntelligenceDashboardView: View {
     }
 
     private var currentSortByDisplay: String {
-        viewModel.sortBy.rawValue
+        viewModel?.sortBy.rawValue ?? "Score"
     }
 
     private var conflictsOnlyDisplay: String {
-        viewModel.showConflictsOnly ? "Yes" : "No"
+        (viewModel?.showConflictsOnly ?? false) ? "Yes" : "No"
     }
     
     var body: some View {
@@ -64,37 +67,40 @@ struct OpponentIntelligenceDashboardView: View {
                 // #GoodNav Header (matching Mission Control exactly)
                 headerSection
                 
-                if viewModel.isLoading {
+                if viewModel?.isLoading == true {
                     loadingView
-                } else if viewModel.opponentIntelligence.isEmpty {
+                } else if viewModel?.opponentIntelligence.isEmpty == true {
                     emptyStateView
                 } else {
                     // Main content
                     ScrollView {
                         VStack(spacing: 16) {
                             // 1. PLAYER INJURY ALERTS (highest priority) - ALWAYS SHOW
-                            playerInjuryAlertsSection
+                            if let vm = viewModel {
+                                playerInjuryAlertsSection(viewModel: vm)
+                            }
                             
                             // 2. GAME ALERTS (highest scoring plays per refresh) - DISABLED 🚫
-                            // 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
-                            // TO RE-ENABLE: Uncomment the section below and ensure GameAlertsManager is properly integrated
-                            // gameAlertsSection
                             
                             // 3. CRITICAL THREAT ALERTS (strategic recommendations excluding injuries)
-                            if !viewModel.nonInjuryRecommendations.isEmpty {
-                                criticalThreatAlertsSection
+                            if let vm = viewModel, !vm.nonInjuryRecommendations.isEmpty {
+                                criticalThreatAlertsSection(viewModel: vm)
                             }
                             
                             // 4. THREAT MATRIX
-                            threatMatrixSection
+                            if let vm = viewModel {
+                                threatMatrixSection(viewModel: vm)
+                            }
                             
                             // 5. CONFLICT ALERTS
-                            if !viewModel.conflictPlayers.isEmpty {
-                                conflictsSection
+                            if let vm = viewModel, !vm.conflictPlayers.isEmpty {
+                                conflictsSection(viewModel: vm)
                             }
                             
                             // 6. ALL OPPONENT PLAYERS
-                            opponentPlayersSection
+                            if let vm = viewModel {
+                                opponentPlayersSection(viewModel: vm)
+                            }
                         }
                         .padding(.horizontal, 16)
                         .padding(.bottom, 100) // Tab bar space
@@ -102,20 +108,37 @@ struct OpponentIntelligenceDashboardView: View {
                 }
             }
         }
+        .onAppear {
+            // Initialize viewModel with environment dependencies
+            if viewModel == nil {
+                viewModel = OpponentIntelligenceViewModel(
+                    matchupsHubViewModel: matchupsHub,
+                    allLivePlayersViewModel: allLivePlayersViewModel
+                )
+            }
+        }
         .task {
-            await viewModel.loadOpponentIntelligence()
+            if let vm = viewModel {
+                await vm.loadOpponentIntelligence()
+            }
         }
         .refreshable {
-            await viewModel.manualRefresh()
+            if let vm = viewModel {
+                await vm.manualRefresh()
+            }
         }
-        .onChange(of: viewModel.lastUpdateTime) {
-            watchService.updateWatchedPlayerScores(viewModel.allOpponentPlayers)
+        .onChange(of: viewModel?.lastUpdateTime ?? Date()) {
+            if let vm = viewModel {
+                watchService.updateWatchedPlayerScores(vm.allOpponentPlayers)
+            }
         }
         .sheet(item: $selectedIntelligence) { intelligence in
             OpponentDetailSheet(intelligence: intelligence)
         }
         .sheet(isPresented: $showingFilters) {
-            OpponentFiltersSheet(viewModel: viewModel)
+            if let vm = viewModel {
+                OpponentFiltersSheet(viewModel: vm)
+            }
         }
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(
@@ -132,9 +155,6 @@ struct OpponentIntelligenceDashboardView: View {
         .sheet(isPresented: $showingInjuryAlertsInfo) {
             IntelligenceSectionInfoSheet(sectionType: .injuryAlerts)
         }
-        // .sheet(isPresented: $showingGameAlertsInfo) { // DISABLED: Game alerts info sheet
-        //     IntelligenceSectionInfoSheet(sectionType: .gameAlerts)
-        // }
         .sheet(isPresented: $showingThreatAlertsInfo) {
             IntelligenceSectionInfoSheet(sectionType: .criticalThreatAlerts)
         }
@@ -150,7 +170,9 @@ struct OpponentIntelligenceDashboardView: View {
         .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
             // Nuclear option: Clear ALL caches and force fresh load when week changes
             Task {
-                await viewModel.weekChangeReload()
+                if let vm = viewModel {
+                    await vm.weekChangeReload()
+                }
             }
         }
     }
@@ -175,7 +197,7 @@ struct OpponentIntelligenceDashboardView: View {
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.white)
                     
-                    Text("Opponent Analysis • \(viewModel.timeAgo(viewModel.lastUpdateTime))")
+                    Text("Opponent Analysis • \(viewModel?.timeAgo(viewModel?.lastUpdateTime ?? Date()) ?? "")")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.white.opacity(0.7))
                 }
@@ -241,7 +263,7 @@ struct OpponentIntelligenceDashboardView: View {
                 
                 // Refresh button
                 Button(action: { 
-                    Task { await viewModel.manualRefresh() }
+                    Task { await viewModel?.manualRefresh() }
                 }) {
                     Image(systemName: "arrow.clockwise.circle.fill")
                         .font(.system(size: 22))
@@ -273,19 +295,19 @@ struct OpponentIntelligenceDashboardView: View {
                 // Threat Level filter with dropdown
                 Menu {
                     Button("All") {
-                        viewModel.setThreatLevelFilter(.none)
+                        viewModel?.setThreatLevelFilter(.none)
                     }
                     Button("Critical") {
-                        viewModel.setThreatLevelFilter(.critical)
+                        viewModel?.setThreatLevelFilter(.critical)
                     }
                     Button("High") {
-                        viewModel.setThreatLevelFilter(.high)
+                        viewModel?.setThreatLevelFilter(.high)
                     }
                     Button("Medium") {
-                        viewModel.setThreatLevelFilter(.medium)
+                        viewModel?.setThreatLevelFilter(.medium)
                     }
                     Button("Low") {
-                        viewModel.setThreatLevelFilter(.low)
+                        viewModel?.setThreatLevelFilter(.low)
                     }
                 } label: {
                     VStack(spacing: 2) {
@@ -306,14 +328,14 @@ struct OpponentIntelligenceDashboardView: View {
                 
                 // Position filter with dropdown
                 Menu {
-                    ForEach(viewModel.availablePositions, id: \.self) { position in
+                    ForEach(viewModel?.availablePositions ?? ["All"], id: \.self) { position in
                         Button(position) {
-                            viewModel.setPositionFilter(position)
+                            viewModel?.setPositionFilter(position)
                         }
                     }
                 } label: {
                     VStack(spacing: 2) {
-                        Text(viewModel.selectedPosition)
+                        Text(viewModel?.selectedPosition ?? "All")
                             .font(.subheadline)
                             .fontWeight(.bold)
                             .foregroundColor(.purple)
@@ -332,7 +354,7 @@ struct OpponentIntelligenceDashboardView: View {
                 Menu {
                     ForEach(OpponentIntelligenceViewModel.SortMethod.allCases) { sortMethod in
                         Button(sortMethod.rawValue) {
-                            viewModel.setSortMethod(sortMethod)
+                            viewModel?.setSortMethod(sortMethod)
                         }
                     }
                 } label: {
@@ -354,13 +376,13 @@ struct OpponentIntelligenceDashboardView: View {
                 
                 // Conflicts Only toggle
                 Button(action: { 
-                    viewModel.toggleConflictsOnly()
+                    viewModel?.toggleConflictsOnly()
                 }) {
                     VStack(spacing: 2) {
                         Text(conflictsOnlyDisplay)
                             .font(.subheadline)
                             .fontWeight(.bold)
-                            .foregroundColor(viewModel.showConflictsOnly ? .orange : .gray)
+                            .foregroundColor((viewModel?.showConflictsOnly ?? false) ? .orange : .gray)
                         
                         Text("Conflicts only")
                             .font(.caption2)
@@ -391,7 +413,7 @@ struct OpponentIntelligenceDashboardView: View {
     // MARK: - New Collapsible Sections
     
     /// 1. Player Injury Alerts Section (highest priority)
-    private var playerInjuryAlertsSection: some View {
+    private func playerInjuryAlertsSection(viewModel: OpponentIntelligenceViewModel) -> some View {
         CollapsibleSection(
             title: "Player Injury Alerts",
             notice: "NOTICE: Data may continue to update in real-time.",
@@ -417,50 +439,8 @@ struct OpponentIntelligenceDashboardView: View {
         }
     }
     
-    /// 2. Game Alerts Section (highest scoring plays per refresh) - DISABLED 🚫
-    /// 🚫 DISABLED 2024: Game alerts functionality temporarily disabled due to performance concerns
-    /// TO RE-ENABLE: Uncomment this entire section and ensure GameAlertsManager is active
-    /*
-    private var gameAlertsSection: some View {
-        CollapsibleSection(
-            title: "🚨 Game Alerts",
-            notice: viewModel.gameAlertsManager.hasAlerts ? "Live scoring updates from refreshes" : nil,
-            count: viewModel.gameAlertsManager.alertCount,
-            isExpanded: $showGameAlerts,
-            infoAction: { showingGameAlertsInfo = true }
-        ) {
-            VStack(spacing: 12) {
-                if viewModel.gameAlertsManager.hasAlerts {
-                    LazyVStack(spacing: 12) {
-                        ForEach(viewModel.gameAlertsManager.sessionAlerts.prefix(10)) { alert in
-                            GameAlertCard(alert: alert)
-                        }
-                    }
-                } else {
-                    // Empty state for game alerts
-                    VStack(spacing: 12) {
-                        Image(systemName: "bolt.slash.circle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.white.opacity(0.4))
-                        
-                        Text("No game alerts yet")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        Text("Big plays will appear here as they happen during refreshes")
-                            .font(.system(size: 14))
-                            .foregroundColor(.white.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(.vertical, 20)
-                }
-            }
-        }
-    }
-    */
-    
     /// 2. Critical Threat Alerts Section (non-injury strategic recommendations)
-    private var criticalThreatAlertsSection: some View {
+    private func criticalThreatAlertsSection(viewModel: OpponentIntelligenceViewModel) -> some View {
         CollapsibleSection(
             title: "⚠️ Critical Threat Alerts",
             count: viewModel.nonInjuryRecommendations.count,
@@ -471,7 +451,7 @@ struct OpponentIntelligenceDashboardView: View {
                 ForEach(viewModel.nonInjuryRecommendations.prefix(5)) { recommendation in
                     RecommendationCard(recommendation: recommendation)
                         .onTapGesture {
-                            handleRecommendationTap(recommendation)
+                            handleRecommendationTap(recommendation, viewModel: viewModel)
                         }
                 }
             }
@@ -479,7 +459,7 @@ struct OpponentIntelligenceDashboardView: View {
     }
     
     /// 3. Enhanced Threat Matrix Section
-    private var threatMatrixSection: some View {
+    private func threatMatrixSection(viewModel: OpponentIntelligenceViewModel) -> some View {
         CollapsibleSection(
             title: "🎯 Threat Matrix",
             count: viewModel.filteredIntelligence.count,
@@ -498,7 +478,7 @@ struct OpponentIntelligenceDashboardView: View {
     }
     
     /// 4. Enhanced Conflicts Section
-    private var conflictsSection: some View {
+    private func conflictsSection(viewModel: OpponentIntelligenceViewModel) -> some View {
         CollapsibleSection(
             title: "⚔️ Player Conflicts",
             count: viewModel.conflictPlayers.count,
@@ -514,7 +494,7 @@ struct OpponentIntelligenceDashboardView: View {
     }
     
     /// 5. Enhanced Opponent Players Section
-    private var opponentPlayersSection: some View {
+    private func opponentPlayersSection(viewModel: OpponentIntelligenceViewModel) -> some View {
         CollapsibleSection(
             title: "👥 All Opponent Players",
             count: viewModel.filteredOpponentPlayers.count,
@@ -555,7 +535,7 @@ struct OpponentIntelligenceDashboardView: View {
     // MARK: - Navigation Helpers
     
     /// Handle taps on recommendation cards
-    private func handleRecommendationTap(_ recommendation: StrategicRecommendation) {
+    private func handleRecommendationTap(_ recommendation: StrategicRecommendation, viewModel: OpponentIntelligenceViewModel) {
         // For Critical Threat Alerts, find the matching intelligence and navigate to its matchup
         if recommendation.title.contains("Critical Threat Alert"),
            let opponentTeam = recommendation.opponentTeam {
@@ -572,13 +552,51 @@ struct OpponentIntelligenceDashboardView: View {
         if recommendation.type == .injuryAlert, let matchup = recommendation.matchup {
             selectedMatchup = matchup
         }
-        
-        // For Player Conflicts, could show conflict details or navigate to first conflicted league
-        // For now, we'll handle Critical Threat Alerts and Injury Alerts
     }
 }
 
 #Preview("Intelligence Dashboard - #GoodNav Template") {
+    let espnCredentials = ESPNCredentialsManager.shared
+    let sleeperCredentials = SleeperCredentialsManager.shared
+    let playerDirectory = PlayerDirectoryStore.shared
+    let gameStatusService = GameStatusService.shared
+    let sharedStatsService = SharedStatsService.shared
+    let weekSelectionManager = WeekSelectionManager.shared
+    
+    let sleeperClient = SleeperAPIClient()
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    
+    let allLivePlayersViewModel = AllLivePlayersViewModel(
+        matchupsHubViewModel: matchupsHub,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
     OpponentIntelligenceDashboardView()
+        .environment(matchupsHub)
+        .environment(allLivePlayersViewModel)
         .preferredColorScheme(.dark)
 }

@@ -2,7 +2,7 @@
 //  DraftWarRoomApp.swift
 //  DraftWarRoom
 //
-//  🔥 HYBRID APPROACH: DI at app root + Bridge pattern for backward compatibility
+//  🔥 PURE DI: All dependencies injected via @Observable and @Environment
 //
 
 import SwiftUI
@@ -13,25 +13,50 @@ struct DraftWarRoomApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lifecycleManager = AppLifecycleManager.shared
     
+    // 🔥 PHASE 4: Store all ViewModels as @State for proper lifecycle
+    @State private var appContainer: AppContainer
+    
     init() {
-        // 🔥 HYBRID APPROACH: Create all services with DI at app root, then set .shared
-        setupServicesWithDI()
+        // 🔥 CRITICAL: Clean up corrupted UserDefaults at startup
+        AppConstants.cleanupCorruptedUserDefaults()
+        
+        // Initialize app container with all dependencies
+        _appContainer = State(wrappedValue: AppContainer())
     }
     
     var body: some Scene {
         WindowGroup {
             MainAppView()
+                // 🔥 PHASE 4: Inject ALL dependencies via environment
+                .environment(appContainer.matchupsHubViewModel)
+                .environment(appContainer.fantasyViewModel)
+                .environment(appContainer.matchupDataStore)
+                .environment(appContainer.allLivePlayersViewModel)
+                .environment(NFLGameDataService.shared)
+                .environment(NFLWeekService.shared)
+                .environment(PlayerDirectoryStore.shared)
+                .environment(PlayerWatchService.shared)
         }
         // 🔋 BATTERY FIX: Update lifecycle manager when scene phase changes
         .onChange(of: scenePhase) { oldPhase, newPhase in
             lifecycleManager.updatePhase(newPhase)
         }
     }
+}
+
+// MARK: - App Container (Dependency Injection Container)
+
+/// Holds all app-level dependencies with proper initialization order
+@MainActor
+final class AppContainer {
+    // Core services (still using .shared for now - refactor later)
+    let matchupDataStore: MatchupDataStore
+    let matchupsHubViewModel: MatchupsHubViewModel
+    let fantasyViewModel: FantasyViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
-    /// Setup all services with proper dependency injection, then set shared instances
-    private func setupServicesWithDI() {
-        // 🔥 CRITICAL: Clean up corrupted UserDefaults at startup
-        AppConstants.cleanupCorruptedUserDefaults()
+    init() {
+        print("🔥 APP CONTAINER: Initializing all services with DI")
         
         // MARK: - Core API Clients
         let sleeperAPIClient = SleeperAPIClient()
@@ -82,17 +107,46 @@ struct DraftWarRoomApp: App {
         )
         SharedStatsService.setSharedInstance(sharedStatsService)
         
-        // MARK: - ViewModels
-        let matchupsHubViewModel = MatchupsHubViewModel(
+        // MARK: - 🔥 PHASE 4: MatchupDataStore with DI (NO BRIDGE)
+        let unifiedLeagueManagerForStore = UnifiedLeagueManager(
+            sleeperClient: sleeperAPIClient,
+            espnClient: espnAPIClient,
+            espnCredentials: espnCredentials
+        )
+        
+        self.matchupDataStore = MatchupDataStore(
+            unifiedLeagueManager: unifiedLeagueManagerForStore,
+            sharedStatsService: sharedStatsService,
+            gameStatusService: gameStatusService,
+            weekSelectionManager: weekSelectionManager
+        )
+        
+        // MARK: - 🔥 PHASE 4: MatchupsHubViewModel with DI (NO BRIDGE)
+        self.matchupsHubViewModel = MatchupsHubViewModel(
             espnCredentials: espnCredentials,
             sleeperCredentials: sleeperCredentials,
             playerDirectory: playerDirectory,
             gameStatusService: gameStatusService,
-            sharedStatsService: sharedStatsService
+            sharedStatsService: sharedStatsService,
+            matchupDataStore: matchupDataStore
         )
-        MatchupsHubViewModel.setSharedInstance(matchupsHubViewModel)
         
-        let allLivePlayersViewModel = AllLivePlayersViewModel(
+        // MARK: - 🔥 PHASE 4: FantasyViewModel with DI (NO BRIDGE)
+        let unifiedLeagueManagerForFantasy = UnifiedLeagueManager(
+            sleeperClient: SleeperAPIClient(),
+            espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
+            espnCredentials: espnCredentials
+        )
+        
+        self.fantasyViewModel = FantasyViewModel(
+            matchupDataStore: matchupDataStore,
+            unifiedLeagueManager: unifiedLeagueManagerForFantasy,
+            sleeperCredentials: sleeperCredentials,
+            playerDirectoryStore: playerDirectory
+        )
+        
+        // MARK: - AllLivePlayersViewModel with DI
+        self.allLivePlayersViewModel = AllLivePlayersViewModel(
             matchupsHubViewModel: matchupsHubViewModel,
             playerDirectory: playerDirectory,
             gameStatusService: gameStatusService,
@@ -101,6 +155,7 @@ struct DraftWarRoomApp: App {
         )
         AllLivePlayersViewModel.setSharedInstance(allLivePlayersViewModel)
         
+        // MARK: - Supporting Services
         let playerWatchService = PlayerWatchService(
             weekManager: weekSelectionManager,
             allLivePlayersViewModel: allLivePlayersViewModel
@@ -126,22 +181,26 @@ struct DraftWarRoomApp: App {
         // Mark services as ready for AppLifecycleManager idle timer logic
         AppLifecycleManager.shared.markServicesReady()
         
-        print("✅ HYBRID DI: All services initialized with proper dependency injection")
+        print("✅ APP CONTAINER: All services initialized with pure DI")
     }
 }
 
 // MARK: - Main App View with Spinning Orbs Loading
 struct MainAppView: View {
+    @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
     @State private var showingLoading = true
     @State private var shouldShowOnboarding = false
     
     var body: some View {
         Group {
             if showingLoading {
-                SpinningOrbsLoadingScreen { needsOnboarding in
-                    shouldShowOnboarding = needsOnboarding
-                    showingLoading = false
-                }
+                SpinningOrbsLoadingScreen(
+                    matchupsHubViewModel: matchupsHubViewModel,
+                    onComplete: { needsOnboarding in
+                        shouldShowOnboarding = needsOnboarding
+                        showingLoading = false
+                    }
+                )
             } else {
                 MainTabView(startOnSettings: shouldShowOnboarding)
             }
@@ -153,6 +212,7 @@ struct MainAppView: View {
 
 // MARK: - Spinning Orbs Loading Screen
 struct SpinningOrbsLoadingScreen: View {
+    let matchupsHubViewModel: MatchupsHubViewModel
     let onComplete: (Bool) -> Void
     
     @State private var scale: CGFloat = 0.5
@@ -213,7 +273,7 @@ struct SpinningOrbsLoadingScreen: View {
 
 				   Spacer()
 
-					  // 🔥 VERSION TEXT - FINALLY IN THE RIGHT PLACE
+					  // 🔥 VERSION TEXT
                     Text("Version: \(AppConstants.getVersion())")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.white.opacity(0.7))
@@ -283,7 +343,7 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadCredentials() async {
-        // Just a brief pause - credentials are already loaded in setupServicesWithDI()
+        // Just a brief pause - credentials are already loaded in AppContainer
         try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
@@ -293,8 +353,8 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadMatchups() async {
-        // 🔥 FIX: Actually load matchups (this also loads leagues internally)
-        await MatchupsHubViewModel.shared.loadAllMatchups()
+        // 🔥 PHASE 4: Use injected instance instead of .shared
+        await matchupsHubViewModel.loadAllMatchups()
     }
     
     private func loadPlayers() async {
@@ -365,6 +425,7 @@ extension Color {
 
 // MARK: - Unified Main Tab View
 struct MainTabView: View {
+    @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
     @State private var draftRoomViewModel = DraftRoomViewModel()
     @AppStorage("MainTabView_SelectedTab") private var storedSelectedTab: Int = 0
     @State private var hasInitialized = false
@@ -431,14 +492,14 @@ struct MainTabView: View {
                 }
                 .tag(4)
             }
+            // 🔥 FIX: Add all services to environment for all tabs
+            .environment(WeekSelectionManager.shared)
+            .environment(NFLStandingsService.shared)
+            .environment(NFLGameDataService.shared)
+            .environment(TeamAssetManager.shared)
+            .environment(ESPNCredentialsManager.shared)
             .id("tabview-\(SmartRefreshManager.shared.hasLiveGames)")
             .tint(SmartRefreshManager.shared.hasLiveGames ? .gpGreen : .blue)
-            .environment(NFLGameDataService.shared)
-            .environment(NFLWeekService.shared)
-            .environment(AllLivePlayersViewModel.shared)
-            .environment(PlayerDirectoryStore.shared)
-            .environment(MatchupsHubViewModel.shared)
-            .environment(PlayerWatchService.shared)
             .onAppear {
                 SmartRefreshManager.shared.calculateOptimalRefresh()
             }

@@ -10,12 +10,20 @@ import SwiftUI
 
 struct NFLScheduleView: View {
     @State private var viewModel: NFLScheduleViewModel?
-    @State private var matchupsHubViewModel = MatchupsHubViewModel.shared
+    @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
+    @Environment(WeekSelectionManager.self) private var weekSelectionManager
+    @Environment(NFLStandingsService.self) private var standingsService
+    @Environment(TeamAssetManager.self) private var teamAssetManager
+    @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
+    @Environment(ESPNCredentialsManager.self) private var espnCredentials
     @State private var showingWeekPicker = false
     @State private var showingTeamMatchups = false
     @State private var selectedGame: ScheduleGame?
     @State private var navigationPath = NavigationPath()
-    @State private var standingsService = NFLStandingsService.shared
+    
+    // 🔥 NEW: Store SleeperAPIClient locally (not observable, so can't be @Environment)
+    @State private var sleeperAPIClient: SleeperAPIClient?
     
     // Keep legend pills same width so the explanation text aligns
     private let legendPillWidth: CGFloat = 78
@@ -56,7 +64,7 @@ struct NFLScheduleView: View {
         cardStyle == 3
     }
     
-    // 🔥 SIMPLIFIED: No params needed, use .shared internally
+    // 🔥 SIMPLIFIED: No params needed, use @Environment services
     init() {}
     
     var body: some View {
@@ -77,18 +85,22 @@ struct NFLScheduleView: View {
                 }
             } else {
                 ProgressView("Loading...")
-                    .onAppear {
-                        // 🔥 CREATE ViewModel with .shared services
+                    .task {
+                        // 🔥 CREATE services with injected dependencies
+                        let sleeperAPI = SleeperAPIClient()
+                        sleeperAPIClient = sleeperAPI
+                        
                         viewModel = NFLScheduleViewModel(
-                            gameDataService: NFLGameDataService.shared,
-                            weekService: NFLWeekService.shared
+                            gameDataService: nflGameDataService,
+                            weekService: nflWeekService
                         )
                         
-                        // 🔥 CREATE UnifiedLeagueManager with proper ESPN credentials
+                        // 🔥 CREATE UnifiedLeagueManager with proper credentials
+                        let espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)
                         unifiedLeagueManager = UnifiedLeagueManager(
-                            sleeperClient: SleeperAPIClient(),
-                            espnClient: ESPNAPIClient(credentialsManager: ESPNCredentialsManager.shared),
-                            espnCredentials: ESPNCredentialsManager.shared
+                            sleeperClient: sleeperAPI,
+                            espnClient: espnAPIClient,
+                            espnCredentials: espnCredentials
                         )
                     }
             }
@@ -148,20 +160,20 @@ struct NFLScheduleView: View {
         // BEFORE: .sheet(isPresented: $showingTeamMatchups) { TeamFilteredMatchupsView(...) }
         // AFTER: NavigationLinks in game cards handle navigation
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(weekManager: WeekSelectionManager.shared, isPresented: $showingWeekPicker)
+            WeekPickerView(weekManager: weekSelectionManager, isPresented: $showingWeekPicker)
         }
         // Sync with shared week manager
-        .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, newWeek in
+        .onChange(of: weekSelectionManager.selectedWeek) { _, newWeek in
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: WeekSelectionManager changed to week \(newWeek), updating view model")
             viewModel?.selectWeek(newWeek)
         }
         .onAppear {
             print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
             
-            DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(WeekSelectionManager.shared.selectedWeek)")
+            DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(weekSelectionManager.selectedWeek)")
             
             // Sync initial week
-            viewModel?.selectWeek(WeekSelectionManager.shared.selectedWeek)
+            viewModel?.selectWeek(weekSelectionManager.selectedWeek)
             
             // Start global auto-refresh for live scores
             viewModel?.refreshSchedule() // Initial load only
@@ -182,7 +194,7 @@ struct NFLScheduleView: View {
     private func scheduleHeader(viewModel: NFLScheduleViewModel) -> some View {
         VStack(spacing: 8) {
             // Week picker - using reusable TheWeekPicker component
-            TheWeekPicker(showingWeekPicker: $showingWeekPicker)
+            TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
             
             // Week starting date + Card style toggle
             HStack {
@@ -335,6 +347,7 @@ struct NFLScheduleView: View {
                         awayTeam: game.awayTeam,
                         homeTeam: game.homeTeam,
                         matchupsHubViewModel: matchupsHubViewModel,
+                        standingsService: standingsService,
                         gameData: game
                     )) {
                         ScheduleGameCard(
@@ -355,7 +368,10 @@ struct NFLScheduleView: View {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
-                        matchupsHubViewModel: matchupsHubViewModel
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        weekSelectionManager: weekSelectionManager,
+                        standingsService: standingsService,
+                        teamAssetManager: teamAssetManager
                     )
                     .padding(.top, 24)
                 } else if viewModel.byeWeekTeams.isEmpty {
@@ -439,7 +455,10 @@ struct NFLScheduleView: View {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
-                        matchupsHubViewModel: matchupsHubViewModel
+                        matchupsHubViewModel: matchupsHubViewModel,
+                        weekSelectionManager: weekSelectionManager,
+                        standingsService: standingsService,
+                        teamAssetManager: teamAssetManager
                     )
                     .padding(.top, 12)
                 }
@@ -569,6 +588,7 @@ struct NFLScheduleView: View {
                                 awayTeam: game.awayTeam,
                                 homeTeam: game.homeTeam,
                                 matchupsHubViewModel: matchupsHubViewModel,
+                                standingsService: standingsService,
                                 gameData: game
                             )) {
                                 ScheduleGameCard(
@@ -645,7 +665,7 @@ struct NFLScheduleView: View {
                 .foregroundStyle(
                     useMinimalHeaders
                         ? (hasLiveGames ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.white.opacity(0.7)))
-                        : (hasLiveGames 
+                        : (hasLiveGames
                             ? AnyShapeStyle(LinearGradient(colors: [.red, .red.opacity(0.5)], startPoint: .top, endPoint: .bottom))
                             : AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)))
                 )
@@ -661,9 +681,6 @@ struct NFLScheduleView: View {
                 Text("LIVE")
                     .font(.system(size: 9, weight: .black))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.red))
             }
             
             Spacer()
@@ -785,6 +802,7 @@ struct NFLScheduleView: View {
                             awayTeam: game.awayTeam,
                             homeTeam: game.homeTeam,
                             matchupsHubViewModel: matchupsHubViewModel,
+                            standingsService: standingsService,
                             gameData: game
                         )) {
                             if cardStyle == 0 {
@@ -957,7 +975,7 @@ struct NFLScheduleView: View {
                         .font(.system(size: 14, weight: .black, design: .default))
                         .foregroundColor(.white)
                     
-                    Text("All 32 teams are active in Week \(WeekSelectionManager.shared.selectedWeek).")
+                    Text("All 32 teams are active in Week \(weekSelectionManager.selectedWeek).")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.white.opacity(0.75))
                 }
@@ -977,7 +995,7 @@ struct NFLScheduleView: View {
         }
         .padding(.horizontal, 20)
     }
-
+    
     private var playoffStatusKey: some View {
         VStack(spacing: 12) {
             // Playoff Status Section - styled like FULL SLATE
@@ -1137,7 +1155,7 @@ struct NFLScheduleView: View {
         }
         return false
     }
-
+    
     // MARK: - Helper function to get week start date
     private func getWeekStartDate() -> String {
         let calendar = Calendar.current
@@ -1164,7 +1182,7 @@ struct NFLScheduleView: View {
         }
         
         // Calculate the start date for the selected week
-        let weekStartDate = calendar.date(byAdding: .day, value: (WeekSelectionManager.shared.selectedWeek - 1) * 7, to: seasonStartDate)!
+        let weekStartDate = calendar.date(byAdding: .day, value: (weekSelectionManager.selectedWeek - 1) * 7, to: seasonStartDate)!
         
         // Format as "Thursday, Dec 5"
         let formatter = DateFormatter()

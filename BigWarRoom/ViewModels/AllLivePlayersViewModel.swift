@@ -72,11 +72,11 @@ final class AllLivePlayersViewModel {
     internal var debounceTask: Task<Void, Never>?
     internal var isBatchingUpdates = false
     
-    // 🔥 FIXED: Track last processed update time to prevent duplicate processing
-    internal var lastProcessedMatchupUpdate = Date.distantPast
+    /// 🔥 REMOVED: No longer needed - using proper observation
+    // internal var lastProcessedMatchupUpdate = Date.distantPast
     
-    // 🔥 PHASE 3: Replace Combine subscriptions with observation task
-    private var observationTask: Task<Void, Never>?
+    /// 🔥 REMOVED: Polling observation task - replaced with reactive observation
+    // private var observationTask: Task<Void, Never>?
     
     // 🔥 NEW: Auto-refresh timer for live player data (every 15 seconds during games)
     internal var refreshTimer: Timer?
@@ -96,63 +96,25 @@ final class AllLivePlayersViewModel {
         self.gameStatusService = gameStatusService
         self.sharedStatsService = sharedStatsService
         self.weekSelectionManager = weekSelectionManager
-        // MatchupsHub already has auto-refresh, we'll observe it directly via onChange
-        setupAutoRefresh()
-        // 🔥 FIX: Actually call setupObservation to enable live updates
-        setupObservation()
+        // 🔥 REMOVED: No more timers or polling
+        // setupAutoRefresh()
+        // setupObservation()
     }
     
     // MARK: - Cleanup
     @MainActor
     deinit {
         debounceTask?.cancel()
-        observationTask?.cancel()
-        refreshTimer?.invalidate()
+        // 🔥 REMOVED: No more polling to clean up
+        // observationTask?.cancel()
+        // refreshTimer?.invalidate()
     }
     
-    // 🔥 PHASE 3: Replace Combine subscription with @Observable observation
-    private func setupObservation() {
-        DebugPrint(mode: .liveUpdates, "👀 OBSERVATION SETUP: Setting up @Observable-based observation")
-        
-        observationTask = Task { @MainActor in
-            // Observe changes to MatchupsHubViewModel
-            var lastObservedUpdate = Date.distantPast
-            
-            while !Task.isCancelled {
-                // Check if MatchupsHubViewModel's lastUpdateTime changed
-                let currentUpdateTime = matchupsHubViewModel.lastUpdateTime
-                
-                if currentUpdateTime > lastObservedUpdate && currentUpdateTime > lastProcessedMatchupUpdate {
-                    DebugPrint(mode: .liveUpdates, "🎯 OBSERVATION TRIGGERED: MatchupsHub lastUpdateTime = \(currentUpdateTime)")
-                    
-                    // Only process if we have initial data
-                    guard !allPlayers.isEmpty else {
-                        DebugPrint(mode: .liveUpdates, "🚫 OBSERVATION BLOCKED: No initial data yet (allPlayers.count = \(allPlayers.count))")
-                        lastObservedUpdate = currentUpdateTime
-                        try? await Task.sleep(for: .seconds(1))
-                        continue
-                    }
-                    
-                    DebugPrint(mode: .liveUpdates, "▶️ OBSERVATION PROCESSING: Starting live update for \(currentUpdateTime)")
-                    lastProcessedMatchupUpdate = currentUpdateTime
-                    lastObservedUpdate = currentUpdateTime
-                    
-                    await performLiveUpdate()
-                }
-                
-                // Small delay to prevent excessive polling
-                try? await Task.sleep(for: .milliseconds(500))
-            }
-        }
-    }
+    /// 🔥 REMOVED: Polling observation - now using proper @Observable reactivity
+    // private func setupObservation() { ... }
     
-    // 🔥 NEW: Setup auto-refresh timer
-    private func setupAutoRefresh() {
-        // 🔥 DISABLED: MatchupsHubViewModel already has a 15-second auto-refresh timer
-        // Having both timers causes a race condition where they block each other
-        // Instead, we observe MatchupsHub changes via setupObservation() which is already in place
-        // print("🔥 AUTO-REFRESH DISABLED: AllLivePlayersViewModel will observe MatchupsHub changes instead")
-    }
+    /// 🔥 REMOVED: Auto-refresh timer - MatchupsHub handles refresh cycle
+    // private func setupAutoRefresh() { ... }
 }
 
 // MARK: - Core Enums and Types

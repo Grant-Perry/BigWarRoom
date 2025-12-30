@@ -9,9 +9,8 @@ import SwiftUI
 
 /// Main matchups hub view - focuses on core structure and state management
 struct MatchupsHubView: View {
-    
-    // 🔥 PHASE 3: Use @Bindable for @Observable ViewModels that need two-way binding
-    @Bindable internal var matchupsHubViewModel: MatchupsHubViewModel
+    // 🔥 PHASE 4: Use @Environment to get injected instance (internal for extensions)
+    @Environment(MatchupsHubViewModel.self) internal var matchupsHubViewModel
     
     // Dependencies injected via initializer (proper @Observable pattern)
     let weekManager: WeekSelectionManager
@@ -48,20 +47,17 @@ struct MatchupsHubView: View {
     // MARK: - Dependency injection initializer (PREFERRED)
     init(weekManager: WeekSelectionManager, 
          espnCredentials: ESPNCredentialsManager,
-         sleeperCredentials: SleeperCredentialsManager,
-         matchupsHubViewModel: MatchupsHubViewModel) {
+         sleeperCredentials: SleeperCredentialsManager) {
         self.weekManager = weekManager
         self.espnCredentials = espnCredentials
         self.sleeperCredentials = sleeperCredentials
-        self.matchupsHubViewModel = matchupsHubViewModel
     }
     
-    // MARK: - Default initializer (DEPRECATED - for backward compatibility)
+    // MARK: - Default initializer (uses .shared for backward compatibility)
     init() {
         self.weekManager = WeekSelectionManager.shared
-        self.espnCredentials = ESPNCredentialsManager()
+        self.espnCredentials = ESPNCredentialsManager.shared
         self.sleeperCredentials = SleeperCredentialsManager.shared
-        self.matchupsHubViewModel = MatchupsHubViewModel.shared
     }
     
     // MARK: - Computed Properties for State Access

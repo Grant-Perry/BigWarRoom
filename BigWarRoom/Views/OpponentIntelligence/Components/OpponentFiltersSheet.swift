@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Sheet for filtering and sorting opponent intelligence data
 struct OpponentFiltersSheet: View {
+    @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
     @Bindable var viewModel: OpponentIntelligenceViewModel
     @Environment(\.dismiss) private var dismiss
     
@@ -202,11 +203,4 @@ private struct FilterChip: View {
         }
         .buttonStyle(PlainButtonStyle())
     }
-}
-
-#Preview("Opponent Filters Sheet") {
-    OpponentFiltersSheet(viewModel: OpponentIntelligenceViewModel(
-        matchupsHubViewModel: MatchupsHubViewModel.shared,
-        allLivePlayersViewModel: AllLivePlayersViewModel.shared
-    ))
 }

@@ -46,13 +46,11 @@ final class FantasyMatchupListViewModel {
         self.fantasyViewModel = fantasyViewModel
     }
     
-    // 🔥 PHASE 2.5: Bridge compatibility initializer (DEPRECATED)
+    // 🔥 PHASE 2.5: Bridge compatibility initializer (TEMPORARY - will be removed)
+    // This uses .shared as a fallback but views should prefer DI via @Environment
     convenience init() {
-        self.init(
-            matchupsHubViewModel: MatchupsHubViewModel.shared,
-            weekManager: WeekSelectionManager.shared,
-            fantasyViewModel: FantasyViewModel.shared
-        )
+        // 🔥 Can't use .shared anymore - this init is deprecated
+        fatalError("FantasyMatchupListViewModel() init is deprecated. Use dependency injection instead.")
     }
     
     // MARK: - Setup

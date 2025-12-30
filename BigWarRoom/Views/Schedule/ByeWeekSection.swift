@@ -12,6 +12,9 @@ struct ScheduleByeWeekSection: View {
     let byeTeams: [NFLTeam]
     let unifiedLeagueManager: UnifiedLeagueManager
     let matchupsHubViewModel: MatchupsHubViewModel
+    let weekSelectionManager: WeekSelectionManager
+    let standingsService: NFLStandingsService
+    let teamAssetManager: TeamAssetManager
     
     @State private var byeWeekImpacts: [String: ByeWeekImpact] = [:]
     @State private var isLoadingImpacts = false
@@ -21,7 +24,7 @@ struct ScheduleByeWeekSection: View {
         VStack(alignment: .leading, spacing: 16) {
             // Section header with week number
             HStack {
-                Text("BYE - Week \(WeekSelectionManager.shared.selectedWeek)")
+                Text("BYE - Week \(weekSelectionManager.selectedWeek)")
                     .font(.system(size: 16, weight: .black, design: .default))
                     .foregroundColor(.white)
                 
@@ -51,7 +54,9 @@ struct ScheduleByeWeekSection: View {
                     ScheduleByeTeamCell(
                         team: team,
                         byeWeekImpact: byeWeekImpacts[team.id],
-                        isLoadingImpacts: isLoadingImpacts
+                        isLoadingImpacts: isLoadingImpacts,
+                        standingsService: standingsService,
+                        teamAssetManager: teamAssetManager
                     ) {
                         // 🔥 ONLY open sheet if impact exists AND has problems
                         if let impact = byeWeekImpacts[team.id], impact.hasProblem {
@@ -102,7 +107,7 @@ struct ScheduleByeWeekSection: View {
         .task {
             await analyzeByeWeekImpacts()
         }
-        .onChange(of: WeekSelectionManager.shared.selectedWeek) { _, _ in
+        .onChange(of: weekSelectionManager.selectedWeek) { _, _ in
             Task {
                 await analyzeByeWeekImpacts()
             }
@@ -125,9 +130,9 @@ struct ScheduleByeWeekSection: View {
         var impacts: [String: ByeWeekImpact] = [:]
         
         for team in byeTeams {
-            let impact = await ByeWeekImpactService.shared.analyzeByeWeekImpact(
+            let impact = await analyzeByeWeekImpact(
                 for: team.id,
-                week: WeekSelectionManager.shared.selectedWeek,
+                week: weekSelectionManager.selectedWeek,
                 unifiedLeagueManager: unifiedLeagueManager,
                 matchupsHubViewModel: matchupsHubViewModel
             )
@@ -137,6 +142,81 @@ struct ScheduleByeWeekSection: View {
         
         byeWeekImpacts = impacts
     }
+    
+    // MARK: - Bye Week Impact Analysis (inline to avoid .shared)
+    
+    private func analyzeByeWeekImpact(
+        for teamCode: String,
+        week: Int,
+        unifiedLeagueManager: UnifiedLeagueManager,
+        matchupsHubViewModel: MatchupsHubViewModel
+    ) async -> ByeWeekImpact {
+        
+        var affectedPlayers: [AffectedPlayer] = []
+        let normalizedTeamCode = normalizeTeamCode(teamCode)
+        
+        // Use the already-loaded matchups from MatchupsHubViewModel
+        let allMatchups = matchupsHubViewModel.myMatchups
+        
+        DebugPrint(mode: .weekCheck, "🔍 Analyzing bye impact for \(teamCode) across \(allMatchups.count) matchups")
+        
+        for matchup in allMatchups {
+            // 🔥 SKIP: Eliminated chopped leagues - they don't matter anymore!
+            if matchup.isMyManagerEliminated {
+                DebugPrint(mode: .weekCheck, "   ⏭️ Skipping \(matchup.league.league.name) - already eliminated")
+                continue
+            }
+            
+            // Get my team's starting lineup
+            guard let myTeam = matchup.myTeam else { continue }
+            
+            let leagueName = matchup.league.league.name
+            
+            // Filter to starting lineup players only
+            let starters = myTeam.roster.filter { $0.isStarter }
+            
+            // Find players on the bye team
+            for player in starters {
+                guard let playerTeam = player.team, !playerTeam.isEmpty else {
+                    continue
+                }
+                
+                if normalizeTeamCode(playerTeam) == normalizedTeamCode {
+                    let affectedPlayer = AffectedPlayer(
+                        playerName: player.fullName,
+                        position: player.position,
+                        nflTeam: playerTeam,
+                        leagueName: leagueName,
+                        fantasyTeamName: myTeam.name,
+                        currentPoints: player.currentPoints,
+                        projectedPoints: player.projectedPoints,
+                        sleeperID: player.sleeperID
+                    )
+                    
+                    affectedPlayers.append(affectedPlayer)
+                    
+                    DebugPrint(mode: .weekCheck, "   ⚠️ Found affected player: \(player.fullName) in \(leagueName)")
+                }
+            }
+        }
+        
+        DebugPrint(mode: .weekCheck, "✅ Total affected players for \(teamCode): \(affectedPlayers.count)")
+        
+        return ByeWeekImpact(
+            teamCode: teamCode,
+            affectedPlayers: affectedPlayers
+        )
+    }
+    
+    private func normalizeTeamCode(_ teamCode: String) -> String {
+        let normalized = teamCode.uppercased().trimmingCharacters(in: .whitespaces)
+        
+        // Handle special cases
+        switch normalized {
+        case "WAS", "WSH": return "WSH"  // Washington team code variations
+        default: return normalized
+        }
+    }
 }
 
 // MARK: -> Schedule Bye Team Cell
@@ -144,9 +224,9 @@ struct ScheduleByeTeamCell: View {
     let team: NFLTeam
     let byeWeekImpact: ByeWeekImpact?
     let isLoadingImpacts: Bool
+    let standingsService: NFLStandingsService
+    let teamAssetManager: TeamAssetManager
     let onTap: () -> Void
-    
-    @State private var standingsService = NFLStandingsService.shared
     
     var body: some View {
         Button(action: {
@@ -158,7 +238,7 @@ struct ScheduleByeTeamCell: View {
             VStack(spacing: 8) {
                 // Team logo with badge overlay
                 ZStack(alignment: .topTrailing) {
-                    TeamAssetManager.shared.logoOrFallback(for: team.id)
+                    teamAssetManager.logoOrFallback(for: team.id)
                         .frame(width: 50, height: 50)
                         .background(
                             Circle()
@@ -287,19 +367,57 @@ struct ByeWeekImpactItem: Identifiable {
         NFLTeam.team(for: "MIA")!
     ]
     
-    let mockUnifiedLeagueManager = UnifiedLeagueManager(
-        sleeperClient: SleeperAPIClient(),
-        espnClient: ESPNAPIClient(credentialsManager: ESPNCredentialsManager.shared),
-        espnCredentials: ESPNCredentialsManager.shared
+    let espnCredentials = ESPNCredentialsManager()
+    let sleeperAPIClient = SleeperAPIClient()
+    let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+    let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+    let nflGameDataService = NFLGameDataService()
+    let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
+    let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+    let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    let seasonYearManager = SeasonYearManager()
+    let playerStatsCache = PlayerStatsCache()
+    let sharedStatsService = SharedStatsService(
+        weekSelectionManager: weekSelectionManager,
+        seasonYearManager: seasonYearManager,
+        playerStatsCache: playerStatsCache
+    )
+    let standingsService = NFLStandingsService()
+    let teamAssetManager = TeamAssetManager()
+    
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
     )
     
-    ZStack {
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    
+    return ZStack {
         Color.black.ignoresSafeArea()
         
         ScheduleByeWeekSection(
             byeTeams: sampleTeams,
-            unifiedLeagueManager: mockUnifiedLeagueManager,
-            matchupsHubViewModel: MatchupsHubViewModel.shared
+            unifiedLeagueManager: unifiedLeagueManager,
+            matchupsHubViewModel: matchupsHub,
+            weekSelectionManager: weekSelectionManager,
+            standingsService: standingsService,
+            teamAssetManager: teamAssetManager
         )
     }
     .preferredColorScheme(.dark)

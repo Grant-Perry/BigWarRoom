@@ -172,10 +172,40 @@ private struct LeagueRowView: View {
 }
 
 #Preview {
+    let espnCredentials = ESPNCredentialsManager.shared
+    let sleeperCredentials = SleeperCredentialsManager.shared
+    let playerDirectory = PlayerDirectoryStore.shared
+    let gameStatusService = GameStatusService.shared
+    let sharedStatsService = SharedStatsService.shared
+    let weekSelectionManager = WeekSelectionManager.shared
+    
+    let sleeperClient = SleeperAPIClient()
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    
     NavigationView {
         LineupRXLeaguePickerView()
-            .environment(MatchupsHubViewModel.shared)
+            .environment(matchupsHub)
     }
     .preferredColorScheme(.dark)
 }
-

@@ -31,6 +31,7 @@ extension FantasyViewModel {
     private static let loadingGuard = LoadingGuard()
     
     /// Fetch matchups for selected league, week, and year
+    /// 🔥 PHASE 4: Refactored to use MatchupDataStore instead of LeagueMatchupProvider
     func fetchMatchups() async {
         guard let league = selectedLeague else {
             matchups = []
@@ -62,60 +63,40 @@ extension FantasyViewModel {
         let startTime = Date()
         
         do {
-            // CRITICAL FIX: Use cached LeagueMatchupProvider instead of direct API calls
-            let cachedProvider = MatchupsHubViewModel.shared.getCachedProvider(
-                for: league, 
-                week: selectedWeek, 
-                year: selectedYear
+            // 🔥 PHASE 4: Use MatchupDataStore instead of cachedProviders
+            DebugPrint(mode: .fantasy, "📦 Using MatchupDataStore for league \(league.league.leagueID)")
+            
+            // Create snapshot ID
+            let snapshotID = MatchupSnapshot.ID(
+                leagueID: league.league.leagueID,
+                matchupID: "\(league.league.leagueID)_\(selectedWeek)",
+                platform: league.source,
+                week: selectedWeek
             )
             
-            if let cachedProvider = cachedProvider {
-                DebugPrint(mode: .fantasy, "📦 Using CACHED provider for league \(league.league.leagueID)")
+            // Try to hydrate from store
+            do {
+                let snapshot = try await matchupDataStore.hydrateMatchup(snapshotID)
                 
-                // Get matchups from cached provider
-                let providerMatchups = try await cachedProvider.fetchMatchups()
+                // Convert snapshot to FantasyMatchup for detail view
+                let fantasyMatchup = convertSnapshotToFantasyMatchup(snapshot)
                 
-                if !providerMatchups.isEmpty {
-                    // Use the fresh, correctly calculated matchups
-                    matchups = providerMatchups
-                } else if league.source == .sleeper {
-                    // Handle Chopped leagues
-                    detectedAsChoppedLeague = true
-                    hasActiveRosters = true
-                }
+                // For detail view, we need to show ALL matchups in the league (for horizontal scrolling)
+                // Extract all matchups from the snapshot if available
+                // For now, just show the single matchup
+                matchups = [fantasyMatchup]
+                
+                DebugPrint(mode: .fantasy, "  ✅ Store hydration complete, matchups.count=\(matchups.count)")
                 
                 // Sync ESPN data if needed
                 if league.source == .espn {
-                    // Get ESPN league data from cached provider for member name resolution
                     await ensureESPNLeagueDataLoaded()
                 }
                 
-            } else {
-                // Fallback: Create a NEW provider if no cached one available
-                DebugPrint(mode: .fantasy, "📦 NO CACHED PROVIDER - Creating NEW provider for league \(league.league.leagueID)")
-                
-                let newProvider = LeagueMatchupProvider(
-                    league: league,
-                    week: selectedWeek,
-                    year: selectedYear
-                )
-                
-                // Fetch matchups using the new provider
-                let providerMatchups = try await newProvider.fetchMatchups()
-                
-                if !providerMatchups.isEmpty {
-                    matchups = providerMatchups
-                    DebugPrint(mode: .fantasy, "  ✅ NEW provider fetch complete, matchups.count=\(matchups.count)")
-                } else if league.source == .sleeper {
-                    // Handle Chopped leagues
-                    detectedAsChoppedLeague = true
-                    hasActiveRosters = true
-                    DebugPrint(mode: .fantasy, "  🍲 Detected Chopped league (empty matchups)")
-                } else if league.source == .espn {
-                    // ESPN shouldn't have empty matchups unless there's an error
-                    errorMessage = "No matchups found for week \(selectedWeek). Check if this week has started."
-                    DebugPrint(mode: .fantasy, "  ⚠️ ESPN league has empty matchups")
-                }
+            } catch {
+                DebugPrint(mode: .fantasy, "❌ Store hydration failed: \(error)")
+                errorMessage = "Failed to load matchup data"
+                matchups = []
             }
             
             // FIX: Better handling when matchups are empty
@@ -123,7 +104,6 @@ extension FantasyViewModel {
                 detectedAsChoppedLeague = true
                 hasActiveRosters = true
             } else if matchups.isEmpty && league.source == .espn {
-                // Don't immediately mark as chopped, ESPN leagues shouldn't be chopped
                 errorMessage = "No matchups found for week \(selectedWeek). Check if this week has started."
             }
             
@@ -159,6 +139,7 @@ extension FantasyViewModel {
     }
     
     /// Refresh matchups for auto-refresh without navigation disruption
+    /// 🔥 PHASE 4: Refactored to use MatchupDataStore.refresh()
     func refreshMatchups() async {
         guard let league = selectedLeague else {
             return
@@ -178,19 +159,29 @@ extension FantasyViewModel {
         }
         
         do {
-            // 🔥 FIXED: Use LeagueMatchupProvider for refresh instead of direct API calls
-            let provider = LeagueMatchupProvider(
-                league: league,
-                week: selectedWeek,
-                year: selectedYear
+            // 🔥 PHASE 4: Use MatchupDataStore.refresh() with LeagueKey
+            let key = MatchupDataStore.LeagueKey(
+                leagueID: league.league.leagueID,
+                platform: league.source,
+                seasonYear: selectedYear,
+                week: selectedWeek
             )
             
-            let refreshedMatchups = try await provider.fetchMatchups()
+            await matchupDataStore.refresh(league: key, force: true)
             
-            if !refreshedMatchups.isEmpty {
-                matchups = refreshedMatchups
-                DebugPrint(mode: .fantasy, "🔄 Matchups refreshed: \(refreshedMatchups.count) matchups")
-            }
+            // Now fetch the refreshed snapshot
+            let snapshotID = MatchupSnapshot.ID(
+                leagueID: league.league.leagueID,
+                matchupID: "\(league.league.leagueID)_\(selectedWeek)",
+                platform: league.source,
+                week: selectedWeek
+            )
+            
+            let snapshot = try await matchupDataStore.hydrateMatchup(snapshotID)
+            let refreshedMatchup = convertSnapshotToFantasyMatchup(snapshot)
+            matchups = [refreshedMatchup]
+            
+            DebugPrint(mode: .fantasy, "🔄 Matchups refreshed via store")
             
             if isChoppedLeague(selectedLeague) {
                 await refreshChoppedData(leagueID: league.league.leagueID, week: selectedWeek)
@@ -209,10 +200,92 @@ extension FantasyViewModel {
         }
     }
 
-    /// Real-time Sleeper data refresh without UI disruption
-    private func refreshSleeperData(leagueID: String, week: Int) async {
-        // 🔥 REMOVED: This method is no longer needed since we use LeagueMatchupProvider
-        // Keeping the stub in case it's called from elsewhere
-        DebugPrint(mode: .fantasy, "⚠️ refreshSleeperData called but is deprecated - use refreshMatchups() instead")
+    // MARK: - 🔥 PHASE 4: Snapshot → FantasyMatchup Conversion
+    
+    /// Convert MatchupSnapshot to FantasyMatchup for detail view
+    private func convertSnapshotToFantasyMatchup(_ snapshot: MatchupSnapshot) -> FantasyMatchup {
+        // Convert team snapshots to FantasyTeam
+        let homeTeam = convertTeamSnapshotToFantasyTeam(snapshot.myTeam)
+        let awayTeam = convertTeamSnapshotToFantasyTeam(snapshot.opponentTeam)
+        
+        // Parse matchup status
+        let status = parseMatchupStatus(snapshot.metadata.status)
+        
+        return FantasyMatchup(
+            id: snapshot.id.matchupID,
+            leagueID: snapshot.id.leagueID,
+            week: snapshot.id.week,
+            year: selectedYear,
+            homeTeam: homeTeam,
+            awayTeam: awayTeam,
+            status: status,
+            winProbability: snapshot.myTeam.score.winProbability,
+            startTime: snapshot.metadata.startTime,
+            sleeperMatchups: nil
+        )
+    }
+    
+    /// Convert TeamSnapshot to FantasyTeam
+    private func convertTeamSnapshotToFantasyTeam(_ snapshot: TeamSnapshot) -> FantasyTeam {
+        let roster = snapshot.roster.map { player in
+            // Convert game status string back to GameStatus struct (if present)
+            let gameStatus: GameStatus? = player.metrics.gameStatus.map { statusString in
+                GameStatus(status: statusString)
+            }
+            
+            return FantasyPlayer(
+                id: player.id,
+                sleeperID: player.identity.sleeperID,
+                espnID: player.identity.espnID,
+                firstName: player.identity.firstName,
+                lastName: player.identity.lastName,
+                position: player.context.position,
+                team: player.context.team,
+                jerseyNumber: player.context.jerseyNumber,
+                currentPoints: player.metrics.currentScore,
+                projectedPoints: player.metrics.projectedScore,
+                gameStatus: gameStatus,
+                isStarter: player.context.isStarter,
+                lineupSlot: player.context.lineupSlot,
+                injuryStatus: player.context.injuryStatus
+            )
+        }
+        
+        return FantasyTeam(
+            id: snapshot.info.teamID,
+            name: snapshot.info.ownerName,
+            ownerName: snapshot.info.ownerName,
+            record: parseRecord(snapshot.info.record),
+            avatar: snapshot.info.avatarURL,
+            currentScore: snapshot.score.actual,
+            projectedScore: snapshot.score.projected,
+            roster: roster,
+            rosterID: Int(snapshot.info.teamID) ?? 0,
+            faabTotal: nil,
+            faabUsed: nil
+        )
+    }
+    
+    /// Parse record string into TeamRecord
+    private func parseRecord(_ recordString: String) -> TeamRecord? {
+        guard !recordString.isEmpty else { return nil }
+        let parts = recordString.split(separator: "-")
+        guard parts.count >= 2 else { return nil }
+        let wins = Int(parts[0]) ?? 0
+        let losses = Int(parts[1]) ?? 0
+        let ties = parts.count > 2 ? Int(parts[2]) : nil
+        return TeamRecord(wins: wins, losses: losses, ties: ties)
+    }
+    
+    /// Parse matchup status string to enum
+    private func parseMatchupStatus(_ statusString: String) -> MatchupStatus {
+        switch statusString.lowercased() {
+        case "live", "in_progress":
+            return .live
+        case "completed", "final":
+            return .complete
+        default:
+            return .upcoming
+        }
     }
 }

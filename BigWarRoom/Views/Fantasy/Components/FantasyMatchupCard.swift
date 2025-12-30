@@ -10,7 +10,7 @@ import SwiftUI
 /// Fantasy Matchup Card component
 struct FantasyMatchupCard: View {
     let matchup: FantasyMatchup
-    @State var fantasyViewModel: FantasyViewModel = FantasyViewModel.shared  // 🔥 PHASE 3: Use @State for @Observable
+    @Environment(FantasyViewModel.self) private var fantasyViewModel  // 🔥 PHASE 4: Use environment
     
     var body: some View {
         VStack(spacing: 0) {

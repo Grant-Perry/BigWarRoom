@@ -136,7 +136,7 @@ struct LineupRXView: View {
                 Button(action: {
                     // 💊 RX: Refresh optimization status for this matchup when leaving
                     Task {
-                        await MatchupsHubViewModel.shared.checkLineupOptimization(for: matchup)
+                        await matchupsHub.checkLineupOptimization(for: matchup)
                     }
                     dismiss()
                 }) {

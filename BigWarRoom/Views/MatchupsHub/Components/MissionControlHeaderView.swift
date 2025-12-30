@@ -54,6 +54,7 @@ struct MissionControlHeaderView: View {
                 // Week picker - using TheWeekPicker component
                 TheWeekPicker(
                     showingWeekPicker: $showingWeekPicker,
+                    weekManager: WeekSelectionManager.shared,  // 🔥 Use .shared here since this is inside Mission Control which has it via init
                     labelFontSize: isCompactScreen ? 10 : 11,
                     weekNumberFontSize: isCompactScreen ? 16 : 18,
                     chevronSize: isCompactScreen ? 9 : 10,

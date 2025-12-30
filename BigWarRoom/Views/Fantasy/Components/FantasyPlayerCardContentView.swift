@@ -18,6 +18,9 @@ struct FantasyPlayerCardMainContentView: View {
     
     let fantasyViewModel: FantasyViewModel?
     
+    // 🔥 NEW: Add matchupsHubViewModel for corrected score calculation
+    let matchupsHubViewModel: MatchupsHubViewModel?
+    
     // 🔥 NEW: Add navigation trigger
     let sleeperPlayer: SleeperPlayer?
     let onPlayerImageTap: (() -> Void)?
@@ -32,6 +35,7 @@ struct FantasyPlayerCardMainContentView: View {
         isBench: Bool = false,
         onScoreTap: (() -> Void)? = nil,
         fantasyViewModel: FantasyViewModel? = nil,
+        matchupsHubViewModel: MatchupsHubViewModel? = nil,
         sleeperPlayer: SleeperPlayer? = nil,
         onPlayerImageTap: (() -> Void)? = nil
     ) {
@@ -41,6 +45,7 @@ struct FantasyPlayerCardMainContentView: View {
         self.isBench = isBench
         self.onScoreTap = onScoreTap
         self.fantasyViewModel = fantasyViewModel
+        self.matchupsHubViewModel = matchupsHubViewModel
         self.sleeperPlayer = sleeperPlayer
         self.onPlayerImageTap = onPlayerImageTap
     }
@@ -93,8 +98,9 @@ struct FantasyPlayerCardMainContentView: View {
     
     private var scoreText: some View {
         let displayScore: String
-        if let fantasyViewModel = fantasyViewModel {
-            let correctedScore = fantasyViewModel.getCorrectedPlayerScore(for: player)
+        if let fantasyViewModel = fantasyViewModel,
+           let matchupsHubViewModel = matchupsHubViewModel {
+            let correctedScore = fantasyViewModel.getCorrectedPlayerScore(for: player, matchupsHubViewModel: matchupsHubViewModel)
             displayScore = String(format: "%.2f", correctedScore)
         } else {
             displayScore = player.currentPointsString

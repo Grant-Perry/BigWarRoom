@@ -17,15 +17,13 @@ struct FantasyMatchupDetailView: View {
     var fantasyViewModel: FantasyViewModel? = nil
     let logoSize: CGFloat = 32
     @Environment(\.dismiss) private var dismiss
+    @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
+    @Environment(FantasyViewModel.self) private var defaultFantasyViewModel
 
     // Shared instance to ensure stats are loaded early
-    // 🔥 PHASE 3 DI: Remove .shared assignment, will be injected
+    // 🔥 PHASE 3 DI: Injected via initializer
     @State private var livePlayersViewModel: AllLivePlayersViewModel
     
-    // 🔥 NEW: Observe global matchups for auto-refresh
-    // NOTE: Do NOT use @State with @Observable classes - it breaks observation!
-    private var matchupsHubViewModel: MatchupsHubViewModel { MatchupsHubViewModel.shared }
-
     // Sorting state for matchup details
     @State private var sortingMethod: MatchupSortingMethod = .position
     @State private var sortHighToLow = false // Position: A-Z, Score: High-Low by default
@@ -39,7 +37,7 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Initializers
 
     /// Default initializer for backward compatibility
-    // 🔥 PHASE 3 DI: Add livePlayersViewModel parameter
+    // 🔥 PHASE 3 DI: Require livePlayersViewModel parameter
     init(matchup: FantasyMatchup, leagueName: String, livePlayersViewModel: AllLivePlayersViewModel) {
         self.matchup = matchup
         self.leagueName = leagueName
@@ -48,7 +46,7 @@ struct FantasyMatchupDetailView: View {
     }
 
     /// Full initializer with FantasyViewModel
-    // 🔥 PHASE 3 DI: Add livePlayersViewModel parameter
+    // 🔥 PHASE 3 DI: Require livePlayersViewModel parameter
     init(matchup: FantasyMatchup, fantasyViewModel: FantasyViewModel, leagueName: String, livePlayersViewModel: AllLivePlayersViewModel) {
         self.matchup = matchup
         self.leagueName = leagueName
@@ -230,7 +228,7 @@ struct FantasyMatchupDetailView: View {
                     ForEach(latestMatchup.homeTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
-                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
+                            fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
                             matchup: latestMatchup,
                             teamIndex: 1,
                             isBench: false
@@ -251,7 +249,7 @@ struct FantasyMatchupDetailView: View {
                     ForEach(latestMatchup.awayTeam.roster.filter { $0.isStarter }) { player in
                         FantasyPlayerCard(
                             player: player,
-                            fantasyViewModel: fantasyViewModel ?? FantasyViewModel.shared,
+                            fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
                             matchup: latestMatchup,
                             teamIndex: 0,
                             isBench: false
@@ -266,11 +264,11 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Private Methods
 
     private func handleViewAppearance() {
-        // 🔥 FIXED: Trigger hub refresh to get live scores (not just AllLivePlayersViewModel)
-        // This ensures the matchup data is fresh when the view appears
-        Task {
-            await matchupsHubViewModel.manualRefresh()
-        }
+        // 🔥 REMOVED: Don't trigger full hub refresh on view appear - causes 15+ second hang
+        // The matchup data is already fresh from the previous view (Mission Control or LeagueMatchupsTabView)
+        // If we need live updates, they'll come from the background auto-refresh in MatchupsHubViewModel
+        
+        // Keep the stats loading task in handleViewTask() - that's lightweight and doesn't block
     }
 
     private func handleViewTask() async {

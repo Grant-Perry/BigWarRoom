@@ -11,6 +11,8 @@ import SwiftUI
 struct MatchupDetailSheet: View {
     let matchup: UnifiedMatchup
     @Environment(\.dismiss) private var dismiss
+    @Environment(FantasyViewModel.self) private var fantasyViewModel
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     
     var body: some View {
         // 🔥 FIX: Remove NavigationView wrapper since FantasyMatchupDetailView has its own navigation
@@ -39,9 +41,9 @@ struct MatchupDetailSheet: View {
                 // FantasyMatchupDetailView handles its own navigation with custom header
                 FantasyMatchupDetailView(
                     matchup: matchup.fantasyMatchup!,
-                    fantasyViewModel: matchup.createConfiguredFantasyViewModel(),
+                    fantasyViewModel: fantasyViewModel,
                     leagueName: matchup.league.league.name,
-                    livePlayersViewModel: AllLivePlayersViewModel.shared
+                    livePlayersViewModel: allLivePlayersViewModel
                 )
             }
         }

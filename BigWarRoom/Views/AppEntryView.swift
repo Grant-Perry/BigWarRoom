@@ -12,49 +12,133 @@ struct AppEntryView: View {
     @State private var showingLoading = true // 🔥 CHANGED: Start with loading screen
     @State private var shouldShowOnboarding = false
     
+    // 🔥 PHASE 3 DI: Create dependency instances at app root to pass down
+    @State private var espnCredentials = ESPNCredentialsManager.shared
+    @State private var sleeperCredentials = SleeperCredentialsManager.shared
+    @State private var playerDirectory = PlayerDirectoryStore.shared
+    @State private var gameStatusService = GameStatusService.shared
+    @State private var sharedStatsService = SharedStatsService.shared
+    @State private var weekSelectionManager = WeekSelectionManager.shared
+    
+    // 🔥 PHASE 3 DI: Create UnifiedLeagueManager with proper dependencies
+    @State private var unifiedLeagueManager: UnifiedLeagueManager?
+    
+    // 🔥 PHASE 3 DI: Create MatchupDataStore with all required dependencies
+    @State private var matchupDataStore: MatchupDataStore?
+    
+    // 🔥 PHASE 3 DI: Create ViewModels with proper dependency injection
+    @State private var matchupsHub: MatchupsHubViewModel?
+    @State private var allLivePlayersViewModel: AllLivePlayersViewModel?
+    
     var body: some View {
         Group {
             if showingLoading {
+                // 🔥 PHASE 3 DI: Pass dependencies to LoadingScreen
                 LoadingScreen(
                     onComplete: { needsOnboarding in
                         shouldShowOnboarding = needsOnboarding
                         showingLoading = false
                     },
-                    espnCredentials: ESPNCredentialsManager.shared,
-                    sleeperCredentials: SleeperCredentialsManager.shared,
-                    matchupsHub: MatchupsHubViewModel.shared
+                    espnCredentials: espnCredentials,
+                    sleeperCredentials: sleeperCredentials,
+                    matchupsHub: getOrCreateMatchupsHub()
                 )
             } else {
                 // Only show main app AFTER loading completes
-                BigWarRoomWithConditionalStart(shouldShowOnboarding: shouldShowOnboarding)
+                BigWarRoomWithConditionalStart(
+                    shouldShowOnboarding: shouldShowOnboarding,
+                    matchupsHub: getOrCreateMatchupsHub(),
+                    allLivePlayersViewModel: getOrCreateAllLivePlayersViewModel()
+                )
             }
         }
         .animation(.easeInOut(duration: 0.5), value: showingLoading)
+    }
+    
+    // 🔥 PHASE 3 DI: Lazy initialization helpers
+    private func getOrCreateUnifiedLeagueManager() -> UnifiedLeagueManager {
+        if unifiedLeagueManager == nil {
+            let sleeperClient = SleeperAPIClient()
+            let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+            unifiedLeagueManager = UnifiedLeagueManager(
+                sleeperClient: sleeperClient,
+                espnClient: espnClient,
+                espnCredentials: espnCredentials
+            )
+        }
+        return unifiedLeagueManager!
+    }
+    
+    private func getOrCreateMatchupDataStore() -> MatchupDataStore {
+        if matchupDataStore == nil {
+            matchupDataStore = MatchupDataStore(
+                unifiedLeagueManager: getOrCreateUnifiedLeagueManager(),
+                sharedStatsService: sharedStatsService,
+                gameStatusService: gameStatusService,
+                weekSelectionManager: weekSelectionManager
+            )
+        }
+        return matchupDataStore!
+    }
+    
+    private func getOrCreateMatchupsHub() -> MatchupsHubViewModel {
+        if matchupsHub == nil {
+            matchupsHub = MatchupsHubViewModel(
+                espnCredentials: espnCredentials,
+                sleeperCredentials: sleeperCredentials,
+                playerDirectory: playerDirectory,
+                gameStatusService: gameStatusService,
+                sharedStatsService: sharedStatsService,
+                matchupDataStore: getOrCreateMatchupDataStore()
+            )
+        }
+        return matchupsHub!
+    }
+    
+    private func getOrCreateAllLivePlayersViewModel() -> AllLivePlayersViewModel {
+        if allLivePlayersViewModel == nil {
+            allLivePlayersViewModel = AllLivePlayersViewModel(
+                matchupsHubViewModel: getOrCreateMatchupsHub(),
+                playerDirectory: playerDirectory,
+                gameStatusService: gameStatusService,
+                sharedStatsService: sharedStatsService,
+                weekSelectionManager: weekSelectionManager
+            )
+        }
+        return allLivePlayersViewModel!
     }
 }
 
 // Wrapper to show BigWarRoom with conditional starting tab
 struct BigWarRoomWithConditionalStart: View {
     let shouldShowOnboarding: Bool
+    let matchupsHub: MatchupsHubViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     
     var body: some View {
-        BigWarRoomModified(startOnSettings: shouldShowOnboarding)
+        BigWarRoomModified(
+            startOnSettings: shouldShowOnboarding,
+            matchupsHub: matchupsHub,
+            allLivePlayersViewModel: allLivePlayersViewModel
+        )
     }
 }
 
 // 🔥 SIMPLIFIED: Remove all the tab disabling bullshit - data is already loaded
 struct BigWarRoomModified: View {
     @State private var viewModel = DraftRoomViewModel()
-    @State private var matchupsHub = MatchupsHubViewModel.shared
+    let matchupsHub: MatchupsHubViewModel
+    let allLivePlayersViewModel: AllLivePlayersViewModel
     @State private var selectedTab: Int
     
-    // 🔥 PHASE 3 DI: Create shared instances at app level to pass down
-    @State private var allLivePlayersViewModel = AllLivePlayersViewModel.shared
+    // 🔥 PHASE 3 DI: Other shared singletons
     @State private var playerWatchService = PlayerWatchService.shared
     @State private var weekManager = WeekSelectionManager.shared
     @State private var smartRefreshManager = SmartRefreshManager.shared
     
-    init(startOnSettings: Bool) {
+    init(startOnSettings: Bool, matchupsHub: MatchupsHubViewModel, allLivePlayersViewModel: AllLivePlayersViewModel) {
+        self.matchupsHub = matchupsHub
+        self.allLivePlayersViewModel = allLivePlayersViewModel
         _selectedTab = State(initialValue: startOnSettings ? 4 : 0)
     }
     
@@ -68,6 +152,7 @@ struct BigWarRoomModified: View {
             TabView(selection: $selectedTab) {
                 // MATCHUPS HUB - THE COMMAND CENTER (MAIN TAB)
                 MatchupsHubView()
+                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "target")
                         Text("Matchups")
@@ -76,6 +161,7 @@ struct BigWarRoomModified: View {
                 
                 // TEAM ROSTERS TAB
                 TeamRostersView()
+                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "person.3.fill")
                         Text("Team Rosters")
@@ -85,6 +171,7 @@ struct BigWarRoomModified: View {
                 // NFL SCHEDULE TAB
                 NavigationStack {
                     NFLScheduleView()
+                        .environment(matchupsHub)
                 }
                 .tabItem {
                     Image(systemName: "calendar.circle.fill")
@@ -99,6 +186,7 @@ struct BigWarRoomModified: View {
                     watchService: playerWatchService,
                     weekManager: weekManager
                 )
+                .environment(matchupsHub)
                 .tabItem {
                     Image(systemName: "chart.bar.fill")
                     Text("Rost Players")
@@ -107,6 +195,7 @@ struct BigWarRoomModified: View {
                 
                 // MORE TAB
                 MoreTabView(viewModel: viewModel)
+                    .environment(matchupsHub)
                     .tabItem {
                         Image(systemName: "ellipsis")
                         Text("More")
@@ -151,9 +240,93 @@ struct BigWarRoomModified: View {
 }
 
 #Preview("Mission Control Default") {
-    BigWarRoomWithConditionalStart(shouldShowOnboarding: false)
+    let espnCredentials = ESPNCredentialsManager.shared
+    let sleeperCredentials = SleeperCredentialsManager.shared
+    let playerDirectory = PlayerDirectoryStore.shared
+    let gameStatusService = GameStatusService.shared
+    let sharedStatsService = SharedStatsService.shared
+    let weekSelectionManager = WeekSelectionManager.shared
+    
+    let sleeperClient = SleeperAPIClient()
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    let allLivePlayersViewModel = AllLivePlayersViewModel(
+        matchupsHubViewModel: matchupsHub,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    BigWarRoomWithConditionalStart(
+        shouldShowOnboarding: false,
+        matchupsHub: matchupsHub,
+        allLivePlayersViewModel: allLivePlayersViewModel
+    )
 }
 
 #Preview("Settings Default") {
-    BigWarRoomWithConditionalStart(shouldShowOnboarding: true)
+    let espnCredentials = ESPNCredentialsManager.shared
+    let sleeperCredentials = SleeperCredentialsManager.shared
+    let playerDirectory = PlayerDirectoryStore.shared
+    let gameStatusService = GameStatusService.shared
+    let sharedStatsService = SharedStatsService.shared
+    let weekSelectionManager = WeekSelectionManager.shared
+    
+    let sleeperClient = SleeperAPIClient()
+    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
+    let unifiedLeagueManager = UnifiedLeagueManager(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        espnCredentials: espnCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: unifiedLeagueManager,
+        sharedStatsService: sharedStatsService,
+        gameStatusService: gameStatusService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    let matchupsHub = MatchupsHubViewModel(
+        espnCredentials: espnCredentials,
+        sleeperCredentials: sleeperCredentials,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        matchupDataStore: matchupDataStore
+    )
+    let allLivePlayersViewModel = AllLivePlayersViewModel(
+        matchupsHubViewModel: matchupsHub,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        weekSelectionManager: weekSelectionManager
+    )
+    
+    BigWarRoomWithConditionalStart(
+        shouldShowOnboarding: true,
+        matchupsHub: matchupsHub,
+        allLivePlayersViewModel: allLivePlayersViewModel
+    )
 }

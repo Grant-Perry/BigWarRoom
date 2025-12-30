@@ -94,7 +94,7 @@ struct TeamRostersView: View {
     private var weekHeaderSection: some View {
         HStack {
             Spacer()
-            TheWeekPicker(showingWeekPicker: $showingWeekPicker)
+            TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekManager)
             Spacer()
         }
         .padding(.horizontal, 20)

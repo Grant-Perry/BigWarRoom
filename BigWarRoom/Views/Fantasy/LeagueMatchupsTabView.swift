@@ -12,6 +12,7 @@ struct LeagueMatchupsTabView: View {
     let allMatchups: [FantasyMatchup]
     let startingMatchup: FantasyMatchup
     let leagueName: String
+    let league: UnifiedLeagueManager.LeagueWrapper  // 🔥 NEW: Pass full league for provider creation
     let fantasyViewModel: FantasyViewModel
     
     @State private var selectedIndex: Int = 0
@@ -21,6 +22,7 @@ struct LeagueMatchupsTabView: View {
     @State private var isNavigating = false
     @State private var navigatingDirection: NavigationDirection? = nil
     @State private var hasScrolledToInitialPosition = false
+    @State private var isLoadingNeighbors = false  // 🔥 NEW: Track background neighbor loading
     @Environment(\.dismiss) private var dismiss
     
     // FIX: Add animation trigger that actually changes
@@ -31,10 +33,11 @@ struct LeagueMatchupsTabView: View {
         case left, right
     }
     
-    init(allMatchups: [FantasyMatchup], startingMatchup: FantasyMatchup, leagueName: String, fantasyViewModel: FantasyViewModel) {
+    init(allMatchups: [FantasyMatchup], startingMatchup: FantasyMatchup, leagueName: String, league: UnifiedLeagueManager.LeagueWrapper, fantasyViewModel: FantasyViewModel) {
         self.allMatchups = allMatchups
         self.startingMatchup = startingMatchup
         self.leagueName = leagueName
+        self.league = league  // 🔥 NEW: Store league
         self.fantasyViewModel = fantasyViewModel
         
         // Find the starting index of the matchup user tapped
@@ -104,7 +107,7 @@ struct LeagueMatchupsTabView: View {
                                             ProgressView()
                                                 .progressViewStyle(CircularProgressViewStyle(tint: .gpGreen))
                                                 .scaleEffect(2.0)
-                                            Text("Loading matchups...")
+                                            Text("Loading Matchups...")
                                                 .font(.system(size: 22, weight: .medium))
                                                 .foregroundColor(.white)
                                         }
@@ -139,10 +142,19 @@ struct LeagueMatchupsTabView: View {
                         .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
                     
                     if isLoadingAllMatchups {
-                        Text("Loading matchups...")
+                        Text("Loading Matchups...")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.gpGreen.opacity(0.7))
                             .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
+                    } else if isLoadingNeighbors {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                            Text("Loading other matchups...")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.gpGreen.opacity(0.6))
+                        }
+                        .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 2)
                     } else {
                         Text("Matchup \(currentMatchupPosition) of \(displayMatchups.count)")
                             .font(.system(size: 14, weight: .medium))
@@ -213,11 +225,22 @@ struct LeagueMatchupsTabView: View {
         .navigationBarBackButtonHidden(true)
         .preferredColorScheme(.dark)
         .onAppear {
-            isLoadingAllMatchups = true
-            animationTrigger.toggle()
-            
-            Task {
-                await fetchAllLeagueMatchups()
+            // 🔥 SMART LAZY LOADING: Show instant, load neighbors in background
+            if fetchedAllMatchups.isEmpty {
+                // We have no matchups at all - shouldn't happen but handle it
+                isLoadingAllMatchups = true
+                Task {
+                    await fetchAllLeagueMatchups()
+                }
+            } else if fetchedAllMatchups.count == 1 {
+                // We only have the starting matchup - load neighbors in background
+                isLoadingNeighbors = true
+                Task {
+                    await fetchNeighborMatchupsInBackground()
+                }
+            } else {
+                // We already have all matchups - just show them
+                isLoadingAllMatchups = false
             }
         }
         .onChange(of: selectedMatchupID) { _ in
@@ -446,17 +469,58 @@ struct LeagueMatchupsTabView: View {
     
     // MARK: - Data Fetching
     
+    /// 🔥 NEW: Fetch neighbor matchups in background without blocking UI
+    private func fetchNeighborMatchupsInBackground() async {
+        // 🔥 FIX: Use the passed-in league directly instead of selectedLeague
+        let currentWeek = NFLWeekService.shared.currentWeek
+        let currentYear = String(Calendar.current.component(.year, from: Date()))
+        let provider = LeagueMatchupProvider(
+            league: league,  // 🔥 Use passed-in league, not fantasyViewModel.selectedLeague
+            week: currentWeek,
+            year: currentYear
+        )
+
+        do {
+            let allLeagueMatchups = try await provider.fetchMatchups()
+            await MainActor.run {
+                fetchedAllMatchups = allLeagueMatchups
+                
+                // Preserve the starting matchup ID
+                if allLeagueMatchups.contains(where: { $0.id == startingMatchup.id }) {
+                    selectedMatchupID = startingMatchup.id
+                } else if let first = allLeagueMatchups.first {
+                    selectedMatchupID = first.id
+                }
+                
+                isLoadingNeighbors = false
+                print("✅ Loaded \(allLeagueMatchups.count) matchups for \(leagueName) in background")
+            }
+        } catch {
+            print("❌ Failed to fetch neighbor matchups for \(leagueName): \(error)")
+            await MainActor.run {
+                isLoadingNeighbors = false
+            }
+        }
+    }
+    
+    /// 🔥 REMOVED: No longer needed - we have the league directly
+    // private func fetchMatchupsWithoutSelectedLeague() async { ... }
+    
     /// Fetch all matchups for the current league and week
     private func fetchAllLeagueMatchups() async {
-        guard let selectedLeague = fantasyViewModel.selectedLeague else {
-            return
+        // 🔥 FIX: Always set loading state to false, even on early return
+        defer {
+            Task { @MainActor in
+                isLoadingAllMatchups = false
+            }
         }
         
+        // 🔥 FIX: Use passed-in league directly instead of selectedLeague
         isLoadingAllMatchups = true
         let currentWeek = NFLWeekService.shared.currentWeek
         let currentYear = String(Calendar.current.component(.year, from: Date()))
         let provider = LeagueMatchupProvider(
-            league: selectedLeague,
+            league: league,  // 🔥 Use passed-in league
             week: currentWeek,
             year: currentYear
         )
@@ -475,14 +539,13 @@ struct LeagueMatchupsTabView: View {
                 } else {
                     selectedMatchupID = nil
                 }
-
-                isLoadingAllMatchups = false
             }
         } catch {
+            print("❌ LeagueMatchupsTabView: Failed to fetch matchups: \(error)")
             await MainActor.run {
+                // Fall back to the passed-in starting matchup
                 fetchedAllMatchups = [startingMatchup]
                 selectedMatchupID = startingMatchup.id
-                isLoadingAllMatchups = false
             }
         }
     }

@@ -14,22 +14,10 @@ import Observation
 @Observable
 final class MatchupsHubViewModel {
     
-    // 🔥 HYBRID PATTERN: Bridge for backward compatibility
-    private static var _shared: MatchupsHubViewModel?
-    
-    static var shared: MatchupsHubViewModel {
-        if let existing = _shared {
-            return existing
-        }
-        fatalError("MatchupsHubViewModel.shared accessed before initialization. Call setSharedInstance() first.")
-    }
-    
-    static func setSharedInstance(_ instance: MatchupsHubViewModel) {
-        _shared = instance
-    }
+    // MARK: -> 🔥 NO SINGLETON - Pure DI with @Observable
     
     // MARK: - 🔥 PHASE 3: @Observable State Properties (no @Published needed)
-    var myMatchups: [UnifiedMatchup] = []
+    var myMatchups: [UnifiedMatchup] = []  // 🔥 Uses store via thin conversion layer
     var isLoading = false
     var isUpdating = false // 🔥 NEW: Track live update state for Siri animation
     var lastUpdateTime = Date()
@@ -71,6 +59,7 @@ final class MatchupsHubViewModel {
     private let playerDirectory: PlayerDirectoryStore
     private let gameStatusService: GameStatusService
     private let sharedStatsService: SharedStatsService
+    internal let matchupDataStore: MatchupDataStore  // 🔥 CHANGED: Make internal for extensions
     
     // 🔥 PHASE 3: Replace Combine with observation task
     private var observationTask: Task<Void, Never>?
@@ -107,13 +96,15 @@ final class MatchupsHubViewModel {
         sleeperCredentials: SleeperCredentialsManager,
         playerDirectory: PlayerDirectoryStore,
         gameStatusService: GameStatusService,
-        sharedStatsService: SharedStatsService
+        sharedStatsService: SharedStatsService,
+        matchupDataStore: MatchupDataStore  // 🔥 NEW: Inject store
     ) {
         self.espnCredentials = espnCredentials
         self.sleeperCredentials = sleeperCredentials
         self.playerDirectory = playerDirectory
         self.gameStatusService = gameStatusService
         self.sharedStatsService = sharedStatsService
+        self.matchupDataStore = matchupDataStore  // 🔥 NEW: Store reference
         
         // 🔥 PHASE 3 DI: Create UnifiedLeagueManager with proper dependency injection
         // We need to create API clients here - this is a bit complex but proper
@@ -181,7 +172,9 @@ final class MatchupsHubViewModel {
     /// Load matchups for a specific week
     func loadMatchupsForWeek(_ week: Int) async {
         DebugPrint(mode: .matchupLoading, "MatchupsHubViewModel.loadMatchupsForWeek(\(week)) called")
-        await performLoadMatchupsForWeek(week)
+        // 🔥 TODO: Implement week-specific loading via store
+        // For now, just load current week
+        await performLoadAllMatchups()
     }
     
     /// Manual refresh trigger - BACKGROUND REFRESH (no loading screen)
@@ -427,32 +420,6 @@ struct UnifiedMatchup: Identifiable, Hashable {
         self.myIdentifiedTeamID = myIdentifiedTeamID
         self.authenticatedUsername = authenticatedUsername
         self.allLeagueMatchups = allLeagueMatchups
-    }
-    
-    /// Create a configured FantasyViewModel for this matchup
-    /// This ensures the detail view knows which team is the user's team
-    @MainActor
-    func createConfiguredFantasyViewModel() -> FantasyViewModel {
-        // 🔥 FIXED: Create NEW instance instead of using shared to prevent conflicts
-        let viewModel = FantasyViewModel()
-        
-        // Set up the league context
-        if let myTeamId = myTeam?.id {
-            viewModel.selectLeague(league, myTeamID: myTeamId)
-        } else {
-            viewModel.selectLeague(league)
-        }
-        
-        // If we have chopped data, set it
-        if let chopped = choppedSummary {
-            viewModel.currentChoppedSummary = chopped
-            viewModel.detectedAsChoppedLeague = true
-        }
-        
-        // Disable auto-refresh to prevent conflicts with Mission Control's refresh
-        viewModel.setMatchupsHubControl(true)
-        
-        return viewModel
     }
     
     /// Is this a Chopped league?

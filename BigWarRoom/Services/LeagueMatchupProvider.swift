@@ -48,11 +48,15 @@ final class LeagueMatchupProvider {
     private let sleeperCredentials = SleeperCredentialsManager.shared
     private var cancellables = Set<AnyCancellable>()
     
+    // 🔥 PHASE 3 DI: Store optional reference to FantasyViewModel for syncing (passed from caller)
+    private weak var fantasyViewModel: FantasyViewModel?
+    
     // MARK: -> Initialization
-    init(league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String) {
+    init(league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String, fantasyViewModel: FantasyViewModel? = nil) {
         self.league = league
         self.week = week
         self.year = year
+        self.fantasyViewModel = fantasyViewModel
     }
     
     // MARK: -> Team Identification
@@ -320,7 +324,10 @@ final class LeagueMatchupProvider {
         // First fetch league data for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            await syncESPNDataToMainViewModel()
+            // 🔥 PHASE 3 DI: Only sync if FantasyViewModel was provided
+            if fantasyViewModel != nil {
+                await syncESPNDataToMainViewModel()
+            }
         } catch {
             currentESPNLeague = nil
         }
@@ -346,8 +353,10 @@ final class LeagueMatchupProvider {
                 await calculateRecordsFromMatchupHistory(leagueID: league.league.leagueID)
             }
             
-            // 🔥 DRY FIX: Sync calculated records to FantasyViewModel after calculation completes
-            await syncESPNRecordsToViewModel()
+            // 🔥 DRY FIX: Only sync if FantasyViewModel was provided
+            if fantasyViewModel != nil {
+                await syncESPNRecordsToViewModel()
+            }
 
         } catch {
             // Continue without standings data - records will be nil but won't crash
@@ -854,8 +863,10 @@ final class LeagueMatchupProvider {
         
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
         
-        // 🔥 DRY FIX: Final sync of records after matchups are created to ensure they're available
-        await syncESPNRecordsToViewModel()
+        // 🔥 DRY FIX: Only sync if FantasyViewModel was provided
+        if fantasyViewModel != nil {
+            await syncESPNRecordsToViewModel()
+        }
     }
     
     private func createSleeperFantasyTeam(
@@ -988,66 +999,6 @@ final class LeagueMatchupProvider {
         )
     }
     
-    // 🔥 REMOVE: This is no longer needed since we have actual slot mapping
-    // DELETE the old determineLineupSlot() function
-
-    // 🔥 NEW: Player team cache for instant color loading
-    private func getPlayerTeamFromCache(_ playerID: String) -> String? {
-        // Try to get team from known associations (cache popular players)
-        let knownTeams: [String: String] = [
-            // QBs
-            "4046": "BUF",  // Josh Allen
-            "4035": "KC",   // Patrick Mahomes
-            "3157": "CIN",  // Joe Burrow
-            "2309": "BAL",  // Lamar Jackson
-            
-            // RBs  
-            "4018": "BUF",  // James Cook
-            "4029": "KC",   // Isiah Pacheco
-            "4039": "SF",   // Christian McCaffrey (fixed duplicate)
-            "4988": "BAL",  // Derrick Henry
-            "6130": "CIN",  // Joe Mixon (new ID to avoid duplicate)
-            
-            // WRs
-            "5048": "CIN",  // Ja'Marr Chase
-            "4866": "KC",   // Travis Kelce
-            "4017": "BUF",  // Stefon Diggs
-            "5045": "BAL",  // Mark Andrews
-            
-            // Popular players (add more as needed)
-            "4098": "LAR",  // Cooper Kupp
-            "4036": "GB",   // Aaron Rodgers  
-            "5849": "SF",   // Brock Purdy
-        ]
-        
-        return knownTeams[playerID]
-    }
-    
-    // MARK: -> Chopped League Support
-    
-    private func createChoppedSummary() async -> ChoppedWeekSummary? {
-        // This would use the existing Chopped logic from FantasyViewModel+Chopped
-        // For now, returning nil as this is complex and may not be needed immediately
-        return nil
-    }
-    
-    // 🔥 NEW: Get player score for a specific player in this league context
-    func getPlayerScore(playerId: String) -> Double {
-        guard playerStats[playerId] != nil,
-              sleeperLeagueSettings != nil else {
-            return 0.0
-        }
-        
-        let score = calculateSleeperPlayerScore(playerId: playerId)
-        
-        return score
-    }
-    
-    // 🔥 NEW: Check if this league has calculated player scores
-    func hasPlayerScores() -> Bool {
-        return !playerStats.isEmpty && sleeperLeagueSettings != nil
-    }
-    
     // MARK: -> Helper Methods
     
     private func calculateSleeperPlayerScore(playerId: String) -> Double {
@@ -1086,31 +1037,6 @@ final class LeagueMatchupProvider {
         case 17: return "K"
         case 23: return "FLEX"
         default: return "BN"
-        }
-    }
-    
-    // 🔥 NEW: Sync ESPN data to main FantasyViewModel for score breakdowns
-    private func syncESPNDataToMainViewModel() async {
-        guard let espnLeague = currentESPNLeague else { return }
-        
-        await MainActor.run {
-            FantasyViewModel.shared.currentESPNLeague = espnLeague
-        }
-        
-        // 🔥 DRY FIX: Sync records after league data is set
-        await syncESPNRecordsToViewModel()
-    }
-    
-    /// 🔥 DRY FIX: Centralized function to sync ESPN team records to FantasyViewModel
-    private func syncESPNRecordsToViewModel() async {
-        await MainActor.run {
-            // Sync all calculated records to FantasyViewModel for use in getManagerRecord
-            for (teamId, record) in espnTeamRecords {
-                FantasyViewModel.shared.espnTeamRecords[teamId] = record
-            }
-            if !espnTeamRecords.isEmpty {
-                DebugPrint(mode: .recordCalculation, "Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
-            }
         }
     }
     
@@ -1156,5 +1082,90 @@ final class LeagueMatchupProvider {
         }
         
         return nil
+    }
+    
+    // MARK: -> Chopped League Support
+    
+    private func createChoppedSummary() async -> ChoppedWeekSummary? {
+        // This would use the existing Chopped logic from FantasyViewModel+Chopped
+        // For now, returning nil as this is complex and may not be needed immediately
+        return nil
+    }
+    
+    // 🔥 NEW: Get player score for a specific player in this league context
+    func getPlayerScore(playerId: String) -> Double {
+        guard playerStats[playerId] != nil,
+              sleeperLeagueSettings != nil else {
+            return 0.0
+        }
+        
+        let score = calculateSleeperPlayerScore(playerId: playerId)
+        
+        return score
+    }
+    
+    // 🔥 NEW: Check if this league has calculated player scores
+    func hasPlayerScores() -> Bool {
+        return !playerStats.isEmpty && sleeperLeagueSettings != nil
+    }
+    
+    // 🔥 NEW: Player team cache for instant color loading
+    private func getPlayerTeamFromCache(_ playerID: String) -> String? {
+        // Try to get team from known associations (cache popular players)
+        let knownTeams: [String: String] = [
+            // QBs
+            "4046": "BUF",  // Josh Allen
+            "4035": "KC",   // Patrick Mahomes
+            "3157": "CIN",  // Joe Burrow
+            "2309": "BAL",  // Lamar Jackson
+            
+            // RBs  
+            "4018": "BUF",  // James Cook
+            "4029": "KC",   // Isiah Pacheco
+            "4039": "SF",   // Christian McCaffrey (fixed duplicate)
+            "4988": "BAL",  // Derrick Henry
+            "6130": "CIN",  // Joe Mixon (new ID to avoid duplicate)
+            
+            // WRs
+            "5048": "CIN",  // Ja'Marr Chase
+            "4866": "KC",   // Travis Kelce
+            "4017": "BUF",  // Stefon Diggs
+            "5045": "BAL",  // Mark Andrews
+            
+            // Popular players (add more as needed)
+            "4098": "LAR",  // Cooper Kupp
+            "4036": "GB",   // Aaron Rodgers  
+            "5849": "SF",   // Brock Purdy
+        ]
+        
+        return knownTeams[playerID]
+    }
+    
+    // 🔥 NEW: Sync ESPN data to FantasyViewModel for score breakdowns (if provided)
+    private func syncESPNDataToMainViewModel() async {
+        guard let espnLeague = currentESPNLeague,
+              let viewModel = fantasyViewModel else { return }
+        
+        await MainActor.run {
+            viewModel.currentESPNLeague = espnLeague
+        }
+        
+        // 🔥 DRY FIX: Sync records after league data is set
+        await syncESPNRecordsToViewModel()
+    }
+    
+    /// 🔥 DRY FIX: Centralized function to sync ESPN team records to FantasyViewModel (if provided)
+    private func syncESPNRecordsToViewModel() async {
+        guard let viewModel = fantasyViewModel else { return }
+        
+        await MainActor.run {
+            // Sync all calculated records to FantasyViewModel for use in getManagerRecord
+            for (teamId, record) in espnTeamRecords {
+                viewModel.espnTeamRecords[teamId] = record
+            }
+            if !espnTeamRecords.isEmpty {
+                DebugPrint(mode: .recordCalculation, "Synced \(espnTeamRecords.count) ESPN team records to FantasyViewModel")
+            }
+        }
     }
 }

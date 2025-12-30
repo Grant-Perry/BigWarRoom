@@ -149,6 +149,16 @@ struct AllLivePlayersView: View {
                 await allLivePlayersViewModel.loadAllPlayers()
             }
         }
+        // 🔥 NEW: REACTIVE OBSERVATION - Replace 500ms polling with instant reactivity
+        .onChange(of: allLivePlayersViewModel.matchupsHubViewModel.matchupDataStore.lastRefreshTime) { oldValue, newValue in
+            guard newValue > oldValue else { return }
+            
+            DebugPrint(mode: .liveUpdates, "🎯 REACTIVE UPDATE: Store refreshed - triggering delta update")
+            
+            Task {
+                await allLivePlayersViewModel.handleStoreUpdate()
+            }
+        }
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)
         }

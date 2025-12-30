@@ -132,6 +132,7 @@ struct AllLivePlayersHeaderView: View {
             // WEEK picker (leading) - using TheWeekPicker component
             TheWeekPicker(
                 showingWeekPicker: $showingWeekPicker,
+                weekManager: weekManager,  // 🔥 Use injected weekManager
                 labelFontSize: 16,
                 weekNumberFontSize: 22,
                 chevronSize: 12,

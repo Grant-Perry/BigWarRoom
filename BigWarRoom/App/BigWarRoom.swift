@@ -12,7 +12,7 @@ struct BigWarRoom: View {
     @State private var selectedTab = 3 // Changed from 0 to 3 - Start on Live Players tab
     
     // 🔥 PHASE 3 DI: Core services created in dependency order
-    @State private var sleeperAPIClient = SleeperAPIClient()
+    @State private var sleeperAPIClient: SleeperAPIClient?
     @State private var playerDirectory: PlayerDirectoryStore?
     @State private var idCanonicalizer: ESPNSleeperIDCanonicalizer?
     @State private var nflGameDataService: NFLGameDataService?
@@ -27,7 +27,15 @@ struct BigWarRoom: View {
     @State private var playerWatchService: PlayerWatchService?
     @State private var matchupsHubViewModel: MatchupsHubViewModel?
     @State private var allLivePlayersViewModel: AllLivePlayersViewModel?
+    @State private var fantasyViewModel: FantasyViewModel?
+    @State private var nflStandingsService: NFLStandingsService?
+    @State private var teamAssetManager: TeamAssetManager?
     @State private var servicesInitialized = false
+    
+    // 🔥 FIX: Initialize services IMMEDIATELY in init, not in onAppear
+    init() {
+        setupServicesSync()
+    }
     
     var body: some View {
         ZStack {
@@ -41,14 +49,10 @@ struct BigWarRoom: View {
             } else {
                 // Initial setup loading
                 ProgressView("Initializing...")
-                    .onAppear {
-                        setupServices()
-                    }
             }
         }
         .preferredColorScheme(.dark)
         .onAppear {
-            setupServices()
             // 🔥 INITIALIZE: Start centralized initialization on app start
             if let manager = initManager,
                !manager.isInitialized && !manager.isLoading {
@@ -63,22 +67,27 @@ struct BigWarRoom: View {
         }
     }
     
-    private func setupServices() {
+    // 🔥 FIX: Synchronous setup that runs in init()
+    private func setupServicesSync() {
         guard !servicesInitialized else { return }
         
         // 🔥 PHASE 3 DI: Create services in dependency order
         
         // 1. Core Data Services
-        playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+        sleeperAPIClient = SleeperAPIClient()
+        playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient!)
         idCanonicalizer = ESPNSleeperIDCanonicalizer(playerDirectory: playerDirectory!)
         
         // 2. NFL Game Services
         nflGameDataService = NFLGameDataService()
         gameStatusService = GameStatusService(nflGameDataService: nflGameDataService!)
+        nflStandingsService = NFLStandingsService()
+        teamAssetManager = TeamAssetManager()
         
         // 3. Week/Season Management
-        nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
+        nflWeekService = NFLWeekService(apiClient: sleeperAPIClient!)
         weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService!)
+        WeekSelectionManager.setSharedInstance(weekSelectionManager!)  // 🔥 SET .shared INSTANCE
         seasonYearManager = SeasonYearManager()
         
         // 4. Stats Services
@@ -90,7 +99,7 @@ struct BigWarRoom: View {
         )
         
         // 5. Credential Management
-        sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+        sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient!)
         
         // Break circular dependency: Create ESPN credentials first, then API client
         let espnCreds = ESPNCredentialsManager()
@@ -98,13 +107,36 @@ struct BigWarRoom: View {
         espnCreds.setAPIClient(espnAPIClient)
         espnCredentials = espnCreds
         
-        // 6. ViewModels with dependencies
+        // 6. Create UnifiedLeagueManager and MatchupDataStore
+        let unifiedLeagueManager = UnifiedLeagueManager(
+            sleeperClient: sleeperAPIClient!,
+            espnClient: espnAPIClient,
+            espnCredentials: espnCreds
+        )
+        
+        let matchupDataStore = MatchupDataStore(
+            unifiedLeagueManager: unifiedLeagueManager,
+            sharedStatsService: sharedStatsService!,
+            gameStatusService: gameStatusService!,
+            weekSelectionManager: weekSelectionManager!
+        )
+        
+        // 7. ViewModels with dependencies
         matchupsHubViewModel = MatchupsHubViewModel(
             espnCredentials: espnCreds,
             sleeperCredentials: sleeperCredentials!,
             playerDirectory: playerDirectory!,
             gameStatusService: gameStatusService!,
-            sharedStatsService: sharedStatsService!
+            sharedStatsService: sharedStatsService!,
+            matchupDataStore: matchupDataStore
+        )
+        
+        // Create FantasyViewModel with dependencies
+        fantasyViewModel = FantasyViewModel(
+            matchupDataStore: matchupDataStore,
+            unifiedLeagueManager: unifiedLeagueManager,
+            sleeperCredentials: sleeperCredentials!,
+            playerDirectoryStore: playerDirectory!
         )
         
         // Create AllLivePlayersViewModel with dependencies
@@ -121,7 +153,7 @@ struct BigWarRoom: View {
             allLivePlayersViewModel: allLivePlayersViewModel
         )
         
-        // 7. Initialization Manager
+        // 8. Initialization Manager
         initManager = AppInitializationManager(
             matchupsHubViewModel: matchupsHubViewModel!,
             allLivePlayersViewModel: allLivePlayersViewModel!,
@@ -141,13 +173,16 @@ struct BigWarRoom: View {
                     if let weekManager = weekSelectionManager,
                        let espnCreds = espnCredentials,
                        let sleeperCreds = sleeperCredentials,
-                       let matchupsVM = matchupsHubViewModel {
+                       let matchupsVM = matchupsHubViewModel,
+                       let allLiveVM = allLivePlayersViewModel {
                         MatchupsHubView(
                             weekManager: weekManager,
                             espnCredentials: espnCreds,
-                            sleeperCredentials: sleeperCreds,
-                            matchupsHubViewModel: matchupsVM
+                            sleeperCredentials: sleeperCreds
                         )
+                        .environment(matchupsVM)
+                        .environment(allLiveVM)
+                        .environment(weekManager)
                     } else {
                         Text("Loading services...")
                     }
@@ -160,7 +195,24 @@ struct BigWarRoom: View {
                 
                 // NFL SCHEDULE TAB - PRIORITIZED FOR VISIBILITY
                 Group {
-                    NFLScheduleView()
+                    if let matchupsVM = matchupsHubViewModel,
+                       let weekManager = weekSelectionManager,
+                       let standingsService = nflStandingsService,
+                       let teamAssets = teamAssetManager,
+                       let nflGameData = nflGameDataService,
+                       let nflWeek = nflWeekService,
+                       let espnCreds = espnCredentials {
+                        NFLScheduleView()
+                            .environment(matchupsVM)
+                            .environment(weekManager)
+                            .environment(standingsService)
+                            .environment(teamAssets)
+                            .environment(nflGameData)
+                            .environment(nflWeek)
+                            .environment(espnCreds)
+                    } else {
+                        Text("Loading services...")
+                    }
                 }
                 .tabItem {
                     Image(systemName: "calendar.circle.fill")
@@ -169,23 +221,37 @@ struct BigWarRoom: View {
                 .tag(1)
                 
                 // Fantasy Tab 
-                FantasyMatchupListView(draftRoomViewModel: draftRoomViewModel)
-                    .tabItem {
-                        Image(systemName: "football")
-                        Text("Fantasy")
+                Group {
+                    if let matchupsVM = matchupsHubViewModel,
+                       let fantasyVM = fantasyViewModel,
+                       let weekManager = weekSelectionManager {
+                        FantasyMatchupListView(draftRoomViewModel: draftRoomViewModel)
+                            .environment(matchupsVM)
+                            .environment(fantasyVM)
+                            .environment(weekManager)
+                    } else {
+                        Text("Loading services...")
                     }
-                    .tag(2)
+                }
+                .tabItem {
+                    Image(systemName: "football")
+                    Text("Fantasy")
+                }
+                .tag(2)
                 
                 // All Live Players Tab
                 Group {
                     if let watchService = playerWatchService,
                        let weekManager = weekSelectionManager,
-                       let viewModel = allLivePlayersViewModel {
+                       let viewModel = allLivePlayersViewModel,
+                       let matchupsVM = matchupsHubViewModel {
                         AllLivePlayersView(
                             allLivePlayersViewModel: viewModel,
                             watchService: watchService,
                             weekManager: weekManager
                         )
+                        .environment(matchupsVM)
+                        .environment(weekManager)
                     } else {
                         Text("Loading services...")
                     }
@@ -197,12 +263,21 @@ struct BigWarRoom: View {
                 .tag(3)
                 
                 // Settings Tab
-                OnBoardingView()
-                    .tabItem {
-                        Image(systemName: "gearshape")
-                        Text("Settings")
+                Group {
+                    if let matchupsVM = matchupsHubViewModel,
+                       let weekManager = weekSelectionManager {
+                        OnBoardingView()
+                            .environment(matchupsVM)
+                            .environment(weekManager)
+                    } else {
+                        Text("Loading services...")
                     }
-                    .tag(4)
+                }
+                .tabItem {
+                    Image(systemName: "gearshape")
+                    Text("Settings")
+                }
+                .tag(4)
             }
             
             // Version display in bottom safe area

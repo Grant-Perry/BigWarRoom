@@ -11,6 +11,10 @@ struct TheWeekPicker: View {
     // MARK: - Required
     @Binding var showingWeekPicker: Bool
     
+    // MARK: - Dependencies (pass explicitly instead of environment)
+    private let weekManager: WeekSelectionManager
+    @State private var yearManager = SeasonYearManager.shared
+    
     // MARK: - Optional Customization (with defaults matching Schedule style)
     
     // Text customization
@@ -47,9 +51,62 @@ struct TheWeekPicker: View {
     var yearFontSize: CGFloat = 9
     var yearOpacity: Double = 0.65
     
-    // State references
-    @State private var weekManager = WeekSelectionManager.shared
-    @State private var yearManager = SeasonYearManager.shared
+    // MARK: - Initializer
+    init(
+        showingWeekPicker: Binding<Bool>,
+        weekManager: WeekSelectionManager,
+        labelText: String = "Week",
+        labelFontSize: CGFloat = 14,
+        labelFontWeight: Font.Weight = .medium,
+        labelColor: Color = .white.opacity(0.8),
+        weekNumberFontSize: CGFloat = 24,
+        weekNumberFontWeight: Font.Weight = .bold,
+        weekNumberColor: Color = .white,
+        chevronSize: CGFloat = 12,
+        chevronWeight: Font.Weight = .medium,
+        chevronColor: Color = .white.opacity(0.8),
+        gradientStartColor: Color = .gpGreen,
+        gradientEndColor: Color = .blue,
+        gradientOpacity: Double = 0.3,
+        strokeOpacity: Double = 0.6,
+        strokeWidth: CGFloat = 1.5,
+        cornerRadius: CGFloat = 20,
+        shadowColor: Color = .gpGreen,
+        shadowOpacity: Double = 0.2,
+        shadowRadius: CGFloat = 8,
+        horizontalPadding: CGFloat = 20,
+        verticalPadding: CGFloat = 10,
+        showYear: Bool = true,
+        yearFontSize: CGFloat = 9,
+        yearOpacity: Double = 0.65
+    ) {
+        self._showingWeekPicker = showingWeekPicker
+        self.weekManager = weekManager
+        self.labelText = labelText
+        self.labelFontSize = labelFontSize
+        self.labelFontWeight = labelFontWeight
+        self.labelColor = labelColor
+        self.weekNumberFontSize = weekNumberFontSize
+        self.weekNumberFontWeight = weekNumberFontWeight
+        self.weekNumberColor = weekNumberColor
+        self.chevronSize = chevronSize
+        self.chevronWeight = chevronWeight
+        self.chevronColor = chevronColor
+        self.gradientStartColor = gradientStartColor
+        self.gradientEndColor = gradientEndColor
+        self.gradientOpacity = gradientOpacity
+        self.strokeOpacity = strokeOpacity
+        self.strokeWidth = strokeWidth
+        self.cornerRadius = cornerRadius
+        self.shadowColor = shadowColor
+        self.shadowOpacity = shadowOpacity
+        self.shadowRadius = shadowRadius
+        self.horizontalPadding = horizontalPadding
+        self.verticalPadding = verticalPadding
+        self.showYear = showYear
+        self.yearFontSize = yearFontSize
+        self.yearOpacity = yearOpacity
+    }
     
     var body: some View {
         Button(action: {
@@ -119,14 +176,15 @@ struct TheWeekPicker: View {
 
 extension TheWeekPicker {
     /// Default Schedule style (green-blue gradient)
-    static func scheduleStyle(showingWeekPicker: Binding<Bool>) -> TheWeekPicker {
-        TheWeekPicker(showingWeekPicker: showingWeekPicker)
+    static func scheduleStyle(showingWeekPicker: Binding<Bool>, weekManager: WeekSelectionManager) -> TheWeekPicker {
+        TheWeekPicker(showingWeekPicker: showingWeekPicker, weekManager: weekManager)
     }
     
     /// Compact style for tight spaces
-    static func compact(showingWeekPicker: Binding<Bool>) -> TheWeekPicker {
+    static func compact(showingWeekPicker: Binding<Bool>, weekManager: WeekSelectionManager) -> TheWeekPicker {
         TheWeekPicker(
             showingWeekPicker: showingWeekPicker,
+            weekManager: weekManager,
             labelFontSize: 10,
             weekNumberFontSize: 18,
             chevronSize: 10,
@@ -137,9 +195,10 @@ extension TheWeekPicker {
     }
     
     /// Blue-only style
-    static func blueStyle(showingWeekPicker: Binding<Bool>) -> TheWeekPicker {
+    static func blueStyle(showingWeekPicker: Binding<Bool>, weekManager: WeekSelectionManager) -> TheWeekPicker {
         TheWeekPicker(
             showingWeekPicker: showingWeekPicker,
+            weekManager: weekManager,
             gradientStartColor: .blue,
             gradientEndColor: .blue,
             shadowColor: .blue
@@ -148,22 +207,26 @@ extension TheWeekPicker {
 }
 
 #Preview("The Week Picker") {
-    ZStack {
+    let nflWeekService = NFLWeekService(apiClient: SleeperAPIClient())
+    let weekManager = WeekSelectionManager(nflWeekService: nflWeekService)
+    
+    return ZStack {
         Color.black.ignoresSafeArea()
         
         VStack(spacing: 20) {
             // Default
-            TheWeekPicker(showingWeekPicker: .constant(false))
+            TheWeekPicker(showingWeekPicker: .constant(false), weekManager: weekManager)
             
             // Compact
-            TheWeekPicker.compact(showingWeekPicker: .constant(false))
+            TheWeekPicker.compact(showingWeekPicker: .constant(false), weekManager: weekManager)
             
             // Blue style
-            TheWeekPicker.blueStyle(showingWeekPicker: .constant(false))
+            TheWeekPicker.blueStyle(showingWeekPicker: .constant(false), weekManager: weekManager)
             
             // Custom
             TheWeekPicker(
                 showingWeekPicker: .constant(false),
+                weekManager: weekManager,
                 weekNumberFontSize: 32,
                 gradientStartColor: .orange,
                 gradientEndColor: .red,
@@ -172,4 +235,3 @@ extension TheWeekPicker {
         }
     }
 }
-

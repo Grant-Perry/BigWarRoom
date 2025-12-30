@@ -19,10 +19,7 @@ struct NonMicroTeamSection: View {
     // 🔥 NEW: Team roster navigation callback
     var onTeamLogoTap: ((String) -> Void)? = nil
     
-    // 🔥 FIXED: Get fantasy view model reference without state observation to prevent re-render loops
-    private var fantasyViewModel: FantasyViewModel {
-        FantasyViewModel.shared
-    }
+    // 🔥 REMOVED: Don't need FantasyViewModel here
     
     private var isTeamWinning: Bool {
         if isMyTeam {
