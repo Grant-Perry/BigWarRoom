@@ -132,7 +132,8 @@ final class AppContainer {
             gameStatusService: gameStatusService,
             sharedStatsService: sharedStatsService,
             matchupDataStore: matchupDataStore,
-            gameDataService: nflGameDataService
+            gameDataService: nflGameDataService,
+            unifiedLeagueManager: unifiedLeagueManagerForStore
         )
         
         // MARK: - 🔥 PHASE 4: FantasyViewModel with DI (NO BRIDGE)

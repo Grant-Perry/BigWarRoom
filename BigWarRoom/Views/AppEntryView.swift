@@ -59,6 +59,7 @@ struct AppEntryView: View {
     // 🔥 PHASE 3 DI: Lazy initialization helpers
     private func getOrCreateUnifiedLeagueManager() -> UnifiedLeagueManager {
         if unifiedLeagueManager == nil {
+            print("🔥 APP ENTRY: Creating NEW UnifiedLeagueManager instance")
             let sleeperClient = SleeperAPIClient()
             let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
             unifiedLeagueManager = UnifiedLeagueManager(
@@ -66,6 +67,9 @@ struct AppEntryView: View {
                 espnClient: espnClient,
                 espnCredentials: espnCredentials
             )
+            print("🔥 APP ENTRY: UnifiedLeagueManager instance ID: \(ObjectIdentifier(unifiedLeagueManager!))")
+        } else {
+            print("🔥 APP ENTRY: Reusing existing UnifiedLeagueManager instance ID: \(ObjectIdentifier(unifiedLeagueManager!))")
         }
         return unifiedLeagueManager!
     }
@@ -91,7 +95,8 @@ struct AppEntryView: View {
                 gameStatusService: gameStatusService,
                 sharedStatsService: sharedStatsService,
                 matchupDataStore: getOrCreateMatchupDataStore(),
-                gameDataService: nflGameDataService
+                gameDataService: nflGameDataService,
+				unifiedLeagueManager: getOrCreateUnifiedLeagueManager()
             )
         }
         return matchupsHub!
@@ -234,107 +239,4 @@ struct BigWarRoomModified: View {
             .ignoresSafeArea(edges: .bottom)
         }
     }
-}
-
-// MARK: - Preview
-#Preview("Loading") {
-    AppEntryView()
-}
-
-#Preview("Mission Control Default") {
-    let espnCredentials = ESPNCredentialsManager.shared
-    let sleeperCredentials = SleeperCredentialsManager.shared
-    let playerDirectory = PlayerDirectoryStore.shared
-    let gameStatusService = GameStatusService.shared
-    let sharedStatsService = SharedStatsService.shared
-    let weekSelectionManager = WeekSelectionManager.shared
-    let nflGameDataService = NFLGameDataService.shared
-    
-    let sleeperClient = SleeperAPIClient()
-    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
-    let unifiedLeagueManager = UnifiedLeagueManager(
-        sleeperClient: sleeperClient,
-        espnClient: espnClient,
-        espnCredentials: espnCredentials
-    )
-    
-    let matchupDataStore = MatchupDataStore(
-        unifiedLeagueManager: unifiedLeagueManager,
-        sharedStatsService: sharedStatsService,
-        gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
-    )
-    
-    let matchupsHub = MatchupsHubViewModel(
-        espnCredentials: espnCredentials,
-        sleeperCredentials: sleeperCredentials,
-        playerDirectory: playerDirectory,
-        gameStatusService: gameStatusService,
-        sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
-    )
-    let allLivePlayersViewModel = AllLivePlayersViewModel(
-        matchupsHubViewModel: matchupsHub,
-        playerDirectory: playerDirectory,
-        gameStatusService: gameStatusService,
-        sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager,
-        nflGameDataService: nflGameDataService
-    )
-    
-    BigWarRoomWithConditionalStart(
-        shouldShowOnboarding: false,
-        matchupsHub: matchupsHub,
-        allLivePlayersViewModel: allLivePlayersViewModel
-    )
-}
-
-#Preview("Settings Default") {
-    let espnCredentials = ESPNCredentialsManager.shared
-    let sleeperCredentials = SleeperCredentialsManager.shared
-    let playerDirectory = PlayerDirectoryStore.shared
-    let gameStatusService = GameStatusService.shared
-    let sharedStatsService = SharedStatsService.shared
-    let weekSelectionManager = WeekSelectionManager.shared
-    let nflGameDataService = NFLGameDataService.shared
-    
-    let sleeperClient = SleeperAPIClient()
-    let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
-    let unifiedLeagueManager = UnifiedLeagueManager(
-        sleeperClient: sleeperClient,
-        espnClient: espnClient,
-        espnCredentials: espnCredentials
-    )
-    
-    let matchupDataStore = MatchupDataStore(
-        unifiedLeagueManager: unifiedLeagueManager,
-        sharedStatsService: sharedStatsService,
-        gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
-    )
-    
-    let matchupsHub = MatchupsHubViewModel(
-        espnCredentials: espnCredentials,
-        sleeperCredentials: sleeperCredentials,
-        playerDirectory: playerDirectory,
-        gameStatusService: gameStatusService,
-        sharedStatsService: sharedStatsService,
-        matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
-    )
-    let allLivePlayersViewModel = AllLivePlayersViewModel(
-        matchupsHubViewModel: matchupsHub,
-        playerDirectory: playerDirectory,
-        gameStatusService: gameStatusService,
-        sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager,
-        nflGameDataService: nflGameDataService
-    )
-    
-    BigWarRoomWithConditionalStart(
-        shouldShowOnboarding: true,
-        matchupsHub: matchupsHub,
-        allLivePlayersViewModel: allLivePlayersViewModel
-    )
 }

@@ -590,7 +590,8 @@ struct OpponentIntelligenceDashboardView: View {
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
+        gameDataService: nflGameDataService,
+        unifiedLeagueManager: unifiedLeagueManager
     )
     
     let allLivePlayersViewModel = AllLivePlayersViewModel(

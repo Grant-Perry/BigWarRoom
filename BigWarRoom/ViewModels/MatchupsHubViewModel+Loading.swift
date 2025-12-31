@@ -55,7 +55,7 @@ extension MatchupsHubViewModel {
             
             let leagueDescriptors = availableLeagues.map { league in
                 LeagueDescriptor(
-                    id: league.league.leagueID,
+                    id: league.id,
                     name: league.league.name,
                     platform: league.source,
                     avatarURL: nil
@@ -81,8 +81,8 @@ extension MatchupsHubViewModel {
                 
                 // Create snapshot ID
                 let snapshotID = MatchupSnapshot.ID(
-                    leagueID: league.league.leagueID,
-                    matchupID: "\(league.league.leagueID)_\(currentWeek)",
+                    leagueID: league.id,
+                    matchupID: "\(league.id)_\(currentWeek)",
                     platform: league.source,
                     week: currentWeek
                 )

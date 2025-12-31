@@ -27,18 +27,18 @@ struct MoreTabView: View {
             destination: .playerSearch
         ),
         MenuItem(
-            icon: "star.circle.fill",
-            iconColor: .gpPostBot,
-            title: "App Features",
-            subtitle: "Complete feature overview",
-            destination: .features
-        ),
-        MenuItem(
             icon: "gearshape.fill",
             iconColor: .gray,
             title: "Settings",
             subtitle: "App configuration and setup",
             destination: .settings
+        ),
+        MenuItem(
+            icon: "star.circle.fill",
+            iconColor: .gpPostBot,
+            title: "App Features",
+            subtitle: "Complete feature overview",
+            destination: .features
         ),
         MenuItem(
             icon: "pills.fill",

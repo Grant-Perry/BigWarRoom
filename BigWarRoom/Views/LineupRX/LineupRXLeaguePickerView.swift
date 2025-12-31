@@ -202,7 +202,8 @@ private struct LeagueRowView: View {
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
+        gameDataService: nflGameDataService,
+        unifiedLeagueManager: unifiedLeagueManager
     )
     
     NavigationView {

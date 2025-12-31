@@ -132,7 +132,8 @@ struct BigWarRoom: View {
             gameStatusService: gameStatusService!,
             sharedStatsService: sharedStatsService!,
             matchupDataStore: matchupDataStore,
-            gameDataService: nflGameDataService!
+            gameDataService: nflGameDataService!,
+            unifiedLeagueManager: unifiedLeagueManager
         )
         
         // Create FantasyViewModel with dependencies

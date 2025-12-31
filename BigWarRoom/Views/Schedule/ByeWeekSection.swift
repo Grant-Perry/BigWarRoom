@@ -429,7 +429,8 @@ struct ByeWeekImpactItem: Identifiable {
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
+        gameDataService: nflGameDataService,
+        unifiedLeagueManager: unifiedLeagueManager
     )
     
     ZStack {

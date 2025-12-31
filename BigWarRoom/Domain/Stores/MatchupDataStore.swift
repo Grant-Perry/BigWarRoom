@@ -181,6 +181,7 @@ final class MatchupDataStore {
             
         } catch {
             leagueCaches[key]?.pendingTasks[id] = nil
+            DebugPrint(mode: .liveUpdates, "❌ STORE: Failed to hydrate \(id.matchupID): \(error)")
             throw error
         }
     }
@@ -291,6 +292,12 @@ final class MatchupDataStore {
         
         DebugPrint(mode: .matchupLoading, "🔍 STORE: Looking for league \(summary.leagueID) in \(allLeagues.count) loaded leagues")
         
+        if allLeagues.isEmpty {
+            DebugPrint(mode: .matchupLoading, "⚠️ STORE: UnifiedLeagueManager has NO leagues loaded yet! This is a timing issue.")
+        } else {
+            DebugPrint(mode: .matchupLoading, "📋 STORE: Available leagues: \(allLeagues.map { "[\($0.id): \($0.league.name)]" }.joined(separator: ", "))")
+        }
+        
         // Find matching league
         if let wrapper = allLeagues.first(where: { $0.id == summary.leagueID }) {
             DebugPrint(mode: .matchupLoading, "✅ STORE: Found league wrapper for \(summary.leagueName)")
@@ -302,7 +309,6 @@ final class MatchupDataStore {
         // 2. League failed to load initially
         // 3. Timing issue (rare with current architecture)
         DebugPrint(mode: .matchupLoading, "❌ STORE: League \(summary.leagueID) not found in UnifiedLeagueManager")
-        DebugPrint(mode: .matchupLoading, "   Available leagues: \(allLeagues.map { $0.id })")
         
         throw NSError(
             domain: "MatchupDataStore",
@@ -418,8 +424,11 @@ final class MatchupDataStore {
         
         // Step 1: Get league descriptor
         guard let leagueDescriptor = leagueCaches[key]?.summary else {
+            DebugPrint(mode: .liveUpdates, "❌ STORE: League not found in cache for \(id.matchupID)")
             throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "League not found in cache"])
         }
+        
+        DebugPrint(mode: .liveUpdates, "📋 STORE: Processing league '\(leagueDescriptor.leagueName)' for week \(key.week)")
         
         // Step 2: Create league wrapper for provider
         let leagueWrapper: UnifiedLeagueManager.LeagueWrapper
@@ -455,10 +464,11 @@ final class MatchupDataStore {
         
         // Step 4: Identify my team first (needed for elimination checks)
         guard let myTeamID = try await provider.identifyMyTeamID() else {
+            DebugPrint(mode: .liveUpdates, "❌ STORE: Could not identify team for \(leagueDescriptor.leagueName)")
             throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "Could not identify user's team"])
         }
         
-        DebugPrint(mode: .winProb, "🎯 STORE: My team ID = \(myTeamID)")
+        DebugPrint(mode: .liveUpdates, "✅ STORE: My team ID = \(myTeamID) for \(leagueDescriptor.leagueName)")
         
         // 🔥 STEP 4A: Check for chopped league BEFORE fetching matchups
         if await isSleeperChoppedLeagueResolved(leagueWrapper) {
@@ -473,7 +483,9 @@ final class MatchupDataStore {
         }
         
         // Step 5: Fetch matchup data from provider
+        DebugPrint(mode: .liveUpdates, "🔄 STORE: Fetching matchups from provider for \(leagueDescriptor.leagueName)")
         let matchups = try await provider.fetchMatchups()
+        DebugPrint(mode: .liveUpdates, "📦 STORE: Received \(matchups.count) matchups for \(leagueDescriptor.leagueName)")
         
         // 🔥 STEP 5A: Check for playoff elimination (empty matchups during playoffs)
         if matchups.isEmpty && isPlayoffWeek(key.week, leagueWrapper: leagueWrapper) {
@@ -481,7 +493,7 @@ final class MatchupDataStore {
             
             // Check PE toggle
             if UserDefaults.standard.showEliminatedPlayoffLeagues {
-                DebugPrint(mode: .matchupLoading, "✅ STORE: PE toggle ON - creating eliminated matchup")
+                DebugPrint(mode: .matchupLoading, "✅ STORE: PE toggle ON - creating eliminated matchup for \(leagueDescriptor.leagueName)")
                 return try await fetchEliminatedPlayoffSnapshot(
                     id: id,
                     key: key,
@@ -490,16 +502,19 @@ final class MatchupDataStore {
                     myTeamID: myTeamID
                 )
             } else {
-                DebugPrint(mode: .matchupLoading, "❌ STORE: PE toggle OFF - throwing elimination error")
+                DebugPrint(mode: .matchupLoading, "❌ STORE: PE toggle OFF - throwing elimination error for \(leagueDescriptor.leagueName)")
                 throw EliminatedLeagueError.playoffEliminatedHidden
             }
         }
         
         // Step 6: Find my matchup
+        DebugPrint(mode: .liveUpdates, "🔍 STORE: Looking for my matchup in \(matchups.count) matchups for \(leagueDescriptor.leagueName)")
         guard let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) else {
+            DebugPrint(mode: .liveUpdates, "⚠️ STORE: My matchup not found for \(leagueDescriptor.leagueName)")
+            
             // 🔥 STEP 6A: No matchup found - could be playoff elimination
             if isPlayoffWeek(key.week, leagueWrapper: leagueWrapper) {
-                DebugPrint(mode: .matchupLoading, "🏆 STORE: No matchup found during playoffs - checking winners bracket")
+                DebugPrint(mode: .matchupLoading, "🏆 STORE: No matchup found during playoffs - checking winners bracket for \(leagueDescriptor.leagueName)")
                 
                 let isInWinnersBracket = await checkWinnersBracket(
                     leagueWrapper: leagueWrapper,
@@ -507,9 +522,11 @@ final class MatchupDataStore {
                     myTeamID: myTeamID
                 )
                 
+                DebugPrint(mode: .liveUpdates, "🏅 STORE: Winners bracket check result: \(isInWinnersBracket) for \(leagueDescriptor.leagueName)")
+                
                 if !isInWinnersBracket {
                     if UserDefaults.standard.showEliminatedPlayoffLeagues {
-                        DebugPrint(mode: .matchupLoading, "✅ STORE: Eliminated but PE toggle ON - creating eliminated matchup")
+                        DebugPrint(mode: .matchupLoading, "✅ STORE: Eliminated but PE toggle ON - creating eliminated matchup for \(leagueDescriptor.leagueName)")
                         return try await fetchEliminatedPlayoffSnapshot(
                             id: id,
                             key: key,
@@ -518,14 +535,17 @@ final class MatchupDataStore {
                             myTeamID: myTeamID
                         )
                     } else {
-                        DebugPrint(mode: .matchupLoading, "❌ STORE: Eliminated and PE toggle OFF - throwing elimination error")
+                        DebugPrint(mode: .matchupLoading, "❌ STORE: Eliminated and PE toggle OFF - throwing elimination error for \(leagueDescriptor.leagueName)")
                         throw EliminatedLeagueError.playoffEliminatedHidden
                     }
                 }
             }
             
+            DebugPrint(mode: .liveUpdates, "❌ STORE: Throwing no matchup error for \(leagueDescriptor.leagueName)")
             throw NSError(domain: "MatchupDataStore", code: 404, userInfo: [NSLocalizedDescriptionKey: "No matchup found for team \(myTeamID)"])
         }
+        
+        DebugPrint(mode: .liveUpdates, "✅ STORE: Found my matchup for \(leagueDescriptor.leagueName)")
         
         // Step 7: Build snapshot from matchup WITH my team ID
         let snapshot = buildMatchupSnapshot(
@@ -540,7 +560,7 @@ final class MatchupDataStore {
             )
         )
         
-        DebugPrint(mode: .liveUpdates, "✅ STORE: Fetched snapshot for \(id.matchupID)")
+        DebugPrint(mode: .liveUpdates, "✅ STORE: Built snapshot for \(leagueDescriptor.leagueName) - opponent: \(snapshot.opponentTeam.info.ownerName)")
         return snapshot
     }
     
