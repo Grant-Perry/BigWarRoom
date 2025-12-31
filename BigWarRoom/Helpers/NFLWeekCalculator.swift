@@ -10,10 +10,11 @@ import Foundation
 /// Utility for calculating current NFL week and integrating with game data
 struct NFLWeekCalculator {
     
-    /// Get current NFL week (you can integrate with Sleeper API later)
+    /// Get current NFL week from WeekSelectionManager (SSOT for user-selected week)
+    /// This returns what the USER wants to view, not necessarily the current NFL week
     static func getCurrentWeek() -> Int {
-        // Use NFLWeekService for accurate week calculation
-        return NFLWeekService.shared.currentWeek
+        // 🔥 FIX: Use WeekSelectionManager as SSOT, not NFLWeekService
+        return WeekSelectionManager.shared.selectedWeek
     }
     
     /// Setup real NFL game data for the calculated current week

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct MoreTabView: View {
     let viewModel: DraftRoomViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     // MARK: - Menu Data Configuration
     private let menuItems: [MenuItem] = [
@@ -169,7 +170,7 @@ struct MoreTabView: View {
         case .features:
             FeaturesView()
         case .settings:
-            AppSettingsView()
+            AppSettingsView(nflWeekService: nflWeekService)
         case .teamRosters:
             TeamRostersView()
         case .warRoom:

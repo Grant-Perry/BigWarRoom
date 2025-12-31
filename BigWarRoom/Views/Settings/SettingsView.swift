@@ -9,7 +9,14 @@
 import SwiftUI
 
 struct OnBoardingView: View {
-    @State private var viewModel = SettingsViewModel()
+    @State private var viewModel: SettingsViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
+    
+    init() {
+        // We'll need to fix this - can't access @Environment in init
+        // For now, use a placeholder and update in onAppear
+        _viewModel = State(wrappedValue: SettingsViewModel(nflWeekService: NFLWeekService(apiClient: SleeperAPIClient())))
+    }
     
     var body: some View {
         NavigationView {
@@ -153,6 +160,10 @@ struct OnBoardingView: View {
             } message: {
                 Text(viewModel.clearResultMessage)
             }
+        }
+        .onAppear {
+            // Re-initialize with proper nflWeekService from environment
+            viewModel = SettingsViewModel(nflWeekService: nflWeekService)
         }
     }
 }

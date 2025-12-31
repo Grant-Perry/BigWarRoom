@@ -19,6 +19,7 @@ struct FantasyMatchupActiveRosterSection: View {
     
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     @State private var homeProjected: Double = 0.0
     @State private var awayProjected: Double = 0.0
@@ -42,7 +43,8 @@ struct FantasyMatchupActiveRosterSection: View {
                             matchup: matchup,
                             teamIndex: 0,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -65,7 +67,8 @@ struct FantasyMatchupActiveRosterSection: View {
                             matchup: matchup,
                             teamIndex: 1,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -192,6 +195,7 @@ struct FantasyMatchupBenchSection: View {
     
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     @State private var homeBenchProjected: Double = 0.0
     @State private var awayBenchProjected: Double = 0.0
@@ -215,7 +219,8 @@ struct FantasyMatchupBenchSection: View {
                             matchup: matchup,
                             teamIndex: 0,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -239,7 +244,8 @@ struct FantasyMatchupBenchSection: View {
                             matchup: matchup,
                             teamIndex: 1,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -389,6 +395,7 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -408,7 +415,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                             matchup: matchup,
                             teamIndex: 1,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -433,7 +441,8 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                             matchup: matchup,
                             teamIndex: 0,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -556,6 +565,7 @@ struct FantasyMatchupBenchSectionSorted: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -575,7 +585,8 @@ struct FantasyMatchupBenchSectionSorted: View {
                             matchup: matchup,
                             teamIndex: 1,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -597,7 +608,8 @@ struct FantasyMatchupBenchSectionSorted: View {
                             matchup: matchup,
                             teamIndex: 0,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -709,6 +721,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
 
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -769,7 +782,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             matchup: currentMatchup,
                             teamIndex: 1,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -794,7 +808,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             matchup: currentMatchup,
                             teamIndex: 0,
                             isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -1066,6 +1081,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(NFLWeekService.self) private var nflWeekService
 
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
@@ -1116,7 +1132,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             matchup: currentMatchup,
                             teamIndex: 1,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     
@@ -1138,7 +1155,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             matchup: currentMatchup,
                             teamIndex: 0,
                             isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                     

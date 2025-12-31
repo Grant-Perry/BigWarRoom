@@ -490,11 +490,12 @@ struct LeagueMatchupsTabView: View {
     
     /// 🔥 NEW: Fetch neighbor matchups in background without blocking UI
     private func fetchNeighborMatchupsInBackground() async {
-        let currentWeek = NFLWeekService.shared.currentWeek
+        // 🔥 FIX: Use the week from the starting matchup, not NFLWeekService.currentWeek
+        let matchupWeek = startingMatchup.week
         let currentYear = String(Calendar.current.component(.year, from: Date()))
         let provider = LeagueMatchupProvider(
             league: league,
-            week: currentWeek,
+            week: matchupWeek,
             year: currentYear
         )
 
@@ -547,13 +548,13 @@ struct LeagueMatchupsTabView: View {
             }
         }
         
-        // 🔥 FIX: Use passed-in league directly instead of selectedLeague
+        // 🔥 FIX: Use the week from the starting matchup, not NFLWeekService.currentWeek
         isLoadingAllMatchups = true
-        let currentWeek = NFLWeekService.shared.currentWeek
+        let matchupWeek = startingMatchup.week
         let currentYear = String(Calendar.current.component(.year, from: Date()))
         let provider = LeagueMatchupProvider(
             league: league,  // 🔥 Use passed-in league
-            week: currentWeek,
+            week: matchupWeek,
             year: currentYear
         )
 

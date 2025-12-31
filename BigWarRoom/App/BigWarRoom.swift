@@ -142,7 +142,8 @@ struct BigWarRoom: View {
             unifiedLeagueManager: unifiedLeagueManager,
             sleeperCredentials: sleeperCredentials!,
             playerDirectoryStore: playerDirectory!,
-            nflGameService: nflGameDataService!
+            nflGameService: nflGameDataService!,
+            nflWeekService: nflWeekService!
         )
         
         // Create AllLivePlayersViewModel with dependencies

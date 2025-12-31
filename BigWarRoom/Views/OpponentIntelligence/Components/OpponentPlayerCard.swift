@@ -16,6 +16,7 @@ struct OpponentPlayerCard: View {
     let player: OpponentPlayer
     // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
+    let nflWeekService: NFLWeekService
     
     @State private var watchService = PlayerWatchService.shared
     @State private var fantasyPlayerViewModel: FantasyPlayerViewModel?
@@ -63,7 +64,7 @@ struct OpponentPlayerCard: View {
                     livePlayersViewModel: allLivePlayersViewModel,
                     playerDirectory: PlayerDirectoryStore.shared,
                     nflGameDataService: NFLGameDataService.shared,
-                    nflWeekService: NFLWeekService.shared
+                    nflWeekService: nflWeekService
                 )
             }
         }

@@ -10,10 +10,10 @@
 import SwiftUI
 
 struct AppSettingsView: View {
-   @State private var viewModel = SettingsViewModel()
+   @State private var viewModel: SettingsViewModel
    @State private var showingConnectionSuccess = false
    @State private var connectionSuccessMessage = ""
-   @State private var nflWeekService = NFLWeekService.shared
+   @Environment(NFLWeekService.self) private var nflWeekService
 
 	  // 🎨 WOODY'S REDESIGN TOGGLE
    @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
@@ -47,6 +47,10 @@ struct AppSettingsView: View {
 	  } else {
 		 return "Conservative (stays near 50%)"
 	  }
+   }
+
+   init(nflWeekService: NFLWeekService) {
+      _viewModel = State(wrappedValue: SettingsViewModel(nflWeekService: nflWeekService))
    }
 
    var body: some View {
@@ -939,7 +943,7 @@ struct AppSettingsView: View {
    // MARK: -> NFL Week Settings View
 
 struct NFLWeekSettingsView: View {
-   @State private var nflWeekService = NFLWeekService.shared
+   @Environment(NFLWeekService.self) private var nflWeekService
    @Environment(\.dismiss) private var dismiss
 
    var body: some View {

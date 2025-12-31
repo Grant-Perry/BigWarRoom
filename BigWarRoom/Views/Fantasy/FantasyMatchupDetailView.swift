@@ -19,6 +19,7 @@ struct FantasyMatchupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
     @Environment(FantasyViewModel.self) private var defaultFantasyViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
 
     // Shared instance to ensure stats are loaded early
     // 🔥 PHASE 3 DI: Injected via initializer
@@ -53,27 +54,14 @@ struct FantasyMatchupDetailView: View {
         self.fantasyViewModel = fantasyViewModel
         self._livePlayersViewModel = State(initialValue: livePlayersViewModel)
     }
-    
-    // 🔥 NEW: Get the latest matchup data from the global hub
-    private var latestMatchup: FantasyMatchup {
-        // Try to find updated matchup data from the hub
-        if let updated = matchupsHubViewModel.myMatchups.first(where: { unifiedMatchup in
-            unifiedMatchup.fantasyMatchup?.id == matchup.id
-        })?.fantasyMatchup {
-            return updated
-        }
-        // Fallback to the original matchup passed in
-        return matchup
-    }
 
     // MARK: - Body
 
     var body: some View {
-        // 🔥 CRITICAL: Force SwiftUI to track hub changes by reading lastUpdateTime in body
-        let _ = matchupsHubViewModel.lastUpdateTime
-        
-        let awayTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 0) ?? latestMatchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 1) ?? latestMatchup.homeTeam.currentScore ?? 0.0
+        // 🔥 FIX: Trust the matchup data passed in, don't try to fetch from hub
+        // The parent view (LeagueMatchupsTabView or Mission Control) already has the correct data
+        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
 
@@ -119,8 +107,8 @@ struct FantasyMatchupDetailView: View {
 
     // FIX: Extract content to separate view with proper padding
     private var contentView: some View {
-        let awayTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 0) ?? latestMatchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: latestMatchup, teamIndex: 1) ?? latestMatchup.homeTeam.currentScore ?? 0.0
+        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
         
@@ -128,7 +116,7 @@ struct FantasyMatchupDetailView: View {
             // Fantasy detail header with team comparison
             FantasyDetailHeaderView(
                 leagueName: leagueName,
-                matchup: latestMatchup,
+                matchup: matchup,
                 awayTeamIsWinning: awayTeamIsWinning,
                 homeTeamIsWinning: homeTeamIsWinning,
                 fantasyViewModel: fantasyViewModel,
@@ -187,7 +175,7 @@ struct FantasyMatchupDetailView: View {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
                     FantasyMatchupActiveRosterSectionFiltered(
-                        matchup: latestMatchup,
+                        matchup: matchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
@@ -197,7 +185,7 @@ struct FantasyMatchupDetailView: View {
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
-                        matchup: latestMatchup,
+                        matchup: matchup,
                         fantasyViewModel: viewModel,
                         sortMethod: sortingMethod,
                         highToLow: sortHighToLow,
@@ -205,9 +193,6 @@ struct FantasyMatchupDetailView: View {
                         showActiveOnly: showActiveOnly,
                         showYetToPlayOnly: showYetToPlayOnly
                     )
-                } else {
-                    // Fallback content when no view model is available
-                    simplifiedRosterView
                 }
             }
             .padding(.top, 4)
@@ -223,21 +208,22 @@ struct FantasyMatchupDetailView: View {
         VStack(spacing: 16) {
             // HOME team roster first
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(latestMatchup.homeTeam.name) Roster")
+                Text("\(matchup.homeTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(latestMatchup.homeTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(matchup.homeTeam.roster.filter { $0.isStarter }) { player in
                         // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
-                            matchup: latestMatchup,
+                            matchup: matchup,
                             teamIndex: 1,
                             isBench: false,
-                            allLivePlayersViewModel: livePlayersViewModel
+                            allLivePlayersViewModel: livePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                         .padding(.horizontal, 8)
                     }
@@ -246,21 +232,22 @@ struct FantasyMatchupDetailView: View {
 
             // AWAY team roster second
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(latestMatchup.awayTeam.name) Roster")
+                Text("\(matchup.awayTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(latestMatchup.awayTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(matchup.awayTeam.roster.filter { $0.isStarter }) { player in
                         // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
-                            matchup: latestMatchup,
+                            matchup: matchup,
                             teamIndex: 0,
                             isBench: false,
-                            allLivePlayersViewModel: livePlayersViewModel
+                            allLivePlayersViewModel: livePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                         .padding(.horizontal, 8)
                     }

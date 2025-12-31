@@ -13,6 +13,7 @@ struct OpponentDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     var body: some View {
         NavigationView {
@@ -244,7 +245,8 @@ struct OpponentDetailSheet: View {
                         // 🔥 PURE DI: Pass injected instance
                         OpponentPlayerCard(
                             player: player,
-                            allLivePlayersViewModel: allLivePlayersViewModel
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
                         )
                     }
                 }

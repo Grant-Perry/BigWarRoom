@@ -33,7 +33,7 @@ struct DraftWarRoomApp: App {
                 .environment(appContainer.matchupDataStore)
                 .environment(appContainer.allLivePlayersViewModel)
                 .environment(NFLGameDataService.shared)
-                .environment(NFLWeekService.shared)
+                .environment(appContainer.nflWeekService)
                 .environment(PlayerDirectoryStore.shared)
                 .environment(PlayerWatchService.shared)
         }
@@ -54,6 +54,7 @@ final class AppContainer {
     let matchupsHubViewModel: MatchupsHubViewModel
     let fantasyViewModel: FantasyViewModel
     let allLivePlayersViewModel: AllLivePlayersViewModel
+    let nflWeekService: NFLWeekService
     
     init() {
         print("🔥 APP CONTAINER: Initializing all services with DI")
@@ -74,7 +75,7 @@ final class AppContainer {
         
         // MARK: - Week/Season Services
         let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
-        NFLWeekService.setSharedInstance(nflWeekService)
+        self.nflWeekService = nflWeekService
         
         let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
         WeekSelectionManager.setSharedInstance(weekSelectionManager)
@@ -148,7 +149,8 @@ final class AppContainer {
             unifiedLeagueManager: unifiedLeagueManagerForFantasy,
             sleeperCredentials: sleeperCredentials,
             playerDirectoryStore: playerDirectory,
-            nflGameService: nflGameDataService
+            nflGameService: nflGameDataService,
+            nflWeekService: nflWeekService
         )
         
         // MARK: - AllLivePlayersViewModel with DI
@@ -196,6 +198,7 @@ final class AppContainer {
 // MARK: - Main App View with Spinning Orbs Loading
 struct MainAppView: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     @State private var showingLoading = true
     @State private var shouldShowOnboarding = false
     

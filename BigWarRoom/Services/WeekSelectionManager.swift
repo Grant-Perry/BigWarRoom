@@ -42,6 +42,7 @@ final class WeekSelectionManager {
     }
     
     // MARK: - Observable Properties
+    
     /// The selected week that drives the ENTIRE app
     /// When Mission Control changes this, it changes everywhere
     var selectedWeek: Int

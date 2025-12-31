@@ -12,23 +12,6 @@ import Observation
 @MainActor
 final class NFLWeekService {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
-    private static var _shared: NFLWeekService?
-    
-    static var shared: NFLWeekService {
-        if let existing = _shared {
-            return existing
-        }
-        // Create temporary shared instance with default SleeperAPIClient
-        let instance = NFLWeekService(apiClient: SleeperAPIClient())
-        _shared = instance
-        return instance
-    }
-    
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
-    static func setSharedInstance(_ instance: NFLWeekService) {
-        _shared = instance
-    }
     
     // MARK: -> Observable Properties (Available to all ViewModels)
     var currentWeek: Int

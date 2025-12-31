@@ -11,6 +11,7 @@ import SwiftUI
 struct MatchupsHubView: View {
     // 🔥 PHASE 4: Use @Environment to get injected instance (internal for extensions)
     @Environment(MatchupsHubViewModel.self) internal var matchupsHubViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     // Dependencies injected via initializer (proper @Observable pattern)
     let weekManager: WeekSelectionManager
@@ -109,7 +110,7 @@ struct MatchupsHubView: View {
             LineupRXView(matchup: matchup)
         }
         .sheet(isPresented: $showingSettings) {
-            AppSettingsView()
+            AppSettingsView(nflWeekService: nflWeekService)
         }
         .sheet(isPresented: $showingWeekPicker) {
             buildWeekPickerSheet()

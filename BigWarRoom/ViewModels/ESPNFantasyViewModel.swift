@@ -29,11 +29,13 @@ final class ESPNFantasyViewModel {
     }
     
     // MARK: - Dependencies
-    private let nflWeekService = NFLWeekService.shared
+    private let nflWeekService: NFLWeekService
     private var observationTask: Task<Void, Never>?
     
     // MARK: - Initialization
-    init() {
+    init(nflWeekService: NFLWeekService) {
+        self.nflWeekService = nflWeekService
+        
         // Set initial league if available
         if let firstLeagueID = AppConstants.ESPNLeagueID.first {
             selectedLeagueID = firstLeagueID

@@ -14,6 +14,7 @@ struct WatchedPlayersSheet: View {
     @Environment(\.editMode) private var editMode
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     var body: some View {
         NavigationStack {
@@ -41,7 +42,8 @@ struct WatchedPlayersSheet: View {
                                 // 🔥 PURE DI: Pass injected instance
                                 WatchedPlayerCard(
                                     watchedPlayer: watchedPlayer,
-                                    allLivePlayersViewModel: allLivePlayersViewModel
+                                    allLivePlayersViewModel: allLivePlayersViewModel,
+                                    nflWeekService: nflWeekService
                                 )
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
@@ -253,6 +255,7 @@ struct WatchedPlayerCard: View {
     let watchedPlayer: WatchedPlayer
     // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
+    let nflWeekService: NFLWeekService
     
     @State private var watchService = PlayerWatchService.shared
     @State private var fantasyPlayerViewModel: FantasyPlayerViewModel?
@@ -321,7 +324,7 @@ struct WatchedPlayerCard: View {
                     livePlayersViewModel: allLivePlayersViewModel,
                     playerDirectory: PlayerDirectoryStore.shared,
                     nflGameDataService: NFLGameDataService.shared,
-                    nflWeekService: NFLWeekService.shared
+                    nflWeekService: nflWeekService
                 )
             }
         }

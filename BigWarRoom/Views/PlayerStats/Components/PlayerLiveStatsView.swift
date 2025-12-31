@@ -39,7 +39,7 @@ struct PlayerLiveStatsView: View {
                     
                     HStack(spacing: 8) {
                         // Week indicator
-                        Text("Week \(NFLWeekService.shared.currentWeek)")
+                        Text("Week \(WeekSelectionManager.shared.selectedWeek)")
                             .font(.caption2)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)

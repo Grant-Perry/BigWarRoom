@@ -20,6 +20,7 @@ struct FantasyPlayerCard: View {
     let isBench: Bool
     // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
+    let nflWeekService: NFLWeekService
     
     @State private var viewModel: FantasyPlayerViewModel?
     @State private var watchService = PlayerWatchService.shared
@@ -34,7 +35,8 @@ struct FantasyPlayerCard: View {
         matchup: FantasyMatchup?,
         teamIndex: Int?,
         isBench: Bool,
-        allLivePlayersViewModel: AllLivePlayersViewModel
+        allLivePlayersViewModel: AllLivePlayersViewModel,
+        nflWeekService: NFLWeekService
     ) {
         self.player = player
         self.fantasyViewModel = fantasyViewModel
@@ -42,6 +44,7 @@ struct FantasyPlayerCard: View {
         self.teamIndex = teamIndex
         self.isBench = isBench
         self.allLivePlayersViewModel = allLivePlayersViewModel
+        self.nflWeekService = nflWeekService
     }
 
     var body: some View {
@@ -130,7 +133,7 @@ struct FantasyPlayerCard: View {
                     livePlayersViewModel: allLivePlayersViewModel,
                     playerDirectory: PlayerDirectoryStore.shared,
                     nflGameDataService: NFLGameDataService.shared,
-                    nflWeekService: NFLWeekService.shared
+                    nflWeekService: nflWeekService
                 )
                 viewModel?.configurePlayer(player)
             }

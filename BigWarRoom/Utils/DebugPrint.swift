@@ -1,11 +1,6 @@
 import Foundation
 import os.log
 
-// MARK: - REMOVED: Old DebugLogger enum with DebugCategory - Modified: Wednesday December 17, 2025 at 9:46:38 AM
-// MARK: - Flexible Debug Mode System (OptionSet-based)
-
-   // MARK: - Debug Configuration
-
 enum DebugConfig {
 	  /// Change this to focus debug output on specific areas
 	  ///
@@ -20,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [.liveUpdates, .matchupLoading] // .scoring // []
+   static var activeMode: DebugMode = .matchupLoading // [.liveUpdates, .matchupLoading] // .scoring // []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {

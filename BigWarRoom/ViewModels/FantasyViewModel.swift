@@ -57,7 +57,7 @@ final class FantasyViewModel {
     var myTeamID: String?
 
     // Make nflWeekService publicly accessible for UI
-    private let nflWeekService = NFLWeekService.shared
+    private let nflWeekService: NFLWeekService
     
     // Public getter for UI access
     var currentNFLWeek: Int {
@@ -103,13 +103,15 @@ final class FantasyViewModel {
         unifiedLeagueManager: UnifiedLeagueManager,
         sleeperCredentials: SleeperCredentialsManager,
         playerDirectoryStore: PlayerDirectoryStore,
-        nflGameService: NFLGameDataService
+        nflGameService: NFLGameDataService,
+        nflWeekService: NFLWeekService
     ) {
         self.matchupDataStore = matchupDataStore
         self.unifiedLeagueManager = unifiedLeagueManager
         self.sleeperCredentials = sleeperCredentials
         self.playerDirectoryStore = playerDirectoryStore
         self.nflGameService = nflGameService
+        self.nflWeekService = nflWeekService
         
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1

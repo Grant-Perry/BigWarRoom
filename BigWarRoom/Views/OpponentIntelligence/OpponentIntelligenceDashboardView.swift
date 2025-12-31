@@ -14,6 +14,7 @@ struct OpponentIntelligenceDashboardView: View {
     // 🔥 PHASE 3 DI: Use @Environment for ViewModels instead of creating with .shared
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(NFLWeekService.self) private var nflWeekService
     
     // 🔥 PHASE 3 DI: Create ViewModel using @State
     @State private var viewModel: OpponentIntelligenceViewModel?
@@ -506,7 +507,8 @@ struct OpponentIntelligenceDashboardView: View {
                     // 🔥 PURE DI: Pass injected instance
                     OpponentPlayerCard(
                         player: player,
-                        allLivePlayersViewModel: allLivePlayersViewModel
+                        allLivePlayersViewModel: allLivePlayersViewModel,
+                        nflWeekService: nflWeekService
                     )
                 }
             }

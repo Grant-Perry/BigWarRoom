@@ -37,7 +37,7 @@ final class SettingsViewModel {
     // MARK: - Dependencies
     private let espnCredentials = ESPNCredentialsManager.shared
     private let sleeperCredentials = SleeperCredentialsManager.shared
-    private let nflWeekService = NFLWeekService.shared
+    private let nflWeekService: NFLWeekService
     
     // MARK: - Available Options
     let availableYears = ["2023", "2024", "2025"]
@@ -79,7 +79,9 @@ final class SettingsViewModel {
     }
     
     // MARK: - Initialization
-    init() {
+    init(nflWeekService: NFLWeekService) {
+        self.nflWeekService = nflWeekService
+        
         // Load saved settings
         loadUserPreferences()
     }
