@@ -87,30 +87,18 @@ extension MatchupsHubViewModel {
                     week: currentWeek
                 )
                 
-                // 🔥 FIX: Add timeout to hydration (max 2 seconds per league)
+                // Hydrate matchup directly (no timeout)
                 do {
-                    let snapshot = try await withTimeout(seconds: 2.0) {
-                        try await self.matchupDataStore.hydrateMatchup(snapshotID)
-                    }
+                    let snapshot = try await self.matchupDataStore.hydrateMatchup(snapshotID)
                     
                     // 🔥 SINGLE CONVERSION POINT: Snapshot → UnifiedMatchup
                     let unifiedMatchup = convertSnapshotToUnifiedMatchup(snapshot, league: league)
                     loadedMatchups.append(unifiedMatchup)
                     
-                } catch is TimeoutError {
-                    DebugPrint(mode: .matchupLoading, "⏱️ Timeout hydrating \(league.league.name) - trying elimination fallback")
-                    
-                    // 🔥 NEW: Try playoff elimination fallback
-                    if let eliminatedMatchup = await tryEliminatedMatchupFallback(league: league, week: currentWeek) {
-                        loadedMatchups.append(eliminatedMatchup)
-                        DebugPrint(mode: .matchupLoading, "✅ Created eliminated matchup for \(league.league.name)")
-                    } else {
-                        DebugPrint(mode: .matchupLoading, "❌ No eliminated fallback available for \(league.league.name)")
-                    }
                 } catch {
                     DebugPrint(mode: .matchupLoading, "❌ Failed to hydrate \(league.league.name): \(error) - trying elimination fallback")
                     
-                    // 🔥 NEW: Try playoff elimination fallback
+                    // Try playoff elimination fallback
                     if let eliminatedMatchup = await tryEliminatedMatchupFallback(league: league, week: currentWeek) {
                         loadedMatchups.append(eliminatedMatchup)
                         DebugPrint(mode: .matchupLoading, "✅ Created eliminated matchup for \(league.league.name)")
@@ -884,30 +872,5 @@ extension MatchupsHubViewModel {
         }
         
         return nil
-    }
-}
-
-// MARK: - Helper: Timeout Wrapper
-/// Timeout error type
-fileprivate struct TimeoutError: Error {}
-
-/// Run an async operation with a timeout
-fileprivate func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        // Add the actual operation
-        group.addTask {
-            try await operation()
-        }
-        
-        // Add a timeout task
-        group.addTask {
-            try await Task.sleep(for: .seconds(seconds))
-            throw TimeoutError()
-        }
-        
-        // Return the first result (either success or timeout)
-        let result = try await group.next()!
-        group.cancelAll() // Cancel the other task
-        return result
     }
 }
