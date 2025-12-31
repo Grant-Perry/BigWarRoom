@@ -12,7 +12,7 @@ import Foundation
 /// Main ESPN Fantasy response structure
 struct ESPNFantasyLeagueModel: Codable {
     let teams: [ESPNFantasyTeamModel]
-    let schedule: [ESPNFantasyMatchupModel]
+    let schedule: [ESPNFantasyMatchupModel]?  // 🔥 FIXED: Optional to handle eliminated playoff teams
 }
 
 /// ESPN Fantasy Team

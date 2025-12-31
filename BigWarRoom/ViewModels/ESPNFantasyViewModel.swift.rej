@@ -1,0 +1,12 @@
+***************
+*** 127
+-             return espnFantasyModel?.schedule.first(where: { matchup in
+--- 127,128 -----
++             guard let schedule = espnFantasyModel?.schedule else { return nil }
++             return schedule.first(where: { matchup in
+***************
+*** 146
+-             return espnFantasyModel?.schedule.filter { $0.matchupPeriodId == week } ?? []
+--- 147,148 -----
++             guard let schedule = espnFantasyModel?.schedule else { return [] }
++             return schedule.filter { $0.matchupPeriodId == week }

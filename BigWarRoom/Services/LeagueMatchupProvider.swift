@@ -78,6 +78,7 @@ final class LeagueMatchupProvider {
                 if username.allSatisfy({ $0.isNumber }) {
                     resolvedUserID = username
                 } else {
+                    // It's a username, resolve to user ID
                     let user = try await SleeperAPIClient.shared.fetchUser(username: username)
                     resolvedUserID = user.userID
                 }
@@ -259,7 +260,12 @@ final class LeagueMatchupProvider {
                 let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
 
                 // Process each matchup to determine winner/loser
-                for scheduleEntry in model.schedule {
+                guard let schedule = model.schedule else {
+                    DebugPrint(mode: .recordCalculation, "No schedule for week \(pastWeek), skipping")
+                    continue
+                }
+                
+                for scheduleEntry in schedule {
                     guard let awayTeam = scheduleEntry.away else {
                         continue // Skip bye weeks where away team doesn't exist
                     }
@@ -345,27 +351,29 @@ final class LeagueMatchupProvider {
     // MARK: -> ESPN Data Fetching
     
     private func fetchESPNData() async {
+        DebugPrint(mode: .matchupLoading, "🔍 fetchESPNData() called for league \(league.league.leagueID)")
+        
         guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
+            DebugPrint(mode: .matchupLoading, "❌ fetchESPNData: Failed to create URL")
             return
         }
         
-        // First fetch league data for name resolution
         do {
             currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-            // 🔥 PHASE 3 DI: Only sync if FantasyViewModel was provided
+            DebugPrint(mode: .matchupLoading, "✅ fetchESPNData: Fetched league data")
             if fantasyViewModel != nil {
                 await syncESPNDataToMainViewModel()
             }
         } catch {
+            DebugPrint(mode: .matchupLoading, "⚠️ fetchESPNData: Failed to fetch league data: \(error)")
             currentESPNLeague = nil
         }
 
-        // 🔥 NEW: Fetch ESPN standings to get team records BEFORE processing matchups
         do {
             let standingsData = try await ESPNAPIClient.shared.fetchESPNStandings(leagueID: league.league.leagueID)
+            DebugPrint(mode: .matchupLoading, "✅ fetchESPNData: Fetched standings data")
 
-            // Extract and store team records from standings
-            espnTeamRecords.removeAll() // Clear any existing records
+            espnTeamRecords.removeAll()
             for team in standingsData.teams ?? [] {
                 if let espnRecord = team.record, let record = espnRecord.overall {
                     espnTeamRecords[team.id] = TeamRecord(
@@ -376,25 +384,18 @@ final class LeagueMatchupProvider {
                 }
             }
 
-            // If no records found in standings, calculate from matchup history
             if espnTeamRecords.isEmpty {
                 await calculateRecordsFromMatchupHistory(leagueID: league.league.leagueID)
             }
             
-            // 🔥 DRY FIX: Only sync if FantasyViewModel was provided
             if fantasyViewModel != nil {
                 await syncESPNRecordsToViewModel()
             }
 
         } catch {
-            // Continue without standings data - records will be nil but won't crash
+            DebugPrint(mode: .matchupLoading, "⚠️ fetchESPNData: Failed to fetch standings: \(error)")
         }
-
-        // NOTE: ESPN's standings endpoint does NOT support historical weeks
-        // It always returns current standings regardless of parameters
-        // Since Sleeper records work correctly, we only use Sleeper for team records
         
-        // Now fetch matchup data
         var request = URLRequest(url: url)
         request.addValue("application/json", forHTTPHeaderField: "Accept")
         
@@ -402,9 +403,9 @@ final class LeagueMatchupProvider {
         request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
         
         do {
+            DebugPrint(mode: .matchupLoading, "🔍 fetchESPNData: Fetching matchup data from ESPN API...")
             let (data, _) = try await URLSession.shared.data(for: request)
             
-            // 🔍 DEBUG: Check if positionAgainstOpponent key exists in response
             if AppConstants.debug, let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 print("🔍 LeagueMatchupProvider ESPN API Keys: \(jsonObject.keys.sorted())")
                 if jsonObject["positionAgainstOpponent"] != nil {
@@ -414,22 +415,23 @@ final class LeagueMatchupProvider {
                 }
             }
             
+            DebugPrint(mode: .matchupLoading, "🔍 fetchESPNData: Attempting to decode ESPNFantasyLeagueModel...")
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
+            DebugPrint(mode: .matchupLoading, "✅ fetchESPNData: Successfully decoded model with \(model.teams.count) teams, schedule: \(model.schedule?.count ?? 0) entries")
             
-            // Also try to decode full ESPNLeague for OPRK data
             if let fullLeagueData = try? JSONDecoder().decode(ESPNLeague.self, from: data) {
                 OPRKService.shared.updateOPRKData(from: fullLeagueData)
             }
             await processESPNData(model)
         } catch {
-            // Silent fail - matchup data couldn't be loaded
+            DebugPrint(mode: .matchupLoading, "❌ fetchESPNData: Failed to fetch/decode matchup data: \(error)")
         }
     }
     
     private func processESPNData(_ espnModel: ESPNFantasyLeagueModel) async {
-        DebugPrint(mode: .espnAPI, "processESPNData called for \(espnModel.teams.count) teams")
+        DebugPrint(mode: .matchupLoading, "🔍 processESPNData called for \(espnModel.teams.count) teams")
+        DebugPrint(mode: .matchupLoading, "   Schedule exists: \(espnModel.schedule != nil), Schedule count: \(espnModel.schedule?.count ?? 0)")
         
-        // Store team records and names
         for team in espnModel.teams {
             espnTeamNames[team.id] = team.name
         }
@@ -437,7 +439,23 @@ final class LeagueMatchupProvider {
         var processedMatchups: [FantasyMatchup] = []
         var byeTeams: [FantasyTeam] = []
         
-        let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
+        guard let schedule = espnModel.schedule else {
+            DebugPrint(mode: .matchupLoading, "⚠️ Schedule is nil - creating eliminated playoff matchup")
+            await createEliminatedESPNMatchup()
+            DebugPrint(mode: .matchupLoading, "   After createEliminatedESPNMatchup, matchups.count = \(matchups.count)")
+            return
+        }
+        
+        DebugPrint(mode: .matchupLoading, "✅ Schedule exists with \(schedule.count) entries, filtering for week \(week)")
+        let weekSchedule = schedule.filter { $0.matchupPeriodId == week }
+        DebugPrint(mode: .matchupLoading, "   Week \(week) schedule has \(weekSchedule.count) entries")
+        
+        guard !weekSchedule.isEmpty else {
+            DebugPrint(mode: .matchupLoading, "⚠️ No matchups for week \(week) - creating eliminated playoff matchup")
+            await createEliminatedESPNMatchup()
+            DebugPrint(mode: .matchupLoading, "   After createEliminatedESPNMatchup, matchups.count = \(matchups.count)")
+            return
+        }
         
         for scheduleEntry in weekSchedule {
             
@@ -472,7 +490,7 @@ final class LeagueMatchupProvider {
                 homeTeam: homeFantasyTeam,
                 awayTeam: awayFantasyTeam,
                 status: .live,
-                winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore, homeTeam: homeFantasyTeam, awayTeam: awayFantasyTeam),  // 🔥 FIXED: Pass teams for deterministic check
+                winProbability: calculateWinProbability(homeScore: homeScore, awayScore: awayScore, homeTeam: homeFantasyTeam, awayTeam: awayFantasyTeam),
                 startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
                 sleeperMatchups: nil
             )
@@ -482,6 +500,100 @@ final class LeagueMatchupProvider {
         
         matchups = processedMatchups.sorted { $0.homeTeam.ownerName < $1.homeTeam.ownerName }
         byeWeekTeams = byeTeams
+        DebugPrint(mode: .matchupLoading, "✅ processESPNData complete: \(matchups.count) matchups, \(byeWeekTeams.count) bye teams")
+    }
+    
+    private func createEliminatedESPNMatchup() async {
+        DebugPrint(mode: .matchupLoading, "🔍 Creating eliminated playoff matchup for ESPN league")
+        
+        // Step 1: Get my team ID
+        guard let myTeamIDString = await getESPNUserTeamID() else {
+            DebugPrint(mode: .matchupLoading, "❌ Failed at step 1: Could not get my ESPN team ID")
+            return
+        }
+        
+        guard let myTeamID = Int(myTeamIDString) else {
+            DebugPrint(mode: .matchupLoading, "❌ Failed at step 2: Could not convert team ID to Int: \(myTeamIDString)")
+            return
+        }
+        
+        DebugPrint(mode: .matchupLoading, "✅ Step 1-2: My team ID = \(myTeamID)")
+        
+        // Step 2: Ensure we have ESPN league data
+        if currentESPNLeague == nil {
+            DebugPrint(mode: .matchupLoading, "⚠️ currentESPNLeague is nil, fetching now...")
+            do {
+                currentESPNLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
+                DebugPrint(mode: .matchupLoading, "✅ Step 3: Fetched ESPN league data")
+            } catch {
+                DebugPrint(mode: .matchupLoading, "❌ Failed at step 3: Could not fetch ESPN league data: \(error)")
+                return
+            }
+        }
+        
+        guard let espnLeague = currentESPNLeague else {
+            DebugPrint(mode: .matchupLoading, "❌ Failed at step 4: currentESPNLeague is still nil after fetch")
+            return
+        }
+        
+        // Step 3: Find my team in the league
+        guard let myTeamData = espnLeague.teams?.first(where: { $0.id == myTeamID }) else {
+            DebugPrint(mode: .matchupLoading, "❌ Failed at step 5: My team ID \(myTeamID) not found in league teams")
+            DebugPrint(mode: .matchupLoading, "   Available team IDs: \(espnLeague.teams?.map { $0.id } ?? [])")
+            return
+        }
+        
+        DebugPrint(mode: .matchupLoading, "✅ Step 5: Found my team data")
+        
+        // Step 4: Build the team
+        let managerName = espnLeague.getManagerName(for: myTeamData.owners)
+        let teamLogoURL = myTeamData.logoURL?.absoluteString
+        let record = espnTeamRecords[myTeamID].map { TeamRecord(wins: $0.wins, losses: $0.losses, ties: $0.ties) }
+        
+        let myTeam = FantasyTeam(
+            id: myTeamIDString,
+            name: managerName,
+            ownerName: managerName,
+            record: record,
+            avatar: teamLogoURL,
+            currentScore: 0.0,
+            projectedScore: 0.0,
+            roster: [],
+            rosterID: myTeamID,
+            faabTotal: nil,
+            faabUsed: nil
+        )
+        
+        let eliminatedOpponent = FantasyTeam(
+            id: "eliminated_playoffs",
+            name: "Eliminated from Playoffs",
+            ownerName: "Eliminated from Playoffs",
+            record: nil,
+            avatar: nil,
+            currentScore: 0.0,
+            projectedScore: 0.0,
+            roster: [],
+            rosterID: nil,
+            faabTotal: nil,
+            faabUsed: nil
+        )
+        
+        let eliminatedMatchup = FantasyMatchup(
+            id: "\(league.league.leagueID)_\(week)_eliminated",
+            leagueID: league.league.leagueID,
+            week: week,
+            year: year,
+            homeTeam: myTeam,
+            awayTeam: eliminatedOpponent,
+            status: .complete,
+            winProbability: 0.0,
+            startTime: nil,
+            sleeperMatchups: nil
+        )
+        
+        matchups = [eliminatedMatchup]
+        DebugPrint(mode: .matchupLoading, "✅ Step 6: Created eliminated playoff matchup: \(myTeam.ownerName) vs Eliminated from Playoffs")
+        DebugPrint(mode: .matchupLoading, "   Matchups array now has \(matchups.count) matchup(s)")
     }
     
     private func createESPNFantasyTeam(espnTeam: ESPNFantasyTeamModel, score: Double) -> FantasyTeam {
@@ -688,9 +800,9 @@ final class LeagueMatchupProvider {
                 
                 // Debug: Log a few sample scores for consistency tracking
                 let samplePlayers = Array(sharedStats.prefix(3))
-                for (playerId, stats) in samplePlayers {
+                for (playerID, stats) in samplePlayers {
                     let pprScore = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
-                    print("🔥 LeagueMatchupProvider STATS: Player \(playerId) = \(pprScore) pts")
+                    print("🔥 LeagueMatchupProvider STATS: Player \(playerID) = \(pprScore) pts")
                 }
             }
         } catch {
@@ -881,7 +993,7 @@ final class LeagueMatchupProvider {
                 homeTeam: homeTeam,
                 awayTeam: awayTeam,
                 status: .live,
-                winProbability: calculateWinProbability(homeScore: team2.points ?? 0, awayScore: team1.points ?? 0, homeTeam: homeTeam, awayTeam: awayTeam),  // 🔥 FIXED: Pass teams for deterministic check
+                winProbability: calculateWinProbability(homeScore: team2.points ?? 0, awayScore: team1.points ?? 0, homeTeam: homeTeam, awayTeam: awayTeam),
                 startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
                 sleeperMatchups: nil
             )

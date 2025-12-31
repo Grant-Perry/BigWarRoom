@@ -99,7 +99,7 @@ extension FantasyViewModel {
             }
             
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
-            NSLog("📊 ESPN \(leagueID): \(model.teams.count) teams, \(model.schedule.count) schedule")
+            NSLog("📊 ESPN \(leagueID): \(model.teams.count) teams, \(model.schedule?.count ?? 0) schedule")
             await processESPNFantasyData(espnModel: model, leagueID: leagueID, week: week)
             
         } catch {
@@ -187,7 +187,12 @@ extension FantasyViewModel {
         var processedMatchups: [FantasyMatchup] = []
         var byeTeams: [FantasyTeam] = []
         
-        let weekSchedule = espnModel.schedule.filter { $0.matchupPeriodId == week }
+        guard let schedule = espnModel.schedule, !schedule.isEmpty else {
+            DebugPrint(mode: .espnAPI, "⚠️ No schedule found - team is eliminated from playoffs")
+            return
+        }
+        
+        let weekSchedule = schedule.filter { $0.matchupPeriodId == week }
         
         for scheduleEntry in weekSchedule {
             // Handle bye weeks

@@ -124,8 +124,7 @@ final class ESPNFantasyViewModel {
     
     /// Get matchup for specific week and team - FIXED: Handle optional away field
     func getMatchup(for week: Int, teamId: Int) -> ESPNFantasyMatchupModel? {
-        guard let schedule = espnFantasyModel?.schedule else { return nil }
-        return schedule.first(where: { matchup in
+        return espnFantasyModel?.schedule.first(where: { matchup in
             guard matchup.matchupPeriodId == week else { return false }
             
             // Check if team is home team
@@ -144,8 +143,7 @@ final class ESPNFantasyViewModel {
     
     /// Get all matchups for specific week
     func getMatchups(for week: Int) -> [ESPNFantasyMatchupModel] {
-        guard let schedule = espnFantasyModel?.schedule else { return [] }
-        return schedule.filter { $0.matchupPeriodId == week }
+        return espnFantasyModel?.schedule.filter { $0.matchupPeriodId == week } ?? []
     }
     
     /// Update selected week - NOW USES WeekSelectionManager
