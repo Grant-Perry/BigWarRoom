@@ -45,7 +45,6 @@ struct PlayerNewsView: View {
         }
         .onAppear {
             if let espnId = player.espnId {
-                print("🗞️ LOADING NEWS: ESPN ID \(espnId) for \(player.fullName)")
                 viewModel.loadPlayerNews(espnId: espnId)
             }
         }

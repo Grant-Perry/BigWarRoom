@@ -78,25 +78,20 @@ final class FantasyMatchupListViewModel {
     func smartModeDetection() async {
         // Prevent concurrent executions
         guard !isDetectingSmartMode else {
-            print("🧠 SMART MODE: Already detecting, skipping...")
             return
         }
         
         isDetectingSmartMode = true
         defer { isDetectingSmartMode = false }
         
-        print("🧠 SMART MODE: Detecting current context...")
         
         // Load all available matchups first
         await matchupsHubViewModel.loadAllMatchups()
         availableLeagues = matchupsHubViewModel.myMatchups
         
-        print("🧠 SMART MODE: Found \(availableLeagues.count) available leagues")
         
         // Check if we have a specific league selected from War Room
         if let connectedLeague = draftRoomViewModel?.selectedLeagueWrapper {
-            print("🧠 SMART MODE: War Room has selected league: \(connectedLeague.league.name)")
-            print("🧠 SMART MODE: → SINGLE LEAGUE MODE")
             
             // Single League Mode - setup that specific league
             showLeaguePicker = false
@@ -104,26 +99,21 @@ final class FantasyMatchupListViewModel {
             await setupSingleLeague(connectedLeague)
             
         } else if fantasyViewModel.selectedLeague == nil && availableLeagues.count > 1 {
-            print("🧠 SMART MODE: No specific league selected, multiple leagues available")
-            print("🧠 SMART MODE: → ALL LEAGUES MODE (Show Picker)")
             
             // All Leagues Mode - show picker
             showLeaguePicker = true
             showDraftPositionPicker = false
             
         } else if availableLeagues.count == 1 {
-            print("🧠 SMART MODE: Only one league available, checking draft position...")
             
             let league = availableLeagues[0].league
             
             // Check if we need draft position for this league
             if needsDraftPosition(for: league) {
-                print("🧠 SMART MODE: → DRAFT POSITION SELECTION NEEDED")
                 showLeaguePicker = false
                 selectedLeagueForPosition = league
                 showDraftPositionPicker = true
             } else {
-                print("🧠 SMART MODE: → AUTO SINGLE LEAGUE MODE")
                 // Auto-select the only available league
                 showLeaguePicker = false
                 showDraftPositionPicker = false
@@ -131,8 +121,6 @@ final class FantasyMatchupListViewModel {
             }
             
         } else {
-            print("🧠 SMART MODE: No leagues available or already selected")
-            print("🧠 SMART MODE: → MAINTAIN CURRENT STATE")
             
             // Maintain current state
             showLeaguePicker = false
@@ -176,7 +164,6 @@ final class FantasyMatchupListViewModel {
     /// Handle draft position confirmation
     @MainActor
     func confirmDraftPosition(_ league: UnifiedLeagueManager.LeagueWrapper, position: Int) {
-        print("🎯 DRAFT POSITION: User selected position \(position) for league: \(league.league.name)")
         
         // Dismiss the position picker
         showDraftPositionPicker = false
@@ -196,7 +183,6 @@ final class FantasyMatchupListViewModel {
     /// Handle draft position selection cancellation
     @MainActor
     func cancelDraftPositionSelection() {
-        print("🎯 DRAFT POSITION: User cancelled position selection")
         
         // Go back to league picker if we had multiple leagues, or show empty state
         if availableLeagues.count > 1 {
@@ -214,11 +200,9 @@ final class FantasyMatchupListViewModel {
     @MainActor
     func selectLeagueFromPicker(_ selectedLeague: UnifiedLeagueManager.LeagueWrapper) {
         guard !isSettingUpLeague else {
-            print("🎯 PICKER: Selection ignored - already setting up league")
             return
         }
         
-        print("🎯 PICKER: User selected league: \(selectedLeague.league.name)")
         
         // Immediate UI feedback - dismiss picker first
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -231,13 +215,11 @@ final class FantasyMatchupListViewModel {
         
         // Check if we need draft position for this league
         if needsDraftPosition(for: selectedLeague) {
-            print("🎯 PICKER: Draft position needed for league: \(selectedLeague.league.name)")
             
             // Show draft position picker
             selectedLeagueForPosition = selectedLeague
             showDraftPositionPicker = true
         } else {
-            print("🎯 PICKER: Using saved position or War Room position")
             
             // Setup the selected league directly
             Task {
@@ -251,16 +233,13 @@ final class FantasyMatchupListViewModel {
     func setupSingleLeague(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper, draftPosition: Int? = nil) async {
         // Prevent concurrent executions
         guard !isSettingUpLeague else {
-            print("🏈 Fantasy: Already setting up league, skipping...")
             return
         }
         
         isSettingUpLeague = true
         defer { isSettingUpLeague = false }
         
-        print("🏈 Fantasy: Setting up single league: \(leagueWrapper.league.name)")
         if let position = draftPosition {
-            print("🏈 Fantasy: With draft position: \(position)")
         }
         
         // Ensure we're on the main actor for UI updates
@@ -274,7 +253,6 @@ final class FantasyMatchupListViewModel {
         if let matchingLeague = fantasyViewModel.availableLeagues.first(where: { 
             $0.league.leagueID == leagueWrapper.league.leagueID 
         }) {
-            print("🏈 Fantasy: Loading matchups for league: \(matchingLeague.league.name)")
             
             // Determine team ID based on draft position or saved position
             var myTeamID: String?
@@ -308,12 +286,9 @@ final class FantasyMatchupListViewModel {
             
             // Force UI refresh
             if !fantasyViewModel.matchups.isEmpty || fantasyViewModel.detectedAsChoppedLeague || fantasyViewModel.hasActiveRosters {
-                print("🏈 Fantasy: League setup complete with data")
             } else {
-                print("⚠️ Fantasy: League setup complete but no data found")
             }
         } else {
-            print("❌ Fantasy: League not found in available leagues")
             fantasyViewModel.isLoading = false
             fantasyViewModel.errorMessage = "League not found in available leagues"
         }

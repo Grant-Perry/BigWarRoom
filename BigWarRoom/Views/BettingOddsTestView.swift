@@ -506,10 +506,8 @@ struct BettingOddsTestView: View {
                 if let fetchedOdds = fetchedOdds {
                     odds = fetchedOdds
                     errorMessage = nil
-                    print("✅ Successfully fetched odds for \(player.fullName)")
                 } else {
                     errorMessage = bettingService.errorMessage ?? "No betting odds available for \(player.fullName)"
-                    print("❌ Failed to fetch odds: \(errorMessage ?? "Unknown error")")
                 }
             }
         }

@@ -120,7 +120,6 @@ class EndpointValidationService {
                 return json["scoring_settings"] as? [String: Any]
             }
         } catch {
-            print("Error parsing Sleeper data: \(error)")
         }
         return nil
     }
@@ -133,7 +132,6 @@ class EndpointValidationService {
                 return settings["scoringSettings"] as? [String: Any]
             }
         } catch {
-            print("Error parsing ESPN data: \(error)")
         }
         return nil
     }
@@ -146,7 +144,6 @@ class EndpointValidationService {
                 return events.compactMap { $0["id"] as? String }
             }
         } catch {
-            print("Error parsing ESPN scoreboard: \(error)")
         }
         return nil
     }
@@ -169,21 +166,17 @@ extension EndpointValidationService {
         
         // Test Sleeper if league ID provided
         if let sleeperLeagueId = sleeperLeagueId {
-            print("🔍 Testing Sleeper league endpoint...")
             let sleeperResult = await testSleeperLeagueEndpoint(leagueId: sleeperLeagueId)
             results.append(sleeperResult)
             
             if sleeperResult.success, let data = sleeperResult.data {
                 let scoringSettings = parseSleeperScoringSettings(from: data)
-                print("✅ Sleeper scoring settings found: \(scoringSettings?.keys.count ?? 0) rules")
             } else {
-                print("❌ Sleeper test failed: \(sleeperResult.error ?? "Unknown error")")
             }
         }
         
         // Test ESPN if league ID provided
         if let espnLeagueId = espnLeagueId {
-            print("\n🔍 Testing ESPN mSettings endpoint...")
             let espnSettingsResult = await testESPNScoringSettings(
                 leagueId: espnLeagueId,
                 season: espnSeason,
@@ -194,13 +187,10 @@ extension EndpointValidationService {
             
             if espnSettingsResult.success, let data = espnSettingsResult.data {
                 let scoringSettings = parseESPNScoringSettings(from: data)
-                print("✅ ESPN scoring settings found: \(scoringSettings?.keys.count ?? 0) rules")
             } else {
-                print("❌ ESPN mSettings failed: \(espnSettingsResult.error ?? "Unknown error")")
             }
             
             // Also test general ESPN endpoint as fallback
-            print("\n🔍 Testing ESPN general endpoint...")
             let espnGeneralResult = await testESPNLeagueGeneral(
                 leagueId: espnLeagueId,
                 season: espnSeason,
@@ -210,36 +200,28 @@ extension EndpointValidationService {
             results.append(espnGeneralResult)
             
             if espnGeneralResult.success {
-                print("✅ ESPN general endpoint accessible")
             } else {
-                print("❌ ESPN general failed: \(espnGeneralResult.error ?? "Unknown error")")
             }
         }
         
         // Test ESPN site API (universal stats source)
-        print("\n🔍 Testing ESPN site API scoreboard...")
         let scoreboardResult = await testESPNScoreboard(week: 15) // Current week
         results.append(scoreboardResult)
         
         if scoreboardResult.success, let data = scoreboardResult.data {
             if let eventIds = parseESPNScoreboard(from: data) {
-                print("✅ ESPN scoreboard accessible: \(eventIds.count) games found")
                 
                 // Test game summary for first event
                 if let firstEventId = eventIds.first {
-                    print("\n🔍 Testing ESPN game summary for event \(firstEventId)...")
                     let summaryResult = await testESPNGameSummary(eventId: firstEventId)
                     results.append(summaryResult)
                     
                     if summaryResult.success {
-                        print("✅ ESPN game summary accessible")
                     } else {
-                        print("❌ ESPN game summary failed: \(summaryResult.error ?? "Unknown error")")
                     }
                 }
             }
         } else {
-            print("❌ ESPN scoreboard failed: \(scoreboardResult.error ?? "Unknown error")")
         }
         
         return results

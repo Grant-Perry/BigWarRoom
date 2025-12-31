@@ -45,7 +45,6 @@ final class BettingOddsService {
     // API Configuration
     private var apiKey: String {
         guard let key = Secrets.theOddsAPIKey else {
-            print("⚠️ BettingOddsService: No API key found in Secrets.plist")
             return ""
         }
         return key
@@ -85,12 +84,10 @@ final class BettingOddsService {
         if let (cachedOdds, timestamp) = oddsCache[cacheKey],
            Date().timeIntervalSince(timestamp) < cacheExpiration,
            let odds = cachedOdds {
-            print("📊 BettingOdds: Using cached odds for \(player.fullName)")
             return odds
         }
         
         guard let team = player.team else {
-            print("⚠️ BettingOdds: Player \(player.fullName) has no team")
             return nil
         }
         
@@ -108,7 +105,6 @@ final class BettingOddsService {
             guard let game = findGame(for: team, in: games) else {
                 let errorMsg = "No game found for \(team). Games may not be posted yet (games start Nov 2-3) or team name mismatch."
                 errorMessage = errorMsg
-                print("⚠️ BettingOdds: \(errorMsg)")
                 return nil
             }
             
@@ -131,16 +127,12 @@ final class BettingOddsService {
             if playerOdds == nil {
                 let errorMsg = "Player props not available. The Odds API free tier only includes game moneylines (h2h). Player props require a paid plan ($99+/month)."
                 errorMessage = errorMsg
-                print("⚠️ BettingOdds: Player props not available for \(player.fullName)")
-                print("⚠️ BettingOdds: The Odds API free tier only includes 'h2h' markets (moneylines)")
-                print("⚠️ BettingOdds: Player props require a paid plan")
             }
             
             return playerOdds
             
         } catch {
             errorMessage = error.localizedDescription
-            print("❌ BettingOdds: Error fetching odds - \(error)")
             return nil
         }
     }
@@ -178,7 +170,6 @@ final class BettingOddsService {
             gameOddsCache[cacheKey] = (mapped, Date())
             return mapped
         } catch {
-            print("❌ BettingOdds: Error fetching game odds - \(error)")
             return [:]
         }
     }
@@ -190,8 +181,6 @@ final class BettingOddsService {
         
         // The Odds API v4 doesn't support "player_props" as a market filter
         // Go directly to fetching all markets - player props may not be available in free tier
-        print("📊 BettingOdds: Fetching all markets (player_props not supported as filter)")
-        print("📊 BettingOdds: Week \(week), Year \(year)")
         return try await fetchNFLGamesOddsFallback()
     }
     
@@ -209,7 +198,6 @@ final class BettingOddsService {
             throw BettingOddsError.invalidURL
         }
         
-        print("📊 BettingOdds: Fallback - fetching all markets from \(url.absoluteString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -224,17 +212,13 @@ final class BettingOddsService {
         }
         
         let games = try JSONDecoder().decode([TheOddsGame].self, from: data)
-        print("✅ BettingOdds: Fallback fetched \(games.count) games")
         
         // Debug: Print all available market keys to understand what's available
-        print("📊 BettingOdds: Analyzing \(games.count) games for available markets...")
         var allMarketKeys = Set<String>()
         var sampleOutcomes: [String] = []
         
         for game in games.prefix(3) {
-            print("📊 BettingOdds: Game - \(game.awayTeam) @ \(game.homeTeam)")
             for bookmaker in game.bookmakers.prefix(2) {
-                print("📊 BettingOdds:   \(bookmaker.title): \(bookmaker.markets.count) markets")
                 for market in bookmaker.markets {
                     allMarketKeys.insert(market.key)
                     if market.outcomes.count > 0 && sampleOutcomes.count < 10 {
@@ -244,14 +228,10 @@ final class BettingOddsService {
             }
         }
         
-        print("📊 BettingOdds: Found \(allMarketKeys.count) unique market types:")
         for key in Array(allMarketKeys).sorted() {
-            print("📊 BettingOdds:   - \(key)")
         }
         if !sampleOutcomes.isEmpty {
-            print("📊 BettingOdds: Sample outcomes:")
             for outcome in sampleOutcomes.prefix(5) {
-                print("📊 BettingOdds:   \(outcome)")
             }
         }
         
@@ -264,15 +244,9 @@ final class BettingOddsService {
         }
         
         if !hasPlayerProps {
-            print("⚠️⚠️⚠️ BettingOdds: CRITICAL - No player props markets found!")
-            print("⚠️ BettingOdds: The Odds API free tier ONLY includes basic game markets")
-            print("⚠️ BettingOdds: Found markets: \(Array(allMarketKeys).joined(separator: ", "))")
-            print("⚠️ BettingOdds: Player props require a paid subscription ($99+/month)")
-            print("⚠️ BettingOdds: Recommendation: Use MVP approach with projected points instead")
         }
         
         // Return all games - we'll filter for player props when extracting for specific player
-        print("✅ BettingOdds: Returning all \(games.count) games for player-specific filtering")
         return games
     }
     
@@ -586,17 +560,13 @@ final class BettingOddsService {
     /// Find game for a specific team
     private func findGame(for team: String, in games: [TheOddsGame]) -> TheOddsGame? {
         let normalizedTeam = normalizeTeamName(team)
-        print("📊 BettingOdds: Searching for team '\(team)' (normalized: '\(normalizedTeam)')")
-        print("📊 BettingOdds: Available games: \(games.map { "\($0.awayTeam) @ \($0.homeTeam)" }.joined(separator: ", "))")
         
         let foundGame = games.first { game in
             teamsMatch(team, game.homeTeam) || teamsMatch(team, game.awayTeam)
         }
         
         if let game = foundGame {
-            print("✅ BettingOdds: Found game: \(game.awayTeam) @ \(game.homeTeam)")
         } else {
-            print("⚠️ BettingOdds: No game found for team '\(team)' (normalized: '\(normalizedTeam)')")
         }
         
         return foundGame
@@ -620,8 +590,6 @@ final class BettingOddsService {
         var receptions: PropOdds?
         
         // Search through all bookmakers and markets for player-specific props
-        print("📊 BettingOdds: Searching for \(playerName) in \(game.awayTeam) vs \(game.homeTeam)")
-        print("📊 BettingOdds: Checking \(game.bookmakers.count) bookmakers...")
         
         var foundMarkets = Set<String>()
         
@@ -643,7 +611,6 @@ final class BettingOddsService {
                     
                     if matchesPlayer {
                         foundMarkets.insert(market.key)
-                        print("📊 BettingOdds: Found \(playerName) in market '\(market.key)': \(outcome.name)")
                         
                         // Determine market type and extract odds
                         switch market.key.lowercased() {
@@ -745,18 +712,13 @@ final class BettingOddsService {
             }
         }
         
-        print("📊 BettingOdds: Found markets for \(playerName): \(Array(foundMarkets))")
         
         // Only return if we found at least one prop
         guard anytimeTD != nil || rushingYards != nil || receivingYards != nil || 
               passingYards != nil || passingTDs != nil || receptions != nil else {
-            print("⚠️ BettingOdds: No matching props found for \(playerName)")
-            print("⚠️ BettingOdds: Found markets: \(Array(foundMarkets))")
-            print("⚠️ BettingOdds: The Odds API free tier may not include player props")
             return nil
         }
         
-        print("✅ BettingOdds: Successfully extracted odds for \(playerName)")
         return PlayerBettingOdds(
             id: "\(player.playerID)_\(week)",
             playerID: player.playerID,

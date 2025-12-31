@@ -189,6 +189,5 @@ struct ConflictAlertCard: View {
     private func navigateToPlayerStats() {
         // TODO: Implement navigation to player stats page
         // This could use NavigationLink or a coordinator pattern
-        print("🏃‍♂️ Navigate to \(conflict.player.fullName) stats page")
     }
 }

@@ -141,7 +141,6 @@ struct AllLivePlayersNoLeaguesView: View {
             Button(action: {
                 // TEMPORARILY DISABLED: Send notification to switch to Mission Control tab
                 // NotificationCenter.default.post(name: NSNotification.Name("SwitchToMissionControl"), object: nil)
-                print("Go to Mission Control button tapped - navigation disabled for testing")
             }) {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.left.circle.fill")

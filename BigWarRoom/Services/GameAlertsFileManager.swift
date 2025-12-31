@@ -53,10 +53,8 @@ final class GameAlertsFileManager {
                     attributes: nil
                 )
                 if AppConstants.debug {
-                    print("📁 GameAlertsFileManager: Created directory at \(gameAlertsDirectory.path)")
                 }
             } catch {
-                print("❌ GameAlertsFileManager: Failed to create directory: \(error)")
             }
         }
     }
@@ -67,7 +65,6 @@ final class GameAlertsFileManager {
     func loadPreviousScores() -> [String: Double] {
         guard FileManager.default.fileExists(atPath: previousScoresURL.path) else {
             if AppConstants.debug {
-                print("📁 GameAlertsFileManager: No previous scores file found, returning empty dict")
             }
             return [:]
         }
@@ -77,12 +74,10 @@ final class GameAlertsFileManager {
             let scores = try JSONDecoder().decode([String: Double].self, from: data)
             
             if AppConstants.debug {
-                print("📁 GameAlertsFileManager: Loaded \(scores.count) previous scores from file")
             }
             
             return scores
         } catch {
-            print("❌ GameAlertsFileManager: Failed to load previous scores: \(error)")
             return [:]
         }
     }
@@ -94,10 +89,8 @@ final class GameAlertsFileManager {
             try data.write(to: previousScoresURL)
             
             if AppConstants.debug {
-                print("📁 GameAlertsFileManager: Saved \(scores.count) previous scores to file")
             }
         } catch {
-            print("❌ GameAlertsFileManager: Failed to save previous scores: \(error)")
         }
     }
     
@@ -110,7 +103,6 @@ final class GameAlertsFileManager {
         // Check if UserDefaults has the old data
         guard let userData = UserDefaults.standard.data(forKey: userDefaultsKey) else {
             if AppConstants.debug {
-                print("📁 GameAlertsFileManager: No UserDefaults data to migrate")
             }
             return
         }
@@ -127,16 +119,13 @@ final class GameAlertsFileManager {
             UserDefaults.standard.synchronize()
             
             if AppConstants.debug {
-                print("✅ GameAlertsFileManager: Successfully migrated \(existingScores.count) scores from UserDefaults to file")
             }
         } catch {
-            print("❌ GameAlertsFileManager: Failed to migrate UserDefaults data: \(error)")
             
             // Still remove the corrupted UserDefaults data to prevent crashes
             UserDefaults.standard.removeObject(forKey: userDefaultsKey)
             UserDefaults.standard.synchronize()
             
-            print("🧹 GameAlertsFileManager: Removed corrupted UserDefaults data")
         }
     }
     
@@ -156,10 +145,8 @@ final class GameAlertsFileManager {
             }
             
             if AppConstants.debug {
-                print("🧹 GameAlertsFileManager: Cleared all GameAlerts data")
             }
         } catch {
-            print("❌ GameAlertsFileManager: Failed to clear data: \(error)")
         }
     }
     
@@ -175,7 +162,6 @@ final class GameAlertsFileManager {
                 let attributes = try fileManager.attributesOfItem(atPath: previousScoresURL.path)
                 previousScoresSize = attributes[.size] as? Int ?? 0
             } catch {
-                print("❌ GameAlertsFileManager: Failed to get file size: \(error)")
             }
         }
         
@@ -195,10 +181,6 @@ extension GameAlertsFileManager {
         let previousKB = Double(info.previousScoresSize) / 1024.0
         let totalKB = Double(info.totalSize) / 1024.0
         
-        print("📊 GameAlerts Storage Info:")
-        print("   Previous Scores: \(String(format: "%.2f", previousKB)) KB")
-        print("   Total Storage: \(String(format: "%.2f", totalKB)) KB")
-        print("   Files Directory: \(gameAlertsDirectory.path)")
     }
     
     /// Debug: Print sample of stored data
@@ -206,9 +188,7 @@ extension GameAlertsFileManager {
         let scores = loadPreviousScores()
         let sampleScores = Array(scores.prefix(5))
         
-        print("📊 GameAlerts Sample Data (\(scores.count) total):")
         for (playerId, score) in sampleScores {
-            print("   Player \(playerId): \(score) pts")
         }
     }
 }

@@ -151,12 +151,8 @@ func DebugPrint(
         // Print with iteration info
         let fileName = (file as NSString).lastPathComponent
         let iterInfo = "[\(count + 1)/\(limit)]"
-        print("🔍 \(iterInfo) [\(fileName):\(line)] \(function)")
-        print("   \(message())")
     } else {
         // Unlimited printing
         let fileName = (file as NSString).lastPathComponent
-        print("🔍 [\(fileName):\(line)] \(function)")
-        print("   \(message())")
     }
 }

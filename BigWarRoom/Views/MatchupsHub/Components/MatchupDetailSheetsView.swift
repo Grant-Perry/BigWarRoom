@@ -148,12 +148,6 @@ private struct RegularMatchupDetailSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .onAppear {
-            print("🚨 DEBUG: RegularMatchupDetailSheet - fantasyMatchup is nil!")
-            print("🚨 DEBUG: League: \(matchup.league.league.name) (\(matchup.league.source.rawValue))")
-            print("🚨 DEBUG: League ID: \(matchup.league.league.leagueID)")
-            print("🚨 DEBUG: Matchup ID: \(matchup.id)")
-            print("🚨 DEBUG: Is Chopped: \(matchup.isChoppedLeague)")
-            print("🚨 DEBUG: My Team ID: \(matchup.myIdentifiedTeamID ?? "nil")")
         }
     }
 }

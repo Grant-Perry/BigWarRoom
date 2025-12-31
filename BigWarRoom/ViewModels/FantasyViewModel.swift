@@ -35,7 +35,6 @@ final class FantasyViewModel {
     private let instanceID = UUID().uuidString.prefix(8)
     private static var instanceCount = 0 {
         didSet {
-            print("📊 FantasyViewModel instance count: \(instanceCount)")
         }
     }
     
@@ -115,7 +114,6 @@ final class FantasyViewModel {
         
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1
-            print("📊 FantasyViewModel Instance \(instanceID) created (total: \(FantasyViewModel.instanceCount))")
         }
         
         setupAutoRefresh()
@@ -126,7 +124,6 @@ final class FantasyViewModel {
     deinit {
         Task { @MainActor in
             FantasyViewModel.instanceCount -= 1
-            print("📊 FantasyViewModel Instance \(instanceID) destroyed (remaining: \(FantasyViewModel.instanceCount))")
             refreshTimer?.invalidate()
             observationTask?.cancel()
         }

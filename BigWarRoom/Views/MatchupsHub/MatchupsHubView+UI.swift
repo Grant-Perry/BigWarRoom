@@ -47,7 +47,6 @@ extension MatchupsHubView {
             // #GoodNav: Intelligence-style actions
             onFiltersToggle: {
                 // TODO: Add filters functionality for Mission Control
-                print("🔧 Mission Control filters - to be implemented")
             },
             onWatchedPlayersToggle: {
                 showingWatchedPlayers = true

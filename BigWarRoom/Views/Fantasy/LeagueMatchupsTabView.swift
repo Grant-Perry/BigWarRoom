@@ -575,7 +575,6 @@ struct LeagueMatchupsTabView: View {
                 }
             }
         } catch {
-            print("❌ LeagueMatchupsTabView: Failed to fetch matchups: \(error)")
             await MainActor.run {
                 // Fall back to the passed-in starting matchup
                 fetchedAllMatchups = [startingMatchup]

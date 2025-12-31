@@ -57,7 +57,6 @@ final class AppContainer {
     let nflWeekService: NFLWeekService
     
     init() {
-        print("🔥 APP CONTAINER: Initializing all services with DI")
         
         // MARK: - Core API Clients
         let sleeperAPIClient = SleeperAPIClient()
@@ -191,7 +190,6 @@ final class AppContainer {
         // Mark services as ready for AppLifecycleManager idle timer logic
         AppLifecycleManager.shared.markServicesReady()
         
-        print("✅ APP CONTAINER: All services initialized with pure DI")
     }
 }
 

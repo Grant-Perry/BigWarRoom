@@ -72,7 +72,6 @@ final class ESPNIDMappingService {
         // Try direct lookup first
         let directKey = "\(normalizedName)_\(normalizedTeam)_\(normalizedPosition)"
         if let espnID = fallbackESPNIDs[directKey] {
-            print("🎯 FALLBACK ESPN ID: Found direct match for \(fullName) -> \(espnID)")
             return espnID
         }
         
@@ -90,14 +89,12 @@ final class ESPNIDMappingService {
                 if normalizedName == variation.uppercased() {
                     let variationKey = "\(canonicalName)_\(normalizedTeam)_\(normalizedPosition)"
                     if let espnID = fallbackESPNIDs[variationKey] {
-                        print("🎯 FALLBACK ESPN ID: Found via name variation '\(variation)' -> \(fullName) -> \(espnID)")
                         return espnID
                     }
                 }
             }
         }
         
-        print("🔍 FALLBACK ESPN ID: No mapping found for \(fullName) (\(team) \(position))")
         return nil
     }
 }

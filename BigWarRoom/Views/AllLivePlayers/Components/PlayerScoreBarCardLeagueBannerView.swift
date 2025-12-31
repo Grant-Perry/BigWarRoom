@@ -15,8 +15,6 @@ struct PlayerScoreBarCardLeagueBannerView: View {
             // 🔥 DEBUG: Add logging to see actual leagueSource values
             Group {
                 let leagueSourceValue = playerEntry.leagueSource
-//                let _ = print("🔍 DEBUG - League source: '\(leagueSourceValue)' (lowercased: '\(leagueSourceValue.lowercased())') for league: '\(playerEntry.leagueName)'")
-                
                 switch leagueSourceValue.lowercased() {
                 case "espn":
                     Image("espnLogo")
@@ -30,7 +28,7 @@ struct PlayerScoreBarCardLeagueBannerView: View {
                         .frame(width: 12, height: 12)  // 50% smaller (was 24x24)
                 default:
                     // 🔥 DEBUG: Log when falling back to circle
-                    let _ = print("❌ FALLBACK - Unknown league source: '\(leagueSourceValue)' - using circle fallback")
+//                    let _ = print("❌ FALLBACK - Unknown league source: '\(leagueSourceValue)' - using circle fallback")
                     Circle()
                         .fill(leagueSourceColor)
                         .frame(width: 6, height: 6)

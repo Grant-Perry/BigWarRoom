@@ -277,13 +277,10 @@ final class ChoppedTeamRosterViewModel {
         if let sleeperID = player.sleeperID {
             let sleeperPlayer = PlayerDirectoryStore.shared.player(for: sleeperID)
             if sleeperPlayer == nil {
-                print("⚠️ No SleeperPlayer found for \(player.fullName) with ID: \(sleeperID)")
             } else if sleeperPlayer?.number == nil {
-                print("⚠️ SleeperPlayer \(player.fullName) found but has no jersey number")
             }
             return sleeperPlayer
         } else {
-            print("⚠️ No sleeperID found for player: \(player.fullName)")
             return nil
         }
     }
@@ -342,7 +339,6 @@ final class ChoppedTeamRosterViewModel {
                 self.opponentInfo = opponent
             }
         } catch {
-            print("❌ Failed to load opponent info: \(error)")
         }
     }
 
@@ -430,16 +426,12 @@ final class ChoppedTeamRosterViewModel {
                 return total + playerPoints
             }
             
-            print("🔥 Week \(week) Stats Summary (Year \(currentYear) via SSOT): \(statsData.count) players, Total Points: \(totalPointsThisWeek)")
             
             if totalPointsThisWeek == 0 {
-                print("⚠️ Week \(week) has no scoring data yet - games haven't started!")
             } else {
-                print("✅ Week \(week) stats loaded - scores should now appear!")
             }
             
         } catch {
-            print("❌ Failed to load player stats for week \(week), year \(currentYear): \(error)")
         }
     }
     
@@ -470,18 +462,14 @@ final class ChoppedTeamRosterViewModel {
             let league = try await SleeperAPIClient.shared.fetchLeague(leagueID: leagueID)
             if let scoringSettings = league.scoringSettings {
                 self.leagueScoringSettings = scoringSettings
-                print("✅ CHOPPED: Loaded \(scoringSettings.count) league scoring settings")
                 
                 // Debug: Print key scoring settings
                 for (key, value) in scoringSettings.prefix(10) {
-                    print("   \(key): \(value)")
                 }
             } else {
-                print("⚠️ CHOPPED: League has no scoring settings - using defaults")
                 self.leagueScoringSettings = getDefaultSleeperScoring()
             }
         } catch {
-            print("❌ CHOPPED: Failed to load league scoring settings: \(error)")
             self.leagueScoringSettings = getDefaultSleeperScoring()
         }
     }

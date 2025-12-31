@@ -80,7 +80,6 @@ extension AllLivePlayersViewModel {
         if AppConstants.debug {
             let info = GameAlertsFileManager.shared.getStorageInfo()
             let sizeKB = Double(info.totalSize) / 1024.0
-            print("🚨 GAME ALERTS: Updated file storage with \(newPreviousScores.count) player scores (\(String(format: "%.2f", sizeKB)) KB)")
         }
     }
     
@@ -90,7 +89,6 @@ extension AllLivePlayersViewModel {
         GameAlertsFileManager.shared.clearAllData()
         
         if AppConstants.debug {
-            print("🚨 GAME ALERTS: Cleared all file storage and GameAlerts data")
         }
     }
     

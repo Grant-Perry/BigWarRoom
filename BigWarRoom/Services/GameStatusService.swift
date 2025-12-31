@@ -38,21 +38,16 @@ final class GameStatusService {
     /// This replaces all the createMockGameStatus() bullshit with actual data
     func getGameStatus(for playerTeam: String?) -> GameStatus? {
         guard let team = playerTeam, !team.isEmpty else {
-//            print("⚠️ GAME STATUS: No team provided - cannot determine game status")
             return nil
         }
         
         // Use NFLGameDataService to get real game info
         guard let gameInfo = nflGameDataService.getGameInfo(for: team) else {
-//            print("⚠️ GAME STATUS: No game info found for team \(team)")
             return nil
         }
         
         // Convert NFLGameInfo to GameStatus
         let gameStatus = GameStatus(from: gameInfo)
-        
-//        print("✅ GAME STATUS: Team \(team) -> Status: \(gameStatus.status), Time: \(gameStatus.timeString)")
-        
         return gameStatus
     }
     
@@ -64,7 +59,6 @@ final class GameStatusService {
         }
         
         // Fallback: Default to pregame status instead of random mock data
-//        print("🔥 GAME STATUS FALLBACK: Using pregame status for unknown team '\(playerTeam ?? "nil")'")
         
         return GameStatus(
             status: "pregame",

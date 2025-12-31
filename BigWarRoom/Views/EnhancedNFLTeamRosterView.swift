@@ -63,7 +63,6 @@ struct EnhancedNFLTeamRosterView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Done") {
-                    print("🏈 ROSTER DEBUG: Toolbar Done button tapped - using dismiss()")
                     dismiss()
                 }
                 .foregroundColor(.white)
@@ -81,13 +80,11 @@ struct EnhancedNFLTeamRosterView: View {
             }
             
             // 🔥 FIX: Use onAppear instead of .task to prevent navigation conflicts
-            print("🏈 ROSTER DEBUG: EnhancedNFLTeamRosterView appeared for team \(teamCode)")
             Task {
                 await viewModel?.loadTeamRoster()
             }
         }
         .onDisappear {
-            print("🏈 ROSTER DEBUG: EnhancedNFLTeamRosterView disappeared for team \(teamCode)")
         }
         // 🔥 FIX: Add navigationDestination for opponent team navigation
         .navigationDestination(item: $navigateToTeam) { teamCode in
@@ -149,7 +146,6 @@ struct EnhancedNFLTeamRosterView: View {
                     Spacer()
                     
                     Button(action: { 
-                        print("🏈 ROSTER DEBUG: Close button tapped - using dismiss()")
                         dismiss()
                     }) {
                         Image(systemName: "xmark.circle.fill")
@@ -255,7 +251,6 @@ struct EnhancedNFLTeamRosterView: View {
                             
                             // 🔥 FIXED: Use Button + state instead of NavigationLink
                             Button(action: {
-                                print("🏈 OPPONENT TEAM: Button tapped for \(gameInfo.opponent)")
                                 navigateToTeam = gameInfo.opponent
                             }) {
                                 TeamLogoView(teamCode: gameInfo.opponent, size: 40)
@@ -400,7 +395,6 @@ struct EnhancedNFLTeamRosterView: View {
                 Spacer()
                 
                 Button(action: { 
-                    print("🏈 ROSTER DEBUG: Error view close button tapped - using dismiss()")
                     dismiss() 
                 }) {
                     Image(systemName: "xmark.circle.fill")
@@ -454,7 +448,6 @@ struct EnhancedNFLTeamRosterView: View {
             HStack(spacing: 16) {
                 // Close button
                 Button("Close") {
-                    print("🏈 ROSTER DEBUG: Error view Close button tapped - using dismiss()")
                     dismiss()
                 }
                 .padding(.horizontal, 24)

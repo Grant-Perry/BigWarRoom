@@ -86,7 +86,6 @@ final class SharedStatsService {
         // 🔥 WOODY'S FIX: Skip cache if forceRefresh is true
         if !forceRefresh, let cachedStats = weeklyStatsCache[cacheKey] {
             if AppConstants.debug {
-                print("🔍 SharedStatsService: Returning cached stats for \(cacheKey)")
             }
             return cachedStats
         }
@@ -97,7 +96,6 @@ final class SharedStatsService {
             loadingTasks.removeValue(forKey: cacheKey)
             weeklyStatsCache.removeValue(forKey: cacheKey)
             if AppConstants.debug {
-                print("🔥 SharedStatsService: Force refresh - cleared cache for \(cacheKey)")
             }
         }
         
@@ -122,7 +120,6 @@ final class SharedStatsService {
             lastLoadTime = Date()
             
             if AppConstants.debug {
-                print("✅ SharedStatsService: Cached fresh stats for \(cacheKey) - \(stats.count) players")
             }
             
             // Also update PlayerStatsCache for backward compatibility

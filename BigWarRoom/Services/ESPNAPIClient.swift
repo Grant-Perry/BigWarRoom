@@ -224,7 +224,6 @@ final class ESPNAPIClient: DraftAPIClient {
                 return espnLeague.toSleeperLeague()
             } catch {
                 if AppConstants.debug {
-                    print("❌ ESPNLeague decode error: \(error)")
                 }
                 throw error
             }
@@ -705,11 +704,9 @@ final class ESPNAPIClient: DraftAPIClient {
 
                 // Check if this view combination has records
                 let teamsWithRecords = league.teams?.filter { $0.record != nil } ?? []
-//                print("📊 Standings fetch with \(viewParams): \(teamsWithRecords.count)/\(league.teams?.count ?? 0) teams have records")
 
                 // If we found records, return this data
                 if !teamsWithRecords.isEmpty {
-//                    print("✅ Found records using view: \(viewParams)")
                     return league
                 }
 
@@ -718,7 +715,6 @@ final class ESPNAPIClient: DraftAPIClient {
 
             } catch {
                 lastError = error
-//                print("❌ Failed with view \(viewParams): \(error)")
                 continue
             }
         }
@@ -750,9 +746,7 @@ final class ESPNAPIClient: DraftAPIClient {
             // Convert ESPN stat ID to readable stat name
             if let statName = ESPNStatIDMapper.statIdToSleeperKey[statId] {
                 scoringMap[statName] = points
-//                print("📊 ESPN Scoring: \(statName) = \(points) points")
             } else {
-//                print("⚠️ ESPN: Unknown stat ID \(statId) with \(points) points")
             }
         }
         

@@ -393,7 +393,6 @@ final class MatchupsHubViewModel {
    internal func cacheProvider(_ provider: LeagueMatchupProvider, for league: UnifiedLeagueManager.LeagueWrapper, week: Int, year: String) {
 	  let cacheKey = "\(league.id)_\(week)_\(year)"
 	  cachedProviders[cacheKey] = provider
-		 //        print("🔥 CACHE: Stored provider for \(league.league.name) (key: \(cacheKey))")
    }
 }
 
@@ -606,49 +605,32 @@ struct UnifiedMatchup: Identifiable, Hashable {
    private func checkChoppedElimination() -> Bool {
 		 // Only applies to chopped leagues
 	  guard isChoppedLeague else {
-			//            print("❌ Not a chopped league, returning false")
 		 return false
 	  }
-
-		 //        print("🔍 ELIMINATION CHECK for league: \(league.league.name)")
 
 		 // 🔥 CRITICAL FIX: Check if my team has 0 players and 0 score (most reliable for eliminated teams)
 		 // This is the most reliable indicator of elimination in chopped leagues
 	  if let myTeam = myTeam {
-			//            print("   - My team name: '\(myTeam.ownerName)'")
-			//            print("   - My team ID: '\(myTeam.id)'")
-			//            print("   - My current score: \(myTeam.currentScore ?? 0.0)")
 
 			// Method 1: Check if I have 0 players and 0 score (most reliable for eliminated teams)
 		 _ = (myTeam.currentScore ?? 0.0) == 0.0
 		 _ = myTeam.roster.isEmpty
-
-			//            print("   - Has zero score: \(hasZeroScore)")
-			//            print("   - Roster is empty: \(isEmpty)")
-
 			// 🔥 NEW APPROACH: Check the elimination history first for definitive answer
 		 if let choppedSummary = choppedSummary {
-			   //                print("   - Elimination history count: \(choppedSummary.eliminationHistory.count)")
-
 			   // Check if I'm in THIS league's elimination history
 			let isInThisLeagueGraveyard = choppedSummary.eliminationHistory.contains { elimination in
 			   let nameMatch = elimination.eliminatedTeam.team.ownerName.lowercased() == myTeam.ownerName.lowercased()
 			   let idMatch = elimination.eliminatedTeam.team.id == myTeam.id
-				  //                    print("     - Checking graveyard: '\(elimination.eliminatedTeam.team.ownerName)' vs '\(myTeam.ownerName)' (name: \(nameMatch), id: \(idMatch))")
 			   return nameMatch || idMatch
 			}
 
 			if isInThisLeagueGraveyard {
-				  //                    print("✅ ELIMINATED: Found in THIS league's graveyard!")
 			   return true
 			}
 
 			   // Method 2: Check if my ranking shows eliminated status
 			if let ranking = myTeamRanking {
-				  //                    print("   - My ranking status: \(ranking.eliminationStatus)")
-				  //                    print("   - My ranking isEliminated: \(ranking.isEliminated)")
 			   if ranking.isEliminated {
-					 //                        print("✅ ELIMINATED: Ranking shows eliminated!")
 				  return true
 			   }
 			}
@@ -659,16 +641,13 @@ struct UnifiedMatchup: Identifiable, Hashable {
 			   ranking.team.id == myTeam.id
 			}
 
-			   //                print("   - Am I in active rankings: \(amInActiveRankings)")
 
 			if !amInActiveRankings {
-				  //                    print("✅ ELIMINATED: Not found in active rankings!")
 			   return true
 			}
 		 }
 	  }
 
-		 //        print("❌ ELIMINATION CHECK: Not eliminated from this league")
 	  return false
    }
 

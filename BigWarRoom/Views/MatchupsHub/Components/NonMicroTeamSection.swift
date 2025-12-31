@@ -96,13 +96,10 @@ struct NonMicroTeamSection: View {
         
         // Determine which NFL team to show
         if let teamCode = nflTeamCode {
-            print("🏈 TEAM TAP: Opening roster for NFL team \(teamCode) (detected from \(team.ownerName)'s roster)")
             onTeamLogoTap?(teamCode)
         } else {
-            print("🏈 TEAM TAP: Could not determine NFL team for \(team.ownerName)")
             // For fallback, try the first starter's team
             if let firstStarterTeam = team.roster.first(where: { $0.isStarter })?.team?.uppercased() {
-                print("🏈 TEAM TAP: Fallback to first starter's team: \(firstStarterTeam)")
                 onTeamLogoTap?(firstStarterTeam)
             }
         }

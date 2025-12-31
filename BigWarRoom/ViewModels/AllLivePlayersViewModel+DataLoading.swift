@@ -89,7 +89,6 @@ extension AllLivePlayersViewModel {
         let selectedWeek = weekSelectionManager.selectedWeek
         
         if AppConstants.debug {
-            print("🔄 STATS DEBUG: Loading player stats for week \(selectedWeek), year \(currentYear)")
         }
 
         do {
@@ -101,7 +100,6 @@ extension AllLivePlayersViewModel {
             )
             
             if AppConstants.debug {
-                print("🔄 STATS DEBUG: Successfully loaded FRESH stats from SharedStatsService for \(freshStats.keys.count) players")
             }
             
             // Log a few sample player scores for debugging
@@ -109,7 +107,6 @@ extension AllLivePlayersViewModel {
                 let sampleStats = Array(freshStats.prefix(3))
                 for (playerId, stats) in sampleStats {
                     let fantasyPoints = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
-                    print("🔄 STATS DEBUG: Sample - Player \(playerId): \(fantasyPoints) pts")
                 }
             }
 
@@ -118,13 +115,11 @@ extension AllLivePlayersViewModel {
                 self.playerStats = freshStats
                 self.statsLoaded = true
                 if AppConstants.debug {
-                    print("🔄 STATS DEBUG: Updated playerStats on main thread with FRESH data from SharedStatsService")
                 }
             }
             
         } catch {
             if AppConstants.debug {
-                print("🔄 STATS DEBUG: Failed to load stats from SharedStatsService: \(error)")
             }
             await MainActor.run {
                 guard !Task.isCancelled else { return }

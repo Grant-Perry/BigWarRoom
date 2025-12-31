@@ -59,7 +59,6 @@ struct AppEntryView: View {
     // 🔥 PHASE 3 DI: Lazy initialization helpers
     private func getOrCreateUnifiedLeagueManager() -> UnifiedLeagueManager {
         if unifiedLeagueManager == nil {
-            print("🔥 APP ENTRY: Creating NEW UnifiedLeagueManager instance")
             let sleeperClient = SleeperAPIClient()
             let espnClient = ESPNAPIClient(credentialsManager: espnCredentials)
             unifiedLeagueManager = UnifiedLeagueManager(
@@ -67,9 +66,7 @@ struct AppEntryView: View {
                 espnClient: espnClient,
                 espnCredentials: espnCredentials
             )
-            print("🔥 APP ENTRY: UnifiedLeagueManager instance ID: \(ObjectIdentifier(unifiedLeagueManager!))")
         } else {
-            print("🔥 APP ENTRY: Reusing existing UnifiedLeagueManager instance ID: \(ObjectIdentifier(unifiedLeagueManager!))")
         }
         return unifiedLeagueManager!
     }

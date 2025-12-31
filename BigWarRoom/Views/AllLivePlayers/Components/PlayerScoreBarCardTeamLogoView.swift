@@ -64,12 +64,6 @@ struct PlayerScoreBarCardTeamLogoView: View {
         
         // 🔥 DEBUG: Log for Lamar Jackson
         if playerName.contains("lamar jackson") {
-            print("🔍 DEBUG TEAM LOGO: Searching for Lamar Jackson injury data")
-            print("   Player Name: \(playerName)")
-            print("   Short Name: \(shortName)")
-            print("   Team: \(team ?? "nil")")
-            print("   SleeperID: \(playerEntry.player.sleeperID ?? "nil")")
-            print("   ESPNID: \(playerEntry.player.espnID ?? "nil")")
         }
         
         let result = playerDirectory.players.values.first { sleeperPlayer in
@@ -80,8 +74,6 @@ struct PlayerScoreBarCardTeamLogoView: View {
         
         // 🔍 DEBUG: Log result for Lamar Jackson
         if playerName.contains("lamar jackson") {
-            print("   Found SleeperPlayer: \(result != nil)")
-            print("   Injury Status: \(result?.injuryStatus ?? "nil")")
         }
         
         return result

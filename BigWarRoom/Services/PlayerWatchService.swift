@@ -112,7 +112,6 @@ final class PlayerWatchService {
         
         // 🔥 FIXED: Use injected dependency instead of .shared
         guard let allLiveVM = allLivePlayersViewModel else {
-            print("📅 PlayerWatchService: AllLivePlayersViewModel not available - manual refresh required")
             return
         }
         
@@ -478,7 +477,6 @@ final class PlayerWatchService {
             let data = try JSONEncoder().encode(watchedPlayers)
             try data.write(to: watchedPlayersFileURL)
         } catch {
-            print("❌ PlayerWatchService: Failed to save watched players: \(error)")
         }
     }
     
@@ -488,9 +486,7 @@ final class PlayerWatchService {
             do {
                 try legacyData.write(to: watchedPlayersFileURL)
                 userDefaults.removeObject(forKey: watchedPlayersKey)
-                print("📁 PlayerWatchService: Migrated watched players from UserDefaults to file")
             } catch {
-                print("❌ PlayerWatchService: Failed to migrate watched players: \(error)")
             }
         }
         
@@ -500,7 +496,6 @@ final class PlayerWatchService {
                 let data = try Data(contentsOf: watchedPlayersFileURL)
                 watchedPlayers = try JSONDecoder().decode([WatchedPlayer].self, from: data)
             } catch {
-                print("❌ PlayerWatchService: Failed to load watched players: \(error)")
                 watchedPlayers = []
             }
         }
@@ -515,7 +510,6 @@ final class PlayerWatchService {
             let data = try JSONEncoder().encode(settings)
             try data.write(to: watchSettingsFileURL)
         } catch {
-            print("❌ PlayerWatchService: Failed to save settings: \(error)")
         }
     }
     
@@ -525,9 +519,7 @@ final class PlayerWatchService {
             do {
                 try legacyData.write(to: watchSettingsFileURL)
                 userDefaults.removeObject(forKey: watchSettingsKey)
-                print("📁 PlayerWatchService: Migrated settings from UserDefaults to file")
             } catch {
-                print("❌ PlayerWatchService: Failed to migrate settings: \(error)")
             }
         }
         
@@ -537,7 +529,6 @@ final class PlayerWatchService {
                 let data = try Data(contentsOf: watchSettingsFileURL)
                 settings = try JSONDecoder().decode(WatchSettings.self, from: data)
             } catch {
-                print("❌ PlayerWatchService: Failed to load settings: \(error)")
                 settings = WatchSettings() // Use default settings
             }
         }

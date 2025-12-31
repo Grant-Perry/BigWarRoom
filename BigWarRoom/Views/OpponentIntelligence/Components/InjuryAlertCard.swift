@@ -447,17 +447,14 @@ struct InjuryAlertCard: View {
                 #if os(iOS)
                 UIApplication.shared.open(sleeperURL)
                 #endif
-                print("🚀 Launching Sleeper app")
             }
             
         case .espn:
             // ESPN: Use full web URL with league ID and team ID
             guard let url = generateLeagueURL(for: leagueRoster) else {
-                print("❌ Could not generate ESPN league URL for \(leagueRoster.leagueName)")
                 return
             }
             
-            print("🔗 Opening ESPN league URL: \(url.absoluteString)")
             
             #if os(iOS)
             UIApplication.shared.open(url)
@@ -481,7 +478,6 @@ struct InjuryAlertCard: View {
             let leagueID = matchup.league.league.leagueID
             
             guard let teamID = ESPNCredentialsManager.shared.getTeamID(for: leagueID) else {
-                print("❌ ESPN: No team ID found for league \(leagueID)")
                 return nil
             }
             
@@ -494,7 +490,6 @@ struct InjuryAlertCard: View {
         // DEPRECATED: This method is now replaced by openLeagueURL
         // Navigate to the specific matchup for this league
         onNavigateToMatchup?(leagueRoster.matchup)
-        print("Navigating to \(leagueRoster.leagueName) matchup for \(playerName)")
     }
     
     private func navigateToLeague(_ leagueName: String) {

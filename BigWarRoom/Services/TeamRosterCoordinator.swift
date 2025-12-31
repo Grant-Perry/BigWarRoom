@@ -43,7 +43,6 @@ final class TeamRosterCoordinator {
     /// Load team roster with proper data coordination
     /// This method ensures all dependencies are loaded before returning roster data
     func loadTeamRoster(for teamCode: String) async throws -> NFLTeamRoster {
-        print("🏈 ROSTER COORDINATOR: Loading roster for \(teamCode)")
         
         // Step 1: Ensure stats are loaded (critical for player points)
         try await ensureStatsAreLoaded()
@@ -53,7 +52,6 @@ final class TeamRosterCoordinator {
         
         // Step 3: Check cache first
         if let cachedRoster = getCachedRoster(for: teamCode) {
-            print("🏈 ROSTER COORDINATOR: Using cached roster for \(teamCode)")
             return cachedRoster
         }
         
@@ -68,7 +66,6 @@ final class TeamRosterCoordinator {
     
     /// Force refresh all dependencies
     func forceRefresh() async {
-        print("🏈 ROSTER COORDINATOR: Forcing complete refresh")
         
         // Clear cache
         cachedRosters.removeAll()
@@ -109,7 +106,6 @@ final class TeamRosterCoordinator {
         do {
             // Load stats if not already loaded
             if !livePlayersViewModel.statsLoaded {
-                print("🏈 ROSTER COORDINATOR: Loading player stats...")
                 await livePlayersViewModel.loadAllPlayers()
             }
             
@@ -126,10 +122,8 @@ final class TeamRosterCoordinator {
             
             statsReady = true
             lastStatsLoadTime = Date()
-            print("🏈 ROSTER COORDINATOR: Stats are ready!")
             
         } catch {
-            print("🏈 ROSTER COORDINATOR: Failed to load stats: \(error)")
             throw error
         }
     }
@@ -137,7 +131,6 @@ final class TeamRosterCoordinator {
     /// Ensure player directory is ready
     private func ensurePlayerDirectoryIsReady() async throws {
         if nflRosterService.needsRefresh {
-            print("🏈 ROSTER COORDINATOR: Refreshing player directory...")
             await nflRosterService.refreshPlayerDirectory()
         }
     }
@@ -172,18 +165,15 @@ final class TeamRosterCoordinator {
         defer { isLoadingRoster = false }
         
         do {
-            print("🏈 ROSTER COORDINATOR: Loading fresh roster for \(teamCode)")
             let roster = nflRosterService.getTeamRoster(for: teamCode)
             
             // Cache the result
             cachedRosters[teamCode.uppercased()] = roster
             cacheTimestamps[teamCode.uppercased()] = Date()
             
-            print("🏈 ROSTER COORDINATOR: Successfully loaded \(roster.totalPlayerCount) players for \(teamCode)")
             return roster
             
         } catch {
-            print("🏈 ROSTER COORDINATOR: Failed to load roster for \(teamCode): \(error)")
             throw error
         }
     }

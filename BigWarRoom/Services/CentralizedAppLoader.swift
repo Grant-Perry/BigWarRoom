@@ -91,32 +91,25 @@ final class CentralizedAppLoader {
         // Mark as complete
         isLoading = false
         hasCompletedInitialization = true
-        
-//        print("✅ Progressive app initialization completed")
     }
     
     /// Load shared stats first to eliminate redundant API calls
     private func loadSharedStats() async {
         do {
             let _ = try await sharedStatsService.loadCurrentWeekStats()
-//            print("✅ CentralizedAppLoader: Shared stats loaded")
         } catch {
-//            print("❌ CentralizedAppLoader: Failed to load shared stats: \(error)")
             // Continue anyway - app can still function
         }
     }
     
     /// Load matchups in background without blocking UI
     private func loadMatchupsInBackground() async {
-//        print("🚀 CentralizedAppLoader: Loading matchups in background...")
         await matchupsHubViewModel.loadAllMatchups()
-//        print("✅ CentralizedAppLoader: Background matchup loading completed")
     }
     
     /// Load player data in background
     private func loadPlayerDataInBackground() async {
-//        print("🚀 CentralizedAppLoader: Loading player data in background...")
-        
+
         if !allLivePlayersViewModel.statsLoaded {
             await allLivePlayersViewModel.loadPlayerStats()
         }
@@ -136,15 +129,13 @@ final class CentralizedAppLoader {
             
             allLivePlayersViewModel.lastUpdateTime = Date()
         }
-        
-//        print("✅ CentralizedAppLoader: Player data processing completed")
     }
     
-    /// 🔥 DEPRECATED: Old "load everything first" method
-    @available(*, deprecated, message: "Use initializeAppProgressively() instead")
-    func initializeApp() async {
-        await initializeAppProgressively()
-    }
+//    /// 🔥 DEPRECATED: Old "load everything first" method
+//    @available(*, deprecated, message: "Use initializeAppProgressively() instead")
+//    func initializeAppxx() async {
+//        await initializeAppProgressively()
+//    }
     
     private func updateProgress(_ progress: Double, message: String) async {
         loadingProgress = progress

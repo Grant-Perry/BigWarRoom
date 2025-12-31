@@ -168,7 +168,6 @@ struct NFLScheduleView: View {
             viewModel?.selectWeek(newWeek)
         }
         .onAppear {
-            print("🔍 SCHEDULE DEBUG: NFLScheduleView appeared")
             
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(weekSelectionManager.selectedWeek)")
             

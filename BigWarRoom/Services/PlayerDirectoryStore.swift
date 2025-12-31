@@ -281,10 +281,8 @@ final class PlayerDirectoryStore {
             
             if AppConstants.debug {
                 let sizeKB = Double(data.count) / 1024.0
-                print("💾 PlayerDirectoryStore: Cached \(players.count) players (\(String(format: "%.2f", sizeKB)) KB) to file")
             }
         } catch {
-            print("❌ PlayerDirectoryStore: Failed to cache players to file: \(error)")
         }
     }
     
@@ -295,15 +293,12 @@ final class PlayerDirectoryStore {
                 try legacyData.write(to: cacheFileURL)
                 userDefaults.removeObject(forKey: cacheKey)
                 userDefaults.removeObject(forKey: lastUpdatedKey)
-                print("📁 PlayerDirectoryStore: Migrated cache from UserDefaults to file")
             } catch {
-                print("❌ PlayerDirectoryStore: Failed to migrate cache: \(error)")
             }
         }
         
         // Load from file
         guard FileManager.default.fileExists(atPath: cacheFileURL.path) else {
-            print("📭 PlayerDirectoryStore: No cached players file found")
             return
         }
         
@@ -330,9 +325,7 @@ final class PlayerDirectoryStore {
             
             if AppConstants.debug {
                 let sizeKB = Double(data.count) / 1024.0
-                print("💾 PlayerDirectoryStore: Loaded \(players.count) cached players (\(String(format: "%.2f", sizeKB)) KB) from file")
                 if let lastUpdated = lastUpdated {
-                    print("📅 Cache from: \(lastUpdated)")
                 }
             }
             
@@ -340,7 +333,6 @@ final class PlayerDirectoryStore {
             calculatePositionalRankings()
             
         } catch {
-            print("❌ PlayerDirectoryStore: Failed to load cached players from file: \(error)")
         }
     }
     

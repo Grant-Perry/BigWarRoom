@@ -123,29 +123,23 @@ final class ESPNCredentialsManager {
         leagueTeamIDs[leagueID] = teamID
         UserDefaults.standard.set(leagueTeamIDs, forKey: leagueTeamIDsKey)
         
-        print("✅ ESPN: Stored team ID '\(teamID)' for league '\(leagueID)'")
     }
     
     /// Resolve and store team IDs for all configured leagues
     func resolveAllTeamIDs() async {
         guard hasValidCredentials, let apiClient = apiClient else { return }
         
-        print("🔍 ESPN: Resolving team IDs for \(leagueIDs.count) leagues...")
         
         for leagueID in leagueIDs {
             do {
                 if let teamID = try await apiClient.getCurrentUserMemberID(leagueID: leagueID) {
                     setTeamID(teamID, for: leagueID)
-                    print("✅ ESPN: Found team ID '\(teamID)' for league '\(leagueID)'")
                 } else {
-                    print("⚠️ ESPN: Could not find team ID for league '\(leagueID)'")
                 }
             } catch {
-                print("❌ ESPN: Failed to get team ID for league '\(leagueID)': \(error)")
             }
         }
         
-        print("✅ ESPN: Team ID resolution complete. Found \(leagueTeamIDs.count) team IDs.")
     }
     
     /// Clear all ESPN credentials

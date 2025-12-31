@@ -66,8 +66,6 @@ final class SleeperCredentialsManager {
         self.currentUserID = userID
         self.selectedSeason = season
         self.hasValidCredentials = !username.isEmpty || !userID.isEmpty
-        
-        // x// x Print("✅ Sleeper credentials saved successfully")
     }
     
     /// Load saved Sleeper credentials
@@ -83,26 +81,18 @@ final class SleeperCredentialsManager {
         self.cachedLeagues = leagues
         self.hasValidCredentials = !username.isEmpty || !userID.isEmpty
         
-        // x// x Print("📱 Loaded Sleeper credentials - Has valid: \(hasValidCredentials), Cached leagues: \(leagues.count)")
     }
     
     /// Get current username or user ID for API calls
     func getUserIdentifier() -> String? {
-        // print("🔍 SleeperCredentialsManager.getUserIdentifier() called:")
-        // print("   - currentUsername: '\(currentUsername)'")
-        // print("   - currentUserID: '\(currentUserID)'")
-        // print("   - hasValidCredentials: \(hasValidCredentials)")
-        
+
         if !currentUsername.isEmpty {
-            // print("   - Returning username: '\(currentUsername)'")
             return currentUsername
         } else if !currentUserID.isEmpty {
-            // print("   - Returning userID: '\(currentUserID)'")
             return currentUserID
         }
         // 🔥 FIX: Don't fallback to defaults - return nil if no credentials saved
         // This forces proper credential setup instead of using hardcoded values
-        // print("   - No credentials found, returning nil")
         return nil
     }
     
@@ -124,16 +114,13 @@ final class SleeperCredentialsManager {
             if enteredUsername {
                 // User entered a username, save both username and resolved userID
                 saveCredentials(username: usernameOrID, userID: user.userID, season: season)
-                print("✅ Resolved username '\(usernameOrID)' → userID '\(user.userID)'")
             } else {
                 // User entered a userID, save it and try to get username
                 saveCredentials(username: user.username ?? "", userID: user.userID, season: season)
-                print("✅ Used userID '\(user.userID)' with username '\(user.username ?? "N/A")'")
             }
             
             return true
         } catch {
-            print("❌ Failed to resolve Sleeper credentials: \(error)")
             return false
         }
     }
@@ -151,8 +138,6 @@ final class SleeperCredentialsManager {
         selectedSeason = "2025"
         cachedLeagues = []
         hasValidCredentials = false
-        
-        // x// x Print("🗑️ Sleeper credentials and cache cleared")
     }
     
     /// Check if we have actual user-entered credentials (not just defaults)
@@ -165,8 +150,6 @@ final class SleeperCredentialsManager {
         cachedLeagues = leagueIDs
         UserDefaults.standard.set(leagueIDs, forKey: cachedLeaguesKey)
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: leagueCacheTimestampKey)
-        
-        // x// x Print("💾 Cached \(leagueIDs.count) Sleeper league IDs")
     }
     
     /// Check if league cache is still valid (within 1 hour)
@@ -185,8 +168,7 @@ final class SleeperCredentialsManager {
         do {
             // Try to fetch user info to validate
             let user = try await apiClient.fetchUser(username: identifier)
-            // x// x Print("✅ Sleeper credentials validation successful: \(user.displayName ?? identifier)")
-            
+
             // Update user ID if we only had username
             if currentUserID.isEmpty && !user.userID.isEmpty {
                 saveCredentials(username: currentUsername, userID: user.userID, season: selectedSeason)
@@ -201,7 +183,6 @@ final class SleeperCredentialsManager {
             
             return true
         } catch {
-            // x// x Print("❌ Sleeper credentials validation failed: \(error)")
             return false
         }
     }

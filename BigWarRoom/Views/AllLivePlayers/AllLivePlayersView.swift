@@ -283,7 +283,6 @@ struct AllLivePlayersView: View {
     
     /// Handle player tap - DEPRECATED: Will be replaced with NavigationLink
     private func handlePlayerTap(_ matchup: UnifiedMatchup) {
-        print("🔥 DEBUG: Player tap - should use NavigationLink instead of sheet")
     }
     
     /// Refresh data with task management - ONLY for pull-to-refresh
@@ -308,7 +307,6 @@ struct AllLivePlayersView: View {
     
     /// Load initial data with proper task management - ONLY run when needed
     private func loadInitialData() async {
-        print("🔥 INITIAL LOAD: Loading initial data for All Live Players")
         loadTask?.cancel()
         loadTask = Task {
             // Ensure leagues are loaded first

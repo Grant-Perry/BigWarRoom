@@ -407,11 +407,8 @@ final class LeagueMatchupProvider {
             let (data, _) = try await URLSession.shared.data(for: request)
             
             if AppConstants.debug, let jsonObject = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                print("🔍 LeagueMatchupProvider ESPN API Keys: \(jsonObject.keys.sorted())")
                 if jsonObject["positionAgainstOpponent"] != nil {
-                    print("✅ positionAgainstOpponent EXISTS in LeagueMatchupProvider response")
                 } else {
-                    print("❌ positionAgainstOpponent NOT FOUND in LeagueMatchupProvider response")
                 }
             }
             
@@ -796,19 +793,16 @@ final class LeagueMatchupProvider {
             playerStats = sharedStats
             
             if AppConstants.debug {
-                print("🔥 LeagueMatchupProvider: Loaded shared stats for \(sharedStats.count) players (week \(week))")
                 
                 // Debug: Log a few sample scores for consistency tracking
                 let samplePlayers = Array(sharedStats.prefix(3))
                 for (playerID, stats) in samplePlayers {
                     let pprScore = stats["pts_ppr"] ?? stats["pts_std"] ?? 0.0
-                    print("🔥 LeagueMatchupProvider STATS: Player \(playerID) = \(pprScore) pts")
                 }
             }
         } catch {
             playerStats = [:]  // Set empty to prevent crashes
             if AppConstants.debug {
-                print("❌ LeagueMatchupProvider: Failed to load stats: \(error)")
             }
         }
     }
@@ -832,20 +826,15 @@ final class LeagueMatchupProvider {
             
             // DISABLED VERBOSE LOGGING - uncomment if needed for debugging Sleeper records
             /*
-            print("🔍 SLEEPER API RESPONSE - Record Diagnosis:")
-            print("   Total rosters: \(rosters.count)")
             for (index, roster) in rosters.prefix(5).enumerated() {
                 let winsDisplay = roster.wins.map(String.init) ?? "nil"
                 let lossesDisplay = roster.losses.map(String.init) ?? "nil"
                 let tieValue = roster.ties ?? 0
                 
-                print("   Roster \(index): ID=\(roster.rosterID), Owner=\(roster.ownerID ?? "nil")")
-                print("      Root level - wins:\(winsDisplay), losses:\(lossesDisplay), ties:\(tieValue)")
                 
                 if let settings = roster.settings {
                     let settingsWins = settings.wins ?? -1
                     let settingsLosses = settings.losses ?? -1
-                    print("      Settings level - wins:\(settingsWins), losses:\(settingsLosses)")
                 }
             }
             */

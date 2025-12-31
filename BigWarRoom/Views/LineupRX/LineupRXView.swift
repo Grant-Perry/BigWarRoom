@@ -615,7 +615,6 @@ struct LineupRXView: View {
         defer { isRefreshing = false }
         
         // First, refresh the matchup data from the API
-        print("🔄 Refreshing matchup data from API...")
         await matchupsHub.refreshMatchups()
         
         // Find the updated matchup
@@ -623,7 +622,6 @@ struct LineupRXView: View {
             m.league.league.leagueID == currentMatchup.league.league.leagueID &&
             m.myTeam?.id == currentMatchup.myTeam?.id
         }) {
-            print("✅ Found updated matchup with \(updatedMatchup.myTeam?.roster.count ?? 0) players")
             currentMatchup = updatedMatchup
         }
         
@@ -684,7 +682,6 @@ struct LineupRXView: View {
                     self.groupWaiverRecommendations()
                 } catch {
                     // Silently fail waiver recs
-                    print("⚠️ Failed to load waiver recommendations: \(error)")
                 }
             }
             

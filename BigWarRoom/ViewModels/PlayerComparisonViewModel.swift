@@ -108,14 +108,11 @@ class PlayerComparisonViewModel {
     // MARK: - Comparison Processing
     
     func performComparison() async {
-        print("🏈 performComparison called: player1=\(player1?.fullName ?? "nil"), player2=\(player2?.fullName ?? "nil")")
         guard let p1 = player1, let p2 = player2 else {
             errorMessage = "Please select both players to compare"
-            print("🏈 performComparison: Missing player - returning")
             return
         }
         
-        print("🏈 performComparison: Starting async preparation for \(p1.fullName) vs \(p2.fullName)")
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -125,20 +122,16 @@ class PlayerComparisonViewModel {
             async let prep1 = prepareComparisonPlayer(p1)
             async let prep2 = prepareComparisonPlayer(p2)
             
-            print("🏈 performComparison: Awaiting player preparation...")
             let (comp1, comp2) = try await (prep1, prep2)
-            print("🏈 performComparison: Player preparation complete")
             
             comparisonPlayer1 = comp1
             comparisonPlayer2 = comp2
             
             // Generate recommendation
             recommendation = generateRecommendation(player1: comp1, player2: comp2)
-            print("🏈 performComparison: Recommendation generated")
             
         } catch {
             errorMessage = "Failed to prepare comparison: \(error.localizedDescription)"
-            print("🏈 performComparison: Error - \(error)")
         }
     }
     
@@ -159,7 +152,6 @@ class PlayerComparisonViewModel {
         
         // NEW: Get QB quality tier (for receivers and RBs)
         let (qbTier, qbStats, qbName) = getQBQualityTier(for: player)
-        print("🏈 DEBUG: \(player.fullName) position=\(player.position ?? "nil"), qbTier=\(qbTier ?? "nil")")
         
         // NEW: Calculate TD scoring tier
         let tdTier = getTDScoringTier(for: player)
@@ -576,21 +568,15 @@ class PlayerComparisonViewModel {
     // MARK: - NEW: Enhanced Metrics Helpers
     
     private func getQBQualityTier(for player: SleeperPlayer) -> (tier: String?, stats: (passTDs: Int?, passYards: Int?, passerRating: Double?)?, qbName: String?) {
-        print("🏈 getQBQualityTier called for: \(player.fullName), position: \(player.position ?? "nil")")
         guard let position = player.position?.uppercased() else {
-            print("🏈 No position found")
             return (nil, nil, nil)
         }
         
-        print("🏈 Position is: \(position)")
-        print("🏈 Is QB?: \(position == "QB")")
-        print("🏈 Is WR/TE/RB?: \(["WR", "TE", "RB"].contains(position))")
         
         // If this IS a QB, try to calculate their own passer rating
         if position == "QB" {
             // Try to get stats from store first
             if let stats = PlayerStatsStore.shared.stats(for: player.playerID) {
-                print("🏈 Found season stats for QB \(player.fullName) from PlayerStatsStore")
                 let passTDs = stats.passTDs ?? 0
                 let passYards = stats.passYards ?? 0
                 let passAttempts = stats.passAttempts ?? 1
@@ -605,7 +591,6 @@ class PlayerComparisonViewModel {
                     interceptions: interceptions
                 )
                 
-                print("🏈 QB Rating for \(player.fullName): \(passerRating)")
                 
                 let tier: String
                 switch passerRating {
@@ -618,7 +603,6 @@ class PlayerComparisonViewModel {
                 return (tier, (passTDs: passTDs, passYards: passYards, passerRating: passerRating), player.fullName)
             } else {
                 // Use tier map for QB without stats
-                print("🏈 No season stats for QB \(player.fullName), using tier map")
             }
         }
         
@@ -627,16 +611,13 @@ class PlayerComparisonViewModel {
             return (nil, nil, nil)
         }
         
-        print("🏈 Getting QB for non-QB player: \(player.fullName), team: \(player.team ?? "nil")")
         // Get QB for this player's team
         guard let team = player.team else { return ("Good", nil, nil) }
         let roster = NFLTeamRosterService.shared.getTeamRoster(for: team)
         guard let qb = roster.quarterbacks.first else { 
-            print("🏈 No QB found in roster for team: \(team)")
             return ("Good", nil, nil) 
         }
         
-        print("🏈 Found QB: \(qb.fullName) for team \(team)")
         
         // Use tier map of known QBs to provide reasonable estimates
         let knownQBTiers: [String: String] = [
@@ -653,7 +634,6 @@ class PlayerComparisonViewModel {
             "Aaron Rodgers": "Solid", "Sam Darnold": "Good", "Anthony Richardson": "Good", "Kirk Cousins": "Bad"]
 
         let tier = knownQBTiers[qb.fullName] ?? "Good"
-        print("🏈 QB \(qb.fullName) assigned tier: \(tier)")
         
         // For non-QBs, return the tier and the QB's name
         return (tier, nil, qb.fullName)

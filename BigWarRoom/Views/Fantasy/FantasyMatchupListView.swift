@@ -174,11 +174,9 @@ struct FantasyMatchupListView: View {
     private func handleLeagueChange(_ newLeague: UnifiedLeagueManager.LeagueWrapper?) {
         // Only react to actual changes, not repeat values
         guard fantasyMatchupListViewModel?.isSettingUpLeague == false else {
-            print("🔄 LEAGUE CHANGE: Ignoring during setup")
             return
         }
         
-        print("🔄 LEAGUE CHANGE DETECTED: \(newLeague?.league.name ?? "nil")")
         
         // Debounce this call to prevent rapid fire
         Task {

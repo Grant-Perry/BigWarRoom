@@ -70,10 +70,6 @@ final class SleeperSetupViewModel {
     func saveCredentials() {
         guard canSaveCredentials else { return }
         
-        print("🔥 SleeperSetupViewModel.saveCredentials() called:")
-        print("   - Username to save: '\(username)'")
-        print("   - UserID to save: '\(userID)'")
-        print("   - Season: '\(selectedSeason)'")
         
         // NEW: Use resolution method to ensure we get numeric userID
         Task {
@@ -85,10 +81,6 @@ final class SleeperSetupViewModel {
             await MainActor.run {
                 if success {
                     clearResultMessage = "✅ Sleeper credentials saved and resolved successfully!"
-                    print("🔥 After save, checking credentials manager state:")
-                    print("   - currentUsername: '\(credentialsManager.currentUsername)'")
-                    print("   - currentUserID: '\(credentialsManager.currentUserID)'")
-                    print("   - hasValidCredentials: \(credentialsManager.hasValidCredentials)")
                 } else {
                     clearResultMessage = "❌ Failed to save Sleeper credentials. Please check your username/ID."
                 }

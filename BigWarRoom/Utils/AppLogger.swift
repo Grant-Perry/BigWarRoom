@@ -45,7 +45,6 @@ enum AppLogger {
     static func log(_ message: String, level: Level = .info, category: String = "General") {
         #if DEBUG
         // In debug builds, also print to console for Xcode visibility
-        print("\(level.emoji) [\(category)] \(message)")
         #endif
         
         // Always log to unified logging system

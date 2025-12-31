@@ -60,7 +60,6 @@ extension AllLivePlayersViewModel {
 
         // 🔥 PHASE 3: @Observable handles change notifications automatically
         // No need for objectWillChange.send() anymore
-        print("🔥 @OBSERVABLE: State recovery triggered - UI will update automatically")
     }
     
     // MARK: - State Validation
@@ -123,7 +122,6 @@ extension AllLivePlayersViewModel {
 
         // 🔥 PHASE 3: @Observable handles change notifications automatically
         // No need for objectWillChange.send() anymore
-        print("🔥 @OBSERVABLE: Batch update completed - UI will update automatically")
 
         isBatchingUpdates = false
     }

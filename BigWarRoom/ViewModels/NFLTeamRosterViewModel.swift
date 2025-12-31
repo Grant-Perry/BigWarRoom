@@ -50,9 +50,6 @@ final class NFLTeamRosterViewModel {
     
     /// Load the NFL team roster using the coordinator for race condition prevention
     func loadTeamRoster() async {
-        print("🏈 VIEW MODEL: Starting roster load for \(teamCode)")
-        print("🏈 VIEW MODEL: Normalized team code: \(TeamCodeNormalizer.normalize(teamCode) ?? teamCode)")
-        print("🏈 VIEW MODEL: All aliases for \(teamCode): \(TeamCodeNormalizer.aliases(for: teamCode))")
         
         isLoading = true
         errorMessage = nil
@@ -63,22 +60,16 @@ final class NFLTeamRosterViewModel {
             loadingState = "Loading player stats and directory..."
             let nflRoster = try await coordinator.loadTeamRoster(for: teamCode)
             
-            print("🏈 VIEW MODEL: Coordinator returned \(nflRoster.totalPlayerCount) players for \(teamCode)")
-            print("🏈 VIEW MODEL: Raw players loaded: \(nflRoster.allPlayers.count)")
             
             // 🔥 NEW: Debug the actual players being loaded
             if nflRoster.allPlayers.isEmpty {
-                print("🚨 WARNING: No players loaded for \(teamCode)!")
-                print("🚨 Trying alternative team codes...")
                 
                 // Try loading with different team code variations
                 let aliases = TeamCodeNormalizer.aliases(for: teamCode)
                 for alias in aliases where alias != teamCode {
-                    print("🚨 Attempting to load roster with alias: \(alias)")
                     do {
                         let alternativeRoster = try await coordinator.loadTeamRoster(for: alias)
                         if !alternativeRoster.allPlayers.isEmpty {
-                            print("🚨 SUCCESS: Found \(alternativeRoster.allPlayers.count) players using alias \(alias)")
                             let smartFilteredPlayers = applySmartFiltering(alternativeRoster.allPlayers)
                             await MainActor.run {
                                 self.filteredPlayers = smartFilteredPlayers
@@ -88,14 +79,12 @@ final class NFLTeamRosterViewModel {
                             return
                         }
                     } catch {
-                        print("🚨 Failed to load with alias \(alias): \(error)")
                     }
                 }
             } else {
                 // Log sample of players loaded
                 let samplePlayers = nflRoster.allPlayers.prefix(5)
                 for player in samplePlayers {
-                    print("🏈 Sample player: \(player.fullName ?? "unknown") (\(player.team ?? "no team"))")
                 }
             }
             
@@ -110,7 +99,6 @@ final class NFLTeamRosterViewModel {
                 self.loadingState = "Complete"
             }
             
-            print("🏈 VIEW MODEL: Successfully loaded \(smartFilteredPlayers.count) filtered players for \(teamCode)")
             
         } catch {
             await MainActor.run {
@@ -118,7 +106,6 @@ final class NFLTeamRosterViewModel {
                 self.isLoading = false
                 self.loadingState = "Error"
             }
-            print("🏈 VIEW MODEL: Failed to load roster for \(teamCode): \(error)")
         }
     }
     
@@ -153,7 +140,6 @@ final class NFLTeamRosterViewModel {
     
     /// Force refresh all data
     func forceRefresh() async {
-        print("🏈 VIEW MODEL: Forcing complete refresh for \(teamCode)")
         await coordinator.forceRefresh()
         await loadTeamRoster()
     }
@@ -162,13 +148,11 @@ final class NFLTeamRosterViewModel {
     
     /// Apply intelligent filtering: hide 0.0 point players in completed games, with fallback
     private func applySmartFiltering(_ players: [SleeperPlayer]) -> [SleeperPlayer] {
-        print("🔥 FILTERING START: \(teamCode) - Input players: \(players.count)")
         
         // Debug first few players
         let sampleSize = min(5, players.count)
         for i in 0..<sampleSize {
             let player = players[i]
-            print("🔥 INPUT PLAYER \(i+1): \(player.fullName ?? "unknown") - Team: \(player.team ?? "nil") - Points: \(getPlayerPoints(for: player) ?? 0.0)")
         }
         
         let filtered = players.filter { player in
@@ -191,13 +175,11 @@ final class NFLTeamRosterViewModel {
         // 🔥 ENHANCED FALLBACK: If filtering resulted in zero players, check if we might have a live game
         let finalResult: [SleeperPlayer]
         if filtered.isEmpty && !players.isEmpty {
-            print("🏈 FILTERING: \(teamCode) - Smart filtering resulted in 0 players from \(players.count) input players")
             
             // Check if this team might have a live game
             let hasLiveGame = checkForPossibleLiveGame()
             
             if hasLiveGame {
-                print("🏈 FILTERING: \(teamCode) - Detected possible live game, showing ALL players as emergency fallback")
                 // Show ALL players if we suspect a live game
                 finalResult = players.sorted { player1, player2 in
                     let priority1 = getPositionPriority(player1.position ?? "")
@@ -210,7 +192,6 @@ final class NFLTeamRosterViewModel {
                     return (player1.fullName ?? "") < (player2.fullName ?? "")
                 }
             } else {
-                print("🏈 FILTERING: \(teamCode) - No live game detected, showing top 15 players as fallback")
                 // Original fallback logic
                 finalResult = players.sorted { player1, player2 in
                     let priority1 = getPositionPriority(player1.position ?? "")
@@ -233,7 +214,6 @@ final class NFLTeamRosterViewModel {
             finalResult = filtered
         }
         
-        print("🏈 FILTERING: \(teamCode) - Original: \(players.count), Filtered: \(filtered.count), Final: \(finalResult.count)")
         return finalResult
     }
     
@@ -244,7 +224,6 @@ final class NFLTeamRosterViewModel {
         
         // Always show players with points > 0
         if points > 0.0 {
-            print("🏈 FILTERING: \(teamCode) - Showing player \(player.fullName ?? "unknown") with \(points) points")
             return true
         }
         
@@ -263,7 +242,6 @@ final class NFLTeamRosterViewModel {
         for alias in teamAliases {
             if let foundGameInfo = nflGameService.getGameInfo(for: alias) {
                 gameInfo = foundGameInfo
-                print("🏈 FILTERING DEBUG: \(normalizedTeamCode) - Found game info using alias '\(alias)'")
                 break
             }
         }
@@ -272,34 +250,23 @@ final class NFLTeamRosterViewModel {
         if gameInfo == nil {
             gameInfo = nflGameService.getGameInfo(for: teamCode)
             if gameInfo != nil {
-                print("🏈 FILTERING DEBUG: \(normalizedTeamCode) - Found game info using raw team code '\(teamCode)'")
             }
         }
         
         guard let gameInfo = gameInfo else {
             // If we can't determine game status, ALWAYS show the player (safest default)
-            print("🏈 FILTERING: \(normalizedTeamCode) - No game info found for any alias \(teamAliases), showing player \(player.fullName ?? "unknown") (safe default)")
             return true
         }
         
-        print("🏈 FILTERING DEBUG: \(normalizedTeamCode) - Player: \(player.fullName ?? "unknown")")
-        print("   Player Team: '\(playerTeam)' (original: '\(player.team ?? teamCode)')")
-        print("   Game Status: '\(gameInfo.gameStatus)'")
-        print("   Is Live: \(gameInfo.isLive)")
-        print("   Is Completed: \(gameInfo.isCompleted)")
-        print("   Game Time: '\(gameInfo.gameTime)'")
-        print("   Scores: \(gameInfo.awayScore)-\(gameInfo.homeScore)")
         
         // 🔥 RULE 1: If game is explicitly marked as live, show ALL players
         if gameInfo.isLive {
-            print("🏈 FILTERING: \(normalizedTeamCode) - Game is LIVE, showing player \(player.fullName ?? "unknown")")
             return true
         }
         
         // 🔥 RULE 2: If game has ANY scores, assume it could still be active
         let gameHasScores = gameInfo.homeScore > 0 || gameInfo.awayScore > 0
         if gameHasScores {
-            print("🏈 FILTERING: \(normalizedTeamCode) - Game has scores (\(gameInfo.awayScore)-\(gameInfo.homeScore)), showing player \(player.fullName ?? "unknown")")
             return true
         }
         
@@ -309,7 +276,6 @@ final class NFLTeamRosterViewModel {
         let hasActiveTimeIndicator = activeIndicators.contains { gameTimeIndicators.contains($0) }
         
         if hasActiveTimeIndicator {
-            print("🏈 FILTERING: \(normalizedTeamCode) - Game time '\(gameInfo.gameTime)' suggests active play, showing player \(player.fullName ?? "unknown")")
             return true
         }
         
@@ -318,12 +284,10 @@ final class NFLTeamRosterViewModel {
         let isExplicitlyFinal = gameStatus.contains("final") || gameStatus.contains("post")
         
         if isExplicitlyFinal && gameInfo.isCompleted && !gameHasScores {
-            print("🏈 FILTERING: \(normalizedTeamCode) - Game is explicitly final with no scores, hiding 0.0 point player \(player.fullName ?? "unknown")")
             return false
         }
         
         // 🔥 DEFAULT: If we're not 100% sure the game is over, show the player
-        print("🏈 FILTERING: \(normalizedTeamCode) - Uncertain about game status, showing player \(player.fullName ?? "unknown") (safe default)")
         return true
     }
     
@@ -361,11 +325,9 @@ final class NFLTeamRosterViewModel {
         
         guard let gameInfo = gameInfo else {
             // No game info = can't determine, assume live for safety
-            print("🏈 LIVE CHECK: \(normalizedTeamCode) - No game info found for any alias, assuming live for safety")
             return true
         }
         
-        print("🏈 LIVE CHECK: \(normalizedTeamCode) - Status: '\(gameInfo.gameStatus)', Live: \(gameInfo.isLive), Scores: \(gameInfo.awayScore)-\(gameInfo.homeScore)")
         
         // If explicitly live, definitely show all
         if gameInfo.isLive {

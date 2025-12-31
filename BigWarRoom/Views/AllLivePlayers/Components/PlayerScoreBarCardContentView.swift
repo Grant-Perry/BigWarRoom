@@ -447,7 +447,6 @@ struct PlayerScoreBarCardContentView: View {
             let success = watchService.watchPlayer(opponentPlayer, opponentReferences: opponentRefs)
             if !success {
                 // TODO: Show alert about watch limit or other issues
-                print("Failed to watch player - possibly at limit")
             }
         }
     }

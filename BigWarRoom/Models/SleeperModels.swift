@@ -117,21 +117,17 @@ struct SleeperLeagueSettings: Codable {
     /// Detect if this is a Chopped/elimination league - CENTRALIZED METHOD
     var isChoppedLeague: Bool {
         // Debug logging to see what we're getting
-//        print("🔍 CHOPPED DEBUG: type=\(type?.description ?? "nil"), isChopped=\(isChopped?.description ?? "nil")")
-        
+
         // PRIMARY: Check if type is 3 (Guillotine/Chopped) - THE OFFICIAL WAY
         if let type = type, type == 3 {
-//            print("✅ CHOPPED: Detected via type=3")
             return true
         }
         
         // FALLBACK: Check explicit Chopped flag for older leagues
         if let isChopped = isChopped, isChopped {
-//            print("✅ CHOPPED: Detected via isChopped=true")
             return true
         }
         
-//        print("❌ CHOPPED: Not detected")
         return false
     }
     

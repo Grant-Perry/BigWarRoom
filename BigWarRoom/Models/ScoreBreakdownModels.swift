@@ -255,19 +255,16 @@ struct ScoreBreakdownFactory {
         if isChoppedLeague, let customScoring = customScoringSettings {
             scoringSettings = customScoring
             hasRealScoringData = true
-            print("Using custom chopped league scoring (\(customScoring.count) rules)")
         }
         // Priority 2: Use injected scoring manager
         else if let unifiedScoring = scoringSettingsManager.getScoringSettings(for: leagueID, source: leagueSource) {
             scoringSettings = unifiedScoring
             hasRealScoringData = true
-            print("Using unified \(leagueSource) scoring (\(unifiedScoring.count) rules)")
         }
         // Priority 3: Fallback to estimates
         else {
             scoringSettings = getEstimatedSleeperScoring()
             hasRealScoringData = false
-            print("Using estimated scoring (no league rules found)")
         }
         
         // Calculate breakdown using the selected scoring with proper position handling

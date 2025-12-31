@@ -207,13 +207,11 @@ struct LoadingScreen: View {
         
         // If no credentials, skip data loading and go straight to onboarding
         if !hasAnyCredentials {
-            print("🔥 LOADING: No credentials found - skipping data loading")
             completeLoading()
             return
         }
         
         // Start loading essential data
-        print("🔥 LOADING: Starting essential data loading...")
         isDataLoading = true
         loadingMessage = "Loading your leagues..."
         
@@ -224,7 +222,6 @@ struct LoadingScreen: View {
             // TODO: Update this when AllLivePlayersViewModel.shared is eliminated
             // await AllLivePlayersViewModel.shared.loadAllPlayers()
             
-            print("🔥 LOADING: Essential data loading complete")
             
             await MainActor.run {
                 completeLoading()
@@ -244,7 +241,6 @@ struct LoadingScreen: View {
         // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
-        print("🔍 Loading complete - ESPN: \(hasESPNCredentials), Sleeper: \(hasSleeperCredentials), Any: \(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
             // Add exit animation here if needed
