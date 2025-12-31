@@ -13,6 +13,8 @@ import SwiftUI
 /// **Before:** 300+ lines of mostly duplicate rendering code
 /// **After:** Use existing UnifiedPlayerCardBackground + clean logic
 struct FantasyPlayerCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let player: FantasyPlayer
     let fantasyViewModel: FantasyViewModel
     let matchup: FantasyMatchup?
@@ -70,7 +72,7 @@ struct FantasyPlayerCard: View {
                             let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
                             
                             if let team = NFLTeam.team(for: normalizedTeamCode) {
-                                TeamAssetManager.shared.logoOrFallback(for: team.id)
+                                teamAssets.logoOrFallback(for: team.id)
                                     .frame(width: 90, height: 90)
                                     .opacity(vm.isPlayerLive(player) ? 0.4 : 0.25)
                                     .offset(x: 10, y: 10)

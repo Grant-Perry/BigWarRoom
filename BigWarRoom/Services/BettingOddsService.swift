@@ -57,7 +57,7 @@ final class BettingOddsService {
     var isLoading = false
     var errorMessage: String?
     
-    private init() {}
+    init() {}
     
     // MARK: - Public API
     
@@ -833,4 +833,3 @@ final class BettingOddsService {
         return (weekStart, weekEnd)
     }
 }
-

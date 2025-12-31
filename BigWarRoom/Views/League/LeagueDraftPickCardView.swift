@@ -9,6 +9,8 @@ import SwiftUI
 
 /// Enhanced pick card component with player details and team styling
 struct LeagueDraftPickCardView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let pick: EnhancedPick
     let viewModel: LeagueDraftViewModel
     
@@ -109,6 +111,8 @@ private struct PickCardHeaderRow: View {
 
 /// Middle row component with player image, team logo, and pick number
 private struct PickCardMiddleRow: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let pick: EnhancedPick
     let realSleeperPlayer: SleeperPlayer?
     let isMyPick: Bool
@@ -122,7 +126,7 @@ private struct PickCardMiddleRow: View {
             )
             
             // Team logo
-            TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
+            teamAssets.logoOrFallback(for: pick.teamCode)
                 .frame(width: 28, height: 28)
             
             Spacer()

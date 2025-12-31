@@ -20,10 +20,11 @@ struct EnhancedNFLTeamRosterView: View {
     let teamCode: String
     let rootDismiss: (() -> Void)? // 🔥 NEW: Optional root dismiss action
     
-    @Environment(\.dismiss) private var dismiss
-    // 🔥 PURE DI: Inject from environment
-    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    @Environment(TeamAssetManager.self) private var teamAssets
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(\.dismiss) private var dismiss
+    @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
+    // 🔥 PURE DI: Inject from environment
     @State private var viewModel: NFLTeamRosterViewModel?
     
     // UI State
@@ -549,7 +550,7 @@ struct EnhancedNFLTeamRosterView: View {
     }
     
     private func getTeamColor() -> Color {
-        return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
     }
     
     private func getGameInfo() -> GameDisplayInfo? {
@@ -586,6 +587,8 @@ struct EnhancedNFLTeamRosterView: View {
 // MARK: - Enhanced NFL Player Card (Adapted from ChoppedRosterPlayerCard)
 
 struct EnhancedNFLPlayerCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let player: SleeperPlayer
     let teamCode: String
     let viewModel: NFLTeamRosterViewModel
@@ -695,7 +698,7 @@ struct EnhancedNFLPlayerCard: View {
             HStack {
                 ZStack {
                     // Team logo background
-                    TeamAssetManager.shared.logoOrFallback(for: teamCode)
+                    teamAssets.logoOrFallback(for: teamCode)
                         .frame(width: 120, height: 120)
                         .opacity(0.3)
                         .offset(x: 15, y: -5)
@@ -822,7 +825,7 @@ struct EnhancedNFLPlayerCard: View {
     }
     
     private func getTeamColor() -> Color {
-        return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
     }
     
     private func getPositionColor() -> Color {

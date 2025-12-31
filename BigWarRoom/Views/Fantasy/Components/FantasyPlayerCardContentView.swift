@@ -187,6 +187,8 @@ struct FantasyPlayerCardHeadshotView: View {
         return position.contains("DEF") || position.contains("DST") || position.contains("D/ST")
     }
     
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     var body: some View {
         ZStack {
             // 🔥 MODIFIED: Use tap gesture instead of NavigationLink
@@ -228,7 +230,7 @@ struct FantasyPlayerCardHeadshotView: View {
         let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
         
         if let team = NFLTeam.team(for: normalizedTeamCode) {
-            TeamAssetManager.shared.logoOrFallback(for: team.id)
+            teamAssets.logoOrFallback(for: team.id)
                 .frame(width: 90, height: 90)
                 .opacity(isPlayerLive ? 1.0 : 0.85)
         } else {

@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct CompactSuggestionCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let suggestion: Suggestion
     @Bindable var viewModel: DraftRoomViewModel
     let onShowStats: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
@@ -48,7 +50,7 @@ struct CompactSuggestionCard: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
-            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+            teamAssets.teamBackground(for: suggestion.player.team)
                 .opacity(0.6)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))

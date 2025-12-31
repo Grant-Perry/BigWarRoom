@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct PlayerScoreBarCardContentView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     let scoreBarWidth: Double
     let cardHeight: Double
@@ -179,7 +180,7 @@ struct PlayerScoreBarCardContentView: View {
                     
                     if let team = NFLTeam.team(for: normalizedTeamCode) {
                         // Team logo
-                        TeamAssetManager.shared.logoOrFallback(for: team.id)
+                        teamAssets.logoOrFallback(for: team.id)
                             .frame(width: 140, height: 140)
                             .opacity(0.25)
                             .offset(x: 20, y: 15)
@@ -520,6 +521,7 @@ struct PlayerScoreBarCardContentView: View {
 
 /// On-demand stats loader - only loads stats when user clicks points box
 struct ScoreBreakdownLoaderView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
     // 🔥 PHASE 3 DI: viewModel should be passed in, not using .shared
@@ -596,6 +598,7 @@ struct ScoreBreakdownLoaderView: View {
 /// Compact win probability thermometer for Live Players cards
 /// Pure view component - receives calculated probability from parent
 struct CompactWinThermometer: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     let winProbability: Double
     let isWinning: Bool
     

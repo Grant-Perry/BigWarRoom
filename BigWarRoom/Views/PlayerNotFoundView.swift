@@ -11,6 +11,7 @@ import SwiftUI
 struct PlayerNotFoundView: View {
     let player: Player
     @Environment(\.dismiss) private var dismiss
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     var body: some View {
         NavigationView {
@@ -36,7 +37,7 @@ struct PlayerNotFoundView: View {
                     
                     if let team = NFLTeam.team(for: player.team) {
                         HStack(spacing: 8) {
-                            TeamAssetManager.shared.logoOrFallback(for: team.id)
+                            teamAssets.logoOrFallback(for: team.id)
                                 .frame(width: 24, height: 24)
                             Text(team.name)
                                 .font(.subheadline)

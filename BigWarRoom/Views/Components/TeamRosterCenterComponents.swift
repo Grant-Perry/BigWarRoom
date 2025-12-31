@@ -11,13 +11,15 @@ import UIKit
 // MARK: - Center Circle Coordinator View
 
 struct CenterCircleCoordinatorView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let size: CGFloat
     let displayTeamCode: String
     let gameInfo: GameDisplayInfo?
     let onTeamTap: (String) -> Void
     
     private var teamColor: Color {
-        TeamAssetManager.shared.team(for: displayTeamCode)?.primaryColor ?? .white
+        teamAssets.team(for: displayTeamCode)?.primaryColor ?? .white
     }
     
     var body: some View {

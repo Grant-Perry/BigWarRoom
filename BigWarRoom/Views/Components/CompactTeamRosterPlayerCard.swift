@@ -13,6 +13,7 @@ struct CompactTeamRosterPlayerCard: View {
     let pick: EnhancedPick
     let onPlayerTap: (SleeperPlayer) -> Void
     @Bindable var viewModel: DraftRoomViewModel
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     var body: some View {
         VStack(spacing: 8) {
@@ -30,7 +31,7 @@ struct CompactTeamRosterPlayerCard: View {
                 Spacer()
                 
                 // Team logo (smaller)
-                TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
+                teamAssets.logoOrFallback(for: pick.teamCode)
                     .frame(width: 14, height: 14)
                 
                 // 🔥 REFACTOR: Using UnifiedPositionBadge

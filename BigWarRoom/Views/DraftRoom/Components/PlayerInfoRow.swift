@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct PlayerInfoRow: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let suggestion: Suggestion
     @Bindable var viewModel: DraftRoomViewModel
     
@@ -17,7 +19,7 @@ struct PlayerInfoRow: View {
             Spacer()
             
             // Team logo (smaller)
-            TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+            teamAssets.logoOrFallback(for: suggestion.player.team)
                 .frame(width: 24, height: 24)
         }
     }

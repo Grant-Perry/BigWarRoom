@@ -22,6 +22,7 @@ struct NFLTeamRosterView: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @State private var viewModel: NFLTeamRosterViewModel?
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     // MARK: - Initialization
     
@@ -259,7 +260,7 @@ struct NFLTeamRosterView: View {
     }
     
     private func getTeamColor() -> Color {
-        return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
     }
 }
 

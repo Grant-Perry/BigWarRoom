@@ -14,7 +14,7 @@ struct PlayerCardView: View {
     let showDetails: Bool
     let onTap: (() -> Void)?
     
-    @State private var teamAssets = TeamAssetManager.shared
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     init(player: SleeperPlayer, showDetails: Bool = true, onTap: (() -> Void)? = nil) {
         self.player = player
@@ -79,7 +79,7 @@ struct CompactPlayerCardView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
     
-    @State private var teamAssets = TeamAssetManager.shared
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     init(player: SleeperPlayer) {
         self.player = player

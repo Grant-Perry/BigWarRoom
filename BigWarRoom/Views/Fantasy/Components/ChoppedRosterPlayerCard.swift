@@ -23,6 +23,7 @@ struct ChoppedRosterPlayerCard: View {
     
     // 🔥 PURE DI: Inject from environment
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     // 🔥 PURE DI: allLivePlayersViewModel is OPTIONAL for Chopped views (they don't need it)
     init(
@@ -195,7 +196,7 @@ struct ChoppedRosterPlayerCard: View {
                 ZStack {
                     // Large team logo background
                     if let team = viewModel.player.team {
-                        TeamAssetManager.shared.logoOrFallback(for: team)
+                        teamAssets.logoOrFallback(for: team)
                             .frame(width: 140, height: 140)
                             .opacity(0.25)
                             .offset(x: 20, y: 15)

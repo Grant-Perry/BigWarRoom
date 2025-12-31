@@ -15,6 +15,7 @@ struct PlayerComparisonView: View {
     @State private var searchText2 = ""
     @State private var isPlayerSelectionCollapsed = false
     @Environment(NFLGameDataService.self) private var nflGameDataService
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     @Environment(\.dismiss) var dismiss
     
@@ -372,7 +373,7 @@ struct PlayerComparisonView: View {
                     if let team = player.team {
                         let normalizedTeamCode = TeamCodeNormalizer.normalize(team) ?? team
                         if let nflTeam = NFLTeam.team(for: normalizedTeamCode) {
-                            TeamAssetManager.shared.logoOrFallback(for: nflTeam.id)
+                            teamAssets.logoOrFallback(for: nflTeam.id)
                                 .frame(width: 70, height: 70)
                                 .opacity(0.2)
                         }
@@ -528,7 +529,7 @@ struct PlayerComparisonView: View {
                     if let team = player.sleeperPlayer.team {
                         let normalizedTeamCode = TeamCodeNormalizer.normalize(team) ?? team
                         if let nflTeam = NFLTeam.team(for: normalizedTeamCode) {
-                            TeamAssetManager.shared.logoOrFallback(for: nflTeam.id)
+                            teamAssets.logoOrFallback(for: nflTeam.id)
                                 .frame(width: 120, height: 120)
                                 .opacity(0.25)
                                 .zIndex(0)

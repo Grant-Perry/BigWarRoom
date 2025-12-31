@@ -30,6 +30,7 @@ struct PlayerNavigationValue: Hashable {
 }
 
 struct PlayerScoreBarCardPlayerImageView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
     // 🔥 PHASE 3 DI: PlayerDirectory removed - not used in this view
@@ -59,7 +60,7 @@ struct PlayerScoreBarCardPlayerImageView: View {
                 let normalizedTeamCode = TeamCodeNormalizer.normalize(teamCode) ?? teamCode
                 
                 if let team = NFLTeam.team(for: normalizedTeamCode) {
-                    TeamAssetManager.shared.logoOrFallback(for: team.id)
+                    teamAssets.logoOrFallback(for: team.id)
                         .frame(width: 140, height: 140)
                 } else {
                     // Fallback

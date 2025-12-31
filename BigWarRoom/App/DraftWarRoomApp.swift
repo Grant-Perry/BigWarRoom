@@ -13,7 +13,7 @@ struct DraftWarRoomApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lifecycleManager = AppLifecycleManager.shared
     
-    // 🔥 PHASE 4: Store all ViewModels as @State for proper lifecycle
+    // 🔥 PHASE 5: Store all dependencies for pure DI
     @State private var appContainer: AppContainer
     
     init() {
@@ -27,15 +27,33 @@ struct DraftWarRoomApp: App {
     var body: some Scene {
         WindowGroup {
             MainAppView()
-                // 🔥 PHASE 4: Inject ALL dependencies via environment
+                // 🔥 PHASE 5: Inject ALL dependencies via environment (PURE DI - NO .shared IN VIEWS)
+                // ViewModels
                 .environment(appContainer.matchupsHubViewModel)
                 .environment(appContainer.fantasyViewModel)
                 .environment(appContainer.matchupDataStore)
                 .environment(appContainer.allLivePlayersViewModel)
-                .environment(NFLGameDataService.shared)
+                // API Clients & Credentials
+                .environment(appContainer.espnCredentials)
+                .environment(appContainer.sleeperCredentials)
+                // Week/Season
                 .environment(appContainer.nflWeekService)
-                .environment(PlayerDirectoryStore.shared)
-                .environment(PlayerWatchService.shared)
+                .environment(appContainer.weekSelectionManager)
+                .environment(appContainer.seasonYearManager)
+                // Player Data
+                .environment(appContainer.playerDirectory)
+                // Game Services
+                .environment(appContainer.nflGameDataService)
+                .environment(appContainer.gameStatusService)
+                .environment(appContainer.nflStandingsService)
+                // Stats
+                .environment(appContainer.sharedStatsService)
+                .environment(appContainer.projectedPointsManager)
+                // Supporting
+                .environment(appContainer.playerWatchService)
+                .environment(appContainer.teamAssetManager)
+                .environment(appContainer.bettingOddsService)
+                .environment(appContainer.oprKService)
         }
         // 🔋 BATTERY FIX: Update lifecycle manager when scene phase changes
         .onChange(of: scenePhase) { oldPhase, newPhase in
@@ -49,68 +67,120 @@ struct DraftWarRoomApp: App {
 /// Holds all app-level dependencies with proper initialization order
 @MainActor
 final class AppContainer {
-    // Core services (still using .shared for now - refactor later)
+    // 🔥 PHASE 5: Store ALL services for pure DI (NO .shared IN VIEWS)
+    // ViewModels
     let matchupDataStore: MatchupDataStore
     let matchupsHubViewModel: MatchupsHubViewModel
     let fantasyViewModel: FantasyViewModel
     let allLivePlayersViewModel: AllLivePlayersViewModel
+    
+    // API Clients & Credentials
+    let sleeperAPIClient: SleeperAPIClient
+    let espnAPIClient: ESPNAPIClient
+    let espnCredentials: ESPNCredentialsManager
+    let sleeperCredentials: SleeperCredentialsManager
+    
+    // Week/Season
     let nflWeekService: NFLWeekService
+    let weekSelectionManager: WeekSelectionManager
+    let seasonYearManager: SeasonYearManager
+    
+    // Player Data
+    let playerDirectory: PlayerDirectoryStore
+    let idCanonicalizer: ESPNSleeperIDCanonicalizer
+    
+    // Game Services
+    let nflGameDataService: NFLGameDataService
+    let gameStatusService: GameStatusService
+    let nflStandingsService: NFLStandingsService
+    
+    // Stats
+    let playerStatsCache: PlayerStatsCache
+    let sharedStatsService: SharedStatsService
+    let projectedPointsManager: ProjectedPointsManager
+    
+    // Supporting Services
+    let playerWatchService: PlayerWatchService
+    let teamAssetManager: TeamAssetManager
+    let bettingOddsService: BettingOddsService
+    let oprKService: OPRKService
+    
+    // App Management
+    let appInitManager: AppInitializationManager
+    let centralizedLoader: CentralizedAppLoader
     
     init() {
         
         // MARK: - Core API Clients
-        let sleeperAPIClient = SleeperAPIClient()
+        self.sleeperAPIClient = SleeperAPIClient()
         SleeperAPIClient.setSharedInstance(sleeperAPIClient)
         
         // MARK: - Credentials (handle circular dependency)
-        let espnCredentials = ESPNCredentialsManager()
-        let espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)
+        self.espnCredentials = ESPNCredentialsManager()
+        self.espnAPIClient = ESPNAPIClient(credentialsManager: espnCredentials)
         espnCredentials.setAPIClient(espnAPIClient)
         ESPNCredentialsManager.setSharedInstance(espnCredentials)
         ESPNAPIClient.setSharedInstance(espnAPIClient)
         
-        let sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
+        self.sleeperCredentials = SleeperCredentialsManager(apiClient: sleeperAPIClient)
         SleeperCredentialsManager.setSharedInstance(sleeperCredentials)
         
         // MARK: - Week/Season Services
-        let nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
-        self.nflWeekService = nflWeekService
+        self.nflWeekService = NFLWeekService(apiClient: sleeperAPIClient)
         
-        let weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
+        self.weekSelectionManager = WeekSelectionManager(nflWeekService: nflWeekService)
         WeekSelectionManager.setSharedInstance(weekSelectionManager)
         
-        let seasonYearManager = SeasonYearManager()
+        self.seasonYearManager = SeasonYearManager()
         SeasonYearManager.setSharedInstance(seasonYearManager)
         
         // MARK: - Player Data Services
-        let playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
+        self.playerDirectory = PlayerDirectoryStore(apiClient: sleeperAPIClient)
         PlayerDirectoryStore.setSharedInstance(playerDirectory)
         
-        let idCanonicalizer = ESPNSleeperIDCanonicalizer(playerDirectory: playerDirectory)
+        self.idCanonicalizer = ESPNSleeperIDCanonicalizer(playerDirectory: playerDirectory)
         ESPNSleeperIDCanonicalizer.setSharedInstance(idCanonicalizer)
         
         // MARK: - Game Services
-        let nflGameDataService = NFLGameDataService(
+        self.nflGameDataService = NFLGameDataService(
             weekSelectionManager: weekSelectionManager,
             appLifecycleManager: AppLifecycleManager.shared
         )
         NFLGameDataService.setSharedInstance(nflGameDataService)
         
-        let gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
+        self.gameStatusService = GameStatusService(nflGameDataService: nflGameDataService)
         GameStatusService.setSharedInstance(gameStatusService)
         
+        self.nflStandingsService = NFLStandingsService()
+        NFLStandingsService.setSharedInstance(nflStandingsService)
+        
         // MARK: - Stats Services
-        let playerStatsCache = PlayerStatsCache()
+        self.playerStatsCache = PlayerStatsCache()
         PlayerStatsCache.setSharedInstance(playerStatsCache)
         
-        let sharedStatsService = SharedStatsService(
+        self.sharedStatsService = SharedStatsService(
             weekSelectionManager: weekSelectionManager,
             seasonYearManager: seasonYearManager,
             playerStatsCache: playerStatsCache
         )
         SharedStatsService.setSharedInstance(sharedStatsService)
         
-        // MARK: - 🔥 PHASE 4: MatchupDataStore with DI (NO BRIDGE)
+        self.projectedPointsManager = ProjectedPointsManager(
+            sleeperProjectionsService: SleeperProjectionsService(),
+            weekManager: weekSelectionManager,
+            gameDataService: nflGameDataService
+        )
+        ProjectedPointsManager.setSharedInstance(projectedPointsManager)
+        
+        // MARK: - Supporting Services
+        self.teamAssetManager = TeamAssetManager()
+        TeamAssetManager.setSharedInstance(teamAssetManager)
+        
+        self.bettingOddsService = BettingOddsService()
+        
+        self.oprKService = OPRKService()
+        
+        // MARK: - 🔥 PHASE 5: MatchupDataStore with DI
         let unifiedLeagueManagerForStore = UnifiedLeagueManager(
             sleeperClient: sleeperAPIClient,
             espnClient: espnAPIClient,
@@ -124,7 +194,7 @@ final class AppContainer {
             weekSelectionManager: weekSelectionManager
         )
         
-        // MARK: - 🔥 PHASE 4: MatchupsHubViewModel with DI (NO BRIDGE)
+        // MARK: - 🔥 PHASE 5: MatchupsHubViewModel with DI
         self.matchupsHubViewModel = MatchupsHubViewModel(
             espnCredentials: espnCredentials,
             sleeperCredentials: sleeperCredentials,
@@ -136,7 +206,7 @@ final class AppContainer {
             unifiedLeagueManager: unifiedLeagueManagerForStore
         )
         
-        // MARK: - 🔥 PHASE 4: FantasyViewModel with DI (NO BRIDGE)
+        // MARK: - 🔥 PHASE 5: FantasyViewModel with DI
         let unifiedLeagueManagerForFantasy = UnifiedLeagueManager(
             sleeperClient: SleeperAPIClient(),
             espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
@@ -163,8 +233,8 @@ final class AppContainer {
         )
         AllLivePlayersViewModel.setSharedInstance(allLivePlayersViewModel)
         
-        // MARK: - Supporting Services
-        let playerWatchService = PlayerWatchService(
+        // MARK: - PlayerWatchService with DI
+        self.playerWatchService = PlayerWatchService(
             weekManager: weekSelectionManager,
             gameDataService: nflGameDataService,
             allLivePlayersViewModel: allLivePlayersViewModel
@@ -172,7 +242,7 @@ final class AppContainer {
         PlayerWatchService.setSharedInstance(playerWatchService)
         
         // MARK: - App Initialization
-        let appInitManager = AppInitializationManager(
+        self.appInitManager = AppInitializationManager(
             matchupsHubViewModel: matchupsHubViewModel,
             allLivePlayersViewModel: allLivePlayersViewModel,
             playerDirectory: playerDirectory,
@@ -180,7 +250,7 @@ final class AppContainer {
         )
         AppInitializationManager.setSharedInstance(appInitManager)
         
-        let centralizedLoader = CentralizedAppLoader(
+        self.centralizedLoader = CentralizedAppLoader(
             matchupsHubViewModel: matchupsHubViewModel,
             allLivePlayersViewModel: allLivePlayersViewModel,
             sharedStatsService: sharedStatsService
@@ -189,7 +259,6 @@ final class AppContainer {
         
         // Mark services as ready for AppLifecycleManager idle timer logic
         AppLifecycleManager.shared.markServicesReady()
-        
     }
 }
 
@@ -352,22 +421,18 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadCredentials() async {
-        // Just a brief pause - credentials are already loaded in AppContainer
         try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
     private func loadLeagues() async {
-        // Brief pause - leagues will be loaded by loadMatchups()
         try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
     private func loadMatchups() async {
-        // 🔥 PHASE 4: Use injected instance instead of .shared
         await matchupsHubViewModel.loadAllMatchups()
     }
     
     private func loadPlayers() async {
-        // Brief pause - players are extracted from matchups
         try? await Task.sleep(nanoseconds: 200_000_000)
     }
     
@@ -501,12 +566,6 @@ struct MainTabView: View {
                 }
                 .tag(4)
             }
-            // 🔥 FIX: Add all services to environment for all tabs
-            .environment(WeekSelectionManager.shared)
-            .environment(NFLStandingsService.shared)
-            .environment(NFLGameDataService.shared)
-            .environment(TeamAssetManager.shared)
-            .environment(ESPNCredentialsManager.shared)
             .id("tabview-\(SmartRefreshManager.shared.hasLiveGames)")
             .tint(SmartRefreshManager.shared.hasLiveGames ? .gpGreen : .blue)
             .onAppear {
@@ -519,7 +578,6 @@ struct MainTabView: View {
                 storedSelectedTab = 0
             }
             .onAppear {
-                // 🔁 STATE RESTORE: If onboarding needed, switch to Settings. Otherwise, stay on persisted tab.
                 if startOnSettings && !hasInitialized {
                     storedSelectedTab = 4
                 }

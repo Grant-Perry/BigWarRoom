@@ -12,7 +12,7 @@ struct PlayerStatsHeaderView: View {
     let player: SleeperPlayer
     let team: NFLTeam?
     
-    @State private var teamAssets = TeamAssetManager.shared
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     // 🔥 USE ENVIRONMENT for dependencies
     @Environment(AllLivePlayersViewModel.self) private var livePlayersViewModel

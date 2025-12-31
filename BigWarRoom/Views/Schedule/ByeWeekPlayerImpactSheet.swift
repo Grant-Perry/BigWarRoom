@@ -13,6 +13,7 @@ struct ByeWeekPlayerImpactSheet: View {
     let teamName: String
     let teamCode: String
     @Environment(\.dismiss) private var dismiss
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     var body: some View {
             ZStack {
@@ -62,7 +63,7 @@ struct ByeWeekPlayerImpactSheet: View {
     private var headerSection: some View {
         VStack(spacing: 12) {
             // Team logo instead of warning icon
-            TeamAssetManager.shared.logoOrFallback(for: teamCode)
+            teamAssets.logoOrFallback(for: teamCode)
                 .frame(width: 80, height: 80)
                 .background(
                     Circle()

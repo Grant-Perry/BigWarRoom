@@ -11,6 +11,7 @@ import SwiftUI
 /// **OPRK Service**
 ///
 /// Manages opponent rank data for defenses, providing matchup advantage assessments
+@Observable
 @MainActor
 final class OPRKService {
     static let shared = OPRKService()
@@ -28,7 +29,7 @@ final class OPRKService {
     /// Cache expiration (refresh every hour)
     private let cacheExpiration: TimeInterval = 3600
     
-    private init() {}
+    init() {}
     
     // MARK: - Public Interface
     
@@ -137,4 +138,3 @@ final class OPRKService {
         lastUpdateTime = nil
     }
 }
-

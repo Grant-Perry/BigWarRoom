@@ -8,18 +8,18 @@
 import SwiftUI
 
 struct PlayerScoreBarCardTeamLogoView: View {
-    let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
+    @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(PlayerDirectoryStore.self) private var playerDirectory
     
-    // 🔥 USE .shared for player directory
-    private var playerDirectory: PlayerDirectoryStore { PlayerDirectoryStore.shared }
+    let playerEntry: AllLivePlayersViewModel.LivePlayerEntry
     
     var body: some View {
         ZStack {
             // Main team logo or fallback circle
             Group {
                 if let team = NFLTeam.team(for: playerEntry.player.team ?? "") {
-                    TeamAssetManager.shared.logoOrFallback(for: team.id)
-                        .frame(width: 20, height: 20) // Smaller logo (was 24x24)
+                    teamAssets.logoOrFallback(for: team.id)
+                        .frame(width: 20, height: 20)
                 } else {
                     Circle()
                         .fill(leagueSourceColor)
@@ -34,22 +34,8 @@ struct PlayerScoreBarCardTeamLogoView: View {
                     HStack {
                         Spacer()
                         InjuryStatusBadgeView(injuryStatus: injuryStatus)
-                            .scaleEffect(0.7) // Scale for smaller team logo
-                            .offset(x: -2, y: -2) // Adjusted positioning for small logo
-                    }
-                }
-            }
-            
-            // 🔥 DEBUG: Force show badge for Lamar Jackson to test visibility
-            if playerEntry.player.fullName.contains("Lamar Jackson") {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        InjuryStatusBadgeView(injuryStatus: "Questionable")
                             .scaleEffect(0.7)
                             .offset(x: -2, y: -2)
-                            .border(Color.red, width: 2) // Debug border to see positioning
                     }
                 }
             }

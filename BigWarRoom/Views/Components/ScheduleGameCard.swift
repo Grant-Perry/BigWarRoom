@@ -9,14 +9,14 @@
 import SwiftUI
 
 struct ScheduleGameCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(NFLStandingsService.self) private var standingsService
+    
     let game: ScheduleGame
     let odds: GameBettingOdds?
     let action: () -> Void
     var showDayTime: Bool = false  // For classic mode - shows day/time in center
     var showStartTime: Bool = false  // For Morg mode - shows just start time above odds
-    
-    @State private var teamAssets = TeamAssetManager.shared
-    @State private var standingsService = NFLStandingsService.shared
     
     var body: some View {
         HStack(spacing: 0) {
@@ -413,11 +413,11 @@ struct ScheduleGameCard: View {
 
 // MARK: -> Compact Schedule Game Card (for collapsible time slots)
 struct ScheduleGameCardCompact: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(NFLStandingsService.self) private var standingsService
+    
     let game: ScheduleGame
     let odds: GameBettingOdds?
-    
-    @State private var teamAssets = TeamAssetManager.shared
-    @State private var standingsService = NFLStandingsService.shared
     
     private let cardHeight: CGFloat = 52
     
@@ -565,10 +565,10 @@ struct ScheduleGameCardCompact: View {
 
 // MARK: -> Team Logo Component
 struct TeamLogoView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let teamCode: String
     let size: CGFloat
-    
-    @State private var teamAssets = TeamAssetManager.shared
     
     var body: some View {
         Group {
@@ -596,4 +596,3 @@ struct TeamLogoView: View {
         teamAssets.team(for: teamCode)?.primaryColor ?? Color.gray
     }
 }
-

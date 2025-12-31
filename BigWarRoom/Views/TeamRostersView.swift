@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct TeamRostersView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     @State private var viewModel = TeamRostersViewModel()
     @State private var nflGameService = NFLGameDataService.shared
     @State private var weekManager = WeekSelectionManager.shared
@@ -302,7 +303,7 @@ struct TeamRostersView: View {
     }
     
     private func getTeamColor(for teamCode: String) -> Color {
-        return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
     }
     
     private func getTeamName(for teamCode: String) -> String {
@@ -394,7 +395,7 @@ struct MiniScheduleCard: View {
     let isByeWeek: Bool
     let onTeamTap: (String) -> Void
     
-    @State private var teamAssets = TeamAssetManager.shared
+    @Environment(TeamAssetManager.self) private var teamAssets
     @State private var standingsService = NFLStandingsService.shared
     
     var body: some View {

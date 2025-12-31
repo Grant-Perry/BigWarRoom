@@ -9,6 +9,7 @@ import SwiftUI
 
 /// Sheet view for team-filtered matchups (DRY - reuses Mission Control components)
 struct TeamFilteredMatchupsView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     // MARK: - Properties
     let awayTeam: String
@@ -654,7 +655,7 @@ struct TeamFilteredMatchupsView: View {
     
     // MARK: - Helper function to get team color
     private func getTeamColor(for teamCode: String) -> Color {
-        return TeamAssetManager.shared.team(for: teamCode)?.primaryColor ?? Color.white
+        return teamAssets.team(for: teamCode)?.primaryColor ?? Color.white
     }
     
     // MARK: - Helper function to get team name

@@ -15,6 +15,7 @@ struct WatchedPlayersSheet: View {
     // 🔥 PURE DI: Inject from environment
     @Environment(AllLivePlayersViewModel.self) private var allLivePlayersViewModel
     @Environment(NFLWeekService.self) private var nflWeekService
+    @Environment(TeamAssetManager.self) private var teamAssets
     
     var body: some View {
         NavigationStack {
@@ -252,6 +253,7 @@ struct WatchedPlayersSheet: View {
 // MARK: - Watched Player Card
 
 struct WatchedPlayerCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
     let watchedPlayer: WatchedPlayer
     // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
@@ -592,7 +594,7 @@ struct WatchedPlayerCard: View {
     private var teamLogoBackground: some View {
         Group {
             if let team = NFLTeam.team(for: normalizedTeamCode) {
-                TeamAssetManager.shared.logoOrFallback(for: team.id)
+                teamAssets.logoOrFallback(for: team.id)
                     .frame(width: 100, height: 100)
                     .opacity(0.2)
                     .offset(x: 20, y: 0)

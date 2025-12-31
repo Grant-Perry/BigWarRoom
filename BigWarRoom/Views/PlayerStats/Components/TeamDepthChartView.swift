@@ -15,7 +15,7 @@ struct TeamDepthChartView: View {
     // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
     
-    @State private var teamAssets = TeamAssetManager.shared
+    @Environment(TeamAssetManager.self) private var teamAssets
     @State private var isExpanded: Bool = true // 🏈 UX: Changed to true for initial expanded state
     
     // 🏈 PLAYER NAVIGATION: Remove sheet states, use callback instead

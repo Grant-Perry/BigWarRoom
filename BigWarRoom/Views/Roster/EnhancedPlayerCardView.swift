@@ -9,6 +9,8 @@ import SwiftUI
 
 /// Enhanced player card component with team styling and detailed player information
 struct EnhancedPlayerCardView: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let player: Player
     let sleeperPlayer: SleeperPlayer?
     let onTap: () -> Void
@@ -31,7 +33,7 @@ struct EnhancedPlayerCardView: View {
                     TierBadgeView(tier: player.tier)
                     
                     // Team logo
-                    TeamAssetManager.shared.logoOrFallback(for: player.team)
+                    teamAssets.logoOrFallback(for: player.team)
                         .frame(width: 42, height: 42)
                     
                     Spacer()
@@ -45,7 +47,7 @@ struct EnhancedPlayerCardView: View {
             }
         }
         .padding(12)
-        .background(TeamAssetManager.shared.teamBackground(for: player.team))
+        .background(teamAssets.teamBackground(for: player.team))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onTapGesture {
             onTap()

@@ -7,12 +7,14 @@
 
 import SwiftUI
 
-/// Content section with smart recommendations
+// MARK: - AI Pick Suggestions Content View
 struct AIPickSuggestionsContentView: View {
     let viewModel: DraftRoomViewModel
     let onPlayerTap: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     let onLockPick: (Suggestion) -> Void
     let onAddToFeed: (Suggestion) -> Void
+    @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(PlayerDirectoryStore.self) private var playerDirectory
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -82,7 +84,7 @@ struct AIPickSuggestionsContentView: View {
     }
 }
 
-/// Individual suggestion card component
+// MARK: - AI Pick Suggestion Card View
 struct AIPickSuggestionCardView: View {
     let suggestion: Suggestion
     let viewModel: DraftRoomViewModel
@@ -90,6 +92,8 @@ struct AIPickSuggestionCardView: View {
     let onPlayerTap: ((Player) -> Void)? // 🔥 DEATH TO SHEETS: Made optional for NavigationLink usage
     let onLockPick: (Suggestion) -> Void
     let onAddToFeed: (Suggestion) -> Void
+    @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(PlayerDirectoryStore.self) private var playerDirectory
     
     enum DisplayMode {
         case standard, all
@@ -195,7 +199,7 @@ struct AIPickSuggestionCardView: View {
                     Spacer()
                     
                     // Team logo (much larger size)
-                    TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+                    teamAssets.logoOrFallback(for: suggestion.player.team)
                         .frame(width: 42, height: 42)
                 }
                 
@@ -205,7 +209,7 @@ struct AIPickSuggestionCardView: View {
         }
         .padding(12)
         .background(
-            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+            teamAssets.teamBackground(for: suggestion.player.team)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
@@ -246,7 +250,7 @@ struct AIPickSuggestionCardView: View {
                     HStack(spacing: 8) {
                         tierBadge()
                         
-                        TeamAssetManager.shared.logoOrFallback(for: suggestion.player.team)
+                        teamAssets.logoOrFallback(for: suggestion.player.team)
                             .frame(width: 42, height: 42)
                     }
                 }
@@ -257,7 +261,7 @@ struct AIPickSuggestionCardView: View {
         .padding(.horizontal, 16)  
         .padding(.vertical, 14)    
         .background(
-            TeamAssetManager.shared.teamBackground(for: suggestion.player.team)
+            teamAssets.teamBackground(for: suggestion.player.team)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }

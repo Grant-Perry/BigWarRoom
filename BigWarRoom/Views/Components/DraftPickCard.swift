@@ -9,6 +9,8 @@
 import SwiftUI
 
 struct DraftPickCard: View {
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
     let pick: EnhancedPick
     let isRecent: Bool // Highlight recent picks
     let myRosterID: Int? // To identify my picks
@@ -107,7 +109,7 @@ struct DraftPickCard: View {
                     // Team info with logo and manager name
                     VStack(spacing: 2) {
                         HStack(spacing: 2) {
-                            TeamAssetManager.shared.logoOrFallback(for: pick.teamCode)
+                            teamAssets.logoOrFallback(for: pick.teamCode)
                                 .frame(width: 12, height: 12)
                             
                             Text(pick.teamCode)
