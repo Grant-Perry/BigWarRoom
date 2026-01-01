@@ -82,12 +82,12 @@ final class UnifiedLeagueManager {
             
             // Fetch ESPN leagues if credentials exist
             if espnCredentials.hasValidCredentials {
-                DebugPrint(mode: .espnAPI, "🔵 FETCH ALL LEAGUES: Will fetch ESPN leagues")
+                DebugPrint(mode: .matchupLoading, "🔵 FETCH ALL LEAGUES: Will fetch ESPN leagues")
                 group.addTask { [weak self] in
-                    await self?.fetchESPNLeagues()
+                    await self?.fetchESPNLeagues(season: season)
                 }
             } else {
-                DebugPrint(mode: .espnAPI, "🔵 FETCH ALL LEAGUES: No ESPN credentials - skipping ESPN leagues")
+                DebugPrint(mode: .matchupLoading, "🔵 FETCH ALL LEAGUES: No ESPN credentials - skipping ESPN leagues")
             }
         }
         
@@ -154,21 +154,35 @@ final class UnifiedLeagueManager {
     }
     
     /// Fetch ESPN leagues
-    func fetchESPNLeagues() async {
+    func fetchESPNLeagues(season: String = "2025") async {
+        DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Starting fetch for season '\(season)'")
         isLoadingESPNLeagues = true
-        defer { isLoadingESPNLeagues = false }
+        defer { 
+            isLoadingESPNLeagues = false 
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Fetch complete. Total ESPN leagues: \(allLeagues.filter { $0.source == .espn }.count)")
+        }
         
         // Use saved credentials instead of hardcoded ones
         guard let swid = espnCredentials.getSWID() else {
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: ❌ NO SWID found - cannot fetch leagues")
             return
         }
         
+        DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Using SWID: \(swid)")
+        
         do {
-            // Use the saved credentials and selected year
+            // 🔥 FIX: Use the passed-in season parameter, not AppConstants
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Calling espnClient.fetchLeagues(userID: \(swid), season: \(season))")
             let leagues = try await espnClient.fetchLeagues(
                 userID: swid, 
-                season: AppConstants.ESPNLeagueYear
+                season: season
             )
+            
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Found \(leagues.count) leagues from API")
+            
+            if leagues.isEmpty {
+                DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: ⚠️ API returned 0 leagues - this might be normal if you have no ESPN leagues for season \(season)")
+            }
             
             let espnWrappers = leagues.map { league in
                 LeagueWrapper(
@@ -180,11 +194,15 @@ final class UnifiedLeagueManager {
             }
             
             // Remove old ESPN leagues and add new ones
+            let previousCount = allLeagues.filter { $0.source == .espn }.count
             allLeagues.removeAll { $0.source == .espn }
             allLeagues.append(contentsOf: espnWrappers)
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: Replaced \(previousCount) old leagues with \(espnWrappers.count) new leagues")
             
         } catch {
-            // Silent error handling
+            // 🔥 FIX: Log the actual error instead of silently swallowing it!
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: ❌ ERROR fetching leagues: \(error)")
+            DebugPrint(mode: .matchupLoading, "🔴 ESPN LEAGUES: ❌ Error details: \(error.localizedDescription)")
         }
     }
     

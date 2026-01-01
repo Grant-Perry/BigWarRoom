@@ -75,24 +75,40 @@ final class SleeperCredentialsManager {
         let season = UserDefaults.standard.string(forKey: seasonKey) ?? "2025"
         let leagues = UserDefaults.standard.stringArray(forKey: cachedLeaguesKey) ?? []
         
+        DebugPrint(mode: .sleeperAPI, "🟣 SleeperCredentialsManager.loadCredentials():")
+        DebugPrint(mode: .sleeperAPI, "   Loaded username from UserDefaults: '\(username)'")
+        DebugPrint(mode: .sleeperAPI, "   Loaded userID from UserDefaults: '\(userID)'")
+        DebugPrint(mode: .sleeperAPI, "   Loaded season: '\(season)'")
+        
         self.currentUsername = username
         self.currentUserID = userID
         self.selectedSeason = season
         self.cachedLeagues = leagues
         self.hasValidCredentials = !username.isEmpty || !userID.isEmpty
         
+        DebugPrint(mode: .sleeperAPI, "   hasValidCredentials: \(hasValidCredentials)")
     }
     
     /// Get current username or user ID for API calls
     func getUserIdentifier() -> String? {
-
+        DebugPrint(mode: .sleeperAPI, "🟣 getUserIdentifier() called:")
+        DebugPrint(mode: .sleeperAPI, "   currentUsername: '\(currentUsername)'")
+        DebugPrint(mode: .sleeperAPI, "   currentUserID: '\(currentUserID)'")
+        
         if !currentUsername.isEmpty {
+            DebugPrint(mode: .sleeperAPI, "   ✅ Returning username: '\(currentUsername)'")
             return currentUsername
         } else if !currentUserID.isEmpty {
+            DebugPrint(mode: .sleeperAPI, "   ✅ Returning userID: '\(currentUserID)'")
             return currentUserID
         }
-        // 🔥 FIX: Don't fallback to defaults - return nil if no credentials saved
-        // This forces proper credential setup instead of using hardcoded values
+        // 🔥 FALLBACK: Use AppConstants default for Gp if no credentials saved
+        // This ensures the app works out of the box for the original user
+        if let defaultUsername = [AppConstants.SleeperUser, AppConstants.GpSleeperUsername].first(where: { !$0.isEmpty }) {
+            DebugPrint(mode: .sleeperAPI, "   ⚠️ Using FALLBACK username: '\(defaultUsername)'")
+            return defaultUsername
+        }
+        DebugPrint(mode: .sleeperAPI, "   ❌ Returning NIL - no credentials found!")
         return nil
     }
     

@@ -192,7 +192,8 @@ private struct LeagueRowView: View {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService.shared
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -203,7 +204,9 @@ private struct LeagueRowView: View {
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
-        unifiedLeagueManager: unifiedLeagueManager
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService.shared,
+        choppedLeagueService: ChoppedLeagueService.shared
     )
     
     NavigationView {

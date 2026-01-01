@@ -2,9 +2,10 @@
 //  FantasyViewModel.swift
 //  BigWarRoom
 //
+//  🔥 PHASE 3 REFACTOR: Simplified ViewModel with extracted services
 //  Core ViewModel for Fantasy matchup data and operations
+//  NOW: Pure orchestration layer - business logic moved to services
 //
-// MARK: -> Fantasy ViewModel Core
 
 import Foundation
 import SwiftUI
@@ -13,9 +14,8 @@ import Observation
 @MainActor
 @Observable
 final class FantasyViewModel {
-    // MARK: -> 🔥 NO SINGLETON - Pure DI with @Observable
     
-    // MARK: -> 🔥 PHASE 3: @Observable State Properties (no @Published needed)
+    // MARK: - State Properties
     var matchups: [FantasyMatchup] = []
     var byeWeekTeams: [FantasyTeam] = []
     var selectedLeague: UnifiedLeagueManager.LeagueWrapper?
@@ -29,81 +29,66 @@ final class FantasyViewModel {
     var isLoadingChoppedData: Bool = false
     var hasActiveRosters: Bool = false
     var detectedAsChoppedLeague: Bool = false
-    var nflGameService: NFLGameDataService
     
-    // MARK: -> Instance tracking for debugging
-    private let instanceID = UUID().uuidString.prefix(8)
-    private static var instanceCount = 0 {
-        didSet {
-        }
-    }
-    
-    // MARK: -> Week Management (SSOT)
-    /// The week selection manager - SINGLE SOURCE OF TRUTH for all week data
-    private let weekManager = WeekSelectionManager.shared
-    
-    /// Public getter for selectedWeek - always use WeekSelectionManager
-    var selectedWeek: Int {
-        return weekManager.selectedWeek
-    }
-    
-    // Flag to disable auto-refresh when MatchupsHub is managing refreshes
-    var isControlledByMatchupsHub: Bool = false
-
-    // MARK: -> Team Identification
-    /// The authenticated user's team ID for the currently selected league
-    /// This ensures Mission Control shows the correct matchup every damn time
-    var myTeamID: String?
-
-    // Make nflWeekService publicly accessible for UI
-    private let nflWeekService: NFLWeekService
-    
-    // Public getter for UI access
-    var currentNFLWeek: Int {
-        return nflWeekService.currentWeek
-    }
-    
-    // MARK: -> ESPN Data Storage
+    // MARK: - ESPN Data Storage (for UI access)
     var espnTeamRecords: [Int: TeamRecord] = [:]
     var espnTeamNames: [Int: String] = [:]
-    var currentESPNLeague: ESPNLeague? = nil // For ESPN member name resolution
+    var currentESPNLeague: ESPNLeague? = nil
     
-    // MARK: -> Sleeper Data Storage
-    var sleeperLeagueSettings: [String: Any]? = nil
-    var sleeperLeague: SleeperLeague?  // 🔥 NEW: Store full Sleeper league for FAAB and other settings
-    var sleeperRosters: [SleeperRoster] = []  // 🔥 NEW: Store rosters for record and FAAB lookup
-    var playerStats: [String: [String: Double]] = [:]
+    // MARK: - Sleeper Data Storage (for UI access)
+    var sleeperLeague: SleeperLeague?
+    var sleeperRosters: [SleeperRoster] = []
     var rosterIDToManagerID: [Int: String] = [:]
     var userIDs: [String: String] = [:]
     var userAvatars: [String: URL] = [:]
     
-    // MARK: -> Picker Options
-    let availableWeeks = Array(1...18)
-    let availableYears = AppConstants.availableYears
+    // MARK: - Team Identification
+    var myTeamID: String?
     
-    // MARK: -> Dependencies (All Injected)
+    // MARK: - Control Flags
+    var isControlledByMatchupsHub: Bool = false
+    var sharedDraftRoomViewModel: DraftRoomViewModel?
+    
+    // MARK: - Instance Tracking
+    private let instanceID = UUID().uuidString.prefix(8)
+    private static var instanceCount = 0
+    
+    // MARK: - Week Management (SSOT)
+    private let weekManager = WeekSelectionManager.shared
+    
+    var selectedWeek: Int {
+        return weekManager.selectedWeek
+    }
+    
+    // MARK: - Dependencies (Injected)
     private let unifiedLeagueManager: UnifiedLeagueManager
     private let sleeperCredentials: SleeperCredentialsManager
     private let playerDirectoryStore: PlayerDirectoryStore
-    internal let matchupDataStore: MatchupDataStore // 🔥 PHASE 4: Internal for extensions
+    let nflGameService: NFLGameDataService
+    private let nflWeekService: NFLWeekService
     
-    var sharedDraftRoomViewModel: DraftRoomViewModel?
-    var refreshTimer: Timer?
+    // 🔥 PHASE 3: NEW service dependencies (internal for extensions)
+    internal let matchupDataStore: MatchupDataStore
+    internal let espnFantasyService: ESPNFantasyService
+    internal let sleeperFantasyService: SleeperFantasyService
+    internal let matchupMapperService: MatchupMapperService
     
-    // 🔥 PHASE 3: Replace Combine with observation task
+    // MARK: - Refresh Control
+    private var refreshTimer: Timer?
     private var observationTask: Task<Void, Never>?
-    
-    // MARK: -> Refresh control to prevent cascading
     private var isRefreshing = false
     
-    // MARK: -> Initialization with Full DI
+    // MARK: - Initialization
     init(
         matchupDataStore: MatchupDataStore,
         unifiedLeagueManager: UnifiedLeagueManager,
         sleeperCredentials: SleeperCredentialsManager,
         playerDirectoryStore: PlayerDirectoryStore,
         nflGameService: NFLGameDataService,
-        nflWeekService: NFLWeekService
+        nflWeekService: NFLWeekService,
+        espnFantasyService: ESPNFantasyService,
+        sleeperFantasyService: SleeperFantasyService,
+        matchupMapperService: MatchupMapperService
     ) {
         self.matchupDataStore = matchupDataStore
         self.unifiedLeagueManager = unifiedLeagueManager
@@ -111,13 +96,15 @@ final class FantasyViewModel {
         self.playerDirectoryStore = playerDirectoryStore
         self.nflGameService = nflGameService
         self.nflWeekService = nflWeekService
+        self.espnFantasyService = espnFantasyService
+        self.sleeperFantasyService = sleeperFantasyService
+        self.matchupMapperService = matchupMapperService
         
         Task { @MainActor in
             FantasyViewModel.instanceCount += 1
         }
         
-        setupAutoRefresh()
-        setupObservation() // 🔥 PHASE 3: Replace Combine subscriptions with observation
+        setupObservation()
         setupInitialNFLGameData()
     }
     
@@ -129,7 +116,8 @@ final class FantasyViewModel {
         }
     }
     
-    /// 🔥 PHASE 3: Replace Combine subscriptions with @Observable observation
+    // MARK: - Observation Setup
+    
     private func setupObservation() {
         observationTask = Task { @MainActor in
             var lastObservedWeek = weekManager.selectedWeek
@@ -141,9 +129,7 @@ final class FantasyViewModel {
                 if currentWeek != lastObservedWeek {
                     DebugPrint(mode: .weekCheck, "📊 FantasyViewModel \(instanceID): Week changed to \(currentWeek), refreshing data...")
                     
-                    // Prevent cascading refreshes
                     guard !isRefreshing else {
-                        DebugPrint(mode: .weekCheck, "📊 FantasyViewModel \(instanceID): Skipping refresh - already refreshing")
                         lastObservedWeek = currentWeek
                         try? await Task.sleep(for: .seconds(1))
                         continue
@@ -151,10 +137,8 @@ final class FantasyViewModel {
                     
                     isRefreshing = true
                     
-                    // Update NFL game data for the new week (non-blocking)
                     refreshNFLGameData()
                     
-                    // Refresh matchups for the new week (only if we have a selected league)
                     if selectedLeague != nil {
                         await fetchMatchups()
                     }
@@ -173,13 +157,17 @@ final class FantasyViewModel {
                     lastObservedYear = currentYear
                 }
                 
-                // Small delay to prevent excessive polling
                 try? await Task.sleep(for: .milliseconds(500))
             }
         }
     }
     
-    /// Setup initial NFL game data
+    // MARK: - NFL Game Data Management
+    
+    var currentNFLWeek: Int {
+        return nflWeekService.currentWeek
+    }
+    
     private func setupInitialNFLGameData() {
         let currentWeek = selectedWeek
         let currentYear = AppConstants.currentSeasonYearInt
@@ -194,7 +182,6 @@ final class FantasyViewModel {
         }
     }
     
-    /// Refresh NFL game data when week changes
     private func refreshNFLGameData() {
         let currentWeek = selectedWeek
         let currentYear = AppConstants.currentSeasonYearInt
@@ -202,27 +189,26 @@ final class FantasyViewModel {
         nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear, forceRefresh: true)
     }
     
-    /// Set the shared DraftRoomViewModel for manager name resolution
-    func setSharedDraftRoomViewModel(_ viewModel: DraftRoomViewModel) {
-        sharedDraftRoomViewModel = viewModel
-    }
-    
-    /// Enable/disable MatchupsHub control to prevent refresh conflicts
-    nonisolated func setMatchupsHubControl(_ enabled: Bool) {
-        Task { @MainActor in
-            self.isControlledByMatchupsHub = enabled
-            if enabled {
-                // Disable auto-refresh when hub is controlling
-                self.refreshTimer?.invalidate()
-            } else {
-                // Re-enable auto-refresh if it was enabled
-                self.setupAutoRefresh()
-            }
+    func setupNFLGameData() {
+        let currentWeek = selectedWeek
+        let currentYear = AppConstants.currentSeasonYearInt
+        
+        nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear)
+        
+        let calendar = Calendar.current
+        let weekday = calendar.component(.weekday, from: Date())
+        
+        if [1, 2, 5].contains(weekday) {
+            nflGameService.startLiveUpdates(forWeek: currentWeek, year: currentYear)
         }
     }
     
-    // MARK: -> League Selection
-    /// Set the connected league from War Room
+    // MARK: - League Management
+    
+    var availableLeagues: [UnifiedLeagueManager.LeagueWrapper] {
+        return unifiedLeagueManager.allLeagues
+    }
+    
     func selectLeague(_ league: UnifiedLeagueManager.LeagueWrapper) {
         selectedLeague = league
         clearAllData()
@@ -232,10 +218,7 @@ final class FantasyViewModel {
         }
     }
     
-    /// Set the connected league with explicit team ID for reliable identification
-    /// This method ensures Mission Control shows YOUR fucking matchup, not some random one
     func selectLeague(_ league: UnifiedLeagueManager.LeagueWrapper, myTeamID: String?) {
-        // Only update if it's a new league or we are refreshing the same league with team ID
         guard selectedLeague?.id != league.id || myTeamID != nil else {
             return
         }
@@ -251,71 +234,7 @@ final class FantasyViewModel {
         }
     }
     
-    /// Available leagues from UnifiedLeagueManager
-    var availableLeagues: [UnifiedLeagueManager.LeagueWrapper] {
-        return unifiedLeagueManager.allLeagues
-    }
-    
-    /// Clear all cached data
-    private func clearAllData() {
-        matchups = []
-        byeWeekTeams = []
-        errorMessage = nil
-        detectedAsChoppedLeague = false
-        hasActiveRosters = false
-        currentChoppedSummary = nil
-        // Don't clear myTeamID here - it's needed for reliable identification
-        
-        // Clear ESPN-specific data
-        espnTeamRecords.removeAll()
-        espnTeamNames.removeAll()
-        
-        // Clear Sleeper-specific data
-        sleeperLeagueSettings = nil
-        playerStats.removeAll()
-        rosterIDToManagerID.removeAll()
-        userIDs.removeAll()
-        userAvatars.removeAll()
-        sleeperRosters.removeAll()  // 🔥 NEW: Clear roster data
-    }
-    
-    // MARK: -> Auto Refresh Setup
-    /// Toggle auto refresh on/off
-    func toggleAutoRefresh() {
-        autoRefresh.toggle()
-        setupAutoRefresh()
-    }
-    
-    /// Setup auto refresh timer
-    private func setupAutoRefresh() {
-        refreshTimer?.invalidate()
-        
-        // 🔥 DISABLED: Removed competing timer - MatchupsHubViewModel handles all auto-refresh
-        // Individual ViewModels should not have their own refresh timers to prevent conflicts
-        // Only MatchupsHubViewModel should control the global refresh cycle
-    }
-    
-    // MARK: -> Week Selection (DEPRECATED - Now handled by WeekSelectionManager)
-    /// Show week selector sheet
-    func presentWeekSelector() {
-        showWeekSelector = true
-    }
-    
-    /// Hide week selector sheet
-    func dismissWeekSelector() {
-        showWeekSelector = false
-    }
-    
-    /// Select a specific week - NOW USES WeekSelectionManager
-    func selectWeek(_ week: Int) {
-        weekManager.selectWeek(week)
-        // No need to manually refresh - the observation will handle it
-    }
-    
-    // MARK: -> Load Leagues
-    /// Load available leagues on app start
     func loadLeagues() async {
-        // 🔥 FIX: Use dynamic Sleeper credentials instead of hardcoded AppConstants.GpSleeperID
         let sleeperUserID = sleeperCredentials.getUserIdentifier()
         
         await unifiedLeagueManager.fetchAllLeagues(
@@ -324,128 +243,91 @@ final class FantasyViewModel {
         )
     }
     
-    /// Initialize NFL game data for the current week
-    func setupNFLGameData() {
-        let currentWeek = selectedWeek
-        let currentYear = AppConstants.currentSeasonYearInt
+    private func clearAllData() {
+        matchups = []
+        byeWeekTeams = []
+        errorMessage = nil
+        detectedAsChoppedLeague = false
+        hasActiveRosters = false
+        currentChoppedSummary = nil
         
-        nflGameService.fetchGameData(forWeek: currentWeek, year: currentYear)
+        espnTeamRecords.removeAll()
+        espnTeamNames.removeAll()
+        currentESPNLeague = nil
         
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        
-        if [1, 2, 5].contains(weekday) {
-            nflGameService.startLiveUpdates(forWeek: currentWeek, year: currentYear)
+        rosterIDToManagerID.removeAll()
+        userIDs.removeAll()
+        userAvatars.removeAll()
+        sleeperRosters.removeAll()
+        sleeperLeague = nil
+    }
+    
+    // MARK: - Week Selection
+    
+    let availableWeeks = Array(1...18)
+    let availableYears = AppConstants.availableYears
+    
+    func presentWeekSelector() {
+        showWeekSelector = true
+    }
+    
+    func dismissWeekSelector() {
+        showWeekSelector = false
+    }
+    
+    func selectWeek(_ week: Int) {
+        weekManager.selectWeek(week)
+    }
+    
+    // MARK: - MatchupsHub Control
+    
+    nonisolated func setMatchupsHubControl(_ enabled: Bool) {
+        Task { @MainActor in
+            self.isControlledByMatchupsHub = enabled
+            if enabled {
+                self.refreshTimer?.invalidate()
+            }
         }
     }
     
-    // MARK: - ADD: ESPN Scoring Settings Helper
+    func setSharedDraftRoomViewModel(_ viewModel: DraftRoomViewModel) {
+        sharedDraftRoomViewModel = viewModel
+    }
     
-    /// Convert ESPN scoring settings to format usable by ScoreBreakdownFactory
+    // MARK: - ESPN Scoring Settings
+    
     func getESPNScoringSettings() -> [String: Double]? {
-        DebugPrint(mode: .espnAPI, "🐛 DEBUG: getESPNScoringSettings called")
-        
-        // 🔥 FIX: If currentESPNLeague is nil, try to fetch it from the selected league
         if currentESPNLeague == nil, let league = selectedLeague, league.source == .espn {
-            DebugPrint(mode: .espnAPI, "🐛 DEBUG: currentESPNLeague is nil, attempting to fetch ESPN league data")
             Task {
                 do {
                     let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
                     await MainActor.run {
                         self.currentESPNLeague = espnLeague
-                        DebugPrint(mode: .espnAPI, "🐛 DEBUG: Successfully fetched and stored ESPN league data")
                     }
                 } catch {
-                    DebugPrint(mode: .espnAPI, "🐛 DEBUG: Failed to fetch ESPN league data: \(error)")
+                    DebugPrint(mode: .espnAPI, "Failed to fetch ESPN league data: \(error)")
                 }
             }
-            // For now, return nil since the fetch is async
-            DebugPrint(mode: .espnAPI, "🐛 DEBUG: Initiated async fetch, returning nil for now")
             return nil
         }
         
         guard let espnLeague = currentESPNLeague else {
-            DebugPrint(mode: .espnAPI, "🐛 DEBUG: No currentESPNLeague - selectedLeague: \(selectedLeague?.source.rawValue ?? "nil")")
             return nil
         }
         
-        // 🔥 UPDATED: Check both root level and nested scoring settings
-        var scoringSettings: ESPNScoringSettings?
-        
-        // First try root level scoring settings
-        if let rootScoring = espnLeague.scoringSettings {
-            scoringSettings = rootScoring
-        }
-        // Then try nested scoring settings in league settings
-        else if let nestedScoring = espnLeague.settings?.scoringSettings {
-            scoringSettings = nestedScoring
-        } else {
-            return nil
-        }
-        
-        guard let finalScoringSettings = scoringSettings,
-              let scoringItems = finalScoringSettings.scoringItems else {
-            return nil
-        }
-        
-        var scoringMap: [String: Double] = [:]
-        
-        for item in scoringItems {
-            guard let statId = item.statId,
-                  let points = item.points else { 
-                continue 
-            }
-            
-            // 🔥 FIX: Use direct ESPN stat ID to Sleeper key mapping instead of display names
-            if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
-                scoringMap[sleeperKey] = points
-            }
-        }
-        
-        return scoringMap.isEmpty ? nil : scoringMap
+        return espnFantasyService.getScoringSettings(from: espnLeague)
     }
     
-    // 🔥 NEW: Synchronous ESPN scoring settings getter for immediate use
     func getESPNScoringSettingsSync() -> [String: Double]? {
         guard let espnLeague = currentESPNLeague else {
             return nil
         }
         
-        var scoringSettings: ESPNScoringSettings?
-        
-        if let rootScoring = espnLeague.scoringSettings {
-            scoringSettings = rootScoring
-        } else if let nestedScoring = espnLeague.settings?.scoringSettings {
-            scoringSettings = nestedScoring
-        } else {
-            return nil
-        }
-        
-        guard let finalScoringSettings = scoringSettings,
-              let scoringItems = finalScoringSettings.scoringItems else {
-            return nil
-        }
-        
-        var scoringMap: [String: Double] = [:]
-        
-        for item in scoringItems {
-            guard let statId = item.statId,
-                  let points = item.points else { 
-                continue 
-            }
-            
-            // Use direct ESPN stat ID to Sleeper key mapping
-            if let sleeperKey = ESPNStatIDMapper.statIdToSleeperKey[statId] {
-                scoringMap[sleeperKey] = points
-            }
-        }
-        
-        return scoringMap.isEmpty ? nil : scoringMap
+        return espnFantasyService.getScoringSettings(from: espnLeague)
     }
     
-    // 🔥 NEW: Method to ensure ESPN league data is loaded
     func ensureESPNLeagueDataLoaded() async {
-        guard let league = selectedLeague, 
+        guard let league = selectedLeague,
               league.source == .espn,
               currentESPNLeague == nil else {
             return

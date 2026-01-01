@@ -15,13 +15,14 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = .matchupLoading // [.liveUpdates, .matchupLoading] // .scoring // []
+   static var activeMode: DebugMode = [.matchupLoading] // [.liveUpdates, .matchupLoading] // .scoring // []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
 	  debugPrintIterations.removeAll()
    }
 }
+
 /// Debug mode flags - combine multiple modes to focus on specific areas
 struct DebugMode: OptionSet {
     let rawValue: Int
@@ -91,8 +92,6 @@ struct DebugMode: OptionSet {
     ]
 }
 
-
-
 // MARK: - Iteration Tracking
 
 /// Tracks how many times each debug statement has printed (by file:line)
@@ -137,6 +136,8 @@ func DebugPrint(
         return
     }
     
+    let fileName = (file as NSString).lastPathComponent
+    
     // Handle iteration limiting
     if limit > 0 {
         let key = "\(file):\(line)"
@@ -149,10 +150,10 @@ func DebugPrint(
         debugPrintIterations[key] = count + 1
         
         // Print with iteration info
-        let fileName = (file as NSString).lastPathComponent
         let iterInfo = "[\(count + 1)/\(limit)]"
+        NSLog("[\(fileName):\(line)] \(iterInfo) \(message())")
     } else {
         // Unlimited printing
-        let fileName = (file as NSString).lastPathComponent
+        NSLog("[\(fileName):\(line)] \(message())")
     }
 }

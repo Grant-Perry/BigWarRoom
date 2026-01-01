@@ -76,30 +76,62 @@ final class ESPNCredentialsManager {
         self.leagueTeamIDs = leagueTeamIDs
         self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
         
-        // x// x Print("✅ ESPN credentials saved successfully")
+        DebugPrint(mode: .matchupLoading, "✅ ESPN credentials saved successfully - \(leagueIDs.count) leagues")
     }
     
     /// Load saved ESPN credentials
     private func loadCredentials() {
         let swid = loadFromKeychain(key: swidKey) ?? ""
         let espnS2 = loadFromKeychain(key: espnS2Key) ?? ""
-        let leagueIDs = UserDefaults.standard.stringArray(forKey: leagueIDsKey) ?? []
+        var leagueIDs = UserDefaults.standard.stringArray(forKey: leagueIDsKey) ?? []
         let leagueTeamIDs = UserDefaults.standard.dictionary(forKey: leagueTeamIDsKey) as? [String: String] ?? [:]
         
-        self.currentSWID = swid
+        // 🔥 FIX: If league IDs are empty in UserDefaults, fallback to AppConstants for backward compatibility
+        if leagueIDs.isEmpty {
+            DebugPrint(mode: .matchupLoading, "⚠️ ESPN league IDs empty in UserDefaults - falling back to AppConstants")
+            leagueIDs = AppConstants.ESPNLeagueID
+            
+            // Save them to UserDefaults for next time
+            if !leagueIDs.isEmpty {
+                UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
+                DebugPrint(mode: .matchupLoading, "✅ Saved \(leagueIDs.count) ESPN league IDs to UserDefaults from AppConstants")
+            }
+        }
+        
+        // 🔥 FIX: If SWID/ESPN_S2 are empty in Keychain, fallback to AppConstants for backward compatibility
+        let finalSWID: String
+        let finalESPN_S2: String
+        
+        if swid.isEmpty {
+            DebugPrint(mode: .matchupLoading, "⚠️ ESPN SWID empty in Keychain - falling back to AppConstants")
+            finalSWID = AppConstants.SWID
+            // Save it to Keychain for next time
+            saveToKeychain(key: swidKey, value: finalSWID)
+        } else {
+            finalSWID = swid
+        }
+        
+        if espnS2.isEmpty {
+            DebugPrint(mode: .matchupLoading, "⚠️ ESPN_S2 empty in Keychain - falling back to AppConstants")
+            finalESPN_S2 = AppConstants.currentESPNToken
+            // Save it to Keychain for next time
+            saveToKeychain(key: espnS2Key, value: finalESPN_S2)
+        } else {
+            finalESPN_S2 = espnS2
+        }
+        
+        self.currentSWID = finalSWID
         self.leagueIDs = leagueIDs
         self.leagueTeamIDs = leagueTeamIDs
-        self.hasValidCredentials = !swid.isEmpty && !espnS2.isEmpty
+        self.hasValidCredentials = !finalSWID.isEmpty && !finalESPN_S2.isEmpty
         
         // 🔥 DEBUG: Log what we're loading
-        if AppConstants.debug {
-            // x Print("🔍 ESPNCredentialsManager loadCredentials:")
-            // x Print("   SWID: '\(swid.isEmpty ? "EMPTY" : "HAS_VALUE")'")
-            // x Print("   ESPN_S2: '\(espnS2.isEmpty ? "EMPTY" : "HAS_VALUE")'") 
-            // x Print("   League IDs: \(leagueIDs.count)")
-            // x Print("   Team IDs: \(leagueTeamIDs.count)")
-            // x Print("   hasValidCredentials: \(hasValidCredentials)")
-        }
+        DebugPrint(mode: .matchupLoading, "🔍 ESPNCredentialsManager loadCredentials:")
+        DebugPrint(mode: .matchupLoading, "   SWID: '\(finalSWID.isEmpty ? "EMPTY" : "HAS_VALUE")'")
+        DebugPrint(mode: .matchupLoading, "   ESPN_S2: '\(finalESPN_S2.isEmpty ? "EMPTY" : "HAS_VALUE")'")
+        DebugPrint(mode: .matchupLoading, "   League IDs: \(leagueIDs.count) - \(leagueIDs)")
+        DebugPrint(mode: .matchupLoading, "   Team IDs: \(leagueTeamIDs.count)")
+        DebugPrint(mode: .matchupLoading, "   hasValidCredentials: \(hasValidCredentials)")
     }
     
     /// Get current ESPN_S2 cookie
@@ -122,24 +154,21 @@ final class ESPNCredentialsManager {
     func setTeamID(_ teamID: String, for leagueID: String) {
         leagueTeamIDs[leagueID] = teamID
         UserDefaults.standard.set(leagueTeamIDs, forKey: leagueTeamIDsKey)
-        
     }
     
     /// Resolve and store team IDs for all configured leagues
     func resolveAllTeamIDs() async {
         guard hasValidCredentials, let apiClient = apiClient else { return }
         
-        
         for leagueID in leagueIDs {
             do {
                 if let teamID = try await apiClient.getCurrentUserMemberID(leagueID: leagueID) {
                     setTeamID(teamID, for: leagueID)
-                } else {
                 }
             } catch {
+                // Silent fail - team ID resolution is not critical
             }
         }
-        
     }
     
     /// Clear all ESPN credentials
@@ -147,14 +176,14 @@ final class ESPNCredentialsManager {
         deleteFromKeychain(key: swidKey)
         deleteFromKeychain(key: espnS2Key)
         UserDefaults.standard.removeObject(forKey: leagueIDsKey)
-        UserDefaults.standard.removeObject(forKey: leagueTeamIDsKey) // Clear team IDs too
+        UserDefaults.standard.removeObject(forKey: leagueTeamIDsKey)
         
         currentSWID = ""
         leagueIDs = []
         leagueTeamIDs = [:]
         hasValidCredentials = false
         
-        // x// x Print("🗑️ ESPN credentials cleared")
+        DebugPrint(mode: .matchupLoading, "🗑️ ESPN credentials cleared")
     }
     
     /// Validate credentials by attempting a test API call
@@ -168,10 +197,10 @@ final class ESPNCredentialsManager {
         do {
             // Use the injected API client to test credentials
             let league = try await apiClient.fetchLeague(leagueID: firstLeagueID)
-            // x// x Print("✅ ESPN credentials validation successful: \(league.name)")
+            DebugPrint(mode: .matchupLoading, "✅ ESPN credentials validation successful: \(league.name)")
             return true
         } catch {
-            // x// x Print("❌ ESPN credentials validation failed: \(error)")
+            DebugPrint(mode: .matchupLoading, "❌ ESPN credentials validation failed: \(error)")
             return false
         }
     }
@@ -183,7 +212,7 @@ final class ESPNCredentialsManager {
         leagueIDs.append(leagueID)
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
         
-        // x// x Print("➕ Added ESPN league ID: \(leagueID)")
+        DebugPrint(mode: .matchupLoading, "➕ Added ESPN league ID: \(leagueID)")
     }
     
     /// Remove a league ID from the saved list
@@ -191,7 +220,7 @@ final class ESPNCredentialsManager {
         leagueIDs.removeAll { $0 == leagueID }
         UserDefaults.standard.set(leagueIDs, forKey: leagueIDsKey)
         
-        // x// x Print("➖ Removed ESPN league ID: \(leagueID)")
+        DebugPrint(mode: .matchupLoading, "➖ Removed ESPN league ID: \(leagueID)")
     }
     
     // MARK: - Keychain Helpers
@@ -213,7 +242,7 @@ final class ESPNCredentialsManager {
         let status = SecItemAdd(query as CFDictionary, nil)
         
         if status != errSecSuccess {
-            // x// x Print("❌ Failed to save \(key) to Keychain: \(status)")
+            DebugPrint(mode: .matchupLoading, "❌ Failed to save \(key) to Keychain: \(status)")
         }
     }
     

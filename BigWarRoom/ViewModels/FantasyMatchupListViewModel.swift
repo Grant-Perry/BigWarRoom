@@ -58,8 +58,6 @@ final class FantasyMatchupListViewModel {
     func setSharedDraftRoomViewModel(_ draftRoomViewModel: DraftRoomViewModel) {
         self.draftRoomViewModel = draftRoomViewModel
         fantasyViewModel.setSharedDraftRoomViewModel(draftRoomViewModel)
-        
-        // 🔥 REMOVED: No longer need to initialize our own instance
     }
     
     // MARK: - Smart Mode Detection

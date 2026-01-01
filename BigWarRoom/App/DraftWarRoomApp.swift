@@ -13,7 +13,7 @@ struct DraftWarRoomApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var lifecycleManager = AppLifecycleManager.shared
     
-    // 🔥 PHASE 5: Store all dependencies for pure DI
+    // 🔥 Store all dependencies for pure DI
     @State private var appContainer: AppContainer
     
     init() {
@@ -105,6 +105,17 @@ final class AppContainer {
     let bettingOddsService: BettingOddsService
     let oprKService: OPRKService
     
+    // 🔥 NEW: Playoff Elimination Service (DRY)
+    let playoffEliminationService: PlayoffEliminationService
+    
+    // 🔥 NEW: Chopped League Service (DRY)
+    let choppedLeagueService: ChoppedLeagueService
+    
+    // 🔥 PHASE 3: NEW Fantasy Services (DRY)
+    let espnFantasyService: ESPNFantasyService
+    let sleeperFantasyService: SleeperFantasyService
+    let matchupMapperService: MatchupMapperService
+    
     // App Management
     let appInitManager: AppInitializationManager
     let centralizedLoader: CentralizedAppLoader
@@ -180,6 +191,35 @@ final class AppContainer {
         
         self.oprKService = OPRKService()
         
+        // MARK: - 🔥 NEW: Playoff Elimination Service (DRY)
+        self.playoffEliminationService = PlayoffEliminationService(
+            sleeperAPIClient: sleeperAPIClient,
+            espnAPIClient: espnAPIClient
+        )
+        PlayoffEliminationService.setSharedInstance(playoffEliminationService)
+        
+        // MARK: - 🔥 NEW: Chopped League Service (DRY)
+        self.choppedLeagueService = ChoppedLeagueService(
+            sleeperAPIClient: sleeperAPIClient,
+            sharedStatsService: sharedStatsService,
+            weekSelectionManager: weekSelectionManager,
+            seasonYearManager: seasonYearManager
+        )
+        ChoppedLeagueService.setSharedInstance(choppedLeagueService)
+        
+        // MARK: - 🔥 PHASE 3: Fantasy Services (DRY)
+        self.espnFantasyService = ESPNFantasyService(
+            apiClient: espnAPIClient,
+            gameStatusService: gameStatusService
+        )
+        
+        self.sleeperFantasyService = SleeperFantasyService(
+            gameStatusService: gameStatusService,
+            playerDirectoryStore: playerDirectory
+        )
+        
+        self.matchupMapperService = MatchupMapperService()
+        
         // MARK: - 🔥 PHASE 5: MatchupDataStore with DI
         let unifiedLeagueManagerForStore = UnifiedLeagueManager(
             sleeperClient: sleeperAPIClient,
@@ -191,7 +231,8 @@ final class AppContainer {
             unifiedLeagueManager: unifiedLeagueManagerForStore,
             sharedStatsService: sharedStatsService,
             gameStatusService: gameStatusService,
-            weekSelectionManager: weekSelectionManager
+            weekSelectionManager: weekSelectionManager,
+            playoffEliminationService: playoffEliminationService
         )
         
         // MARK: - 🔥 PHASE 5: MatchupsHubViewModel with DI
@@ -203,10 +244,12 @@ final class AppContainer {
             sharedStatsService: sharedStatsService,
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService,
-            unifiedLeagueManager: unifiedLeagueManagerForStore
+            unifiedLeagueManager: unifiedLeagueManagerForStore,
+            playoffEliminationService: playoffEliminationService,
+            choppedLeagueService: choppedLeagueService
         )
         
-        // MARK: - 🔥 PHASE 5: FantasyViewModel with DI
+        // MARK: - 🔥 PHASE 3: FantasyViewModel with new services (DRY)
         let unifiedLeagueManagerForFantasy = UnifiedLeagueManager(
             sleeperClient: SleeperAPIClient(),
             espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
@@ -219,7 +262,10 @@ final class AppContainer {
             sleeperCredentials: sleeperCredentials,
             playerDirectoryStore: playerDirectory,
             nflGameService: nflGameDataService,
-            nflWeekService: nflWeekService
+            nflWeekService: nflWeekService,
+            espnFantasyService: espnFantasyService,
+            sleeperFantasyService: sleeperFantasyService,
+            matchupMapperService: matchupMapperService
         )
         
         // MARK: - AllLivePlayersViewModel with DI
@@ -349,9 +395,9 @@ struct SpinningOrbsLoadingScreen: View {
                         .foregroundColor(loadingProgress >= 1.0 ? .green.opacity(0.8) : .white.opacity(0.8))
                         .opacity(textOpacity)
 
-				   Spacer()
+                    Spacer()
 
-					  // 🔥 VERSION TEXT
+                    // 🔥 VERSION TEXT
                     Text("Version: \(AppConstants.getVersion())")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.white.opacity(0.7))
@@ -359,7 +405,7 @@ struct SpinningOrbsLoadingScreen: View {
                         .padding(.top, 20)
 
                     Text("Copyright © \(String(Calendar.current.component(.year, from: Date()))) Cre8vPlanet Studios. All rights reserved.")
-					  .font(.system(size: 10, weight: .regular))
+                        .font(.system(size: 10, weight: .regular))
                         .foregroundColor(.white.opacity(0.7))
                         .opacity(textOpacity)
                         .padding(.bottom, 40)
@@ -398,7 +444,9 @@ struct SpinningOrbsLoadingScreen: View {
             await loadLeagues()
             
             await updateProgress(0.6, "Loading matchup data...")
+            DebugPrint(mode: .matchupLoading, "🔥 LOADING SCREEN: About to call loadAllMatchups()")
             await loadMatchups()
+            DebugPrint(mode: .matchupLoading, "🔥 LOADING SCREEN: loadAllMatchups() returned - matchup count: \(matchupsHubViewModel.myMatchups.count)")
             
             await updateProgress(0.8, "Processing players...")
             await loadPlayers()

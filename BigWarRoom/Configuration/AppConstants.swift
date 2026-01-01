@@ -2,7 +2,11 @@ import SwiftUI
 
 /// Global application constants and feature flags.
 struct AppConstants {
+    // 🔥 DYNAMIC: User can override the season year in settings, but defaults to calculated NFL season
+    @AppStorage("selectedESPNYear") private static var _overrideSeasonYear: String?
+    
     // 🔥 FIXED: Default to current NFL season (2025), not calendar year
+    // Add validation to prevent future years during active NFL season
     @AppStorage("selectedESPNYear") static var ESPNLeagueYear: String = "2025"
     
     // Dynamic debug mode - can be toggled in settings
@@ -70,16 +74,47 @@ struct AppConstants {
     }
 
     // MARK: -> Current Season Year (SSOT)
-    /// Get the current season year - now requires dependency injection instead of singleton
-    /// NOTE: This will need to be updated in Phase 3 when we wire up dependency injection
-    /// For now, keeping ESPNLeagueYear as the source of truth
+    /// Get the current NFL season year dynamically based on calendar date
+    /// NFL season runs September through August of the following year
+    /// Example: January 2026 = 2025 NFL season, September 2026 = 2026 NFL season
+    /// Users can manually override this in settings
     static var currentSeasonYear: String {
-        return ESPNLeagueYear
+        // If user has manually set a year in settings, use that
+        if let override = _overrideSeasonYear {
+            return override
+        }
+        // Otherwise, calculate dynamically
+        return calculateCurrentNFLSeason()
     }
     
     /// Get the current season year as Int for API calls
     static var currentSeasonYearInt: Int {
-        return Int(ESPNLeagueYear) ?? 2025
+        return Int(currentSeasonYear) ?? calculateCurrentNFLSeasonInt()
+    }
+    
+    /// Dynamically calculate the current NFL season year based on calendar date
+    /// - Returns: The current NFL season year as a String
+    private static func calculateCurrentNFLSeason() -> String {
+        return String(calculateCurrentNFLSeasonInt())
+    }
+    
+    /// Dynamically calculate the current NFL season year as Int
+    private static func calculateCurrentNFLSeasonInt() -> Int {
+        let now = Date()
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: now)
+        let currentMonth = calendar.component(.month, from: now)
+        
+        // NFL season logic:
+        // September (9) through December (12) = Current calendar year's season
+        // January (1) through August (8) = Previous calendar year's season
+        if currentMonth >= 9 {
+            // Sep-Dec: Current year's NFL season
+            return currentYear
+        } else {
+            // Jan-Aug: Previous year's NFL season
+            return currentYear - 1
+        }
     }
     
     // MARK: -> ESPN Token Management (Updated to use SSOT)

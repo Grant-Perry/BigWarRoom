@@ -407,9 +407,6 @@ final class ChoppedTeamRosterViewModel {
     
     /// Load weekly player stats for detailed breakdown display
     private func loadPlayerStats() async {
-        // 🔥 REMOVED: Allow reloading stats if needed
-        // guard playerStats.isEmpty else { return }
-        
         let currentYear = AppConstants.currentSeasonYearInt
         
         guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }

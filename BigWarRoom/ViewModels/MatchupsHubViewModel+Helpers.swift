@@ -16,9 +16,28 @@ extension MatchupsHubViewModel {
         return WeekSelectionManager.shared.selectedWeek
     }
     
-    /// Get current year as string
+    /// Get current NFL season year (NOT calendar year)
+    /// January 2026 = 2025 NFL season (since season started Sep 2025)
     internal func getCurrentYear() -> String {
-        return String(Calendar.current.component(.year, from: Date()))
+        // Check if user manually set a season year in Settings
+        if !AppConstants.ESPNLeagueYear.isEmpty {
+            return AppConstants.ESPNLeagueYear
+        }
+        
+        // Otherwise, calculate current NFL season
+        let now = Date()
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: now)
+        let currentMonth = calendar.component(.month, from: now)
+        
+        // NFL season logic:
+        // September (9) through December (12) = Current calendar year's season
+        // January (1) through August (8) = Previous calendar year's season
+        if currentMonth >= 9 {
+            return String(currentYear)
+        } else {
+            return String(currentYear - 1)
+        }
     }
     
     // MARK: - 💊 RX Optimization Status Helpers

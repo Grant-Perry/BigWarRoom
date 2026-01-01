@@ -419,7 +419,8 @@ struct ByeWeekImpactItem: Identifiable {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService.shared
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -430,7 +431,9 @@ struct ByeWeekImpactItem: Identifiable {
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
-        unifiedLeagueManager: unifiedLeagueManager
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService.shared,
+        choppedLeagueService: ChoppedLeagueService.shared
     )
     
     ZStack {

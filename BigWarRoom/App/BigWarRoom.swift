@@ -121,7 +121,8 @@ struct BigWarRoom: View {
             unifiedLeagueManager: unifiedLeagueManager,
             sharedStatsService: sharedStatsService!,
             gameStatusService: gameStatusService!,
-            weekSelectionManager: weekSelectionManager!
+            weekSelectionManager: weekSelectionManager!,
+            playoffEliminationService: PlayoffEliminationService.shared
         )
         
         // 7. ViewModels with dependencies
@@ -133,17 +134,35 @@ struct BigWarRoom: View {
             sharedStatsService: sharedStatsService!,
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService!,
-            unifiedLeagueManager: unifiedLeagueManager
+            unifiedLeagueManager: unifiedLeagueManager,
+            playoffEliminationService: PlayoffEliminationService.shared,
+            choppedLeagueService: ChoppedLeagueService.shared
         )
         
         // Create FantasyViewModel with dependencies
+        // 🔥 PHASE 3: New fantasy services for DRY code
+        let espnFantasyService = ESPNFantasyService(
+            apiClient: espnAPIClient,
+            gameStatusService: gameStatusService!
+        )
+        
+        let sleeperFantasyService = SleeperFantasyService(
+            gameStatusService: gameStatusService!,
+            playerDirectoryStore: playerDirectory!
+        )
+        
+        let matchupMapperService = MatchupMapperService()
+        
         fantasyViewModel = FantasyViewModel(
             matchupDataStore: matchupDataStore,
             unifiedLeagueManager: unifiedLeagueManager,
             sleeperCredentials: sleeperCredentials!,
             playerDirectoryStore: playerDirectory!,
             nflGameService: nflGameDataService!,
-            nflWeekService: nflWeekService!
+            nflWeekService: nflWeekService!,
+            espnFantasyService: espnFantasyService,
+            sleeperFantasyService: sleeperFantasyService,
+            matchupMapperService: matchupMapperService
         )
         
         // Create AllLivePlayersViewModel with dependencies

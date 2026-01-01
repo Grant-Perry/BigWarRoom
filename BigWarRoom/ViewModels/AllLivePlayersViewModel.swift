@@ -33,22 +33,22 @@ final class AllLivePlayersViewModel {
     var filteredPlayers: [LivePlayerEntry] = []
     var selectedPosition: PlayerPosition = .all
     var isLoading = false
-    var isUpdating = false // 🔥 NEW: Track live update state for animation
+    var isUpdating = false
     var errorMessage: String?
     var dataState: DataLoadingState = .initial
     
     // MARK: - UI State
     var sortHighToLow = true
     var sortingMethod: SortingMethod = .score
-    var showActiveOnly: Bool = true // 🔥 SMART DEFAULT: Will be set to false if no live games on initial load
-    var hasAppliedInitialActiveOnlyDefault = false // 🔥 Track if we've applied smart default
+    var showActiveOnly: Bool = true
+    var hasAppliedInitialActiveOnlyDefault = false
     var shouldResetAnimations = false
     var sortChangeID = UUID()
     var lastUpdateTime = Date()
     var searchText: String = ""
     var isSearching: Bool = false
-    var showRosteredOnly: Bool = false // Changed to checkbox approach
-    var allNFLPlayers: [SleeperPlayer] = [] // For All Players search
+    var showRosteredOnly: Bool = false
+    var allNFLPlayers: [SleeperPlayer] = []
     
     // MARK: - Computed Statistics
     var topScore: Double = 0.0
@@ -72,14 +72,6 @@ final class AllLivePlayersViewModel {
     // MARK: - Internal State (not published)
     internal var debounceTask: Task<Void, Never>?
     internal var isBatchingUpdates = false
-    
-    /// 🔥 REMOVED: No longer needed - using proper observation
-    // internal var lastProcessedMatchupUpdate = Date.distantPast
-    
-    /// 🔥 REMOVED: Polling observation task - replaced with reactive observation
-    // private var observationTask: Task<Void, Never>?
-    
-    // 🔥 NEW: Auto-refresh timer for live player data (every 15 seconds during games)
     internal var refreshTimer: Timer?
     var autoRefreshEnabled = true
     
@@ -99,25 +91,13 @@ final class AllLivePlayersViewModel {
         self.sharedStatsService = sharedStatsService
         self.weekSelectionManager = weekSelectionManager
         self.nflGameDataService = nflGameDataService
-        // 🔥 REMOVED: No more timers or polling
-        // setupAutoRefresh()
-        // setupObservation()
     }
     
     // MARK: - Cleanup
     @MainActor
     deinit {
         debounceTask?.cancel()
-        // 🔥 REMOVED: No more polling to clean up
-        // observationTask?.cancel()
-        // refreshTimer?.invalidate()
     }
-    
-    /// 🔥 REMOVED: Polling observation - now using proper @Observable reactivity
-    // private func setupObservation() { ... }
-    
-    /// 🔥 REMOVED: Auto-refresh timer - MatchupsHub handles refresh cycle
-    // private func setupAutoRefresh() { ... }
 }
 
 // MARK: - Core Enums and Types
@@ -148,7 +128,7 @@ extension AllLivePlayersViewModel {
         case score = "Score"
         case name = "Name"
         case team = "Team"
-        case recent = "Recent Activity" // 🔥 NEW: Recent Activity sort
+        case recent = "Recent Activity"
 
         var id: String { rawValue }
         var displayName: String { rawValue }
@@ -166,14 +146,9 @@ extension AllLivePlayersViewModel {
         let matchup: UnifiedMatchup
         let performanceTier: PerformanceTier
         
-        // 🔥 NEW: Activity tracking for recent sort
         var lastActivityTime: Date?
         var previousScore: Double?
-        var accumulatedDelta: Double    // Sticky delta for pill, survives refreshes
-        
-        // 🔥 REMOVED: These are now on FantasyPlayer model itself!
-        // Access via: playerEntry.player.injuryStatus
-        // Access via: playerEntry.player.jerseyNumber
+        var accumulatedDelta: Double
 
         var scoreBarWidth: Double {
             let minBarWidth: Double = 0.08
@@ -186,16 +161,14 @@ extension AllLivePlayersViewModel {
         var playerName: String { player.fullName }
         var currentScoreString: String { String(format: "%.2f", currentScore) }
         
-        // 🔥 NEW: Check if player had recent activity
         var hasRecentActivity: Bool {
             guard let activityTime = lastActivityTime else { return false }
-            return Date().timeIntervalSince(activityTime) < 300 // 5 minutes
+            return Date().timeIntervalSince(activityTime) < 300
         }
         
-        // 🔥 NEW: Check if score changed (for activity tracking)
         var scoreChanged: Bool {
             guard let previous = previousScore else { return false }
-            return abs(currentScore - previous) > 0.01 // Account for floating point precision
+            return abs(currentScore - previous) > 0.01
         }
     }
     
@@ -225,7 +198,6 @@ extension AllLivePlayersViewModel {
     
     /// Main entry point for refreshing data
     func refresh() async {
-        // 🔥 NO THROTTLING: Always fetch fresh data from APIs
         DebugPrint(mode: .liveUpdates, "🔄 AUTO-REFRESH: Performing background live update")
         await performLiveUpdate()
     }
@@ -249,7 +221,6 @@ extension AllLivePlayersViewModel {
 extension AllLivePlayersViewModel {
     /// Resets all player previousScore to current score, clearing all per-player deltas
     func resetAllPlayerDeltas() {
-        // Update allPlayers with previousScore set to currentScore
         allPlayers = allPlayers.map { entry in
             LivePlayerEntry(
                 id: entry.id,
@@ -268,7 +239,6 @@ extension AllLivePlayersViewModel {
             )
         }
         
-        // Also update filteredPlayers
         filteredPlayers = filteredPlayers.map { entry in
             LivePlayerEntry(
                 id: entry.id,
@@ -302,8 +272,6 @@ extension AllLivePlayersViewModel {
     }
     
     var hasNoLeagues: Bool {
-        // Only consider it "no leagues" if we've finished loading and still have nothing
-        // Don't show "no leagues" during initial loading
         let isCurrentlyLoading = {
             switch dataState {
             case .loading:

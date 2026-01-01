@@ -59,8 +59,10 @@ final class MatchupsHubViewModel {
    private let playerDirectory: PlayerDirectoryStore
    private let gameStatusService: GameStatusService
    private let sharedStatsService: SharedStatsService
-   internal let matchupDataStore: MatchupDataStore  // 🔥 CHANGED: Make internal for extensions
+   internal let matchupDataStore: MatchupDataStore
    internal let gameDataService: NFLGameDataService
+   internal let playoffEliminationService: PlayoffEliminationService
+   internal let choppedLeagueService: ChoppedLeagueService
 
 	  // 🔥 PHASE 3: Replace Combine with observation task
    private var observationTask: Task<Void, Never>?
@@ -100,17 +102,20 @@ final class MatchupsHubViewModel {
 	  sharedStatsService: SharedStatsService,
 	  matchupDataStore: MatchupDataStore,
 	  gameDataService: NFLGameDataService,
-	  unifiedLeagueManager: UnifiedLeagueManager  // ✅ NEW PARAMETER
+	  unifiedLeagueManager: UnifiedLeagueManager,
+	  playoffEliminationService: PlayoffEliminationService,
+	  choppedLeagueService: ChoppedLeagueService
    ) {
 	  self.espnCredentials = espnCredentials
 	  self.sleeperCredentials = sleeperCredentials
 	  self.playerDirectory = playerDirectory
 	  self.gameStatusService = gameStatusService
 	  self.sharedStatsService = sharedStatsService
-	  self.matchupDataStore = matchupDataStore  // 🔥 NEW: Store reference
+	  self.matchupDataStore = matchupDataStore
 	  self.gameDataService = gameDataService
-
-	  self.unifiedLeagueManager = unifiedLeagueManager  // ✅ ASSIGN THE PASSED INSTANCE
+	  self.unifiedLeagueManager = unifiedLeagueManager
+	  self.playoffEliminationService = playoffEliminationService
+	  self.choppedLeagueService = choppedLeagueService
 
 	  setupAutoRefresh()
 	  setupCredentialObservation()

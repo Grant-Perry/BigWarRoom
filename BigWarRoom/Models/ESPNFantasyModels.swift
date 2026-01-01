@@ -12,7 +12,7 @@ import Foundation
 /// Main ESPN Fantasy response structure
 struct ESPNFantasyLeagueModel: Codable {
     let teams: [ESPNFantasyTeamModel]
-    let schedule: [ESPNFantasyMatchupModel]?  // 🔥 FIXED: Optional to handle eliminated playoff teams
+    let schedule: [ESPNScheduleEntry]?
 }
 
 /// ESPN Fantasy Team
@@ -169,15 +169,33 @@ extension ESPNFantasyTeamModel {
     }
     
     private func sortOrder(_ lineupSlotId: Int) -> Int {
-        switch lineupSlotId {
-        case 0: return 0 // QB
-        case 2, 3: return 1 // RB
-        case 4, 5: return 2 // WR
-        case 6: return 3 // TE
-        case 23: return 4 // FLEX
-        case 16: return 5 // D/ST
-        case 17: return 6 // K
-        default: return 7 // Others
-        }
+        // Standard fantasy football position order
+        let order: [Int: Int] = [
+            0: 0,   // QB
+            2: 1,   // RB1
+            3: 2,   // RB2
+            4: 3,   // WR1
+            5: 4,   // WR2
+            6: 5,   // TE
+            23: 6,  // FLEX
+            16: 7,  // D/ST
+            17: 8   // K
+        ]
+        return order[lineupSlotId] ?? 99
     }
+}
+
+// MARK: - ESPN Schedule Entry
+
+struct ESPNScheduleEntry: Codable {
+    let matchupPeriodId: Int
+    let away: ESPNMatchupTeam?
+    let home: ESPNMatchupTeam
+    let winner: String?
+    let playoffTierType: String?
+}
+
+struct ESPNMatchupTeam: Codable {
+    let teamId: Int
+    let totalPoints: Double?
 }
