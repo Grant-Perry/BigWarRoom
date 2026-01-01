@@ -106,7 +106,7 @@ extension AllLivePlayersViewModel {
         applyPositionFilter()
     }
     
-    // MARK: - Core Filtering Logic
+    // MARK: - Core Filtering Logic (🔥 DRY: Uses PlayerFilteringService + PlayerSortingService)
     
     internal func applyPositionFilter() {
         guard !allPlayers.isEmpty else {
@@ -119,24 +119,20 @@ extension AllLivePlayersViewModel {
         // If searching, handle two different flows
         if isSearching {
             if showRosteredOnly {
-                // ROSTERED ONLY SEARCH: Filter existing league players by search terms
-                players = allPlayers.filter { livePlayer in
-                    return playerNameMatches(livePlayer.playerName, searchQuery: searchText)
-                }
-                
-                // IMPORTANT: Don't apply any other filters when doing rostered search
-                // Skip to the final steps to preserve the search results
+                // ROSTERED ONLY SEARCH: Use service for filtering
+                players = PlayerFilteringService.shared.filterBySearchText(allPlayers, searchText: searchText)
             } else {
                 // FULL NFL SEARCH: Search all NFL players and create search entries
                 guard !allNFLPlayers.isEmpty else {
-                    // If NFL players not loaded yet, show empty state
                     filteredPlayers = []
                     return
                 }
                 
-                let matchingNFLPlayers = allNFLPlayers.filter { player in
-                    return sleeperPlayerMatches(player, searchQuery: searchText)
-                }.prefix(50)
+                // 🔥 DRY: Use service for Sleeper player search
+                let matchingNFLPlayers = PlayerFilteringService.shared.filterSleeperPlayers(
+                    allNFLPlayers,
+                    searchText: searchText
+                ).prefix(50)
                 
                 // Convert to LivePlayerEntry format for display
                 guard let templateMatchup = allPlayers.first?.matchup else {
@@ -180,32 +176,13 @@ extension AllLivePlayersViewModel {
                 }
             }
         } else {
-            // Apply normal filters when not searching
-            
-            // Step 1: Position filter
-            players = selectedPosition == .all ?
-                allPlayers :
-                allPlayers.filter { $0.position.uppercased() == selectedPosition.rawValue }
-
-            // Step 2: Active-only filter (SIMPLIFIED)
-            if showActiveOnly {
-                players = players.filter { player in
-                    // 🔥 PHASE 4 DI: Use method instead of computed property
-                    return player.player.isInActiveGame(gameDataService: nflGameDataService)
-                }
-            }
-        }
-        
-        // Step 3: Basic quality filter - BUT SKIP if doing rostered search to preserve results
-        if !(isSearching && showRosteredOnly) {
-            players = players.filter { player in
-                // Keep players with valid names and reasonable data
-                let hasValidName = !player.playerName.trimmingCharacters(in: .whitespaces).isEmpty
-                let isNotUnknown = player.player.fullName != "Unknown Player"
-                let hasReasonableData = player.currentScore >= 0.0 // Allow 0.0 scores
-                
-                return hasValidName && isNotUnknown && hasReasonableData
-            }
+            // 🔥 DRY: Use service for all filtering
+            players = PlayerFilteringService.shared.applyFilters(
+                to: allPlayers,
+                selectedPosition: selectedPosition,
+                showActiveOnly: showActiveOnly,
+                gameDataService: nflGameDataService
+            )
         }
 
         guard !players.isEmpty else {
@@ -214,15 +191,22 @@ extension AllLivePlayersViewModel {
             return
         }
 
-        // Step 4: Calculate position-specific statistics
+        // 🔥 DRY: Use PlayerStatisticsService for calculations
         let positionScores = players.map { $0.currentScore }.sorted(by: >)
         positionTopScore = positionScores.first ?? 1.0
-        let positionQuartiles = calculateQuartiles(from: positionScores)
+        let positionQuartiles = PlayerStatisticsService.shared.calculateQuartiles(from: positionScores)
 
-        // Step 5: Update players with position-relative percentages and tiers
+        // Update players with position-relative percentages and tiers
         let updatedPlayers = players.map { entry in
-            let percentage = calculateScaledPercentage(score: entry.currentScore, topScore: positionTopScore)
-            let tier = determinePerformanceTier(score: entry.currentScore, quartiles: positionQuartiles)
+            let percentage = PlayerStatisticsService.shared.calculateScaledPercentage(
+                score: entry.currentScore,
+                topScore: positionTopScore,
+                useAdaptiveScaling: useAdaptiveScaling
+            )
+            let tier = PlayerStatisticsService.shared.determinePerformanceTier(
+                score: entry.currentScore,
+                quartiles: positionQuartiles
+            )
 
             return LivePlayerEntry(
                 id: entry.id,
@@ -241,106 +225,16 @@ extension AllLivePlayersViewModel {
             )
         }
 
-        // Step 6: Apply sorting
-        let sorted = sortPlayers(updatedPlayers)
-        filteredPlayers = []
-        filteredPlayers = sorted
+        // 🔥 DRY: Use PlayerSortingService for sorting
+        filteredPlayers = PlayerSortingService.shared.sortPlayers(
+            updatedPlayers,
+            by: sortingMethod,
+            highToLow: sortHighToLow
+        )
     }
     
-    // MARK: - Sorting Logic
-    
-    private func sortPlayers(_ players: [LivePlayerEntry]) -> [LivePlayerEntry] {
-        let sortedPlayers: [LivePlayerEntry]
-
-        switch sortingMethod {
-        case .position:
-            sortedPlayers = sortHighToLow ?
-                players.sorted { positionPriority($0.position) < positionPriority($1.position) } :
-                players.sorted { positionPriority($0.position) > positionPriority($1.position) }
-            
-        case .score:
-            // Sort by score, with position order as secondary sort (tiebreaker)
-            sortedPlayers = sortHighToLow ?
-                players.sorted { player1, player2 in
-                    if player1.currentScore != player2.currentScore {
-                        return player1.currentScore > player2.currentScore
-                    }
-                    // Secondary sort by position priority when scores are equal
-                    return positionPriority(player1.position) < positionPriority(player2.position)
-                } :
-                players.sorted { player1, player2 in
-                    if player1.currentScore != player2.currentScore {
-                        return player1.currentScore < player2.currentScore
-                    }
-                    // Secondary sort by position priority when scores are equal
-                    return positionPriority(player1.position) < positionPriority(player2.position)
-                }
-
-        case .name:
-            // Simplified name sorting - no special handling
-            sortedPlayers = sortHighToLow ?
-                players.sorted { extractLastName($0.playerName) < extractLastName($1.playerName) } :
-                players.sorted { extractLastName($0.playerName) > extractLastName($1.playerName) }
-
-        case .team:
-            sortedPlayers = sortHighToLow ?
-                players.sorted { player1, player2 in
-                    let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
-                    let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
-
-                    if team1 != team2 {
-                        return team1 < team2
-                    }
-                    return positionPriority(player1.position) < positionPriority(player2.position)
-                } :
-                players.sorted { player1, player2 in
-                    let team1 = player1.teamName.isEmpty ? "ZZZ" : player1.teamName.uppercased()
-                    let team2 = player2.teamName.isEmpty ? "ZZZ" : player2.teamName.uppercased()
-
-                    if team1 != team2 {
-                        return team1 > team2
-                    }
-                    return positionPriority(player1.position) < positionPriority(player2.position)
-                }
-                
-        case .recent:
-            sortedPlayers = players.sorted { player1, player2 in
-                let time1 = player1.lastActivityTime ?? Date.distantPast
-                let time2 = player2.lastActivityTime ?? Date.distantPast
-                
-                if time1 != time2 {
-                    return time1 > time2 // Most recent first
-                }
-                
-                // Secondary sort by score
-                return player1.currentScore > player2.currentScore
-            }
-        }
-
-        return sortedPlayers
-    }
-    
-    // MARK: - Sorting Helpers
-    
-    private func extractLastName(_ fullName: String) -> String {
-        let components = fullName.components(separatedBy: " ")
-        return components.last ?? fullName
-    }
-
-    private func positionPriority(_ position: String) -> Int {
-        // Order: QB, RB, WR, TE, Flex, Super Flex, D/ST, K
-        switch position.uppercased() {
-        case "QB": return 1
-        case "RB": return 2
-        case "WR": return 3
-        case "TE": return 4
-        case "FLEX", "W/R/T": return 5
-        case "SUPERFLEX", "SUPER FLEX", "SF", "Q/W/R/T": return 6
-        case "DEF", "DST", "D/ST": return 7
-        case "K": return 8
-        default: return 9
-        }
-    }
+    // MARK: - REMOVED: All sorting logic moved to PlayerSortingService
+    // MARK: - REMOVED: All helper methods moved to PlayerFilteringService
     
     // MARK: - Animation Control
     
@@ -351,76 +245,5 @@ extension AllLivePlayersViewModel {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             self.shouldResetAnimations = false
         }
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Smart name matching that handles apostrophes properly - FIXED VERSION  
-    private func playerNameMatches(_ playerName: String, searchQuery: String) -> Bool {
-        // Don't force any capitalization - keep everything lowercase for matching
-        let query = searchQuery.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let name = playerName.lowercased()
-        
-        guard !query.isEmpty else { return false }
-        
-        // Split both query and name by spaces for flexible matching
-        let queryTerms = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        let nameComponents = name.components(separatedBy: .whitespaces)
-        let firstName = nameComponents.first ?? ""
-        let lastName = nameComponents.last ?? ""
-        
-        // For each query term, check if ANY name field contains it
-        for queryTerm in queryTerms {
-            let termFound = name.contains(queryTerm) || 
-                          firstName.contains(queryTerm) || 
-                          lastName.contains(queryTerm)
-            
-            if termFound {
-                return true  // If any term matches, player matches
-            }
-        }
-        
-        return false
-    }
-    
-    /// Smart name matching for SleeperPlayer objects - FIXED VERSION
-    private func sleeperPlayerMatches(_ player: SleeperPlayer, searchQuery: String) -> Bool {
-        // Don't force any capitalization - keep everything lowercase for matching
-        let query = searchQuery.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard !query.isEmpty else { return false }
-        
-        let fullName = player.fullName.lowercased()
-        let shortName = player.shortName.lowercased()  
-        let firstName = player.firstName?.lowercased() ?? ""
-        let lastName = player.lastName?.lowercased() ?? ""
-        
-        // Split query by spaces for flexible matching
-        let queryTerms = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-        
-        // For each query term, check if ANY name field contains it
-        for queryTerm in queryTerms {
-            let termFound = fullName.contains(queryTerm) || 
-                          shortName.contains(queryTerm) || 
-                          firstName.contains(queryTerm) || 
-                          lastName.contains(queryTerm)
-            
-            if termFound {
-                return true  // If any term matches, player matches
-            }
-        }
-        
-        return false
-    }
-    
-    /// Get all Sleeper IDs of players on my rosters
-    private func getMyRosterSleeperIDs() -> Set<String> {
-        var ids = Set<String>()
-        for matchup in allPlayers {
-            if let sleeperID = matchup.player.sleeperID {
-                ids.insert(sleeperID)
-            }
-        }
-        return ids
     }
 }

@@ -294,7 +294,7 @@ final class ChoppedTeamRosterViewModel {
     
     /// Sort players using DRY logic
     func sortPlayers(_ players: [FantasyPlayer], by sortingMethod: MatchupSortingMethod, highToLow: Bool) -> [FantasyPlayer] {
-        return PlayerSortingService.sortPlayers(
+        return PlayerSortingService.shared.sortFantasyPlayers(
             players, 
             by: sortingMethod, 
             highToLow: highToLow,
