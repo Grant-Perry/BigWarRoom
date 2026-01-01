@@ -1,4 +1,4 @@
-   //
+//
    //  Color+Ext.swift
    //  howFar Watch App
    //
@@ -197,24 +197,35 @@ extension Color {
    }
 
    func interpolated(with color: Color, by factor: Double) -> Color {
-	  let factor = max(0, min(1, factor)) // Clamp factor between 0 and 1
+      let factor = max(0, min(1, factor)) // Clamp factor between 0 and 1
 
-		 // Convert SwiftUI Colors to UIColors for easier interpolation
-	  let uiColor1 = UIColor(self)
-	  let uiColor2 = UIColor(color)
+         // Convert SwiftUI Colors to UIColors for easier interpolation
+      let uiColor1 = UIColor(self)
+      let uiColor2 = UIColor(color)
 
-	  var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-	  var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+      var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+      var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
 
-	  uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-	  uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+      uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+      uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
 
-	  let r = r1 + (r2 - r1) * factor
-	  let g = g1 + (g2 - g1) * factor
-	  let b = b1 + (b2 - b1) * factor
-	  let a = a1 + (a2 - a1) * factor
+      let r = r1 + (r2 - r1) * factor
+      let g = g1 + (g2 - g1) * factor
+      let b = b1 + (b2 - b1) * factor
+      let a = a1 + (a2 - a1) * factor
 
-	  return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: Double(a))
+      return Color(.sRGB, red: Double(r), green: Double(g), blue: Double(b), opacity: Double(a))
+   }
+   
+   // 🔥 DRY: Moved from DraftWarRoomApp.swift
+   /// Get RGB components of color for interpolation and manipulation
+   var components: (red: Double, green: Double, blue: Double, alpha: Double) {
+       let uiColor = UIColor(self)
+       var red: CGFloat = 0
+       var green: CGFloat = 0
+       var blue: CGFloat = 0
+       var alpha: CGFloat = 0
+       uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+       return (Double(red), Double(green), Double(blue), Double(alpha))
    }
 }
-

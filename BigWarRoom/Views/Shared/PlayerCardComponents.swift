@@ -167,53 +167,7 @@ enum ImageBorderStyle {
     case custom(Color, CGFloat) // Custom color and width
 }
 
-/// **Image Styling View Modifier**
-struct ImageStylingModifier: ViewModifier {
-    let configuration: PlayerImageConfiguration
-    
-    // 🔥 DRY: Use centralized ColorThemeService
-    private let colorService = ColorThemeService.shared
-    
-    func body(content: Content) -> some View {
-        switch configuration.borderStyle {
-        case .none:
-            content.clipShape(Circle())
-            
-        case .position(let position):
-            content
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(
-                            colorService.positionColor(for: position).opacity(0.6),
-                            lineWidth: 2
-                        )
-                )
-                
-        case .team(let team):
-            content
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(team.primaryColor.opacity(0.6), lineWidth: 2)
-                )
-                
-        case .custom(let color, let width):
-            content
-                .clipShape(Circle())
-                .overlay(
-                    Circle()
-                        .stroke(color, lineWidth: width)
-                )
-        }
-    }
-}
-
-extension View {
-    func applyImageStyling(configuration: PlayerImageConfiguration) -> some View {
-        self.modifier(ImageStylingModifier(configuration: configuration))
-    }
-}
+// MARK: - REMOVED: ImageStylingModifier moved to /Extensions/View+Extensions.swift
 
 /// **Unified Position Badge**
 /// **Standardized position badges across all card types**

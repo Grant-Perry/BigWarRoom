@@ -292,32 +292,7 @@ final class AsyncTaskService {
     }
 }
 
-// MARK: - View Extensions
-
-extension View {
-    /// Execute async task when view appears
-    func asyncOnAppear(
-        id: String? = nil,
-        priority: TaskPriority = .userInitiated,
-        _ operation: @escaping @MainActor () async throws -> Void
-    ) -> some View {
-        self.onAppear {
-            AsyncTaskService.shared.run(id: id, priority: priority, operation)
-        }
-    }
-    
-    /// Execute debounced async task
-    func asyncDebounced(
-        id: String,
-        delay: TimeInterval = 0.5,
-        priority: TaskPriority = .userInitiated,
-        _ operation: @escaping @MainActor () async throws -> Void
-    ) -> some View {
-        self.onChange(of: id) { _, _ in
-            AsyncTaskService.shared.debounce(id: id, delay: delay, priority: priority, operation)
-        }
-    }
-}
+// MARK: - REMOVED: View Extensions moved to /Extensions/View+Extensions.swift
 
 // MARK: - Observable Object Extension
 

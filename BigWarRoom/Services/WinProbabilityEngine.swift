@@ -152,12 +152,3 @@ final class WinProbabilityEngine {
         return 0.5 * (1.0 + sign * y)
     }
 }
-
-// MARK: - SwiftUI View Extension
-
-extension View {
-    /// Access win probability engine from any view
-    var winProbabilityEngine: WinProbabilityEngine {
-        WinProbabilityEngine.shared
-    }
-}
