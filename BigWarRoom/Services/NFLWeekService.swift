@@ -30,11 +30,11 @@ final class NFLWeekService {
     init(apiClient: SleeperAPIClient) {
         self.apiClient = apiClient
         
-        // Start with simple fallback (don't try to be smart about Tuesday/Wednesday)
-        currentYear = String(Calendar.current.component(.year, from: Date()))
+        // Start with NFL fiscal year fallback (will be updated by Sleeper API)
+        currentYear = String(NFLWeekCalculator.getCurrentSeasonYear())
         currentWeek = 1 // Default fallback if API hasn't loaded yet
         
-        DebugPrint(mode: .weekCheck, "📅 NFLWeekService.init: Initialized with fallback week \(currentWeek), waiting for Sleeper API...")
+        DebugPrint(mode: .weekCheck, "📅 NFLWeekService.init: Initialized with fallback week \(currentWeek), year \(currentYear), waiting for Sleeper API...")
         
         // Fetch real data immediately - Sleeper API is SSOT
         Task {

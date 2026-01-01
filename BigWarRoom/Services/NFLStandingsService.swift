@@ -223,7 +223,7 @@ final class NFLStandingsService {
             
             // Prefer ESPN standings flags (clincher/eliminated + playoff seed) for playoff status.
             // Fallback to our calculation only if the standings endpoint fails.
-            let selectedYear = Int(SeasonYearManager.shared.selectedYear) ?? Calendar.current.component(.year, from: Date())
+            let selectedYear = Int(SeasonYearManager.shared.selectedYear) ?? NFLWeekCalculator.getCurrentSeasonYear()
             let espnStatusMap = await self.fetchPlayoffStatusMapFromESPNStandings(season: selectedYear)
             
             // Fetch individual team records
@@ -468,7 +468,7 @@ final class NFLStandingsService {
     
     /// Fetch single team record (now includes playoff status)
     private func fetchSingleTeamRecord(teamCode: String, teamId: String, playoffStatusMap: [String: PlayoffStatus]) async -> (String, NFLTeamRecord?) {
-        let currentYear = Calendar.current.component(.year, from: Date())
+        let currentYear = NFLWeekCalculator.getCurrentSeasonYear()
         // 🔥 FIXED: Add season and seasontype parameters
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?season=\(currentYear)&seasontype=2") else {
             return (teamCode, nil)

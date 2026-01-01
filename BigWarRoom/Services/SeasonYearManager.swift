@@ -51,10 +51,17 @@ final class SeasonYearManager {
     
     // MARK: - Initialization
     init() {
-        // 🔥 FIXED: Default to current NFL season (2025)
-        // Check if user has a saved preference, otherwise use 2025
+        // 🔥 FIXED: Default to current NFL FISCAL season year (Sep-Aug logic)
+        // Check if user has a saved preference, otherwise calculate current NFL season
         let savedYear = AppConstants.ESPNLeagueYear
-        self.selectedYear = (savedYear == "2024") ? "2025" : savedYear
+        let currentNFLYear = String(NFLWeekCalculator.getCurrentSeasonYear())
+        
+        // Use saved year if valid, otherwise use calculated NFL season year
+        if availableYears.contains(savedYear) {
+            self.selectedYear = savedYear
+        } else {
+            self.selectedYear = currentNFLYear
+        }
         
         // Ensure AppConstants matches
         if AppConstants.ESPNLeagueYear != self.selectedYear {
@@ -85,6 +92,12 @@ final class SeasonYearManager {
     var isCurrentCalendarYear: Bool {
         let currentYear = Calendar.current.component(.year, from: Date())
         return selectedYearInt == currentYear
+    }
+    
+    /// Check if we're viewing the current NFL season year (uses fiscal year logic)
+    var isCurrentNFLSeasonYear: Bool {
+        let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
+        return selectedYearInt == currentNFLYear
     }
     
     /// Get ESPN token for current selected year

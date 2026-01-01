@@ -14,7 +14,7 @@ final class ESPNFantasyViewModel {
     // MARK: - Observable Properties
     var espnFantasyModel: ESPNFantasyLeagueModel?
     var selectedLeagueID: String = ""
-    var selectedYear: String = String(Calendar.current.component(.year, from: Date())) // FIXED: Use current year dynamically
+    var selectedYear: String = String(NFLWeekCalculator.getCurrentSeasonYear()) // Use NFL fiscal year
     var isLoading: Bool = false
     var errorMessage: String? = nil
     var availableLeagues: [ESPNLeagueResponse] = []

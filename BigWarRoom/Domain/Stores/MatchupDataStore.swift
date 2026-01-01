@@ -68,7 +68,7 @@ final class MatchupDataStore {
             let key = LeagueKey(
                 leagueID: league.id,
                 platform: league.platform,
-                seasonYear: String(Calendar.current.component(.year, from: Date())),
+                seasonYear: String(NFLWeekCalculator.getCurrentSeasonYear()),
                 week: week
             )
             
@@ -139,7 +139,7 @@ final class MatchupDataStore {
         let key = LeagueKey(
             leagueID: id.leagueID,
             platform: id.platform,
-            seasonYear: String(Calendar.current.component(.year, from: Date())),
+            seasonYear: String(NFLWeekCalculator.getCurrentSeasonYear()),
             week: id.week
         )
         
@@ -191,7 +191,7 @@ final class MatchupDataStore {
         let key = LeagueKey(
             leagueID: id.leagueID,
             platform: id.platform,
-            seasonYear: String(Calendar.current.component(.year, from: Date())),
+            seasonYear: String(NFLWeekCalculator.getCurrentSeasonYear()),
             week: id.week
         )
         return leagueCaches[key]?.matchups[id]
@@ -282,7 +282,7 @@ final class MatchupDataStore {
     
     /// Get current year as string
     private func getCurrentYear() -> String {
-        return String(Calendar.current.component(.year, from: Date()))
+        return String(NFLWeekCalculator.getCurrentSeasonYear())
     }
     
     /// Create league wrapper from LeagueSummary (needed for provider creation)

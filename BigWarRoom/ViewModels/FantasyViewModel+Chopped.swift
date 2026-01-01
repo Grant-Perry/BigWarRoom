@@ -120,7 +120,7 @@ extension FantasyViewModel {
         }
         
         // Create a LeagueMatchupProvider for this Chopped league
-        let currentYear = String(Calendar.current.component(.year, from: Date()))
+        let currentYear = String(NFLWeekCalculator.getCurrentSeasonYear())
         let provider = LeagueMatchupProvider(
             league: leagueWrapper,
             week: week,

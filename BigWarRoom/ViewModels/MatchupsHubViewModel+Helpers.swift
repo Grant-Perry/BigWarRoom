@@ -18,7 +18,7 @@ extension MatchupsHubViewModel {
     
     /// Get current year as string
     internal func getCurrentYear() -> String {
-        return String(Calendar.current.component(.year, from: Date()))
+        return String(NFLWeekCalculator.getCurrentSeasonYear())
     }
     
     // MARK: - 💊 RX Optimization Status Helpers

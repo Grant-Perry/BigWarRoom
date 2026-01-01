@@ -610,7 +610,7 @@ struct FantasyDetailHeaderView: View {
             name: leagueName,
             status: .inSeason,
             sport: "nfl",
-            season: Calendar.current.component(.year, from: Date()).description,
+            season: NFLWeekCalculator.getCurrentSeasonYear().description,
             seasonType: "regular",
             totalRosters: 0,
             draftID: nil,

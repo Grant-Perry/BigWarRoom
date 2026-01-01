@@ -73,7 +73,7 @@ final class ProjectedPointsManager {
         
         // Try to get from Sleeper ID
         if let sleeperID = player.sleeperID {
-            let currentYear = String(Calendar.current.component(.year, from: Date()))
+            let currentYear = String(NFLWeekCalculator.getCurrentSeasonYear())
             let currentWeek = weekManager.selectedWeek
             
             DebugPrint(mode: .liveUpdates, "🎯 API CALL: Fetching projection for \(player.fullName) (Sleeper ID: \(sleeperID))")

@@ -230,7 +230,7 @@ extension FantasyViewModel {
                 id: "\(leagueID)_\(matchupID)_\(week)",
                 leagueID: leagueID,
                 week: week,
-                year: String(Calendar.current.component(.year, from: Date())),
+                year: String(NFLWeekCalculator.getCurrentSeasonYear()),
                 homeTeam: team1,
                 awayTeam: team2,
                 status: .live,

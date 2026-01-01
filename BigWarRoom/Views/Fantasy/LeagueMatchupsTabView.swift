@@ -492,7 +492,7 @@ struct LeagueMatchupsTabView: View {
     private func fetchNeighborMatchupsInBackground() async {
         // 🔥 FIX: Use the week from the starting matchup, not NFLWeekService.currentWeek
         let matchupWeek = startingMatchup.week
-        let currentYear = String(Calendar.current.component(.year, from: Date()))
+        let currentYear = String(NFLWeekCalculator.getCurrentSeasonYear())
         let provider = LeagueMatchupProvider(
             league: league,
             week: matchupWeek,
@@ -551,7 +551,7 @@ struct LeagueMatchupsTabView: View {
         // 🔥 FIX: Use the week from the starting matchup, not NFLWeekService.currentWeek
         isLoadingAllMatchups = true
         let matchupWeek = startingMatchup.week
-        let currentYear = String(Calendar.current.component(.year, from: Date()))
+        let currentYear = String(NFLWeekCalculator.getCurrentSeasonYear())
         let provider = LeagueMatchupProvider(
             league: league,  // 🔥 Use passed-in league
             week: matchupWeek,
