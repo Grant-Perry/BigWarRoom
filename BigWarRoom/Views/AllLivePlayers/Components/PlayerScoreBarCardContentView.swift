@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Main content view for PlayerScoreBarCardView - CLEAN ARCHITECTURE
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -22,6 +23,9 @@ struct PlayerScoreBarCardContentView: View {
     
     @State private var showingScoreBreakdown = false
     @State private var isLoadingOverlayVisible = false
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     // 🔥 SSOT: Projected scores for win probability thermometer (matches Matchups Hub)
     @State private var myProjected: Double = 0.0
@@ -97,17 +101,17 @@ struct PlayerScoreBarCardContentView: View {
                             let deltaValue = playerEntry.accumulatedDelta
                             Text(String(format: "%+.2f", deltaValue))
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(deltaValue >= 0 ? .gpGreen : .gpRedPink)
+                                .foregroundColor(colorService.deltaColor(for: deltaValue))
                                 .lineLimit(1)
                                 .fixedSize(horizontal: true, vertical: false)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 2)
                                 .background(
                                     Capsule()
-                                        .fill((deltaValue >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.2))
+                                        .fill(colorService.deltaColor(for: deltaValue).opacity(0.2))
                                         .overlay(
                                             Capsule()
-                                                .stroke((deltaValue >= 0 ? Color.gpGreen : Color.gpRedPink).opacity(0.5), lineWidth: 1)
+                                                .stroke(colorService.deltaColor(for: deltaValue).opacity(0.5), lineWidth: 1)
                                         )
                                 )
                         }
@@ -242,7 +246,7 @@ struct PlayerScoreBarCardContentView: View {
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(positionColor)
+                            .fill(colorService.positionColor(for: playerEntry.position))
                     )
             }
             .padding(.top, 6)
@@ -377,7 +381,7 @@ struct PlayerScoreBarCardContentView: View {
     private var matchupDeltaColor: Color {
         // Regular matchup
         if let diff = playerEntry.matchup.scoreDifferential {
-            return diff >= 0 ? .gpGreen : .gpRedPink
+            return colorService.deltaColor(for: diff)
         }
         
         // Chopped league - green if above cutoff, red if below
@@ -386,22 +390,10 @@ struct PlayerScoreBarCardContentView: View {
            let choppedSummary = playerEntry.matchup.choppedSummary {
             let myScore = ranking.team.currentScore ?? 0
             let cutoff = choppedSummary.cutoffScore
-            return myScore >= cutoff ? .gpGreen : .gpRedPink
+            return colorService.deltaColor(for: myScore - cutoff)
         }
         
         return .secondary
-    }
-    
-    private var positionColor: Color {
-        switch playerEntry.position.uppercased() {
-        case "QB": return .red
-        case "RB": return .blue
-        case "WR": return .green
-        case "TE": return .orange
-        case "K": return .yellow
-        case "D/ST", "DEF": return .purple
-        default: return .gray
-        }
     }
     
     // 🔥 NEW: Get Sleeper player data for injury status - REMOVED DEBUG
@@ -602,12 +594,15 @@ struct CompactWinThermometer: View {
     let winProbability: Double
     let isWinning: Bool
     
+    // 🔥 DRY: Use ColorThemeService for win probability colors
+    private let colorService = ColorThemeService.shared
+    
     var body: some View {
         VStack(spacing: 2) {
             // Win percentage text
             Text("\(Int(winProbability * 100))%")
                 .font(.system(size: 10, weight: .bold))
-                .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
+                .foregroundColor(colorService.winProbabilityColor(for: winProbability))
             
             // Thermometer bar
             GeometryReader { geometry in
@@ -619,7 +614,7 @@ struct CompactWinThermometer: View {
                     
                     // Fill bar
                     RoundedRectangle(cornerRadius: 2)
-                        .fill(isWinning ? Color.gpGreen : Color.gpRedPink)
+                        .fill(colorService.winProbabilityColor(for: winProbability))
                         .frame(width: geometry.size.width * CGFloat(winProbability), height: 4)
                         .animation(.easeInOut(duration: 0.5), value: winProbability)
                 }

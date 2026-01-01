@@ -5,27 +5,21 @@
 //  🔥 PHASE 2 DRY REFACTOR: Shared player card components library
 //  Extracts commonly used patterns from multiple player card variants
 //  Smart DRY approach - consolidate shared logic, preserve domain-specific layouts
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
 
 // MARK: - Shared Player Card Components
 
-/// **Unified Position Color System**
-/// **Used across all player card variants for consistent position theming**
+/// **Unified Position Color System - DEPRECATED**
+/// **Use ColorThemeService.shared instead**
 struct PlayerCardPositionColorSystem {
     
     /// **Get position color consistently across all card types**
     static func color(for position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return Color(red: 0.6, green: 0.3, blue: 0.9) // Purple
-        case "RB": return Color(red: 0.2, green: 0.8, blue: 0.4) // Green
-        case "WR": return Color(red: 0.3, green: 0.6, blue: 1.0) // Blue
-        case "TE": return Color(red: 1.0, green: 0.6, blue: 0.2) // Orange
-        case "K": return Color(red: 0.7, green: 0.7, blue: 0.7) // Gray
-        case "DEF", "DST", "D/ST": return Color(red: 0.9, green: 0.3, blue: 0.3) // Red
-        default: return Color(red: 0.6, green: 0.6, blue: 0.6) // Default Gray
-        }
+        // 🔥 DRY: Delegate to ColorThemeService
+        return ColorThemeService.shared.positionColor(for: position)
     }
     
     /// **Get position color with opacity**
@@ -177,6 +171,9 @@ enum ImageBorderStyle {
 struct ImageStylingModifier: ViewModifier {
     let configuration: PlayerImageConfiguration
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
+    
     func body(content: Content) -> some View {
         switch configuration.borderStyle {
         case .none:
@@ -188,7 +185,7 @@ struct ImageStylingModifier: ViewModifier {
                 .overlay(
                     Circle()
                         .stroke(
-                            PlayerCardPositionColorSystem.color(for: position).opacity(0.6),
+                            colorService.positionColor(for: position).opacity(0.6),
                             lineWidth: 2
                         )
                 )
@@ -253,6 +250,9 @@ struct PositionBadgeConfiguration {
     let backgroundColor: Color
     let shape: BadgeShapeType
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private static let colorService = ColorThemeService.shared
+    
     init(
         position: String,
         displayText: String? = nil,
@@ -269,7 +269,7 @@ struct PositionBadgeConfiguration {
         self.fontWeight = fontWeight
         self.horizontalPadding = horizontalPadding
         self.verticalPadding = verticalPadding
-        self.backgroundColor = backgroundColor ?? PlayerCardPositionColorSystem.color(for: position)
+        self.backgroundColor = backgroundColor ?? Self.colorService.positionColor(for: position)
         self.shape = shape
     }
     
@@ -408,9 +408,12 @@ struct PickNumberConfiguration {
 /// **Standardized gradient patterns for consistent theming**
 struct PlayerCardGradientSystem {
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private static let colorService = ColorThemeService.shared
+    
     /// **Position-based gradient**
     static func positionGradient(for position: String) -> LinearGradient {
-        let positionColor = PlayerCardPositionColorSystem.color(for: position)
+        let positionColor = colorService.positionColor(for: position)
         
         return LinearGradient(
             gradient: Gradient(stops: [

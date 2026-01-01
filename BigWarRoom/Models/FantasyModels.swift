@@ -21,7 +21,7 @@ struct SleeperMatchup: Codable {
     /// Projected points formatted
     var projectedPointsString: String {
         guard let projected_points = projected_points else { return "0.00" }
-        return String(format: "%.2f", projected_points)
+        return FormattingService.formatPrecise(projected_points)
     }
 }
 
@@ -66,7 +66,7 @@ struct FantasyMatchup: Identifiable {
     /// Win probability as percentage string
     var winProbabilityString: String {
         guard let prob = winProbability else { return "50.0" }
-        return String(format: "%.1f", prob * 100)
+        return FormattingService.formatPercentageFromWhole(prob * 100, includeSymbol: false)
     }
     
     /// Away team win probability
@@ -77,7 +77,7 @@ struct FantasyMatchup: Identifiable {
     
     /// Away win probability as percentage string
     var awayWinProbabilityString: String {
-        return String(format: "%.1f", awayWinProbability * 100)
+        return FormattingService.formatPercentageFromWhole(awayWinProbability * 100, includeSymbol: false)
     }
 }
 
@@ -134,13 +134,13 @@ struct FantasyTeam: Identifiable, Codable {
     /// Current score formatted
     var currentScoreString: String {
         guard let score = currentScore else { return "0.00" }
-        return String(format: "%.2f", score)
+        return FormattingService.formatPrecise(score)
     }
     
     /// Projected score formatted  
     var projectedScoreString: String {
         guard let score = projectedScore else { return "0.00" }
-        return String(format: "%.2f", score)
+        return FormattingService.formatPrecise(score)
     }
     
     /// Calculate number of players yet to play for this team
@@ -192,10 +192,7 @@ struct TeamRecord: Codable {
     
     /// Record display string (e.g., "8-3-1")
     var displayString: String {
-        if let ties = ties, ties > 0 {
-            return "\(wins)-\(losses)-\(ties)"
-        }
-        return "\(wins)-\(losses)"
+        return FormattingService.formatRecord(wins: wins, losses: losses, ties: ties)
     }
 }
 
@@ -353,13 +350,13 @@ struct FantasyPlayer: Identifiable, Codable {
     /// Current points formatted
     var currentPointsString: String {
         guard let points = currentPoints else { return "0.00" }
-        return String(format: "%.2f", points)
+        return FormattingService.formatPrecise(points)
     }
     
     /// Projected points formatted
     var projectedPointsString: String {
         guard let points = projectedPoints else { return "0.00" }
-        return String(format: "%.2f", points)
+        return FormattingService.formatPrecise(points)
     }
     
     /// NFL team color (for player card backgrounds)
@@ -404,9 +401,7 @@ struct GameStatus: Codable {
             return "FINAL"
         case "pregame", "pre":
             if let startTime = startTime {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "h:mm a"
-                return formatter.string(from: startTime)
+                return FormattingService.formatGameTime(startTime)
             }
             return "SOON"
         default:
@@ -480,33 +475,22 @@ struct FantasyTeamRanking: Identifiable {
     
     /// Weekly points formatted
     var weeklyPointsString: String {
-        return String(format: "%.2f", weeklyPoints)
+        return FormattingService.formatPrecise(weeklyPoints)
     }
     
     /// Rank display (e.g., "1st", "2nd", "3rd")
     var rankDisplay: String {
-        let suffix: String
-        switch rank {
-        case 1: suffix = "st"
-        case 2: suffix = "nd" 
-        case 3: suffix = "rd"
-        default: suffix = "th"
-        }
-        return "\(rank)\(suffix)"
+        return FormattingService.formatOrdinal(rank)
     }
     
     /// Survival probability as percentage
     var survivalPercentage: String {
-        return String(format: "%.0f%%", survivalProbability * 100)
+        return FormattingService.formatPercentageFromWhole(survivalProbability * 100, includeSymbol: true)
     }
     
     /// Points from safety line display
     var safetyMarginDisplay: String {
-        if pointsFromSafety >= 0 {
-            return "+\(String(format: "%.1f", pointsFromSafety))"
-        } else {
-            return String(format: "%.1f", pointsFromSafety)
-        }
+        return FormattingService.formatDelta(pointsFromSafety)
     }
 }
 
@@ -646,7 +630,7 @@ struct EliminationEvent: Identifiable {
     }
     
     var marginDisplay: String {
-        return String(format: "%.2f pts", margin)
+        return "\(FormattingService.formatPrecise(margin)) pts"
     }
 }
 

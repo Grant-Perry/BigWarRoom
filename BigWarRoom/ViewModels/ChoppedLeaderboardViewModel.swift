@@ -75,19 +75,19 @@ final class ChoppedLeaderboardViewModel {
     /// Format elimination line score for display (only if week started)
     var eliminationLineDisplay: String {
         guard hasWeekStarted else { return "--" }
-        return String(format: "%.1f", choppedSummary.cutoffScore)
+        return FormattingService.formatPoints(choppedSummary.cutoffScore)
     }
     
     /// Format average score for display (only if week started)
     var averageScoreDisplay: String {
         guard hasWeekStarted else { return "--" }
-        return String(format: "%.1f", choppedSummary.averageScore)
+        return FormattingService.formatPoints(choppedSummary.averageScore)
     }
     
     /// Format top score for display (only if week started)
     var topScoreDisplay: String {
         guard hasWeekStarted else { return "--" }
-        return String(format: "%.1f", choppedSummary.highestScore)
+        return FormattingService.formatPoints(choppedSummary.highestScore)
     }
     
     /// Get week status display
@@ -166,26 +166,14 @@ final class ChoppedLeaderboardViewModel {
     /// Your rank display (e.g., "1ST", "2ND", "3RD")
     var myRankDisplay: String {
         guard let myTeam = myTeamRanking else { return "?" }
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .ordinal
-        
-        // Ensure rank is treated as NSNumber for the formatter
-        let rankNumber = NSNumber(value: myTeam.rank)
-        
-        // Format and make uppercase to match the UI style
-        if let formattedRank = formatter.string(from: rankNumber) {
-            return formattedRank.uppercased()
-        }
-        
-        // Fallback for safety, though it should never be needed
-        return "\(myTeam.rank)TH"
+        return FormattingService.formatOrdinal(myTeam.rank).uppercased()
     }
 
     /// Your score display with formatting (handle pre-game state)
     var myScoreDisplay: String {
         guard let myTeam = myTeamRanking else { return "--" }
         guard hasWeekStarted else { return "--" }
-        return String(format: "%.1f", myTeam.weeklyPoints)
+        return FormattingService.formatPoints(myTeam.weeklyPoints)
     }
     
     /// Your status color based on elimination status (gray if week hasn't started)

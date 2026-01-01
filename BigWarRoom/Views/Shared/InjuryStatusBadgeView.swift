@@ -3,12 +3,16 @@
 //  BigWarRoom
 //
 //  Small circular injury status badge for player images
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
 
 struct InjuryStatusBadgeView: View {
     let injuryStatus: String
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     var body: some View {
         ZStack {
@@ -26,77 +30,21 @@ struct InjuryStatusBadgeView: View {
         }
     }
     
-    // MARK: - Computed Properties
+    // MARK: - Computed Properties (now using ColorThemeService)
     
     private var statusText: String {
-        let status = injuryStatus.uppercased()
-        
-        // Map common injury statuses to short codes
-        switch status {
-        case "QUESTIONABLE":
-            return "Q"
-        case "DOUBTFUL":
-            return "D"
-        case "OUT":
-            return "O"
-        case "INJURED_RESERVE", "IR":
-            return "IR"
-        case "PROBABLE":
-            return "P"
-        case "BYE":
-            return "BYE"
-        case "SUSPENDED":
-            return "S"
-        case "PHYSICALLY_UNABLE_TO_PERFORM", "PUP":
-            return "PUP"
-        case "NON_FOOTBALL_INJURY", "NFI":
-            return "NFI"
-        default:
-            // For other statuses, take first letter or first 2 letters if short
-            if status.count <= 2 {
-                return status
-            } else {
-                return String(status.prefix(1))
-            }
-        }
+        // 🔥 DRY: Delegate to ColorThemeService
+        return colorService.injuryStatusText(for: injuryStatus)
     }
     
     private var backgroundColor: Color {
-        let status = injuryStatus.uppercased()
-        
-        switch status {
-        case "QUESTIONABLE":
-            return .yellow
-        case "DOUBTFUL":
-            return .orange
-        case "OUT", "INJURED_RESERVE", "IR":
-            return .red
-        case "PROBABLE":
-            return .green.opacity(0.8)
-        case "BYE":
-            return .blue.opacity(0.8)
-        case "SUSPENDED":
-            return .purple
-        case "PHYSICALLY_UNABLE_TO_PERFORM", "PUP", "NON_FOOTBALL_INJURY", "NFI":
-            return .gray.opacity(0.8)
-        default:
-            return .orange // Default for unknown statuses
-        }
+        // 🔥 DRY: Delegate to ColorThemeService
+        return colorService.injuryStatusColor(for: injuryStatus)
     }
     
     private var textColor: Color {
-        let status = injuryStatus.uppercased()
-        
-        switch status {
-        case "QUESTIONABLE":
-            return .black // Yellow background needs black text
-        case "PROBABLE":
-            return .white
-        case "BYE":
-            return .white
-        default:
-            return .white
-        }
+        // 🔥 DRY: Delegate to ColorThemeService
+        return colorService.injuryStatusTextColor(for: injuryStatus)
     }
 }
 

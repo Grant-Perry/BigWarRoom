@@ -114,7 +114,7 @@ struct MatchupBarCardContentView: View {
                         // Current scores
                         HStack(spacing: 6) {
                             // My score
-                            Text(String(format: "%.1f", matchup.myTeam?.currentScore ?? 0.0))
+                            Text(FormattingService.formatPoints(matchup.myTeam?.currentScore ?? 0.0))
                                 .font(.system(size: 18, weight: .black))
                                 .foregroundColor(isWinning ? .gpGreen : .gpRedPink)
                                 .minimumScaleFactor(0.8)
@@ -124,7 +124,7 @@ struct MatchupBarCardContentView: View {
                                 .foregroundColor(.secondary)
                             
                             // Opponent score
-                            Text(String(format: "%.1f", matchup.opponentTeam?.currentScore ?? 0.0))
+                            Text(FormattingService.formatPoints(matchup.opponentTeam?.currentScore ?? 0.0))
                                 .font(.system(size: 18, weight: .black))
                                 .foregroundColor(isWinning ? .gpRedPink : .gpGreen)
                                 .minimumScaleFactor(0.8)
@@ -171,13 +171,13 @@ struct MatchupBarCardContentView: View {
                                 
                                 // Projected scores on either end
                                 HStack(spacing: 0) {
-                                    Text(String(format: "%.1f", myProjected))
+                                    Text(FormattingService.formatPoints(myProjected))
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(winProbabilityValue >= 0.5 ? .gpGreen : .gpRedPink)
                                     
                                     Spacer()
                                     
-                                    Text(String(format: "%.1f", opponentProjected))
+                                    Text(FormattingService.formatPoints(opponentProjected))
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundColor(winProbabilityValue >= 0.5 ? .gpRedPink : .gpGreen)
                                 }
@@ -304,7 +304,7 @@ struct MatchupBarCardContentView: View {
                         
                         // Delta badge (medium size)
                         if let differential = matchup.scoreDifferential {
-                            Text(String(format: "%.1f", abs(differential)))
+                            Text(FormattingService.formatPoints(abs(differential)))
                                 .font(.system(size: 10, weight: .black))
                                 .foregroundColor(differential >= 0 ? .gpGreen : .gpRedPink)
                                 .padding(.horizontal, 8)
@@ -403,7 +403,7 @@ struct MatchupBarCardContentView: View {
     
     private func recordText(for team: FantasyTeam) -> String {
         guard let record = team.record else { return "0-0" }
-        return "\(record.wins)-\(record.losses)"
+        return FormattingService.formatRecord(record)
     }
     
     private func toPlayCount(for team: FantasyTeam) -> Int {

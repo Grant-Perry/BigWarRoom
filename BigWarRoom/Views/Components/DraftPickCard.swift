@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Individual draft pick card for live draft feed
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 // MARK: -> Draft Pick Card
 
@@ -17,6 +18,9 @@ struct DraftPickCard: View {
     let isUsingPositionalLogic: Bool // NEW: Whether to use positional logic
     let teamCount: Int // NEW: Team count for positional calculations
     let viewModel: DraftRoomViewModel // Add viewModel to get manager names
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     // Computed property to check if this is my pick
     private var isMyPick: Bool {
@@ -68,7 +72,7 @@ struct DraftPickCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
-                        .background(positionColor(pick.position))
+                        .background(colorService.positionColor(for: pick.position))
                         .clipShape(RoundedRectangle(cornerRadius: 3))
                 } else {
                     // Fallback to basic position badge if no positional rank
@@ -77,7 +81,7 @@ struct DraftPickCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(positionColor(pick.position))
+                        .background(colorService.positionColor(for: pick.position))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
             }
@@ -163,18 +167,6 @@ struct DraftPickCard: View {
         .frame(width: 125, height: 110)
         .scaleEffect(isRecent ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.2), value: isRecent)
-    }
-    
-    private func positionColor(_ position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return .purple
-        case "RB": return .green
-        case "WR": return .blue
-        case "TE": return .orange
-        case "K": return .gray
-        case "DEF", "DST": return .red
-        default: return .gray
-        }
     }
     
     /// Extract first name from manager display name

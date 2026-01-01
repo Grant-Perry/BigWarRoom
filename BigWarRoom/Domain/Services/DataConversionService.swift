@@ -38,11 +38,7 @@ final class DataConversionService {
     /// Consolidates duplicate logic from MatchupDataStore
     func formatRecord(_ record: TeamRecord?) -> String {
         guard let record = record else { return "" }
-        
-        if let ties = record.ties, ties > 0 {
-            return "\(record.wins)-\(record.losses)-\(ties)"
-        }
-        return "\(record.wins)-\(record.losses)"
+        return FormattingService.formatRecord(record)
     }
     
     // MARK: - Matchup Status Parsing

@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Created by System on 1/27/2025.
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -16,6 +17,9 @@ final class RosterViewModel {
     
     // MARK: - Dependencies
     private let draftRoomViewModel: DraftRoomViewModel
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     // MARK: - Observable Properties (No @Published needed with @Observable)
     var expandedTeam: Int? = nil
@@ -116,15 +120,8 @@ final class RosterViewModel {
     }
     
     func positionColor(_ position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return .purple
-        case "RB": return .green
-        case "WR": return .blue
-        case "TE": return .orange
-        case "K": return .gray
-        case "DEF", "DST": return .red
-        default: return .gray
-        }
+        // 🔥 DRY: Delegate to ColorThemeService
+        return colorService.positionColor(for: position)
     }
     
     // MARK: - Player Stats

@@ -4,6 +4,7 @@
 //
 //  🎯 MODERN SPORTS APP DESIGN - Inspired by ESPN, Sleeper, Nike Run Club
 //  Philosophy: Glanceable data, high contrast, horizontal layout
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -21,6 +22,9 @@ struct PlayerScoreBarCardContentView_Modern: View {
     
     @State private var showingScoreBreakdown = false
     @State private var isLoadingOverlayVisible = false
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     init(
         playerEntry: AllLivePlayersViewModel.LivePlayerEntry,
@@ -70,7 +74,7 @@ struct PlayerScoreBarCardContentView_Modern: View {
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(positionColor)
+                                    .fill(colorService.positionColor(for: playerEntry.position))
                             )
                     }
                     
@@ -204,14 +208,14 @@ struct PlayerScoreBarCardContentView_Modern: View {
                 MatchupTeamFinalView(player: playerEntry.player, scaleEffect: 0.7)
                 
                 if let injuryStatus = playerEntry.player.injuryStatus, !injuryStatus.isEmpty {
-                    Text(injuryStatus.uppercased())
+                    Text(colorService.injuryStatusText(for: injuryStatus))
                         .font(.system(size: 7, weight: .black))
-                        .foregroundColor(.white)
+                        .foregroundColor(colorService.injuryStatusTextColor(for: injuryStatus))
                         .padding(.horizontal, 3)
                         .padding(.vertical, 1)
                         .background(
                             Capsule()
-                                .fill(injuryColor(injuryStatus))
+                                .fill(colorService.injuryStatusColor(for: injuryStatus))
                         )
                 }
             }
@@ -292,21 +296,9 @@ struct PlayerScoreBarCardContentView_Modern: View {
                     .padding(.vertical, 2)
                     .background(
                         Capsule()
-                            .fill(positionColor.opacity(0.3))
+                            .fill(colorService.positionColor(for: playerEntry.position).opacity(0.3))
                     )
             }
-        }
-    }
-    
-    private var positionColor: Color {
-        switch playerEntry.position {
-        case "QB": return .blue
-        case "RB": return .green
-        case "WR": return .purple
-        case "TE": return .orange
-        case "K": return .yellow
-        case "DEF": return .red
-        default: return .gray
         }
     }
     
@@ -371,14 +363,14 @@ struct PlayerScoreBarCardContentView_Modern: View {
                     
                     // Injury badge (if any)
                     if let injuryStatus = playerEntry.player.injuryStatus, !injuryStatus.isEmpty {
-                        Text(injuryStatus.uppercased())
+                        Text(colorService.injuryStatusText(for: injuryStatus))
                             .font(.system(size: 8, weight: .black))
-                            .foregroundColor(.white)
+                            .foregroundColor(colorService.injuryStatusTextColor(for: injuryStatus))
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
                             .background(
                                 Capsule()
-                                    .fill(injuryColor(injuryStatus))
+                                    .fill(colorService.injuryStatusColor(for: injuryStatus))
                             )
                     }
                     
@@ -397,15 +389,6 @@ struct PlayerScoreBarCardContentView_Modern: View {
             return .gpGreen
         }
         return .gray.opacity(0.5)
-    }
-    
-    private func injuryColor(_ status: String) -> Color {
-        switch status.uppercased() {
-        case "OUT": return .red
-        case "DOUBTFUL": return .orange
-        case "QUESTIONABLE": return .yellow
-        default: return .gray
-        }
     }
     
     // MARK: - RIGHT: Score Section
@@ -458,9 +441,7 @@ struct PlayerScoreBarCardContentView_Modern: View {
     private var deltaColor: Color {
         guard let previous = playerEntry.previousScore else { return .gray }
         let diff = playerEntry.currentScore - previous
-        if diff > 0 { return .gpGreen }
-        if diff < 0 { return .gpRedPink }
-        return .gray
+        return colorService.deltaColor(for: diff)
     }
     
     // MARK: - Background & Border
@@ -523,7 +504,7 @@ struct PlayerScoreBarCardContentView_Modern: View {
     
     private var matchupDeltaColor: Color {
         guard let diff = playerEntry.matchup.scoreDifferential else { return .secondary }
-        return diff >= 0 ? .gpGreen : .gpRedPink
+        return colorService.deltaColor(for: diff)
     }
     
     // MARK: - Score Delta

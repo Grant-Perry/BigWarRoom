@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Data models for player statistics display
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import Foundation
@@ -73,16 +74,11 @@ struct DepthChartData {
     let position: String
     let players: [DepthChartPlayer]
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private static let colorService = ColorThemeService.shared
+    
     var positionColor: Color {
-        switch position {
-        case "QB": return .blue
-        case "RB": return .green
-        case "WR": return .purple
-        case "TE": return .orange
-        case "K": return .yellow
-        case "DEF": return .red
-        default: return .gray
-        }
+        return Self.colorService.positionColor(for: position)
     }
 }
 

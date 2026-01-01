@@ -68,18 +68,11 @@ extension DraftRoomViewModel {
     }
 }
 
-// MARK: - View Color Helpers
+// MARK: - View Color Helpers (🔥 REFACTORED: Now uses ColorThemeService)
 extension Position {
     var displayColor: Color {
-        switch self.rawValue.uppercased() {
-        case "QB": return .purple
-        case "RB": return .green
-        case "WR": return .blue
-        case "TE": return .orange
-        case "K": return .gray
-        case "DEF": return .red
-        default: return .gray
-        }
+        // 🔥 DRY: Use centralized ColorThemeService
+        return ColorThemeService.shared.positionColor(for: self.rawValue)
     }
 }
 

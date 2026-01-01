@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Seamless player card with animated score bar integration - CLEAN ARCHITECTURE
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -21,6 +22,9 @@ struct PlayerScoreBarCardView: View {
     @State private var scoreBarWidth: Double = 0.0
     @State private var cardOffset: Double = 50.0
     @State private var cardOpacity: Double = 0.0
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     // 🎨 WOODY'S REDESIGN TOGGLE
     @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
@@ -142,16 +146,7 @@ struct PlayerScoreBarCardView: View {
             // For Chopped leagues, use elimination status
             guard let ranking = matchup.myTeamRanking else { return .gpGreen }
             
-            switch ranking.eliminationStatus {
-            case .champion, .safe:
-                return .gpGreen
-            case .warning:
-                return .gpYellow
-            case .danger:
-                return .orange
-            case .critical, .eliminated:
-                return .gpRedPink
-            }
+            return colorService.eliminationStatusColor(for: ranking.eliminationStatus)
         } else {
             // For regular fantasy matchups, use the same logic as MatchupsHub
             guard let myTeam = matchup.myTeam,
@@ -161,9 +156,9 @@ struct PlayerScoreBarCardView: View {
             
             let myScore = myTeam.currentScore ?? 0
             let opponentScore = opponentTeam.currentScore ?? 0
-            let isWinning = myScore > opponentScore
+            let diff = myScore - opponentScore
             
-            return isWinning ? .gpGreen : .gpRedPink
+            return colorService.deltaColor(for: diff)
         }
     }
     
@@ -206,18 +201,6 @@ struct PlayerScoreBarCardView: View {
             return team.primaryColor
         }
         return .nyyDark // Fallback to original color if no team found
-    }
-    
-    private var positionColor: Color {
-        switch playerEntry.position {
-        case "QB": return .blue
-        case "RB": return .green
-        case "WR": return .purple
-        case "TE": return .orange
-        case "K": return .yellow
-        case "DEF": return .red
-        default: return .gray
-        }
     }
     
     private var leagueSourceColor: Color {

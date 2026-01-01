@@ -184,7 +184,7 @@ extension AllLivePlayersViewModel {
         var position: String { player.position }
         var teamName: String { player.team ?? "" }
         var playerName: String { player.fullName }
-        var currentScoreString: String { String(format: "%.2f", currentScore) }
+        var currentScoreString: String { FormattingService.formatPrecise(currentScore) }
         
         // 🔥 NEW: Check if player had recent activity
         var hasRecentActivity: Bool {

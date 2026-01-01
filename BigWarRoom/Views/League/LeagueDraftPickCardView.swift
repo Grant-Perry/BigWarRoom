@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Enhanced pick card component for league draft display
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -13,6 +14,9 @@ struct LeagueDraftPickCardView: View {
     
     let pick: EnhancedPick
     let viewModel: LeagueDraftViewModel
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     private var isMyPick: Bool {
         viewModel.isMyPick(pick)
@@ -61,7 +65,7 @@ struct LeagueDraftPickCardView: View {
         LinearGradient(
             gradient: Gradient(stops: [
                 .init(color: isMyPick ? Color.gpGreen.opacity(0.4) : Color.black.opacity(0.7), location: 0.0),
-                .init(color: PositionColorHelper.color(for: pick.position).opacity(0.2), location: 0.5),
+                .init(color: colorService.positionColor(for: pick.position).opacity(0.2), location: 0.5),
                 .init(color: isMyPick ? Color.gpGreen.opacity(0.2) : Color.black.opacity(0.8), location: 1.0)
             ]),
             startPoint: .topLeading,
@@ -72,7 +76,7 @@ struct LeagueDraftPickCardView: View {
     private var pickCardBorder: some View {
         RoundedRectangle(cornerRadius: 10)
             .stroke(
-                isMyPick ? Color.gpGreen.opacity(0.8) : PositionColorHelper.color(for: pick.position).opacity(0.4), 
+                isMyPick ? Color.gpGreen.opacity(0.8) : colorService.positionColor(for: pick.position).opacity(0.4), 
                 lineWidth: isMyPick ? 2 : 1
             )
     }
@@ -93,6 +97,9 @@ private struct PickCardHeaderRow: View {
     let displayName: String
     let position: String
     let player: SleeperPlayer
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     var body: some View {
         HStack {
@@ -168,6 +175,9 @@ private struct PositionBadgeView: View {
     let position: String
     let player: SleeperPlayer
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
+    
     var body: some View {
         Group {
             if let positionRank = player.positionalRank {
@@ -178,7 +188,7 @@ private struct PositionBadgeView: View {
                     .padding(.vertical, 5)
                     .background(
                         Capsule()
-                            .fill(PositionColorHelper.color(for: position))
+                            .fill(colorService.positionColor(for: position))
                     )
             } else {
                 Text(position)
@@ -188,7 +198,7 @@ private struct PositionBadgeView: View {
                     .padding(.vertical, 5)
                     .background(
                         Capsule()
-                            .fill(PositionColorHelper.color(for: position))
+                            .fill(colorService.positionColor(for: position))
                     )
             }
         }
@@ -200,10 +210,13 @@ private struct PlayerImageSection: View {
     let pick: EnhancedPick
     let realSleeperPlayer: SleeperPlayer?
     
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
+    
     var body: some View {
         ZStack {
             Circle()
-                .fill(PositionColorHelper.color(for: pick.position).opacity(0.3))
+                .fill(colorService.positionColor(for: pick.position).opacity(0.3))
                 .frame(width: 58, height: 58)
                 .blur(radius: 1)
             
@@ -215,7 +228,7 @@ private struct PlayerImageSection: View {
             .clipShape(Circle())
             .overlay(
                 Circle()
-                    .stroke(PositionColorHelper.color(for: pick.position).opacity(0.6), lineWidth: 1.5)
+                    .stroke(colorService.positionColor(for: pick.position).opacity(0.6), lineWidth: 1.5)
             )
         }
     }
@@ -256,23 +269,6 @@ private struct FantasyRankDisplay: View {
             } else {
                 Text("")
             }
-        }
-    }
-}
-
-// MARK: - Position Color Helper
-
-/// Helper struct for consistent position colors across components
-struct PositionColorHelper {
-    static func color(for position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return Color(red: 0.6, green: 0.3, blue: 0.9) // Purple
-        case "RB": return Color(red: 0.2, green: 0.8, blue: 0.4) // Green
-        case "WR": return Color(red: 0.3, green: 0.6, blue: 1.0) // Blue
-        case "TE": return Color(red: 1.0, green: 0.6, blue: 0.2) // Orange
-        case "K": return Color(red: 0.7, green: 0.7, blue: 0.7) // Gray
-        case "DEF", "DST": return Color(red: 0.9, green: 0.3, blue: 0.3) // Red
-        default: return Color(red: 0.6, green: 0.6, blue: 0.6) // Default Gray
         }
     }
 }

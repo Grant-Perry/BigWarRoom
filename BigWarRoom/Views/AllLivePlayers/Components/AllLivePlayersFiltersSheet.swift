@@ -3,6 +3,7 @@
 //  BigWarRoom
 //
 //  Filter options for All Rostered Players view - modeled after OpponentFiltersSheet
+//  🔥 REFACTORED: Now uses ColorThemeService for DRY compliance
 //
 
 import SwiftUI
@@ -11,6 +12,9 @@ import SwiftUI
 struct AllLivePlayersFiltersSheet: View {
     @Bindable var allLivePlayersViewModel: AllLivePlayersViewModel
     @Environment(\.dismiss) private var dismiss
+    
+    // 🔥 DRY: Use centralized ColorThemeService
+    private let colorService = ColorThemeService.shared
     
     var body: some View {
         NavigationView {
@@ -75,7 +79,7 @@ struct AllLivePlayersFiltersSheet: View {
                     FilterChip(
                         title: position.displayName,
                         isSelected: allLivePlayersViewModel.selectedPosition == position,
-                        color: positionColor(for: position.rawValue)
+                        color: colorService.positionColor(for: position.rawValue)
                     ) {
                         allLivePlayersViewModel.setPositionFilter(position)
                     }
@@ -174,18 +178,6 @@ struct AllLivePlayersFiltersSheet: View {
         allLivePlayersViewModel.setSortingMethod(.score)
         allLivePlayersViewModel.setSortDirection(highToLow: true)
         allLivePlayersViewModel.setShowActiveOnly(false)
-    }
-    
-    private func positionColor(for position: String) -> Color {
-        switch position.uppercased() {
-        case "QB": return .blue
-        case "RB": return .green
-        case "WR": return .purple
-        case "TE": return .orange
-        case "K": return .yellow
-        case "DEF": return .red
-        default: return .gray
-        }
     }
 }
 
