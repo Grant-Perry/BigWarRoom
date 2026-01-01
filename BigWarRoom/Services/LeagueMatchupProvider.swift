@@ -46,6 +46,7 @@ final class LeagueMatchupProvider {
     // MARK: -> Dependencies
     private let playerDirectoryStore = PlayerDirectoryStore.shared
     private let sleeperCredentials = SleeperCredentialsManager.shared
+    private let teamIdentificationService: TeamIdentificationService
     private var cancellables = Set<AnyCancellable>()
     
     // 🔥 PHASE 3 DI: Store optional reference to FantasyViewModel for syncing (passed from caller)
@@ -57,132 +58,22 @@ final class LeagueMatchupProvider {
         self.week = week
         self.year = year
         self.fantasyViewModel = fantasyViewModel
+        
+        // Create team identification service
+        self.teamIdentificationService = TeamIdentificationService(
+            sleeperClient: SleeperAPIClient.shared,
+            espnClient: ESPNAPIClient.shared,
+            sleeperCredentials: SleeperCredentialsManager.shared
+        )
     }
     
     // MARK: -> Team Identification
     
-    /// Identify the authenticated user's team ID in this league (robust to async races)
+    /// Identify the authenticated user's team ID in this league (delegates to service)
     func identifyMyTeamID() async -> String? {
         DebugPrint(mode: .winProb, "🔍 identifyMyTeamID() called for league: \(league.league.name)")
         
-        if league.source == .sleeper {
-            guard let username = sleeperCredentials.getUserIdentifier() else {
-                DebugPrint(mode: .winProb, "   ❌ No Sleeper username")
-                return nil
-            }
-            
-            DebugPrint(mode: .winProb, "   Sleeper username: \(username)")
-
-            let resolvedUserID: String
-            do {
-                if username.allSatisfy({ $0.isNumber }) {
-                    resolvedUserID = username
-                } else {
-                    // It's a username, resolve to user ID
-                    let user = try await SleeperAPIClient.shared.fetchUser(username: username)
-                    resolvedUserID = user.userID
-                }
-                DebugPrint(mode: .winProb, "   Resolved to user ID: \(resolvedUserID)")
-            } catch {
-                DebugPrint(mode: .winProb, "   ❌ Failed to resolve user ID")
-                return nil
-            }
-
-            // 💡 FIX: Only use *loaded* rosters (already fetched/set earlier)
-            if !sleeperRosters.isEmpty, 
-               let myRoster = sleeperRosters.first(where: { $0.ownerID == resolvedUserID }) {
-                let teamID = String(myRoster.rosterID)
-                DebugPrint(mode: .winProb, "   ✅ Found my roster: ID=\(teamID)")
-                return teamID
-            }
-
-            DebugPrint(mode: .winProb, "   ⚠️ Rosters not loaded yet, fetching...")
-            
-            // Fallback: If not already loaded (shouldn't happen!), do blocking load
-            do {
-                let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
-                if let userRoster = rosters.first(where: { $0.ownerID == resolvedUserID }) {
-                    let teamID = String(userRoster.rosterID)
-                    DebugPrint(mode: .winProb, "   ✅ Fetched my roster: ID=\(teamID)")
-                    return teamID
-                } else {
-                    DebugPrint(mode: .winProb, "   ❌ My roster not found in league")
-                    return nil
-                }
-            } catch {
-                DebugPrint(mode: .winProb, "   ❌ Failed to fetch rosters: \(error)")
-                return nil
-            }
-        } else if league.source == .espn {
-            if let teamID = await getESPNUserTeamID() {
-                DebugPrint(mode: .winProb, "   ✅ ESPN team ID: \(teamID)")
-                return teamID
-            } else {
-                DebugPrint(mode: .winProb, "   ❌ ESPN team ID not found")
-                return nil
-            }
-        }
-        
-        DebugPrint(mode: .winProb, "   ❌ Unknown league source")
-        return nil
-    }
-    
-    /// Get current user's roster ID for Sleeper leagues
-    private func getCurrentUserRosterID() async -> Int? {
-        // 🔥 FIX: Use username resolution instead of empty currentUserID
-        guard let username = sleeperCredentials.getUserIdentifier() else {
-            return nil
-        }
-        
-        // Resolve username to user ID if needed
-        let resolvedUserID: String
-        do {
-            if username.allSatisfy({ $0.isNumber }) {
-                // Already a user ID
-                resolvedUserID = username
-            } else {
-                // It's a username, resolve to user ID
-                let user = try await SleeperAPIClient.shared.fetchUser(username: username)
-                resolvedUserID = user.userID
-            }
-        } catch {
-            return nil
-        }
-        
-        do {
-            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
-            let userRoster = rosters.first { $0.ownerID == resolvedUserID }
-            
-            if let userRoster = userRoster {
-                return userRoster.rosterID
-            } else {
-                return nil
-            }
-        } catch {
-            return nil
-        }
-    }
-    
-    /// Get current user's team ID for ESPN leagues
-    private func getESPNUserTeamID() async -> String? {
-        let myESPNID = AppConstants.GpESPNID
-
-        do {
-            let espnLeague = try await ESPNAPIClient.shared.fetchESPNLeagueData(leagueID: league.league.leagueID)
-
-            if let teams = espnLeague.teams {
-                for team in teams {
-                    if let owners = team.owners {
-                        if owners.contains(myESPNID) {
-                            return String(team.id)
-                        }
-                    }
-                }
-            }
-            return nil
-        } catch {
-            return nil
-        }
+        return await teamIdentificationService.identifyMyTeamID(for: league)
     }
     
     // MARK: -> Data Fetching
@@ -504,7 +395,7 @@ final class LeagueMatchupProvider {
         DebugPrint(mode: .matchupLoading, "🔍 Creating eliminated playoff matchup for ESPN league")
         
         // Step 1: Get my team ID
-        guard let myTeamIDString = await getESPNUserTeamID() else {
+        guard let myTeamIDString = await identifyMyTeamID() else {
             DebugPrint(mode: .matchupLoading, "❌ Failed at step 1: Could not get my ESPN team ID")
             return
         }
@@ -873,37 +764,6 @@ final class LeagueMatchupProvider {
             
         } catch {
             DebugPrint(mode: .sleeperAPI, "Failed to fetch Sleeper rosters: \(error)")
-        }
-    }
-    
-    private func fetchSleeperUsers() async {
-        guard let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users") else { 
-            return 
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: usersURL)
-            // NOTE: `/league/{id}/users` returns league-scoped users with team metadata.
-            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: data)
-            
-            var newUserIDs: [String: String] = [:]
-            var newUserAvatars: [String: URL] = [:]
-            
-            for user in users {
-                let resolvedName = user.teamName ?? user.displayName ?? "Team \(user.userID)"
-                newUserIDs[user.userID] = resolvedName
-                
-                if let avatar = user.avatar {
-                    let avatarURL = URL(string: "https://sleepercdn.com/avatars/\(avatar)")
-                    newUserAvatars[user.userID] = avatarURL
-                }
-            }
-            
-            userIDs = newUserIDs
-            userAvatars = newUserAvatars
-            
-        } catch {
-            // Silent fail
         }
     }
     

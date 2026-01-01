@@ -188,22 +188,49 @@ private struct LeagueRowView: View {
         espnCredentials: espnCredentials
     )
     
-    let matchupDataStore = MatchupDataStore(
-        unifiedLeagueManager: unifiedLeagueManager,
-        sharedStatsService: sharedStatsService,
-        gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)
+    // Create services
+    let playoffEliminationService = PlayoffEliminationService(
+        sleeperClient: SleeperAPIClient.shared,
+        espnClient: ESPNAPIClient.shared
+    )
+    
+    let teamRosterFetchService = TeamRosterFetchService(
+        sleeperClient: SleeperAPIClient.shared,
+        espnClient: ESPNAPIClient.shared,
+        playerDirectory: PlayerDirectoryStore.shared,
+        gameStatusService: GameStatusService.shared,
+        seasonYearManager: SeasonYearManager.shared
     )
     
     let choppedLeagueService = ChoppedLeagueService(
-        sleeperClient: sleeperClient,
-        playerDirectory: playerDirectory,
-        gameStatusService: gameStatusService,
-        sharedStatsService: sharedStatsService,
-        weekSelectionManager: weekSelectionManager,
-        seasonYearManager: SeasonYearManager(),
-        sleeperCredentials: sleeperCredentials
+        sleeperClient: SleeperAPIClient.shared,
+        playerDirectory: PlayerDirectoryStore.shared,
+        gameStatusService: GameStatusService.shared,
+        sharedStatsService: SharedStatsService.shared,
+        weekSelectionManager: WeekSelectionManager.shared,
+        seasonYearManager: SeasonYearManager.shared,
+        sleeperCredentials: SleeperCredentialsManager.shared
+    )
+    
+    let teamIdentificationService = TeamIdentificationService(
+        sleeperClient: SleeperAPIClient.shared,
+        espnClient: ESPNAPIClient.shared,
+        sleeperCredentials: SleeperCredentialsManager.shared
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: UnifiedLeagueManager(
+            sleeperClient: SleeperAPIClient.shared,
+            espnClient: ESPNAPIClient.shared,
+            espnCredentials: ESPNCredentialsManager.shared
+        ),
+        sharedStatsService: SharedStatsService.shared,
+        gameStatusService: GameStatusService.shared,
+        weekSelectionManager: WeekSelectionManager.shared,
+        playoffEliminationService: playoffEliminationService,
+        teamRosterFetchService: teamRosterFetchService,
+        choppedLeagueService: choppedLeagueService,
+        teamIdentificationService: teamIdentificationService
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -216,7 +243,9 @@ private struct LeagueRowView: View {
         gameDataService: nflGameDataService,
         unifiedLeagueManager: unifiedLeagueManager,
         playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient),
-        choppedLeagueService: choppedLeagueService
+        choppedLeagueService: choppedLeagueService,
+        teamRosterFetchService: teamRosterFetchService,
+        teamIdentificationService: teamIdentificationService
     )
     
     NavigationView {

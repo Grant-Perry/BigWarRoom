@@ -94,6 +94,35 @@ final class ChoppedLeagueService {
         return unifiedMatchup
     }
     
+    // MARK: - Chopped League Detection
+    
+    /// Robust Chopped/Guillotine league detection for Sleeper
+    /// Consolidates logic previously duplicated in MatchupsHubViewModel and MatchupDataStore
+    func isSleeperChoppedLeagueResolved(_ league: UnifiedLeagueManager.LeagueWrapper) async -> Bool {
+        guard league.source == .sleeper else { return false }
+    
+        if let settings = league.league.settings {
+            if settings.type == 3 || settings.isChopped == true { return true }
+    
+            if settings.type != nil || settings.isChopped != nil {
+                return false
+            }
+        }
+    
+        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)") else {
+            return false
+        }
+    
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let fullLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            let settings = fullLeague.settings
+            return settings?.type == 3 || settings?.isChopped == true || (settings?.isChoppedLeague == true)
+        } catch {
+            return false
+        }
+    }
+    
     // MARK: - Chopped Summary Creation
     
     /// Create Chopped league summary for Sleeper leagues with no matchups

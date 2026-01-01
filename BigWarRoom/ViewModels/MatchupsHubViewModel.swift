@@ -63,6 +63,8 @@ final class MatchupsHubViewModel {
    internal let gameDataService: NFLGameDataService
    internal let playoffEliminationService: PlayoffEliminationService  // 🔥 NEW: Phase 2 service
    internal let choppedLeagueService: ChoppedLeagueService  // 🔥 NEW: Phase 2 service
+   internal let teamRosterFetchService: TeamRosterFetchService  // 🔥 NEW: Phase 2 service
+   internal let teamIdentificationService: TeamIdentificationService  // 🔥 NEW: Phase 2 service
 
 	  // 🔥 PHASE 3: Replace Combine with observation task
    private var observationTask: Task<Void, Never>?
@@ -104,7 +106,9 @@ final class MatchupsHubViewModel {
 	  gameDataService: NFLGameDataService,
 	  unifiedLeagueManager: UnifiedLeagueManager,
 	  playoffEliminationService: PlayoffEliminationService,  // 🔥 NEW: Phase 2 service
-	  choppedLeagueService: ChoppedLeagueService  // 🔥 NEW: Phase 2 service
+	  choppedLeagueService: ChoppedLeagueService,  // 🔥 NEW: Phase 2 service
+	  teamRosterFetchService: TeamRosterFetchService,  // 🔥 NEW: Phase 2 service
+	  teamIdentificationService: TeamIdentificationService  // 🔥 NEW: Phase 2 service
    ) {
 	  self.espnCredentials = espnCredentials
 	  self.sleeperCredentials = sleeperCredentials
@@ -116,6 +120,8 @@ final class MatchupsHubViewModel {
 	  self.unifiedLeagueManager = unifiedLeagueManager
 	  self.playoffEliminationService = playoffEliminationService  // 🔥 NEW: Store service
 	  self.choppedLeagueService = choppedLeagueService  // 🔥 NEW: Store service
+	  self.teamRosterFetchService = teamRosterFetchService  // 🔥 NEW: Store service
+	  self.teamIdentificationService = teamIdentificationService  // 🔥 NEW: Store service
 
 	  setupAutoRefresh()
 	  setupCredentialObservation()

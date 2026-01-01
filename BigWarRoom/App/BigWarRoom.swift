@@ -33,6 +33,7 @@ struct BigWarRoom: View {
     @State private var servicesInitialized = false
     @State private var playoffEliminationService: PlayoffEliminationService?  // 🔥 NEW: Phase 2 service
     @State private var choppedLeagueService: ChoppedLeagueService?  // 🔥 NEW: Phase 2 service
+    @State private var teamRosterFetchService: TeamRosterFetchService?  // 🔥 NEW: Phase 2 service
     
     // 🔥 FIX: Initialize services IMMEDIATELY in init, not in onAppear
     init() {
@@ -136,12 +137,31 @@ struct BigWarRoom: View {
             sleeperCredentials: sleeperCredentials!
         )
         
+        // 🔥 NEW: Phase 2 - Create TeamRosterFetchService
+        teamRosterFetchService = TeamRosterFetchService(
+            sleeperClient: sleeperAPIClient!,
+            espnClient: espnAPIClient,
+            playerDirectory: playerDirectory!,
+            gameStatusService: gameStatusService!,
+            seasonYearManager: seasonYearManager!
+        )
+        
+        // 🔥 NEW: Phase 2 - Create TeamIdentificationService
+        let teamIdentificationService = TeamIdentificationService(
+            sleeperClient: sleeperAPIClient!,
+            espnClient: espnAPIClient,
+            sleeperCredentials: sleeperCredentials!
+        )
+        
         let matchupDataStore = MatchupDataStore(
             unifiedLeagueManager: unifiedLeagueManager,
             sharedStatsService: sharedStatsService!,
             gameStatusService: gameStatusService!,
             weekSelectionManager: weekSelectionManager!,
-            playoffEliminationService: playoffEliminationService!  // 🔥 NEW: Pass service
+            playoffEliminationService: playoffEliminationService!,
+            teamRosterFetchService: teamRosterFetchService!,
+            choppedLeagueService: choppedLeagueService!,
+            teamIdentificationService: teamIdentificationService
         )
         
         // 7. ViewModels with dependencies
@@ -154,8 +174,10 @@ struct BigWarRoom: View {
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService!,
             unifiedLeagueManager: unifiedLeagueManager,
-            playoffEliminationService: playoffEliminationService!,  // 🔥 NEW: Pass service
-            choppedLeagueService: choppedLeagueService!  // 🔥 NEW: Pass service
+            playoffEliminationService: playoffEliminationService!,
+            choppedLeagueService: choppedLeagueService!,
+            teamRosterFetchService: teamRosterFetchService!,
+            teamIdentificationService: teamIdentificationService
         )
         
         // Create FantasyViewModel with dependencies

@@ -578,12 +578,18 @@ struct OpponentIntelligenceDashboardView: View {
         espnCredentials: espnCredentials
     )
     
-    let matchupDataStore = MatchupDataStore(
-        unifiedLeagueManager: unifiedLeagueManager,
-        sharedStatsService: sharedStatsService,
+    // Create services first
+    let playoffEliminationService = PlayoffEliminationService(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient
+    )
+    
+    let teamRosterFetchService = TeamRosterFetchService(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)
+        seasonYearManager: SeasonYearManager()
     )
     
     let choppedLeagueService = ChoppedLeagueService(
@@ -596,6 +602,27 @@ struct OpponentIntelligenceDashboardView: View {
         sleeperCredentials: sleeperCredentials
     )
     
+    let teamIdentificationService = TeamIdentificationService(
+        sleeperClient: sleeperClient,
+        espnClient: espnClient,
+        sleeperCredentials: sleeperCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: UnifiedLeagueManager(
+            sleeperClient: SleeperAPIClient.shared,
+            espnClient: ESPNAPIClient.shared,
+            espnCredentials: ESPNCredentialsManager.shared
+        ),
+        sharedStatsService: SharedStatsService.shared,
+        gameStatusService: GameStatusService.shared,
+        weekSelectionManager: WeekSelectionManager.shared,
+        playoffEliminationService: playoffEliminationService,
+        teamRosterFetchService: teamRosterFetchService,
+        choppedLeagueService: choppedLeagueService,
+        teamIdentificationService: teamIdentificationService
+    )
+    
     let matchupsHub = MatchupsHubViewModel(
         espnCredentials: espnCredentials,
         sleeperCredentials: sleeperCredentials,
@@ -605,8 +632,10 @@ struct OpponentIntelligenceDashboardView: View {
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
         unifiedLeagueManager: unifiedLeagueManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient),
-        choppedLeagueService: choppedLeagueService
+        playoffEliminationService: playoffEliminationService,
+        choppedLeagueService: choppedLeagueService,
+        teamRosterFetchService: teamRosterFetchService,
+        teamIdentificationService: teamIdentificationService
     )
     
     let allLivePlayersViewModel = AllLivePlayersViewModel(

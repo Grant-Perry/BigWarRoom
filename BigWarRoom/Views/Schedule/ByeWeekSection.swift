@@ -415,12 +415,18 @@ struct ByeWeekImpactItem: Identifiable {
         espnCredentials: espnCredentials
     )
     
-    let matchupDataStore = MatchupDataStore(
-        unifiedLeagueManager: unifiedLeagueManager,
-        sharedStatsService: sharedStatsService,
+    // Create services first
+    let playoffEliminationService = PlayoffEliminationService(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient
+    )
+    
+    let teamRosterFetchService = TeamRosterFetchService(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient,
+        playerDirectory: playerDirectory,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)
+        seasonYearManager: seasonYearManager
     )
     
     let choppedLeagueService = ChoppedLeagueService(
@@ -433,6 +439,27 @@ struct ByeWeekImpactItem: Identifiable {
         sleeperCredentials: sleeperCredentials
     )
     
+    let teamIdentificationService = TeamIdentificationService(
+        sleeperClient: sleeperAPIClient,
+        espnClient: espnClient,
+        sleeperCredentials: sleeperCredentials
+    )
+    
+    let matchupDataStore = MatchupDataStore(
+        unifiedLeagueManager: UnifiedLeagueManager(
+            sleeperClient: SleeperAPIClient.shared,
+            espnClient: ESPNAPIClient.shared,
+            espnCredentials: ESPNCredentialsManager.shared
+        ),
+        sharedStatsService: SharedStatsService.shared,
+        gameStatusService: GameStatusService.shared,
+        weekSelectionManager: WeekSelectionManager.shared,
+        playoffEliminationService: playoffEliminationService,
+        teamRosterFetchService: teamRosterFetchService,
+        choppedLeagueService: choppedLeagueService,
+        teamIdentificationService: teamIdentificationService
+    )
+    
     let matchupsHub = MatchupsHubViewModel(
         espnCredentials: espnCredentials,
         sleeperCredentials: sleeperCredentials,
@@ -442,8 +469,10 @@ struct ByeWeekImpactItem: Identifiable {
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
         unifiedLeagueManager: unifiedLeagueManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient),
-        choppedLeagueService: choppedLeagueService
+        playoffEliminationService: playoffEliminationService,
+        choppedLeagueService: choppedLeagueService,
+        teamRosterFetchService: teamRosterFetchService,
+        teamIdentificationService: teamIdentificationService
     )
     
     ZStack {

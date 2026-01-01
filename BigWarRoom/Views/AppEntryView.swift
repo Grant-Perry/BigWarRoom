@@ -81,6 +81,27 @@ struct AppEntryView: View {
                 playoffEliminationService: PlayoffEliminationService(
                     sleeperClient: SleeperAPIClient(),
                     espnClient: ESPNAPIClient(credentialsManager: espnCredentials)
+                ),
+                teamRosterFetchService: TeamRosterFetchService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
+                    playerDirectory: playerDirectory,
+                    gameStatusService: gameStatusService,
+                    seasonYearManager: SeasonYearManager.shared
+                ),
+                choppedLeagueService: ChoppedLeagueService(
+                    sleeperClient: SleeperAPIClient(),
+                    playerDirectory: playerDirectory,
+                    gameStatusService: gameStatusService,
+                    sharedStatsService: sharedStatsService,
+                    weekSelectionManager: weekSelectionManager,
+                    seasonYearManager: SeasonYearManager.shared,
+                    sleeperCredentials: sleeperCredentials
+                ),
+                teamIdentificationService: TeamIdentificationService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
+                    sleeperCredentials: sleeperCredentials
                 )
             )
         }
@@ -109,6 +130,18 @@ struct AppEntryView: View {
                     sharedStatsService: sharedStatsService,
                     weekSelectionManager: weekSelectionManager,
                     seasonYearManager: SeasonYearManager.shared,
+                    sleeperCredentials: sleeperCredentials
+                ),
+                teamRosterFetchService: TeamRosterFetchService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
+                    playerDirectory: playerDirectory,
+                    gameStatusService: gameStatusService,
+                    seasonYearManager: SeasonYearManager.shared
+                ),
+                teamIdentificationService: TeamIdentificationService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials),
                     sleeperCredentials: sleeperCredentials
                 )
             )

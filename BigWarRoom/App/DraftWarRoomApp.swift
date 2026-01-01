@@ -106,6 +106,7 @@ final class AppContainer {
     let oprKService: OPRKService
     let playoffEliminationService: PlayoffEliminationService  // 🔥 NEW: Phase 2 service
     let choppedLeagueService: ChoppedLeagueService  // 🔥 NEW: Phase 2 service
+    let teamRosterFetchService: TeamRosterFetchService  // 🔥 NEW: Phase 2 service
     
     // App Management
     let appInitManager: AppInitializationManager
@@ -199,6 +200,22 @@ final class AppContainer {
             sleeperCredentials: sleeperCredentials
         )
         
+        // 🔥 NEW: Phase 2 - TeamRosterFetchService
+        self.teamRosterFetchService = TeamRosterFetchService(
+            sleeperClient: sleeperAPIClient,
+            espnClient: espnAPIClient,
+            playerDirectory: playerDirectory,
+            gameStatusService: gameStatusService,
+            seasonYearManager: seasonYearManager
+        )
+        
+        // 🔥 NEW: Phase 2 - TeamIdentificationService
+        let teamIdentificationService = TeamIdentificationService(
+            sleeperClient: sleeperAPIClient,
+            espnClient: espnAPIClient,
+            sleeperCredentials: sleeperCredentials
+        )
+        
         // MARK: - 🔥 PHASE 5: MatchupDataStore with DI
         let unifiedLeagueManagerForStore = UnifiedLeagueManager(
             sleeperClient: sleeperAPIClient,
@@ -211,7 +228,10 @@ final class AppContainer {
             sharedStatsService: sharedStatsService,
             gameStatusService: gameStatusService,
             weekSelectionManager: weekSelectionManager,
-            playoffEliminationService: playoffEliminationService  // 🔥 NEW: Pass service
+            playoffEliminationService: playoffEliminationService,
+            teamRosterFetchService: teamRosterFetchService,
+            choppedLeagueService: choppedLeagueService,
+            teamIdentificationService: teamIdentificationService
         )
         
         // MARK: - 🔥 PHASE 5: MatchupsHubViewModel with DI
@@ -224,8 +244,10 @@ final class AppContainer {
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService,
             unifiedLeagueManager: unifiedLeagueManagerForStore,
-            playoffEliminationService: playoffEliminationService,  // 🔥 NEW: Pass service
-            choppedLeagueService: choppedLeagueService  // 🔥 NEW: Pass service
+            playoffEliminationService: playoffEliminationService,
+            choppedLeagueService: choppedLeagueService,
+            teamRosterFetchService: teamRosterFetchService,
+            teamIdentificationService: teamIdentificationService
         )
         
         // MARK: - 🔥 PHASE 5: FantasyViewModel with DI
