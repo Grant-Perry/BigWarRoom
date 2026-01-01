@@ -2,6 +2,7 @@
 //  RefreshTimerService.swift
 //  BigWarRoom
 //
+//  🔥 DRY REFACTOR: Now uses AsyncTaskService for consistent async patterns
 //  Service for managing refresh timers and countdown logic
 //
 
@@ -37,10 +38,11 @@ final class RefreshTimerService {
     var isTimerActive: Bool = false
     
     // MARK: - Private Properties
-    private var refreshTimer: Timer?
-    private var countdownTimer: Timer?
     private let refreshInterval: TimeInterval
     private var onRefreshCallback: (() async -> Void)?
+    
+    // 🔥 DRY: Use AsyncTaskService for task management
+    private let asyncTaskService = AsyncTaskService.shared
     
     // MARK: - Initialization
     
@@ -55,12 +57,9 @@ final class RefreshTimerService {
     }
     
     deinit {
-        Task { @MainActor in
-            refreshTimer?.invalidate()
-            refreshTimer = nil
-            countdownTimer?.invalidate()
-            countdownTimer = nil
-        }
+        // 🔥 DRY: Cancel tasks via AsyncTaskService
+        asyncTaskService.cancel(id: "refresh_timer")
+        asyncTaskService.cancel(id: "countdown_timer")
     }
     
     // MARK: - Public Interface
@@ -71,13 +70,14 @@ final class RefreshTimerService {
         
         self.onRefreshCallback = onRefresh
         
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                // 🔋 BATTERY FIX: Only refresh if app is active
-                if await AppLifecycleManager.shared.isActive {
-                    await onRefresh()
-                }
+        // 🔥 DRY: Use AsyncTaskService for periodic execution
+        asyncTaskService.runPeriodically(
+            id: "refresh_timer",
+            interval: refreshInterval
+        ) { @MainActor in
+            // 🔋 BATTERY FIX: Only refresh if app is active
+            if await AppLifecycleManager.shared.isActive {
+                await onRefresh()
             }
         }
         
@@ -87,8 +87,8 @@ final class RefreshTimerService {
     
     /// Stop periodic refresh
     func stopPeriodicRefresh() {
-        refreshTimer?.invalidate()
-        refreshTimer = nil
+        // 🔥 DRY: Cancel via AsyncTaskService
+        asyncTaskService.cancel(id: "refresh_timer")
         onRefreshCallback = nil
         isTimerActive = false
         stopCountdownTimer()
@@ -103,16 +103,19 @@ final class RefreshTimerService {
     private func startCountdownTimer() {
         stopCountdownTimer()
         
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                // 🔋 BATTERY FIX: Only countdown if app is active
-                if await AppLifecycleManager.shared.isActive {
-                    self.refreshCountdown -= 1.0
-                    
-                    if self.refreshCountdown <= 0 {
-                        self.refreshCountdown = self.refreshInterval
-                    }
+        // 🔥 DRY: Use AsyncTaskService for countdown
+        asyncTaskService.runPeriodically(
+            id: "countdown_timer",
+            interval: 1.0
+        ) { @MainActor [weak self] in
+            guard let self = self else { return }
+            
+            // 🔋 BATTERY FIX: Only countdown if app is active
+            if await AppLifecycleManager.shared.isActive {
+                self.refreshCountdown -= 1.0
+                
+                if self.refreshCountdown <= 0 {
+                    self.refreshCountdown = self.refreshInterval
                 }
             }
         }
@@ -120,8 +123,8 @@ final class RefreshTimerService {
     
     /// Stop countdown timer
     private func stopCountdownTimer() {
-        countdownTimer?.invalidate()
-        countdownTimer = nil
+        // 🔥 DRY: Cancel via AsyncTaskService
+        asyncTaskService.cancel(id: "countdown_timer")
     }
     
     /// Stop all timers

@@ -468,3 +468,382 @@ struct PlayerCardGradientSystem {
         )
     }
 }
+
+// MARK: - 🔥 NEW: Missing Reusable Components
+
+/// **Watch Toggle Button Component**
+/// **Standardized watch/unwatch button across all player cards**
+struct WatchToggleButton: View {
+    let playerID: String
+    // 🔥 FIX: Make watchService a parameter instead of using .shared in default
+    let watchService: PlayerWatchService
+    let size: CGFloat
+    let onToggle: ((Bool) -> Void)?
+    
+    init(
+        playerID: String,
+        // 🔥 FIX: Remove default value that causes MainActor isolation issue
+        watchService: PlayerWatchService,
+        size: CGFloat = 24,
+        onToggle: ((Bool) -> Void)? = nil
+    ) {
+        self.playerID = playerID
+        self.watchService = watchService
+        self.size = size
+        self.onToggle = onToggle
+    }
+    
+    private var isWatching: Bool {
+        watchService.isWatching(playerID)
+    }
+    
+    var body: some View {
+        Button(action: {
+            // Toggle watch status
+            let newStatus = !isWatching
+            onToggle?(newStatus)
+        }) {
+            Image(systemName: isWatching ? "eye.fill" : "eye")
+                .font(.system(size: size * 0.67, weight: .medium))
+                .foregroundColor(isWatching ? .gpOrange : .white.opacity(0.6))
+                .frame(width: size, height: size)
+                .background(
+                    Circle()
+                        .fill(isWatching ? Color.gpOrange.opacity(0.2) : Color.black.opacity(0.5))
+                        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+/// **Score Display Component**
+/// **Standardized score display with breakdown button**
+struct ScoreDisplayButton: View {
+    let score: Double
+    let onTap: () -> Void
+    let style: ScoreDisplayStyle
+    
+    // 🔥 DRY: Use ColorThemeService for score colors
+    private let colorService = ColorThemeService.shared
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 4) {
+                Text(formatScore(score))
+                    .font(style.scoreFont)
+                    .fontWeight(.bold)
+                    .foregroundColor(scoreColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                
+                Text("pts")
+                    .font(style.labelFont)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+            .padding(.horizontal, style.horizontalPadding)
+            .padding(.vertical, style.verticalPadding)
+            .background(
+                RoundedRectangle(cornerRadius: style.cornerRadius)
+                    .fill(scoreColor.opacity(0.4))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: style.cornerRadius)
+                            .stroke(scoreColor.opacity(0.6), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var scoreColor: Color {
+        if score >= 20 { return .gpGreen }
+        else if score >= 12 { return .blue }
+        else if score >= 8 { return .orange }
+        else { return .gpRedPink }
+    }
+    
+    private func formatScore(_ score: Double) -> String {
+        String(format: "%.1f", score)
+    }
+}
+
+/// **Score Display Style**
+struct ScoreDisplayStyle {
+    let scoreFont: Font
+    let labelFont: Font
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+    let cornerRadius: CGFloat
+    
+    static var standard: ScoreDisplayStyle {
+        ScoreDisplayStyle(
+            scoreFont: .callout,
+            labelFont: .caption,
+            horizontalPadding: 8,
+            verticalPadding: 4,
+            cornerRadius: 6
+        )
+    }
+    
+    static var large: ScoreDisplayStyle {
+        ScoreDisplayStyle(
+            scoreFont: .system(size: 20, weight: .bold),
+            labelFont: .caption,
+            horizontalPadding: 8,
+            verticalPadding: 4,
+            cornerRadius: 6
+        )
+    }
+    
+    static var compact: ScoreDisplayStyle {
+        ScoreDisplayStyle(
+            scoreFont: .caption,
+            labelFont: .caption2,
+            horizontalPadding: 6,
+            verticalPadding: 3,
+            cornerRadius: 4
+        )
+    }
+}
+
+/// **Player Card Game Status Enum**
+/// Note: Different from FantasyModels.GameStatus (which is a struct)
+enum PlayerCardGameStatus {
+    case live(String)
+    case final
+    case upcoming
+    case inProgress(String)
+    
+    var displayText: String {
+        switch self {
+        case .live(let time): return time.isEmpty ? "LIVE" : time
+        case .final: return "FINAL"
+        case .upcoming: return "UPCOMING"
+        case .inProgress(let time): return time
+        }
+    }
+    
+    var color: Color {
+        switch self {
+        case .live, .inProgress: return .red
+        case .final: return .gray
+        case .upcoming: return .orange
+        }
+    }
+}
+
+/// **Player Card Game Status Badge Component**
+struct PlayerCardGameStatusBadge: View {
+    let status: PlayerCardGameStatus
+    let style: GameStatusBadgeStyle
+    
+    var body: some View {
+        Text(status.displayText)
+            .font(style.font)
+            .fontWeight(.bold)
+            .foregroundColor(.white)
+            .padding(.horizontal, style.horizontalPadding)
+            .padding(.vertical, style.verticalPadding)
+            .background(
+                RoundedRectangle(cornerRadius: style.cornerRadius)
+                    .fill(status.color)
+            )
+    }
+}
+
+/// **Game Status Badge Style**
+struct GameStatusBadgeStyle {
+    let font: Font
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+    let cornerRadius: CGFloat
+    
+    static var standard: GameStatusBadgeStyle {
+        GameStatusBadgeStyle(
+            font: .system(size: 10, weight: .bold),
+            horizontalPadding: 6,
+            verticalPadding: 2,
+            cornerRadius: 3
+        )
+    }
+    
+    static var large: GameStatusBadgeStyle {
+        GameStatusBadgeStyle(
+            font: .system(size: 12, weight: .bold),
+            horizontalPadding: 10,
+            verticalPadding: 3,
+            cornerRadius: 8
+        )
+    }
+}
+
+/// **Team Logo Overlay Component**
+/// **Large team logo background overlay for player cards**
+struct TeamLogoOverlay: View {
+    let team: NFLTeam?
+    let size: CGFloat
+    let opacity: Double
+    let offset: CGSize
+    
+    @Environment(TeamAssetManager.self) private var teamAssets
+    
+    init(
+        team: NFLTeam?,
+        size: CGFloat = 140,
+        opacity: Double = 0.25,
+        offset: CGSize = CGSize(width: 20, height: 15)
+    ) {
+        self.team = team
+        self.size = size
+        self.opacity = opacity
+        self.offset = offset
+    }
+    
+    var body: some View {
+        Group {
+            if let team = team {
+                teamAssets.logoOrFallback(for: team.id)
+                    .frame(width: size, height: size)
+                    .opacity(opacity)
+                    .offset(x: offset.width, y: offset.height)
+            }
+        }
+    }
+}
+
+/// **Jersey Number Overlay Component**
+/// **Large jersey number background for player cards**
+struct JerseyNumberOverlay: View {
+    let jerseyNumber: String
+    let teamColor: Color
+    let size: CGFloat
+    let opacity: Double
+    
+    init(
+        jerseyNumber: String,
+        teamColor: Color,
+        size: CGFloat = 90,
+        opacity: Double = 0.65
+    ) {
+        self.jerseyNumber = jerseyNumber
+        self.teamColor = teamColor
+        self.size = size
+        self.opacity = opacity
+    }
+    
+    var body: some View {
+        Text(jerseyNumber)
+            .font(.system(size: size, weight: .black))
+            .italic()
+            .foregroundColor(teamColor)
+            .opacity(opacity)
+            .shadow(color: .black.opacity(0.4), radius: 2, x: 1, y: 1)
+    }
+}
+
+/// **Stat Display Component**
+/// **Standardized stat text display**
+struct StatDisplayText: View {
+    let text: String
+    let style: StatDisplayStyle
+    
+    var body: some View {
+        Text(text)
+            .font(style.font)
+            .fontWeight(style.fontWeight)
+            .foregroundColor(style.textColor)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+}
+
+/// **Stat Display Style**
+struct StatDisplayStyle {
+    let font: Font
+    let fontWeight: Font.Weight
+    let textColor: Color
+    
+    static var standard: StatDisplayStyle {
+        StatDisplayStyle(
+            font: .system(size: 9, weight: .bold),
+            fontWeight: .bold,
+            textColor: .white
+        )
+    }
+    
+    static var prominent: StatDisplayStyle {
+        StatDisplayStyle(
+            font: .system(size: 11, weight: .bold),
+            fontWeight: .bold,
+            textColor: .gpGreen
+        )
+    }
+}
+
+/// **Player Name Display Component**
+/// **Standardized player name formatting and display**
+struct PlayerNameDisplay: View {
+    let playerName: String
+    let style: PlayerNameStyle
+    
+    var body: some View {
+        Text(formatPlayerName())
+            .font(style.font)
+            .fontWeight(style.fontWeight)
+            .foregroundColor(style.textColor)
+            .lineLimit(1)
+            .minimumScaleFactor(style.minimumScaleFactor)
+    }
+    
+    private func formatPlayerName() -> String {
+        // Smart name formatting: prefer full name, fallback to short name
+        let components = playerName.split(separator: " ")
+        
+        if components.count >= 2 {
+            let firstName = String(components[0])
+            // If first name is just initial, try to expand
+            if firstName.count == 1 {
+                return playerName // Keep as-is if already abbreviated
+            }
+        }
+        
+        return playerName
+    }
+}
+
+/// **Player Name Style**
+struct PlayerNameStyle {
+    let font: Font
+    let fontWeight: Font.Weight
+    let textColor: Color
+    let minimumScaleFactor: CGFloat
+    
+    static var standard: PlayerNameStyle {
+        PlayerNameStyle(
+            font: .system(size: 18, weight: .bold),
+            fontWeight: .bold,
+            textColor: .primary,
+            minimumScaleFactor: 0.7
+        )
+    }
+    
+    static var large: PlayerNameStyle {
+        PlayerNameStyle(
+            font: .system(size: 22, weight: .black),
+            fontWeight: .black,
+            textColor: .primary,
+            minimumScaleFactor: 0.6
+        )
+    }
+    
+    static var compact: PlayerNameStyle {
+        PlayerNameStyle(
+            font: .system(size: 14, weight: .bold),
+            fontWeight: .bold,
+            textColor: .white,
+            minimumScaleFactor: 0.8
+        )
+    }
+}
