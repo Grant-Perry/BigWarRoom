@@ -183,7 +183,8 @@ final class SharedStatsService {
     
     /// Fetch stats from Sleeper API
     private func fetchWeekStats(week: Int, year: String) async throws -> [String: [String: Double]] {
-        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(year)/\(week)") else {
+        // 🔥 DRY: Use APIEndpointService for URL construction
+        guard let url = APIEndpointService.sleeperWeeklyStats(year: year, week: week) else {
             throw StatsError.invalidURL
         }
         

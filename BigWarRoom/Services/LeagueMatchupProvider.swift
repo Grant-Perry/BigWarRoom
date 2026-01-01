@@ -652,19 +652,18 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperScoringSettings() async {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)") else { return }
-        
+        // 🔥 PHASE 2.5: Use SleeperAPIClient instead of raw URL
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            
-            // 🔥 FIXED: Decode and store the FULL SleeperLeague object
-            let fullLeague = try JSONDecoder().decode(SleeperLeague.self, from: data)
+            let fullLeague = try await SleeperAPIClient.shared.fetchLeague(leagueID: league.league.leagueID)
             sleeperLeague = fullLeague
             
             // Also keep the scoring settings dictionary for backward compatibility
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let settings = json["scoring_settings"] as? [String: Any] {
-                sleeperLeagueSettings = settings
+            if let scoringSettings = fullLeague.scoringSettings {
+                var asAny: [String: Any] = [:]
+                for (k, v) in scoringSettings {
+                    asAny[k] = v
+                }
+                sleeperLeagueSettings = asAny
             }
         } catch {
             // Silent fail
@@ -699,36 +698,16 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperUsersAndRosters() async {
-        guard let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters"),
-              let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users") else {
-            return
-        }
-        
+        // 🔥 PHASE 2.5: Use SleeperAPIClient instead of raw URLs
         do {
             // 🔥 PERF: Fetch rosters + users concurrently
-            async let rostersResponse = URLSession.shared.data(from: rostersURL)
-            async let usersResponse = URLSession.shared.data(from: usersURL)
-            let ((rostersData, _), (usersData, _)) = try await (rostersResponse, usersResponse)
+            async let rostersResponse = SleeperAPIClient.shared.fetchRosters(leagueID: league.league.leagueID)
+            async let usersResponse = SleeperAPIClient.shared.fetchUsers(leagueID: league.league.leagueID)
             
-            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: rostersData)
+            let (rosters, users) = try await (rostersResponse, usersResponse)
             
             // 🔥 NEW: Store rosters for record lookup
             sleeperRosters = rosters
-            
-            // DISABLED VERBOSE LOGGING - uncomment if needed for debugging Sleeper records
-            /*
-            for (index, roster) in rosters.prefix(5).enumerated() {
-                let winsDisplay = roster.wins.map(String.init) ?? "nil"
-                let lossesDisplay = roster.losses.map(String.init) ?? "nil"
-                let tieValue = roster.ties ?? 0
-                
-                
-                if let settings = roster.settings {
-                    let settingsWins = settings.wins ?? -1
-                    let settingsLosses = settings.losses ?? -1
-                }
-            }
-            */
             
             var newRosterMapping: [Int: String] = [:]
             
@@ -741,10 +720,6 @@ final class LeagueMatchupProvider {
             rosterIDToManagerID = newRosterMapping
             DebugPrint(mode: .dataSync, limit: 5, "Populated rosterIDToManagerID with \(rosterIDToManagerID.count) entries")
         
-            // NOTE: `/league/{id}/users` returns league-scoped users with team metadata.
-            // Decode as `SleeperLeagueUser` (NOT `SleeperUser`).
-            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: usersData)
-            
             var newUserIDs: [String: String] = [:]
             var newUserAvatars: [String: URL] = [:]
             
@@ -768,13 +743,12 @@ final class LeagueMatchupProvider {
     }
     
     private func fetchSleeperMatchups() async {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)") else {
-            return
-        }
-        
+        // 🔥 PHASE 2.5: Use SleeperAPIClient instead of raw URL
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let sleeperMatchups = try JSONDecoder().decode([SleeperMatchupResponse].self, from: data)
+            let sleeperMatchups = try await SleeperAPIClient.shared.fetchMatchups(
+                leagueID: league.league.leagueID,
+                week: week
+            )
             
             if sleeperMatchups.isEmpty {
                 detectedAsChoppedLeague = true

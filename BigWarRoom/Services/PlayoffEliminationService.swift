@@ -107,7 +107,8 @@ final class PlayoffEliminationService {
         let playoffStartWeek = league.league.settings?.playoffWeekStart ?? 15
         let round = max(1, week - playoffStartWeek + 1)
         
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/winners_bracket") else {
+        // 🔥 DRY: Use APIEndpointService for URL construction
+        guard let url = APIEndpointService.sleeperWinnersBracket(leagueID: league.league.leagueID) else {
             return UserDefaults.standard.showEliminatedPlayoffLeagues
         }
         
@@ -159,14 +160,18 @@ final class PlayoffEliminationService {
         
         do {
             let year = SeasonYearManager.shared.selectedYear
-            guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(league.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
+            
+            // 🔥 DRY: Use APIEndpointService for URL construction
+            guard let url = APIEndpointService.espnLeague(
+                leagueID: league.league.leagueID,
+                year: String(year),
+                week: week
+            ) else {
                 return UserDefaults.standard.showEliminatedPlayoffLeagues
             }
             
-            var request = URLRequest(url: url)
-            request.addValue("application/json", forHTTPHeaderField: "Accept")
-            let espnToken = year == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
-            request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
+            // 🔥 DRY: Use APIEndpointService for authenticated request
+            let request = APIEndpointService.espnAuthenticatedRequest(url: url, year: String(year))
             
             let (data, _) = try await URLSession.shared.data(for: request)
             let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)

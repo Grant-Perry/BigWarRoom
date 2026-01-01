@@ -174,18 +174,10 @@ extension MatchupsHubViewModel {
     /// Convert MatchupSnapshot to UnifiedMatchup (SINGLE conversion point for SSOT)
     /// This is the ONLY place where we convert from domain model (snapshot) to view model (UnifiedMatchup)
     internal func convertSnapshotToUnifiedMatchup(_ snapshot: MatchupSnapshot, league: UnifiedLeagueManager.LeagueWrapper) -> UnifiedMatchup {
-        // Build FantasyMatchup from snapshot
-        let fantasyMatchup = FantasyMatchup(
-            id: snapshot.id.matchupID,
-            leagueID: snapshot.id.leagueID,
-            week: snapshot.id.week,
-            year: getCurrentYear(),
-            homeTeam: convertTeamSnapshot(snapshot.myTeam),
-            awayTeam: convertTeamSnapshot(snapshot.opponentTeam),
-            status: parseMatchupStatus(snapshot.metadata.status),
-            winProbability: snapshot.myTeam.score.winProbability,
-            startTime: snapshot.metadata.startTime,
-            sleeperMatchups: nil
+        // 🔥 PHASE 2.5: Use DataConversionService for conversion
+        let fantasyMatchup = DataConversionService.shared.convertSnapshotToFantasyMatchup(
+            snapshot,
+            year: getCurrentYear()
         )
         
         return UnifiedMatchup(
@@ -200,70 +192,6 @@ extension MatchupsHubViewModel {
             allLeagueMatchups: nil,  // TODO: Handle horizontal scrolling
             gameDataService: gameDataService
         )
-    }
-    
-    /// Convert TeamSnapshot to FantasyTeam
-    private func convertTeamSnapshot(_ snapshot: TeamSnapshot) -> FantasyTeam {
-        let roster = snapshot.roster.map { player in
-            // Convert game status string back to GameStatus struct (if present)
-            let gameStatus: GameStatus? = player.metrics.gameStatus.map { statusString in
-                GameStatus(status: statusString)
-            }
-            
-            return FantasyPlayer(
-                id: player.id,
-                sleeperID: player.identity.sleeperID,
-                espnID: player.identity.espnID,
-                firstName: player.identity.firstName,
-                lastName: player.identity.lastName,
-                position: player.context.position,
-                team: player.context.team,
-                jerseyNumber: player.context.jerseyNumber,
-                currentPoints: player.metrics.currentScore,
-                projectedPoints: player.metrics.projectedScore,
-                gameStatus: gameStatus,
-                isStarter: player.context.isStarter,
-                lineupSlot: player.context.lineupSlot,
-                injuryStatus: player.context.injuryStatus
-            )
-        }
-        
-        return FantasyTeam(
-            id: snapshot.info.teamID,
-            name: snapshot.info.ownerName,
-            ownerName: snapshot.info.ownerName,
-            record: parseRecord(snapshot.info.record),
-            avatar: snapshot.info.avatarURL,
-            currentScore: snapshot.score.actual,
-            projectedScore: snapshot.score.projected,
-            roster: roster,
-            rosterID: Int(snapshot.info.teamID) ?? 0,
-            faabTotal: nil,
-            faabUsed: nil
-        )
-    }
-    
-    /// Parse record string into TeamRecord
-    private func parseRecord(_ recordString: String) -> TeamRecord? {
-        guard !recordString.isEmpty else { return nil }
-        let parts = recordString.split(separator: "-")
-        guard parts.count >= 2 else { return nil }
-        let wins = Int(parts[0]) ?? 0
-        let losses = Int(parts[1]) ?? 0
-        let ties = parts.count > 2 ? Int(parts[2]) : nil
-        return TeamRecord(wins: wins, losses: losses, ties: ties)
-    }
-    
-    /// Parse matchup status string to enum
-    private func parseMatchupStatus(_ statusString: String) -> MatchupStatus {
-        switch statusString.lowercased() {
-        case "live", "in_progress":
-            return .live
-        case "completed", "final":
-            return .complete
-        default:
-            return .upcoming
-        }
     }
     
     // MARK: - Playoff Elimination Handling

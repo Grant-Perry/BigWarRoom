@@ -21,6 +21,7 @@ final class ChoppedLeagueService {
     private let weekSelectionManager: WeekSelectionManager
     private let seasonYearManager: SeasonYearManager
     private let sleeperCredentials: SleeperCredentialsManager
+    private let scoringService: ScoringCalculationService  // 🔥 NEW: DRY scoring service
     
     // MARK: - Initialization
     
@@ -31,7 +32,8 @@ final class ChoppedLeagueService {
         sharedStatsService: SharedStatsService,
         weekSelectionManager: WeekSelectionManager,
         seasonYearManager: SeasonYearManager,
-        sleeperCredentials: SleeperCredentialsManager
+        sleeperCredentials: SleeperCredentialsManager,
+        scoringService: ScoringCalculationService = .shared  // 🔥 NEW: Inject scoring service
     ) {
         self.sleeperClient = sleeperClient
         self.playerDirectory = playerDirectory
@@ -40,6 +42,7 @@ final class ChoppedLeagueService {
         self.weekSelectionManager = weekSelectionManager
         self.seasonYearManager = seasonYearManager
         self.sleeperCredentials = sleeperCredentials
+        self.scoringService = scoringService  // 🔥 NEW: Store scoring service
     }
     
     // MARK: - Main Entry Point
@@ -109,7 +112,8 @@ final class ChoppedLeagueService {
             }
         }
     
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)") else {
+        // 🔥 DRY: Use APIEndpointService for URL construction
+        guard let url = APIEndpointService.sleeperLeague(leagueID: league.league.leagueID) else {
             return false
         }
     
@@ -143,13 +147,14 @@ final class ChoppedLeagueService {
             
             // Step 4: Create team mapping and fantasy teams
             let (rosterToOwnerMap, userMap, avatarMap) = createTeamMappings(rosters: rosters, users: users)
-            let (activeTeams, eliminatedTeams) = createChoppedFantasyTeams(
+            let (activeTeams, eliminatedTeams) = await createChoppedFantasyTeams(
                 matchupData: matchupData,
                 rosters: rosters,
                 rosterToOwnerMap: rosterToOwnerMap,
                 userMap: userMap,
                 avatarMap: avatarMap,
-                league: league
+                league: league,
+                week: week  // 🔥 NEW: Pass week for scoring
             )
             
             // Step 5: Process and rank teams
@@ -187,9 +192,10 @@ final class ChoppedLeagueService {
     ) -> (rosterToOwnerMap: [Int: String], userMap: [String: String], avatarMap: [String: URL]) {
         let userMap = Dictionary(uniqueKeysWithValues: users.map { ($0.userID, $0.displayName ?? "Team \($0.userID)") })
         
+        // 🔥 DRY: Use APIEndpointService for avatar URLs
         let avatarMap = Dictionary(uniqueKeysWithValues: users.compactMap { user -> (String, URL)? in
             guard let avatar = user.avatar,
-                  let url = URL(string: "https://sleepercdn.com/avatars/\(avatar)") else { return nil }
+                  let url = APIEndpointService.sleeperAvatar(avatarID: avatar) else { return nil }
             return (user.userID, url)
         })
         
@@ -210,8 +216,9 @@ final class ChoppedLeagueService {
         rosterToOwnerMap: [Int: String],
         userMap: [String: String],
         avatarMap: [String: URL],
-        league: UnifiedLeagueManager.LeagueWrapper
-    ) -> (activeTeams: [FantasyTeam], eliminatedTeams: [FantasyTeam]) {
+        league: UnifiedLeagueManager.LeagueWrapper,
+        week: Int  // 🔥 NEW: Pass week for scoring
+    ) async -> (activeTeams: [FantasyTeam], eliminatedTeams: [FantasyTeam]) {
         var activeTeams: [FantasyTeam] = []
         var eliminatedTeams: [FantasyTeam] = []
         let matchupByRosterID = Dictionary(uniqueKeysWithValues: matchupData.map { ($0.rosterID, $0) })
@@ -236,10 +243,18 @@ final class ChoppedLeagueService {
             let realTeamScore = matchup?.points ?? 0.0
             let projectedScore = matchup?.projectedPoints ?? (realTeamScore * 1.05)
 
-            let starterRoster: [FantasyPlayer] = {
-                guard let matchup else { return [] }
-                return createStarterRoster(from: matchup, realTeamScore: realTeamScore, leagueID: league.league.leagueID)
-            }()
+            // 🔥 FIX: Use await properly instead of closure
+            let starterRoster: [FantasyPlayer]
+            if let matchup = matchup {
+                starterRoster = try await createStarterRoster(
+                    from: matchup,
+                    realTeamScore: realTeamScore,
+                    leagueID: league.league.leagueID,
+                    week: week
+                )
+            } else {
+                starterRoster = []
+            }
 
             let fantasyTeam = FantasyTeam(
                 id: String(rosterID),
@@ -272,112 +287,55 @@ final class ChoppedLeagueService {
     private func createStarterRoster(
         from matchup: SleeperMatchupResponse,
         realTeamScore: Double,
-        leagueID: String
-    ) -> [FantasyPlayer] {
+        leagueID: String,
+        week: Int  // 🔥 NEW: Pass week for scoring
+    ) async -> [FantasyPlayer] {
         guard let starters = matchup.starters, !starters.isEmpty else {
             return []
         }
         
         // Create FantasyPlayer objects from starter player IDs
-        let starterPlayers = starters.compactMap { playerID -> FantasyPlayer? in
-            // Get player info from PlayerDirectoryStore
-            let playerInfo = playerDirectory.player(for: playerID)
-            
-            // Calculate REAL individual player points using actual stats
-            let actualPlayerScore = calculateRealPlayerScore(playerID: playerID, leagueID: leagueID)
-            
-            let player = FantasyPlayer(
-                id: playerID,
-                sleeperID: playerID,
-                espnID: playerInfo?.espnID,
-                firstName: playerInfo?.firstName,
-                lastName: playerInfo?.lastName,
-                position: playerInfo?.position ?? "FLEX",
-                team: playerInfo?.team,
-                jerseyNumber: playerInfo?.number?.description,
-                currentPoints: actualPlayerScore,
-                projectedPoints: actualPlayerScore * 1.05,
-                gameStatus: gameStatusService.getGameStatusWithFallback(for: playerInfo?.team),
-                isStarter: true,
-                lineupSlot: playerInfo?.position,
-                injuryStatus: playerInfo?.injuryStatus
-            )
-            
-            return player
-        }
-        
-        return starterPlayers
-    }
-    
-    // MARK: - Player Scoring
-    
-    /// Calculate real individual player score using Sleeper stats and league scoring settings
-    private func calculateRealPlayerScore(playerID: String, leagueID: String) -> Double {
-        let currentWeek = weekSelectionManager.selectedWeek
-        let currentYear = seasonYearManager.selectedYear
-        
-        // Get player stats from SharedStatsService
-        guard let playerStats = sharedStatsService.getCachedPlayerStats(
-            playerID: playerID,
-            week: currentWeek,
-            year: currentYear
-        ), !playerStats.isEmpty else {
-            return 0.0
-        }
-        
-        // Get league scoring settings (use default if not available)
-        let scoringSettings = getLeagueScoringSettings(leagueID: leagueID) ?? getDefaultScoringSettings()
-        
-        // Calculate score using Sleeper scoring logic
-        var totalScore = 0.0
-        for (statKey, statValue) in playerStats {
-            if let scoring = scoringSettings[statKey] as? Double {
-                let points = statValue * scoring
-                totalScore += points
+        return await withTaskGroup(of: FantasyPlayer?.self) { group in
+            for playerID in starters {
+                group.addTask { @MainActor in
+                    // Get player info from PlayerDirectoryStore
+                    let playerInfo = self.playerDirectory.player(for: playerID)
+                    
+                    // 🔥 DRY: Use ScoringCalculationService for player score
+                    let actualPlayerScore = await self.scoringService.calculatePlayerScore(
+                        playerID: playerID,
+                        leagueID: leagueID,
+                        week: week,
+                        year: String(self.seasonYearManager.selectedYear)
+                    )
+                    
+                    return FantasyPlayer(
+                        id: playerID,
+                        sleeperID: playerID,
+                        espnID: playerInfo?.espnID,
+                        firstName: playerInfo?.firstName,
+                        lastName: playerInfo?.lastName,
+                        position: playerInfo?.position ?? "FLEX",
+                        team: playerInfo?.team,
+                        jerseyNumber: playerInfo?.number?.description,
+                        currentPoints: actualPlayerScore,
+                        projectedPoints: actualPlayerScore * 1.05,
+                        gameStatus: self.gameStatusService.getGameStatusWithFallback(for: playerInfo?.team),
+                        isStarter: true,
+                        lineupSlot: playerInfo?.position,
+                        injuryStatus: playerInfo?.injuryStatus
+                    )
+                }
             }
+            
+            var players: [FantasyPlayer] = []
+            for await player in group {
+                if let player = player {
+                    players.append(player)
+                }
+            }
+            return players
         }
-        
-        return totalScore
-    }
-    
-    /// Get league-specific scoring settings
-    private func getLeagueScoringSettings(leagueID: String) -> [String: Any]? {
-        // This would ideally fetch from cache or API
-        // For now, return nil to fall back to defaults
-        return nil
-    }
-    
-    /// Get default Sleeper scoring settings
-    private func getDefaultScoringSettings() -> [String: Double] {
-        return [
-            // Passing
-            "pass_yd": 0.04,
-            "pass_td": 4.0,
-            "pass_int": -1.0,
-            
-            // Rushing
-            "rush_yd": 0.1,
-            "rush_td": 6.0,
-            
-            // Receiving
-            "rec": 1.0,
-            "rec_yd": 0.1,
-            "rec_td": 6.0,
-            
-            // Kicking
-            "fgm": 3.0,
-            "xpm": 1.0,
-            
-            // Defense
-            "def_td": 6.0,
-            "def_int": 2.0,
-            "def_fr": 2.0,
-            "def_sack": 1.0,
-            "def_safe": 2.0,
-            
-            // Fumbles
-            "fum_lost": -1.0,
-        ]
     }
     
     // MARK: - Team Rankings

@@ -30,6 +30,7 @@ final class MatchupDataStore {
     private let teamRosterFetchService: TeamRosterFetchService  // 🔥 NEW: Phase 2 service
     private let choppedLeagueService: ChoppedLeagueService  // 🔥 NEW: Phase 2 service
     private let teamIdentificationService: TeamIdentificationService  // 🔥 NEW: Phase 2 service
+    private let dataConversionService = DataConversionService.shared  // 🔥 NEW: Phase 2.5 service
     
     // MARK: - Observable State
     
@@ -370,7 +371,7 @@ final class MatchupDataStore {
             info: TeamSnapshot.TeamInfo(
                 teamID: myTeam.id,
                 ownerName: myTeam.ownerName,
-                record: formatRecord(myTeam.record),
+                record: dataConversionService.formatRecord(myTeam.record),
                 avatarURL: myTeam.avatar
             ),
             score: TeamSnapshot.ScoreInfo(
@@ -379,14 +380,14 @@ final class MatchupDataStore {
                 winProbability: matchup.winProbability,
                 margin: (myTeam.currentScore ?? 0.0) - (opponentTeam.currentScore ?? 0.0)
             ),
-            roster: myTeam.roster.map { buildPlayerSnapshot(from: $0) }
+            roster: myTeam.roster.map { dataConversionService.buildPlayerSnapshot(from: $0) }
         )
         
         let opponentTeamSnapshot = TeamSnapshot(
             info: TeamSnapshot.TeamInfo(
                 teamID: opponentTeam.id,
                 ownerName: opponentTeam.ownerName,
-                record: formatRecord(opponentTeam.record),
+                record: dataConversionService.formatRecord(opponentTeam.record),
                 avatarURL: opponentTeam.avatar
             ),
             score: TeamSnapshot.ScoreInfo(
@@ -395,7 +396,7 @@ final class MatchupDataStore {
                 winProbability: matchup.winProbability.map { 1.0 - $0 },
                 margin: (opponentTeam.currentScore ?? 0.0) - (myTeam.currentScore ?? 0.0)
             ),
-            roster: opponentTeam.roster.map { buildPlayerSnapshot(from: $0) }
+            roster: opponentTeam.roster.map { dataConversionService.buildPlayerSnapshot(from: $0) }
         )
         
         // Detect playoff and elimination status
@@ -740,46 +741,14 @@ final class MatchupDataStore {
     
     /// Build PlayerSnapshot from FantasyPlayer
     private func buildPlayerSnapshot(from player: FantasyPlayer) -> PlayerSnapshot {
-        // 🔥 TODO #8: Get kickoff time from game data (GameStatusService doesn't expose this yet)
-        // For now, set to nil - can be enhanced later when game data provides kickoff times
-        let kickoffTime: Date? = nil
-        
-        return PlayerSnapshot(
-            id: player.id,
-            identity: PlayerSnapshot.PlayerIdentity(
-                playerID: player.id,
-                sleeperID: player.sleeperID,
-                espnID: player.espnID,
-                firstName: player.firstName ?? "",
-                lastName: player.lastName ?? "",
-                fullName: player.fullName
-            ),
-            metrics: PlayerSnapshot.PlayerMetrics(
-                currentScore: player.currentPoints ?? 0.0,
-                projectedScore: player.projectedPoints ?? 0.0,
-                delta: 0.0, // Calculated during delta updates at store level
-                lastActivity: nil, // Tracked during delta updates at store level
-                gameStatus: player.gameStatus?.status
-            ),
-            context: PlayerSnapshot.PlayerContext(
-                position: player.position,
-                lineupSlot: player.lineupSlot,
-                isStarter: player.isStarter,
-                team: player.team,
-                injuryStatus: player.injuryStatus,
-                jerseyNumber: player.jerseyNumber,
-                kickoffTime: kickoffTime  // 🔥 Set to nil for now
-            )
-        )
+        // 🔥 PHASE 2.5: Delegate to DataConversionService
+        return dataConversionService.buildPlayerSnapshot(from: player)
     }
     
     /// Format team record as string
     private func formatRecord(_ record: TeamRecord?) -> String {
-        guard let record = record else { return "" }
-        if let ties = record.ties, ties > 0 {
-            return "\(record.wins)-\(record.losses)-\(ties)"
-        }
-        return "\(record.wins)-\(record.losses)"
+        // 🔥 PHASE 2.5: Delegate to DataConversionService
+        return dataConversionService.formatRecord(record)
     }
     
     /// Refresh a specific league

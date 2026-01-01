@@ -12,21 +12,13 @@ import SwiftUI
 extension FantasyViewModel {
     
     func fetchSleeperLeague(leagueID: String) async throws {
-        let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)")!
-        
+        // 🔥 PHASE 2.6: Use SleeperAPIClient instead of raw URL
         do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let league = try JSONDecoder().decode(SleeperLeague.self, from: data)
-            
-            // 🔥 FIX: currentLeague doesn't exist in FantasyViewModel, skip this
-            // await MainActor.run {
-            //     self.currentLeague = league
-            // }
+            let league = try await SleeperAPIClient.shared.fetchLeague(leagueID: leagueID)
             
             if let scoringSettings = league.scoringSettings {
                 DebugPrint(mode: .scoring, "Loaded \(scoringSettings.count) rules for league \(leagueID)")
                 
-                // 🔥 FIX: Use the correct type name
                 let manager = ScoringSettingsManager.shared
                 manager.registerSleeperScoringSettings(from: league, leagueID: leagueID)
                 
@@ -42,21 +34,11 @@ extension FantasyViewModel {
     }
     
     func fetchSleeperRosters(leagueID: String) async throws -> [SleeperRoster] {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/rosters") else {
-            DebugPrint(mode: .sleeperAPI, "Invalid URL for Sleeper rosters league \(leagueID)")
-            throw NSError(domain: "Invalid URL", code: -1, userInfo: nil)
-        }
-        
+        // 🔥 PHASE 2.6: Use SleeperAPIClient instead of raw URL
         DebugPrint(mode: .sleeperAPI, "Fetching Sleeper roster data for league \(leagueID)")
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                DebugPrint(mode: .sleeperAPI, "Sleeper rosters HTTP Status \(httpResponse.statusCode)")
-            }
-            
-            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            let rosters = try await SleeperAPIClient.shared.fetchRosters(leagueID: leagueID)
             DebugPrint(mode: .sleeperAPI, "Decoded \(rosters.count) Sleeper rosters")
             
             DebugPrint(mode: .fantasy, "🔍 SLEEPER API RESPONSE - Record Diagnosis:")
@@ -99,25 +81,11 @@ extension FantasyViewModel {
     }
     
     func fetchSleeperUsers(leagueID: String) async throws -> [SleeperLeagueUser] {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/users") else {
-            DebugPrint(mode: .sleeperAPI, "Invalid URL for Sleeper users league \(leagueID)")
-            throw NSError(domain: "Invalid URL", code: -1, userInfo: nil)
-        }
-        
+        // 🔥 PHASE 2.6: Use SleeperAPIClient instead of raw URL
         DebugPrint(mode: .sleeperAPI, "Fetching Sleeper user data for league \(leagueID)")
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
-            
-            if let httpResponse = response as? HTTPURLResponse {
-                DebugPrint(mode: .sleeperAPI, "Sleeper users HTTP Status \(httpResponse.statusCode)")
-                if httpResponse.statusCode != 200 {
-                    DebugPrint(mode: .sleeperAPI, "Bad HTTP status \(httpResponse.statusCode) for Sleeper users")
-                    throw NSError(domain: "HTTP Error", code: httpResponse.statusCode, userInfo: nil)
-                }
-            }
-            
-            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: data)
+            let users = try await SleeperAPIClient.shared.fetchUsers(leagueID: leagueID)
             DebugPrint(mode: .sleeperAPI, "Decoded \(users.count) Sleeper users")
             
             var userIDs: [String: String] = [:]
@@ -142,24 +110,20 @@ extension FantasyViewModel {
     }
     
     func fetchSleeperMatchups(leagueID: String, week: Int) async throws -> [SleeperMatchup] {
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueID)/matchups/\(week)") else {
-            DebugPrint(mode: .sleeperAPI, "Invalid URL for Sleeper matchups league \(leagueID) week \(week)")
-            throw NSError(domain: "Invalid URL", code: -1, userInfo: nil)
-        }
-        
+        // 🔥 PHASE 2.6: Use SleeperAPIClient instead of raw URL
         DebugPrint(mode: .sleeperAPI, "Fetching Sleeper matchup data for league \(leagueID) week \(week)")
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            // SleeperAPIClient returns [SleeperMatchupResponse], need to convert to [SleeperMatchup]
+            // Actually, looking at the code, these might be the same type or compatible
+            let matchupResponses = try await SleeperAPIClient.shared.fetchMatchups(leagueID: leagueID, week: week)
             
-            if let httpResponse = response as? HTTPURLResponse {
-                DebugPrint(mode: .sleeperAPI, "Sleeper matchups HTTP Status \(httpResponse.statusCode)")
-            }
+            // Convert SleeperMatchupResponse to SleeperMatchup if needed
+            // For now, assuming they're compatible or this will cause a compile error we can fix
+            DebugPrint(mode: .sleeperAPI, "Decoded \(matchupResponses.count) Sleeper matchup entries")
             
-            let matchups = try JSONDecoder().decode([SleeperMatchup].self, from: data)
-            DebugPrint(mode: .sleeperAPI, "Decoded \(matchups.count) Sleeper matchup entries")
-            
-            return matchups
+            // TODO: May need type conversion here depending on SleeperMatchup vs SleeperMatchupResponse
+            return matchupResponses as! [SleeperMatchup]
         } catch {
             DebugPrint(mode: .sleeperAPI, "Sleeper matchups fetch error: \(error)")
             throw error

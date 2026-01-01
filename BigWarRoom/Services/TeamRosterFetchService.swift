@@ -65,9 +65,8 @@ final class TeamRosterFetchService {
     ) async -> FantasyTeam? {
         
         do {
-            let rostersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/rosters")!
-            let (data, _) = try await URLSession.shared.data(from: rostersURL)
-            let rosters = try JSONDecoder().decode([SleeperRoster].self, from: data)
+            // 🔥 PHASE 2.5: Use SleeperAPIClient instead of raw URLs
+            let rosters = try await sleeperClient.fetchRosters(leagueID: league.league.leagueID)
             
             let myRoster = rosters.first { roster in
                 String(roster.rosterID) == myTeamID || roster.ownerID == myTeamID
@@ -80,9 +79,10 @@ final class TeamRosterFetchService {
             
             DebugPrint(mode: .matchupLoading, "   ✅ Found roster ID: \(myRoster.rosterID)")
             
-            let matchupsURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/matchups/\(week)")!
-            let (matchupData, _) = try await URLSession.shared.data(from: matchupsURL)
-            let matchupResponses = try JSONDecoder().decode([SleeperMatchupResponse].self, from: matchupData)
+            let matchupResponses = try await sleeperClient.fetchMatchups(
+                leagueID: league.league.leagueID,
+                week: week
+            )
             
             guard let myMatchupResponse = matchupResponses.first(where: { $0.rosterID == myRoster.rosterID }) else {
                 DebugPrint(mode: .matchupLoading, "   ⚠️ No matchup response found, creating with empty roster")
@@ -107,9 +107,7 @@ final class TeamRosterFetchService {
                 )
             }
             
-            let usersURL = URL(string: "https://api.sleeper.app/v1/league/\(league.league.leagueID)/users")!
-            let (userData, _) = try await URLSession.shared.data(from: usersURL)
-            let users = try JSONDecoder().decode([SleeperLeagueUser].self, from: userData)
+            let users = try await sleeperClient.fetchUsers(leagueID: league.league.leagueID)
             
             let myUser = users.first { $0.userID == myRoster.ownerID }
             let managerName = myUser?.displayName ?? "Team \(myRoster.rosterID)"

@@ -47,11 +47,13 @@ struct ChoppedTeamRosterView: View {
         self.teamRanking = teamRanking
         self.leagueID = leagueID
         self.week = week
+        // 🔥 FIXED: Pass SharedStatsService.shared explicitly
         self.viewModel = ChoppedTeamRosterViewModel(
             teamRanking: teamRanking,
             leagueID: leagueID,
             week: week,
-            gameDataService: NFLGameDataService.shared
+            gameDataService: NFLGameDataService.shared,
+            sharedStatsService: SharedStatsService.shared
         )
     }
 

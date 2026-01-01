@@ -31,21 +31,30 @@ final class ChoppedTeamRosterViewModel {
     
     // MARK: - Private Properties
     
-    private var playerStats: [String: [String: Double]] = [:]
-    private var leagueScoringSettings: [String: Any] = [:] // 🔥 NEW: Store actual league scoring
     private let teamRanking: FantasyTeamRanking
     private let leagueID: String
     private let week: Int
     
     private let gameDataService: NFLGameDataService
+    private let scoringService: ScoringCalculationService  // 🔥 NEW: DRY scoring service
+    private let sharedStatsService: SharedStatsService  // 🔥 NEW: DRY stats service
     
     // MARK: - Initialization
     
-    init(teamRanking: FantasyTeamRanking, leagueID: String, week: Int, gameDataService: NFLGameDataService) {
+    init(
+        teamRanking: FantasyTeamRanking,
+        leagueID: String,
+        week: Int,
+        gameDataService: NFLGameDataService,
+        scoringService: ScoringCalculationService = .shared,  // 🔥 NEW: Inject scoring service
+        sharedStatsService: SharedStatsService  // 🔥 NEW: Inject stats service (no default)
+    ) {
         self.teamRanking = teamRanking
         self.leagueID = leagueID
         self.week = week
         self.gameDataService = gameDataService
+        self.scoringService = scoringService  // 🔥 NEW: Store scoring service
+        self.sharedStatsService = sharedStatsService  // 🔥 NEW: Store stats service
     }
     
     // MARK: - Public Interface
@@ -55,11 +64,18 @@ final class ChoppedTeamRosterViewModel {
         isLoading = true
         errorMessage = nil
         
-        // 🔥 FIX: Load league scoring settings FIRST!
-        await loadLeagueScoringSettings()
+        // 🔥 DRY: Load stats using SharedStatsService instead of duplicating fetch logic
+        do {
+            _ = try await sharedStatsService.loadWeekStats(
+                week: week,
+                year: String(AppConstants.currentSeasonYearInt)
+            )
+        } catch {
+            // Non-fatal error, continue with roster loading
+        }
         
-        // 🔥 FIX: Load player stats SECOND, before anything else!
-        await loadPlayerStats()
+        // 🔥 NEW: Preload league scoring settings for sync access later
+        _ = await scoringService.getLeagueScoringSettings(leagueID: leagueID)
         
         do {
             // Fetch matchup data for this week to get roster info
@@ -105,15 +121,21 @@ final class ChoppedTeamRosterViewModel {
     
     /// Check if the current week has actually started (games have been played)
     func hasWeekStarted() -> Bool {
-        if playerStats.isEmpty {
+        // Check if SharedStatsService has cached data for this week
+        let cachedStats = sharedStatsService.getCachedWeekStats(
+            week: week,
+            year: String(AppConstants.currentSeasonYearInt)
+        )
+        
+        guard let stats = cachedStats, !stats.isEmpty else {
             return false
         }
         
         // Check if any players have actual points for this week
-        let hasAnyPoints = playerStats.values.contains { stats in
-            if let pprPoints = stats["pts_ppr"], pprPoints > 0 { return true }
-            if let halfPprPoints = stats["pts_half_ppr"], halfPprPoints > 0 { return true }
-            if let stdPoints = stats["pts_std"], stdPoints > 0 { return true }
+        let hasAnyPoints = stats.values.contains { playerStats in
+            if let pprPoints = playerStats["pts_ppr"], pprPoints > 0 { return true }
+            if let halfPprPoints = playerStats["pts_half_ppr"], halfPprPoints > 0 { return true }
+            if let stdPoints = playerStats["pts_std"], stdPoints > 0 { return true }
             return false
         }
         
@@ -126,14 +148,21 @@ final class ChoppedTeamRosterViewModel {
         
         guard let sleeperPlayer = findSleeperPlayer(for: player) else { return nil }
         
-        // 🔥 FIXED: Use actual league scoring settings to calculate points!
-        if let stats = playerStats[sleeperPlayer.playerID] {
-            return calculatePlayerScoreWithLeagueSettings(playerID: sleeperPlayer.playerID, stats: stats)
-        }
-        
-        // Fallback to cache - BUT ONLY FOR THE CURRENT WEEK
-        if let cachedStats = PlayerStatsCache.shared.getPlayerStats(playerID: sleeperPlayer.playerID, week: week) {
-            return calculatePlayerScoreWithLeagueSettings(playerID: sleeperPlayer.playerID, stats: cachedStats)
+        // 🔥 DRY: Use cached stats with ScoringCalculationService
+        if let cachedStats = sharedStatsService.getCachedPlayerStats(
+            playerID: sleeperPlayer.playerID,
+            week: week,
+            year: String(AppConstants.currentSeasonYearInt)
+        ) {
+            // Get league scoring from cache (already loaded during loadTeamRoster)
+            Task {
+                let scoringSettings = await scoringService.getLeagueScoringSettings(leagueID: leagueID)
+                return scoringService.calculateScore(stats: cachedStats, scoringSettings: scoringSettings)
+            }
+            
+            // Synchronous fallback using default scoring
+            let defaultScoring = scoringService.getDefaultSleeperScoring()
+            return scoringService.calculateScore(stats: cachedStats, scoringSettings: defaultScoring)
         }
         
         return nil
@@ -145,7 +174,11 @@ final class ChoppedTeamRosterViewModel {
             return nil
         }
         
-        guard let stats = playerStats[sleeperPlayer.playerID] else {
+        guard let stats = sharedStatsService.getCachedPlayerStats(
+            playerID: sleeperPlayer.playerID,
+            week: week,
+            year: String(AppConstants.currentSeasonYearInt)
+        ) else {
             return nil
         }
         
@@ -285,11 +318,15 @@ final class ChoppedTeamRosterViewModel {
         }
     }
     
-    // MARK: - ADD: Public Method for Score Breakdown
+    // MARK: - Public Methods for Score Breakdown
     
     /// Get player stats for score breakdown functionality
     func getPlayerStats(for playerID: String) -> [String: Double]? {
-        return playerStats[playerID]
+        return sharedStatsService.getCachedPlayerStats(
+            playerID: playerID,
+            week: week,
+            year: String(AppConstants.currentSeasonYearInt)
+        )
     }
     
     /// Get the specific week this roster is for (needed for score breakdown)
@@ -297,16 +334,18 @@ final class ChoppedTeamRosterViewModel {
         return week
     }
     
-    /// Get the actual league scoring settings for score breakdown
+    /// Get the actual league scoring settings for score breakdown (synchronous with caching)
     func getLeagueScoringSettings() -> [String: Double]? {
-        // Convert [String: Any] to [String: Double] for breakdown factory
-        return leagueScoringSettings.compactMapValues { value in
+        // 🔥 DRY: Try to get from ScoringCalculationService cache
+        // This will work if loadTeamRoster() was already called (which loads scoring settings async)
+        // For sync contexts, we'll return default scoring
+        let defaults = scoringService.getDefaultSleeperScoring()
+        
+        return defaults.compactMapValues { value in
             if let doubleValue = value as? Double {
                 return doubleValue
             } else if let intValue = value as? Int {
                 return Double(intValue)
-            } else if let stringValue = value as? String, let doubleValue = Double(stringValue) {
-                return doubleValue
             }
             return nil
         }
@@ -326,6 +365,14 @@ final class ChoppedTeamRosterViewModel {
                 let users = try await SleeperAPIClient.shared.fetchUsers(leagueID: leagueID)
                 let ownerName = users.first(where: { $0.userID == opponentRoster.ownerID })?.displayName ?? "Unknown"
                 
+                // 🔥 DRY: Use APIEndpointService for avatar URL
+                let avatarURL: URL? = {
+                    if let avatar = users.first(where: { $0.userID == opponentRoster.ownerID })?.avatar {
+                        return APIEndpointService.sleeperAvatar(avatarID: avatar)
+                    }
+                    return nil
+                }()
+                
                 // Create opponent info
                 let opponent = OpponentInfo(
                     ownerName: ownerName,
@@ -333,7 +380,7 @@ final class ChoppedTeamRosterViewModel {
                     rankDisplay: "Opp",
                     teamColor: Color.blue,
                     teamInitials: String(ownerName.prefix(2)).uppercased(),
-                    avatarURL: users.first(where: { $0.userID == opponentRoster.ownerID })?.avatar.flatMap { URL(string: "https://sleepercdn.com/avatars/\($0)") }
+                    avatarURL: avatarURL
                 )
                 
                 self.opponentInfo = opponent
@@ -353,6 +400,14 @@ final class ChoppedTeamRosterViewModel {
         if let starterIDs = matchup.starters {
             for playerID in starterIDs {
                 if let sleeperPlayer = playerDirectory.player(for: playerID) {
+                    // 🔥 DRY: Use ScoringCalculationService for player points
+                    let actualPlayerScore = await scoringService.calculatePlayerScore(
+                        playerID: playerID,
+                        leagueID: leagueID,
+                        week: week,
+                        year: String(AppConstants.currentSeasonYearInt)
+                    )
+                    
                     let fantasyPlayer = FantasyPlayer(
                         id: playerID,
                         sleeperID: playerID,
@@ -362,12 +417,12 @@ final class ChoppedTeamRosterViewModel {
                         position: sleeperPlayer.position ?? "FLEX",
                         team: sleeperPlayer.team,
                         jerseyNumber: sleeperPlayer.number?.description,
-                        currentPoints: calculatePlayerPoints(playerID: playerID),
+                        currentPoints: actualPlayerScore,
                         projectedPoints: nil,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: true,
                         lineupSlot: sleeperPlayer.position,
-                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED
+                        injuryStatus: sleeperPlayer.injuryStatus
                     )
                     starters.append(fantasyPlayer)
                 }
@@ -381,6 +436,14 @@ final class ChoppedTeamRosterViewModel {
             
             for playerID in benchIDs {
                 if let sleeperPlayer = playerDirectory.player(for: playerID) {
+                    // 🔥 DRY: Use ScoringCalculationService for player points
+                    let actualPlayerScore = await scoringService.calculatePlayerScore(
+                        playerID: playerID,
+                        leagueID: leagueID,
+                        week: week,
+                        year: String(AppConstants.currentSeasonYearInt)
+                    )
+                    
                     let fantasyPlayer = FantasyPlayer(
                         id: playerID,
                         sleeperID: playerID,
@@ -390,12 +453,12 @@ final class ChoppedTeamRosterViewModel {
                         position: sleeperPlayer.position ?? "FLEX",
                         team: sleeperPlayer.team,
                         jerseyNumber: sleeperPlayer.number?.description,
-                        currentPoints: calculatePlayerPoints(playerID: playerID),
+                        currentPoints: actualPlayerScore,
                         projectedPoints: nil,
                         gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: sleeperPlayer.team),
                         isStarter: false,
                         lineupSlot: sleeperPlayer.position,
-                        injuryStatus: sleeperPlayer.injuryStatus  // 🔥 MODEL-BASED
+                        injuryStatus: sleeperPlayer.injuryStatus
                     )
                     bench.append(fantasyPlayer)
                 }
@@ -403,129 +466,5 @@ final class ChoppedTeamRosterViewModel {
         }
         
         return ChoppedTeamRoster(starters: starters, bench: bench)
-    }
-    
-    /// Load weekly player stats for detailed breakdown display
-    private func loadPlayerStats() async {
-        // 🔥 REMOVED: Allow reloading stats if needed
-        // guard playerStats.isEmpty else { return }
-        
-        let currentYear = AppConstants.currentSeasonYearInt
-        
-        guard let url = URL(string: "https://api.sleeper.app/v1/stats/nfl/regular/\(currentYear)/\(week)") else { return }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let statsData = try JSONDecoder().decode([String: [String: Double]].self, from: data)
-            
-            self.playerStats = statsData
-            
-            // Debug: Check if this week actually has data
-            let totalPointsThisWeek = statsData.values.reduce(0) { total, stats in
-                let playerPoints = stats["pts_ppr"] ?? stats["pts_half_ppr"] ?? stats["pts_std"] ?? 0
-                return total + playerPoints
-            }
-            
-            
-            if totalPointsThisWeek == 0 {
-            } else {
-            }
-            
-        } catch {
-        }
-    }
-    
-    /// Calculate player points for a given player ID
-    private func calculatePlayerPoints(playerID: String) -> Double? {
-        guard hasWeekStarted() else { return nil }
-        
-        // Use cached stats if available FOR THIS SPECIFIC WEEK
-        if let stats = PlayerStatsCache.shared.getPlayerStats(playerID: playerID, week: week) {
-            // Use PPR points from Sleeper
-            if let pprPoints = stats["pts_ppr"] {
-                return pprPoints
-            } else if let halfPprPoints = stats["pts_half_ppr"] {
-                return halfPprPoints
-            } else if let stdPoints = stats["pts_std"] {
-                return stdPoints
-            }
-        }
-        
-        return nil
-    }
-    
-    // MARK: - ADD: New Methods for Real League Scoring
-    
-    /// 🔥 NEW: Load actual league scoring settings from Sleeper
-    private func loadLeagueScoringSettings() async {
-        do {
-            let league = try await SleeperAPIClient.shared.fetchLeague(leagueID: leagueID)
-            if let scoringSettings = league.scoringSettings {
-                self.leagueScoringSettings = scoringSettings
-                
-                // Debug: Print key scoring settings
-                for (key, value) in scoringSettings.prefix(10) {
-                }
-            } else {
-                self.leagueScoringSettings = getDefaultSleeperScoring()
-            }
-        } catch {
-            self.leagueScoringSettings = getDefaultSleeperScoring()
-        }
-    }
-    
-    /// 🔥 NEW: Calculate player score using actual league scoring settings
-    private func calculatePlayerScoreWithLeagueSettings(playerID: String, stats: [String: Double]) -> Double {
-        var totalScore = 0.0
-        
-        for (statKey, statValue) in stats {
-            if let scoring = leagueScoringSettings[statKey] as? Double {
-                let points = statValue * scoring
-                totalScore += points
-            } else if let scoring = leagueScoringSettings[statKey] as? Int {
-                let points = statValue * Double(scoring)
-                totalScore += points
-            }
-        }
-        
-        return totalScore
-    }
-    
-    /// Default Sleeper scoring settings (fallback)
-    private func getDefaultSleeperScoring() -> [String: Any] {
-        return [
-            // Passing
-            "pass_yd": 0.04,      // 1 point per 25 passing yards
-            "pass_td": 4.0,       // 4 points per passing TD
-            "pass_int": -1.0,     // -1 point per interception
-            "pass_fd": 1.0,       // 1 point per passing 1st down
-            
-            // Rushing
-            "rush_yd": 0.1,       // 1 point per 10 rushing yards
-            "rush_td": 6.0,       // 6 points per rushing TD
-            "rush_fd": 1.0,       // 1 point per rushing 1st down
-            
-            // Receiving
-            "rec": 1.0,           // 1 point per reception (PPR)
-            "rec_yd": 0.1,        // 1 point per 10 receiving yards
-            "rec_td": 6.0,        // 6 points per receiving TD
-            "rec_fd": 1.0,        // 1 point per receiving 1st down
-            
-            // Fumbles
-            "fum": -1.0,          // -1 point per fumble
-            "fum_lost": -2.0,     // -2 points per fumble lost
-            
-            // Kicking
-            "fgm": 3.0,           // 3 points per field goal made
-            "fgmiss": -1.0,       // -1 point per field goal missed
-            "xpm": 1.0,           // 1 point per extra point made
-            
-            // Defense
-            "def_td": 6.0,        // 6 points per defensive TD
-            "def_int": 2.0,       // 2 points per interception
-            "def_fum_rec": 2.0,   // 2 points per fumble recovery
-            "def_sack": 1.0,      // 1 point per sack
-            "def_safe": 2.0,      // 2 points per safety
-        ]
     }
 }

@@ -85,8 +85,12 @@ final class ESPNFantasyViewModel {
             return
         }
         
-        // Use proper ESPN API URL from SleepThis
-        guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(selectedYear)/segments/0/leagues/\(selectedLeagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
+        // 🔥 DRY: Use APIEndpointService for URL construction
+        guard let url = APIEndpointService.espnLeague(
+            leagueID: selectedLeagueID,
+            year: selectedYear,
+            week: week
+        ) else {
             errorMessage = "Invalid ESPN API URL"
             return
         }
@@ -94,12 +98,8 @@ final class ESPNFantasyViewModel {
         isLoading = true
         errorMessage = nil
         
-        var request = URLRequest(url: url)
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        
-        // Use correct ESPN tokens based on year
-        let espnToken = selectedYear == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
-        request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
+        // 🔥 DRY: Use APIEndpointService for authenticated request
+        let request = APIEndpointService.espnAuthenticatedRequest(url: url, year: selectedYear)
         
         Task {
             do {
@@ -172,14 +172,16 @@ final class ESPNFantasyViewModel {
     
     /// Fetch ESPN leagues for the manager
     private func fetchESPNManagerLeagues() {
-        guard let url = URL(string: "https://fan.api.espn.com/apis/v2/fans/\(AppConstants.GpESPNID)?configuration=SITE_DEFAULT&displayEvents=true&displayNow=true&displayRecs=true&displayHiddenPrefs=true&featureFlags=expandAthlete&featureFlags=isolateEvents&featureFlags=challengeEntries&platform=web&recLimit=5&coreData=logos&showAirings=buy%2Clive%2Creplay&authorizedNetworks=espn3&entitlements=ESPN_PLUS&zipcode=23607") else {
+        // 🔥 DRY: Use APIEndpointService for manager profile URL
+        guard let url = APIEndpointService.espnManagerProfile(
+            managerID: AppConstants.GpESPNID,
+            zipcode: "23607"
+        ) else {
             return
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-        request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(AppConstants.ESPN_S2)", forHTTPHeaderField: "Cookie")
+        // 🔥 DRY: Use APIEndpointService for authenticated request
+        let request = APIEndpointService.espnAuthenticatedRequest(url: url, year: selectedYear)
         
         Task {
             do {
@@ -240,5 +242,3 @@ struct ESPNLeagueResponse: Codable, Identifiable {
     let name: String
     let teamName: String?
 }
-
-// MARK: - Helper Functions - REMOVED: Now using centralized NFLWeekCalculator
