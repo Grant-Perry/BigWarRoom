@@ -77,7 +77,11 @@ struct AppEntryView: View {
                 unifiedLeagueManager: getOrCreateUnifiedLeagueManager(),
                 sharedStatsService: sharedStatsService,
                 gameStatusService: gameStatusService,
-                weekSelectionManager: weekSelectionManager
+                weekSelectionManager: weekSelectionManager,
+                playoffEliminationService: PlayoffEliminationService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials)
+                )  // 🔥 FIX: Add service
             )
         }
         return matchupDataStore!
@@ -93,7 +97,11 @@ struct AppEntryView: View {
                 sharedStatsService: sharedStatsService,
                 matchupDataStore: getOrCreateMatchupDataStore(),
                 gameDataService: nflGameDataService,
-				unifiedLeagueManager: getOrCreateUnifiedLeagueManager()
+				unifiedLeagueManager: getOrCreateUnifiedLeagueManager(),
+                playoffEliminationService: PlayoffEliminationService(
+                    sleeperClient: SleeperAPIClient(),
+                    espnClient: ESPNAPIClient(credentialsManager: espnCredentials)
+                )  // 🔥 FIX: Add service
             )
         }
         return matchupsHub!

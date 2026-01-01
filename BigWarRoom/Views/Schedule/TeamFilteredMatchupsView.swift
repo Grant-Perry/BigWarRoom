@@ -781,7 +781,8 @@ struct TeamFilteredMatchupsView: View {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     let nflGameDataService = NFLGameDataService.shared
@@ -793,7 +794,9 @@ struct TeamFilteredMatchupsView: View {
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService
+        gameDataService: nflGameDataService,
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     TeamFilteredMatchupsView(
@@ -848,7 +851,8 @@ struct TeamFilteredMatchupsView: View {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     let nflGameDataService2 = NFLGameDataService.shared
@@ -860,7 +864,9 @@ struct TeamFilteredMatchupsView: View {
         gameStatusService: gameStatusService,
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
-        gameDataService: nflGameDataService2
+        gameDataService: nflGameDataService2,
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     TeamFilteredMatchupsView(

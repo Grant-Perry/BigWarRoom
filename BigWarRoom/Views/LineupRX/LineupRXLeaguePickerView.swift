@@ -192,7 +192,8 @@ private struct LeagueRowView: View {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -203,7 +204,8 @@ private struct LeagueRowView: View {
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
-        unifiedLeagueManager: unifiedLeagueManager
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     NavigationView {

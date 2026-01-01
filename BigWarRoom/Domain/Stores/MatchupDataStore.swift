@@ -26,6 +26,7 @@ final class MatchupDataStore {
     private let sharedStatsService: SharedStatsService
     private let gameStatusService: GameStatusService
     private let weekSelectionManager: WeekSelectionManager
+    private let playoffEliminationService: PlayoffEliminationService  // 🔥 NEW: Phase 2 service
     
     // MARK: - Observable State
     
@@ -50,12 +51,14 @@ final class MatchupDataStore {
         unifiedLeagueManager: UnifiedLeagueManager,
         sharedStatsService: SharedStatsService,
         gameStatusService: GameStatusService,
-        weekSelectionManager: WeekSelectionManager
+        weekSelectionManager: WeekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService  // 🔥 NEW: Phase 2 service
     ) {
         self.unifiedLeagueManager = unifiedLeagueManager
         self.sharedStatsService = sharedStatsService
         self.gameStatusService = gameStatusService
         self.weekSelectionManager = weekSelectionManager
+        self.playoffEliminationService = playoffEliminationService  // 🔥 NEW: Store service
     }
     
     // MARK: - Public Interface
@@ -487,8 +490,8 @@ final class MatchupDataStore {
         let matchups = try await provider.fetchMatchups()
         DebugPrint(mode: .liveUpdates, "📦 STORE: Received \(matchups.count) matchups for \(leagueDescriptor.leagueName)")
         
-        // 🔥 STEP 5A: Check for playoff elimination (empty matchups during playoffs)
-        if matchups.isEmpty && isPlayoffWeek(key.week, leagueWrapper: leagueWrapper) {
+        // 🔥 STEP 5A: Check for playoff elimination (empty matchups during playoffs) using service
+        if matchups.isEmpty && playoffEliminationService.isPlayoffWeek(league: leagueWrapper, week: key.week) {
             DebugPrint(mode: .matchupLoading, "🏆 STORE: Empty matchups during playoffs - checking elimination status")
             
             // Check PE toggle
@@ -512,8 +515,8 @@ final class MatchupDataStore {
         guard let myMatchup = provider.findMyMatchup(myTeamID: myTeamID) else {
             DebugPrint(mode: .liveUpdates, "⚠️ STORE: My matchup not found for \(leagueDescriptor.leagueName)")
             
-            // 🔥 STEP 6A: No matchup found - could be playoff elimination
-            if isPlayoffWeek(key.week, leagueWrapper: leagueWrapper) {
+            // 🔥 STEP 6A: No matchup found - could be playoff elimination (using service)
+            if playoffEliminationService.isPlayoffWeek(league: leagueWrapper, week: key.week) {
                 DebugPrint(mode: .matchupLoading, "🏆 STORE: No matchup found during playoffs - checking winners bracket for \(leagueDescriptor.leagueName)")
                 
                 let isInWinnersBracket = await checkWinnersBracket(
@@ -572,23 +575,6 @@ final class MatchupDataStore {
         case choppedEliminatedHidden
     }
     
-    /// Check if current week is playoffs
-    private func isPlayoffWeek(_ week: Int, leagueWrapper: UnifiedLeagueManager.LeagueWrapper) -> Bool {
-        let playoffStart: Int?
-        
-        if leagueWrapper.source == .sleeper {
-            playoffStart = leagueWrapper.league.settings?.playoffWeekStart ?? 15
-        } else {
-            playoffStart = 15  // ESPN default
-        }
-        
-        // Hard rule: week 15+ is always playoffs
-        if week >= 15 { return true }
-        
-        guard let start = playoffStart else { return false }
-        return week >= start
-    }
-    
     /// Check if Sleeper league is chopped/guillotine
     private func isSleeperChoppedLeagueResolved(_ leagueWrapper: UnifiedLeagueManager.LeagueWrapper) async -> Bool {
         guard leagueWrapper.source == .sleeper else { return false }
@@ -621,103 +607,12 @@ final class MatchupDataStore {
         week: Int,
         myTeamID: String
     ) async -> Bool {
+        // 🔥 PHASE 2: Use PlayoffEliminationService instead of local methods
         switch leagueWrapper.source {
         case .espn:
-            return await checkESPNWinnersBracket(leagueWrapper: leagueWrapper, week: week, myTeamID: myTeamID)
+            return await playoffEliminationService.isESPNTeamInWinnersBracket(league: leagueWrapper, week: week, myTeamID: myTeamID)
         case .sleeper:
-            return await checkSleeperWinnersBracket(leagueWrapper: leagueWrapper, week: week, myTeamID: myTeamID)
-        }
-    }
-    
-    /// Check ESPN winners bracket
-    private func checkESPNWinnersBracket(
-        leagueWrapper: UnifiedLeagueManager.LeagueWrapper,
-        week: Int,
-        myTeamID: String
-    ) async -> Bool {
-        guard let myTeamIdInt = Int(myTeamID) else { return false }
-        
-        do {
-            let year = getCurrentYear()
-            guard let url = URL(string: "https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/\(year)/segments/0/leagues/\(leagueWrapper.league.leagueID)?view=mMatchupScore&view=mLiveScoring&view=mRoster&view=mPositionalRatings&scoringPeriodId=\(week)") else {
-                return false
-            }
-            
-            var request = URLRequest(url: url)
-            request.addValue("application/json", forHTTPHeaderField: "Accept")
-            let espnToken = year == "2025" ? AppConstants.ESPN_S2_2025 : AppConstants.ESPN_S2
-            request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
-            
-            let (data, _) = try await URLSession.shared.data(for: request)
-            let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
-            
-            let playoffStartWeek = leagueWrapper.league.settings?.playoffWeekStart ?? 15
-            guard week >= playoffStartWeek else { return true }
-            
-            guard let schedule = model.schedule else { return true }
-            
-            if let entry = schedule.first(where: { entry in
-                guard entry.matchupPeriodId == week else { return false }
-                let homeId = entry.home.teamId
-                let awayId = entry.away?.teamId
-                return homeId == myTeamIdInt || awayId == myTeamIdInt
-            }) {
-                return (entry.playoffTierType ?? "NONE") == "WINNERS_BRACKET"
-            }
-            
-            let appearsInFutureWinners = schedule.contains { entry in
-                guard (entry.playoffTierType ?? "NONE") == "WINNERS_BRACKET" else { return false }
-                guard entry.matchupPeriodId >= week else { return false }
-                let homeId = entry.home.teamId
-                let awayId = entry.away?.teamId
-                return homeId == myTeamIdInt || awayId == myTeamIdInt
-            }
-            
-            return appearsInFutureWinners
-        } catch {
-            return true
-        }
-    }
-    
-    /// Check Sleeper winners bracket
-    private func checkSleeperWinnersBracket(
-        leagueWrapper: UnifiedLeagueManager.LeagueWrapper,
-        week: Int,
-        myTeamID: String
-    ) async -> Bool {
-        guard let myRosterID = Int(myTeamID) else { return false }
-        
-        let playoffStartWeek = leagueWrapper.league.settings?.playoffWeekStart ?? 15
-        let round = max(1, week - playoffStartWeek + 1)
-        
-        guard let url = URL(string: "https://api.sleeper.app/v1/league/\(leagueWrapper.league.leagueID)/winners_bracket") else {
-            return false
-        }
-        
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            let winnersBracket = try JSONDecoder().decode([SleeperPlayoffBracketMatchup].self, from: data)
-            
-            let eliminatedInWinners = winnersBracket.contains { matchup in
-                let isParticipant = matchup.team1RosterID == myRosterID || matchup.team2RosterID == myRosterID
-                return isParticipant && matchup.loserRosterID == myRosterID
-            }
-            if eliminatedInWinners { return false }
-            
-            let appearsThisRound = winnersBracket.contains { matchup in
-                matchup.round == round && (matchup.team1RosterID == myRosterID || matchup.team2RosterID == myRosterID)
-            }
-            
-            let myRounds = winnersBracket.compactMap { matchup -> Int? in
-                let isParticipant = matchup.team1RosterID == myRosterID || matchup.team2RosterID == myRosterID
-                return isParticipant ? matchup.round : nil
-            }
-            let firstAppearanceRound = myRounds.min()
-            let hasByeIntoLaterRound = (firstAppearanceRound != nil && firstAppearanceRound! > round)
-            
-            return appearsThisRound || hasByeIntoLaterRound
-        } catch {
-            return false
+            return await playoffEliminationService.isSleeperTeamInWinnersBracket(league: leagueWrapper, week: week, myTeamID: myTeamID)
         }
     }
     

@@ -582,7 +582,8 @@ struct OpponentIntelligenceDashboardView: View {
         unifiedLeagueManager: unifiedLeagueManager,
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
-        weekSelectionManager: weekSelectionManager
+        weekSelectionManager: weekSelectionManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -593,7 +594,8 @@ struct OpponentIntelligenceDashboardView: View {
         sharedStatsService: sharedStatsService,
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
-        unifiedLeagueManager: unifiedLeagueManager
+        unifiedLeagueManager: unifiedLeagueManager,
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperClient, espnClient: espnClient)  // 🔥 FIX: Add service
     )
     
     let allLivePlayersViewModel = AllLivePlayersViewModel(

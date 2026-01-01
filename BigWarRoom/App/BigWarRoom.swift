@@ -31,6 +31,7 @@ struct BigWarRoom: View {
     @State private var nflStandingsService: NFLStandingsService?
     @State private var teamAssetManager: TeamAssetManager?
     @State private var servicesInitialized = false
+    @State private var playoffEliminationService: PlayoffEliminationService?  // 🔥 NEW: Phase 2 service
     
     // 🔥 FIX: Initialize services IMMEDIATELY in init, not in onAppear
     init() {
@@ -117,11 +118,18 @@ struct BigWarRoom: View {
             espnCredentials: espnCreds
         )
         
+        // 🔥 NEW: Phase 2 - Create PlayoffEliminationService
+        playoffEliminationService = PlayoffEliminationService(
+            sleeperClient: sleeperAPIClient!,
+            espnClient: espnAPIClient
+        )
+        
         let matchupDataStore = MatchupDataStore(
             unifiedLeagueManager: unifiedLeagueManager,
             sharedStatsService: sharedStatsService!,
             gameStatusService: gameStatusService!,
-            weekSelectionManager: weekSelectionManager!
+            weekSelectionManager: weekSelectionManager!,
+            playoffEliminationService: playoffEliminationService!  // 🔥 NEW: Pass service
         )
         
         // 7. ViewModels with dependencies
@@ -133,7 +141,8 @@ struct BigWarRoom: View {
             sharedStatsService: sharedStatsService!,
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService!,
-            unifiedLeagueManager: unifiedLeagueManager
+            unifiedLeagueManager: unifiedLeagueManager,
+            playoffEliminationService: playoffEliminationService!  // 🔥 NEW: Pass service
         )
         
         // Create FantasyViewModel with dependencies
