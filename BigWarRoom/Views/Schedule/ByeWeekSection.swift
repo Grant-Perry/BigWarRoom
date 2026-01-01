@@ -420,7 +420,17 @@ struct ByeWeekImpactItem: Identifiable {
         sharedStatsService: sharedStatsService,
         gameStatusService: gameStatusService,
         weekSelectionManager: weekSelectionManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)
+    )
+    
+    let choppedLeagueService = ChoppedLeagueService(
+        sleeperClient: sleeperAPIClient,
+        playerDirectory: playerDirectory,
+        gameStatusService: gameStatusService,
+        sharedStatsService: sharedStatsService,
+        weekSelectionManager: weekSelectionManager,
+        seasonYearManager: seasonYearManager,
+        sleeperCredentials: sleeperCredentials
     )
     
     let matchupsHub = MatchupsHubViewModel(
@@ -432,7 +442,8 @@ struct ByeWeekImpactItem: Identifiable {
         matchupDataStore: matchupDataStore,
         gameDataService: nflGameDataService,
         unifiedLeagueManager: unifiedLeagueManager,
-        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient)  // 🔥 FIX: Add service
+        playoffEliminationService: PlayoffEliminationService(sleeperClient: sleeperAPIClient, espnClient: espnClient),
+        choppedLeagueService: choppedLeagueService
     )
     
     ZStack {

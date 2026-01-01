@@ -105,6 +105,7 @@ final class AppContainer {
     let bettingOddsService: BettingOddsService
     let oprKService: OPRKService
     let playoffEliminationService: PlayoffEliminationService  // 🔥 NEW: Phase 2 service
+    let choppedLeagueService: ChoppedLeagueService  // 🔥 NEW: Phase 2 service
     
     // App Management
     let appInitManager: AppInitializationManager
@@ -187,6 +188,17 @@ final class AppContainer {
             espnClient: espnAPIClient
         )
         
+        // 🔥 NEW: Phase 2 - ChoppedLeagueService
+        self.choppedLeagueService = ChoppedLeagueService(
+            sleeperClient: sleeperAPIClient,
+            playerDirectory: playerDirectory,
+            gameStatusService: gameStatusService,
+            sharedStatsService: sharedStatsService,
+            weekSelectionManager: weekSelectionManager,
+            seasonYearManager: seasonYearManager,
+            sleeperCredentials: sleeperCredentials
+        )
+        
         // MARK: - 🔥 PHASE 5: MatchupDataStore with DI
         let unifiedLeagueManagerForStore = UnifiedLeagueManager(
             sleeperClient: sleeperAPIClient,
@@ -212,7 +224,8 @@ final class AppContainer {
             matchupDataStore: matchupDataStore,
             gameDataService: nflGameDataService,
             unifiedLeagueManager: unifiedLeagueManagerForStore,
-            playoffEliminationService: playoffEliminationService  // 🔥 NEW: Pass service
+            playoffEliminationService: playoffEliminationService,  // 🔥 NEW: Pass service
+            choppedLeagueService: choppedLeagueService  // 🔥 NEW: Pass service
         )
         
         // MARK: - 🔥 PHASE 5: FantasyViewModel with DI
