@@ -220,8 +220,8 @@ extension MatchupsHubViewModel {
         
         let placeholderOpponent = FantasyTeam(
             id: "eliminated_placeholder",
-            name: "Eliminated from Playoffs",
-            ownerName: "Eliminated from Playoffs",
+            name: "Dreams Deferred",
+            ownerName: "Dreams Deferred",
             record: nil,
             avatar: nil,
             currentScore: 0.0,

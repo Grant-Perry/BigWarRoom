@@ -620,8 +620,8 @@ final class MatchupDataStore {
         // Create placeholder opponent
         let placeholderOpponent = FantasyTeam(
             id: "eliminated_placeholder",
-            name: "Eliminated from Playoffs",
-            ownerName: "Eliminated from Playoffs",
+            name: "Dreams Deferred",
+            ownerName: "Dreams Deferred",
             record: nil,
             avatar: nil,
             currentScore: 0.0,
@@ -717,8 +717,8 @@ final class MatchupDataStore {
     /// 🔁 NEW: Detect if matchup involves elimination
     private func detectEliminationStatus(matchup: FantasyMatchup, isChopped: Bool) -> Bool {
         // Method 1: Check for playoff elimination marker
-        if matchup.awayTeam.name == "Eliminated from Playoffs" || 
-           matchup.homeTeam.name == "Eliminated from Playoffs" {
+        if matchup.awayTeam.name == "Dreams Deferred" || 
+           matchup.homeTeam.name == "Dreams Deferred" {
             return true
         }
         

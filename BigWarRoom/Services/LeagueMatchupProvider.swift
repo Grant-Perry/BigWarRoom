@@ -452,35 +452,34 @@ final class LeagueMatchupProvider {
             faabUsed: nil
         )
         
-        let eliminatedOpponent = FantasyTeam(
-            id: "eliminated_playoffs",
-            name: "Eliminated from Playoffs",
-            ownerName: "Eliminated from Playoffs",
+        let placeholderOpponent = FantasyTeam(
+            id: "eliminated_placeholder",
+            name: "Dreams Deferred",
+            ownerName: "Dreams Deferred",
             record: nil,
             avatar: nil,
             currentScore: 0.0,
             projectedScore: 0.0,
             roster: [],
-            rosterID: nil,
+            rosterID: 0,
             faabTotal: nil,
             faabUsed: nil
         )
         
         let eliminatedMatchup = FantasyMatchup(
-            id: "\(league.league.leagueID)_\(week)_eliminated",
+            id: "\(league.league.leagueID)_eliminated_\(week)_\(myTeamID)",
             leagueID: league.league.leagueID,
             week: week,
             year: year,
             homeTeam: myTeam,
-            awayTeam: eliminatedOpponent,
+            awayTeam: placeholderOpponent,
             status: .complete,
             winProbability: 0.0,
-            startTime: nil,
+            startTime: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
             sleeperMatchups: nil
         )
         
-        matchups = [eliminatedMatchup]
-        DebugPrint(mode: .matchupLoading, "✅ Step 6: Created eliminated playoff matchup: \(myTeam.ownerName) vs Eliminated from Playoffs")
+        DebugPrint(mode: .matchupLoading, "✅ Step 6: Created eliminated playoff matchup: \(myTeam.ownerName) vs Dreams Deferred")
         DebugPrint(mode: .matchupLoading, "   Matchups array now has \(matchups.count) matchup(s)")
     }
     

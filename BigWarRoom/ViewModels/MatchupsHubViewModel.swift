@@ -598,7 +598,7 @@ struct UnifiedMatchup: Identifiable, Hashable {
 
 	  // 🔥 NEW: Check if MY manager is eliminated from a chopped league
    var isMyManagerEliminated: Bool {
-		 // 🔥 FIX: DO NOT mark as eliminated if opponent is "Eliminated from Playoffs"
+		 // 🔥 FIX: DO NOT mark as eliminated if opponent is "Dreams Deferred"
 		 // That means YOU are still in playoffs and THEY are eliminated!
 		 // (This is handled separately in the view filter logic)
 

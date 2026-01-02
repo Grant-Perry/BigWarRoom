@@ -419,7 +419,7 @@ struct LeagueMatchupsTabView: View {
     private var paginatedScrollView: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
-                HStack(spacing: 0) {
+                LazyHStack(spacing: 0) {
                     ForEach(Array(displayMatchups.enumerated()), id: \.element.id) { index, matchup in
                         FantasyMatchupDetailView(
                             matchup: matchup,
@@ -433,8 +433,7 @@ struct LeagueMatchupsTabView: View {
                 }
                 .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
-            .contentMargins(.horizontal, 20, for: .scrollContent)
+            .scrollTargetBehavior(.paging)
             .scrollIndicators(.hidden)
             .scrollPosition(id: $selectedMatchupID, anchor: .center)
             .onChange(of: isLoadingAllMatchups) { oldValue, newValue in

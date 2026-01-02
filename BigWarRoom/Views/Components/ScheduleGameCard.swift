@@ -64,12 +64,14 @@ struct ScheduleGameCard: View {
                             .font(.system(size: 24, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.6)
+                            .minimumScaleFactor(0.5)
                             .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         
                         Text(game.displayTime.uppercased())
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 3)
                             .background(
@@ -85,6 +87,8 @@ struct ScheduleGameCard: View {
                             Text(game.dayName.uppercased())
                                 .font(.system(size: 10, weight: .bold, design: .default))
                                 .foregroundColor(.white.opacity(0.8))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         }
                         
@@ -94,14 +98,14 @@ struct ScheduleGameCard: View {
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(game.awayScore > game.homeScore ? .gpGreen : .white)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             
                             Text("-")
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             
                             // Home team score
@@ -109,13 +113,15 @@ struct ScheduleGameCard: View {
                                 .font(.system(size: 24, weight: .bold, design: .rounded))
                                 .foregroundColor(game.homeScore > game.awayScore ? .gpGreen : .white)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                         }
                         
                         Text("FINAL")
                             .font(.system(size: 12, weight: .bold))
                             .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                 } else {
                     // Upcoming game
@@ -170,6 +176,7 @@ struct ScheduleGameCard: View {
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white.opacity(0.7))
                                 .lineLimit(1)
+                                .minimumScaleFactor(0.5)
                                 .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
                             
                             // Odds below start time
@@ -182,15 +189,21 @@ struct ScheduleGameCard: View {
                                             Text(team)
                                                 .font(.system(size: 16, weight: .black))
                                                 .foregroundColor(.white)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                             Text(ml)
                                                 .font(.system(size: 16, weight: .bold))
                                                 .foregroundColor(.gpGreen)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                         }
                                         .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                     } else if let spread = odds.spreadDisplay {
                                         Text(spread)
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
                                             .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                     }
                                     
@@ -204,6 +217,8 @@ struct ScheduleGameCard: View {
                                             Text(total)
                                                 .font(.system(size: 10, weight: .semibold))
                                                 .foregroundColor(.white.opacity(0.85))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                         }
                                         
                                         if let book = odds.sportsbookEnum {
@@ -217,6 +232,8 @@ struct ScheduleGameCard: View {
                                 Text("—")
                                     .font(.system(size: 16, weight: .medium))
                                     .foregroundColor(.white.opacity(0.3))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
                             }
                         } else {
                             // Non-classic mode: show odds prominently
@@ -229,15 +246,21 @@ struct ScheduleGameCard: View {
                                             Text(team)
                                                 .font(.system(size: 16, weight: .black))
                                                 .foregroundColor(.white)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                             Text(ml)
                                                 .font(.system(size: 16, weight: .bold))
                                                 .foregroundColor(.gpGreen)
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                         }
                                         .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                     } else if let spread = odds.spreadDisplay {
                                         Text(spread)
                                             .font(.system(size: 14, weight: .bold))
                                             .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.5)
                                             .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                     }
                                     
@@ -251,6 +274,8 @@ struct ScheduleGameCard: View {
                                             Text(total)
                                                 .font(.system(size: 10, weight: .semibold))
                                                 .foregroundColor(.white.opacity(0.85))
+                                                .lineLimit(1)
+                                                .minimumScaleFactor(0.5)
                                         }
                                         
                                         if let book = odds.sportsbookEnum {
@@ -264,6 +289,8 @@ struct ScheduleGameCard: View {
                                 Text("—")
                                     .font(.system(size: 20, weight: .medium))
                                     .foregroundColor(.white.opacity(0.3))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
                             }
                         }
                     }
@@ -438,10 +465,14 @@ struct ScheduleGameCardCompact: View {
                     Text(game.awayTeam)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                     
                     Text(getTeamRecord(for: game.awayTeam))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -454,20 +485,28 @@ struct ScheduleGameCardCompact: View {
                         Text("\(game.awayScore)")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(game.awayScore > game.homeScore ? .gpGreen : .white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                         
                         Text("-")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.3))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                         
                         Text("\(game.homeScore)")
                             .font(.system(size: 20, weight: .bold, design: .rounded))
                             .foregroundColor(game.homeScore > game.awayScore ? .gpGreen : .white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                     
                     if game.isLive {
                         Text(game.displayTime)
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Capsule().fill(Color.red))
@@ -475,6 +514,8 @@ struct ScheduleGameCardCompact: View {
                         Text("FINAL")
                             .font(.system(size: 9, weight: .bold))
                             .foregroundColor(.white.opacity(0.4))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
                     }
                 }
                 .frame(width: 80)
@@ -490,10 +531,14 @@ struct ScheduleGameCardCompact: View {
                     Text(game.homeTeam)
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                     
                     Text(getTeamRecord(for: game.homeTeam))
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
                 
                 // Logo
@@ -514,6 +559,8 @@ struct ScheduleGameCardCompact: View {
                     Text("\(team) \(ml)")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.7))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         .frame(width: 70, alignment: .trailing)
                         .padding(.leading, 8)
                 }
@@ -586,6 +633,8 @@ struct TeamLogoView: View {
                     Text(teamCode)
                         .font(.system(size: size * 0.25, weight: .bold))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
                 .frame(width: size, height: size)
             }

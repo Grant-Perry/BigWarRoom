@@ -374,13 +374,15 @@ struct FantasyPlayerCardNamePositionView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.white)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                        .minimumScaleFactor(0.5)
                         .shadow(color: .black.opacity(0.9), radius: 4, x: 0, y: 2)
                     
                     // Position badge - smaller, under name
                     Text(positionalRanking)
                         .font(.system(size: 9, weight: .black))
                         .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
                         .background(

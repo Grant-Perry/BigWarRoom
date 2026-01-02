@@ -177,7 +177,7 @@ struct FantasyDetailHeaderView: View {
     // MARK: - View Components
     
     private var teamComparisonRow: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 8) {
             // Home team (left side) - COMPACT
             VStack(spacing: 3) {
                 // Manager name FIRST
@@ -185,7 +185,7 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.yellow)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                 
                 // Avatar and Record on same line
                 HStack(spacing: 6) {
@@ -279,7 +279,7 @@ struct FantasyDetailHeaderView: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 140)
             
             // Center VS section - COMPACT
             VStack(spacing: 2) {
@@ -319,7 +319,7 @@ struct FantasyDetailHeaderView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.yellow)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
                 
                 // Avatar and Record on same line
                 HStack(spacing: 6) {
@@ -413,7 +413,7 @@ struct FantasyDetailHeaderView: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: 140)
         }
         .task {
             await loadProjectedScores()

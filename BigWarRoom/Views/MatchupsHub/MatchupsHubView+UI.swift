@@ -103,9 +103,9 @@ extension MatchupsHubView {
         
         // Filter based on settings
         return allMatchups.filter { matchup in
-            // Check if this is a playoff-eliminated league (opponent = "Eliminated from Playoffs")
+            // Check if this is a playoff-eliminated league (opponent = "Dreams Deferred")
             // IMPORTANT: This must run BEFORE ghost filtering because the placeholder opponent has no starters.
-            let isPlayoffEliminated = matchup.opponentTeam?.name == "Eliminated from Playoffs"
+            let isPlayoffEliminated = matchup.opponentTeam?.name == "Dreams Deferred"
             if isPlayoffEliminated {
                 return showPlayoffEliminated
             }

@@ -340,7 +340,7 @@ struct NFLScheduleView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.games, id: \.id) { game in
-                    // 🏈 Original 12/25 layout: NavigationLink with ScheduleGameCard at 80% width
+                    // 🏈 Original 12/25 layout: NavigationLink with ScheduleGameCard at 92% width
                     // Original card: no odds display, just day/time for upcoming games
                     NavigationLink(destination: TeamFilteredMatchupsView(
                         awayTeam: game.awayTeam,
@@ -356,7 +356,7 @@ struct NFLScheduleView: View {
                             showDayTime: true
                         )
                         .frame(maxWidth: .infinity)
-                        .frame(width: UIScreen.main.bounds.width * 0.8)
+                        .frame(width: UIScreen.main.bounds.width * 0.92)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -596,7 +596,7 @@ struct NFLScheduleView: View {
                                     action: {},
                                     showStartTime: true  // Show start time above odds
                                 )
-                                .padding(.horizontal, 40)  // 40px indent on each side
+                                .padding(.horizontal, 16)  // 16px indent on each side
                             }
                             .buttonStyle(.plain)
                         }
@@ -646,7 +646,7 @@ struct NFLScheduleView: View {
                 }
             }
         )
-        .padding(.horizontal, useMinimalHeaders ? 4 : 12)
+        .padding(.horizontal, useMinimalHeaders ? 6 : 10)
     }
     
     // MARK: -> Day Header
@@ -820,9 +820,9 @@ struct NFLScheduleView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, useMinimalHeaders ? 0 : (cardStyle == 0 ? 20 : 12))
-                .padding(.leading, useMinimalHeaders ? 40 : 0)  // 20px time indent + 20px additional
-                .padding(.trailing, useMinimalHeaders ? 20 : 0)
+                .padding(.horizontal, useMinimalHeaders ? 0 : (cardStyle == 0 ? 12 : 8))
+                .padding(.leading, useMinimalHeaders ? 16 : 0)
+                .padding(.trailing, useMinimalHeaders ? 16 : 0)
                 .padding(.top, useMinimalHeaders ? 0 : 8)
                 .padding(.bottom, useMinimalHeaders ? 0 : 10)
             }
@@ -885,9 +885,9 @@ struct NFLScheduleView: View {
                 .font(.system(size: useMinimalHeaders ? 12 : 16, weight: .bold, design: .default))
                 .foregroundColor(.white.opacity(useMinimalHeaders ? 0.4 : 0.7))
         }
-        .padding(.horizontal, useMinimalHeaders ? 0 : 14)
+        .padding(.horizontal, useMinimalHeaders ? 0 : 10)
         .padding(.vertical, useMinimalHeaders ? 6 : 10)
-        .padding(.leading, useMinimalHeaders ? 20 : 0)
+        .padding(.leading, useMinimalHeaders ? 12 : 0)
         .padding(.trailing, useMinimalHeaders ? 12 : 0)
         .background(
             Group {
