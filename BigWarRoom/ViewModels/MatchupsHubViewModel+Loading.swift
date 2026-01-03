@@ -29,6 +29,18 @@ extension MatchupsHubViewModel {
             loadingProgress = 0.0
         }
         
+        // 🚀 NEW: Check for cached data first
+        let currentWeek = getCurrentWeek()
+        let currentYear = getCurrentYear()
+        
+        if let cachedData = MatchupCacheManager.shared.loadCachedData(week: currentWeek, year: currentYear) {
+            DebugPrint(mode: .matchupLoading, "⚡ CACHE HIT: Loading \(cachedData.snapshots.count) matchups from cache!")
+            await loadMatchupsFromCache(cachedData)
+            return
+        }
+        
+        DebugPrint(mode: .matchupLoading, "📦 CACHE MISS: Fetching fresh data...")
+        
         do {
             // Step 1: Fetch available leagues - 10% progress
             await updateProgress(0.10, message: "Loading available leagues...", sessionId: "STORE")
@@ -62,13 +74,13 @@ extension MatchupsHubViewModel {
                 )
             }
             
-            let currentWeek = getCurrentWeek()
             await matchupDataStore.warmLeagues(leagueDescriptors, week: currentWeek)
             
             // Step 3: Hydrate each matchup lazily - 40% -> 90% progress
             await updateProgress(0.40, message: "Loading matchups...", sessionId: "STORE")
             
             var loadedMatchups: [UnifiedMatchup] = []
+            var loadedSnapshots: [MatchupSnapshot] = []  // 🚀 NEW: Collect snapshots for caching
             let totalLeagues = availableLeagues.count
             var processedLeagues = 0
             
@@ -90,6 +102,9 @@ extension MatchupsHubViewModel {
                 // Hydrate matchup directly (no timeout)
                 do {
                     let snapshot = try await self.matchupDataStore.hydrateMatchup(snapshotID)
+                    
+                    // 🚀 NEW: Save snapshot for caching
+                    loadedSnapshots.append(snapshot)
                     
                     // 🔥 SINGLE CONVERSION POINT: Snapshot → UnifiedMatchup
                     let unifiedMatchup = convertSnapshotToUnifiedMatchup(snapshot, league: league)
@@ -113,6 +128,11 @@ extension MatchupsHubViewModel {
                 await updateProgress(progress, message: "Loaded \(processedLeagues) of \(totalLeagues) leagues", sessionId: "STORE")
             }
             
+            // 🚀 NEW: Save snapshots to cache
+            if !loadedSnapshots.isEmpty {
+                MatchupCacheManager.shared.saveCachedData(loadedSnapshots, week: currentWeek, year: currentYear)
+            }
+            
             // Update UI with loaded matchups
             await MainActor.run {
                 self.myMatchups = loadedMatchups.sorted { $0.priority > $1.priority }
@@ -132,6 +152,47 @@ extension MatchupsHubViewModel {
         }
         
         DebugPrint(mode: .matchupLoading, "🔥 STORE: performLoadAllMatchups COMPLETE - \(myMatchups.count) matchups")
+    }
+    
+    /// 🚀 NEW: Load matchups from cache (instant!)
+    private func loadMatchupsFromCache(_ cachedData: CachedMatchupData) async {
+        await updateProgress(0.20, message: "Loading from cache...", sessionId: "CACHE")
+        
+        // Get available leagues to create wrappers
+        let sleeperUserID = sleeperCredentials.getUserIdentifier()
+        await unifiedLeagueManager.fetchAllLeagues(
+            sleeperUserID: sleeperUserID,
+            season: cachedData.year
+        )
+        
+        await updateProgress(0.50, message: "Building matchups from cache...", sessionId: "CACHE")
+        
+        var loadedMatchups: [UnifiedMatchup] = []
+        
+        // Convert cached snapshots back to MatchupSnapshots
+        for cachedSnapshot in cachedData.snapshots {
+            guard let snapshot = cachedSnapshot.toMatchupSnapshot() else {
+                DebugPrint(mode: .matchupLoading, "⚠️ Failed to convert cached snapshot")
+                continue
+            }
+            
+            // Find the corresponding league wrapper
+            if let league = unifiedLeagueManager.allLeagues.first(where: { $0.id == snapshot.league.id }) {
+                let unifiedMatchup = convertSnapshotToUnifiedMatchup(snapshot, league: league)
+                loadedMatchups.append(unifiedMatchup)
+            }
+        }
+        
+        await updateProgress(0.90, message: "Finalizing cached data...", sessionId: "CACHE")
+        
+        await MainActor.run {
+            self.myMatchups = loadedMatchups.sorted { $0.priority > $1.priority }
+        }
+        
+        await updateProgress(1.0, message: "Loaded from cache!", sessionId: "CACHE")
+        await finalizeLoading()
+        
+        DebugPrint(mode: .matchupLoading, "⚡ CACHE: Loaded \(myMatchups.count) matchups from cache in <1 second!")
     }
     
     /// 🔥 NEW: Bulletproof progress update that forces UI refresh

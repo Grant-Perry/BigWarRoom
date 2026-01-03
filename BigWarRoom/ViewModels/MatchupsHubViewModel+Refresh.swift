@@ -128,6 +128,11 @@ extension MatchupsHubViewModel {
         
         DebugPrint(mode: .globalRefresh, "🔄 MANUAL REFRESH (PTR): Starting FULL refresh via store")
         
+        // 🚀 NEW: Clear matchup cache to force fresh fetch
+        let currentWeek = getCurrentWeek()
+        let currentYear = getCurrentYear()
+        MatchupCacheManager.shared.clearCache(week: currentWeek, year: currentYear)
+        
         // 🔥 PRESERVE Just Me Mode state during refresh
         let wasMicroModeEnabled = microModeEnabled
         let preservedExpandedCardId = expandedCardId

@@ -20,6 +20,9 @@ struct AppSettingsView: View {
 
 	  // 🔥 NEW: Bar-style layout toggle for Mission Control
    @AppStorage("MatchupsHub_UseBarLayout") private var useBarLayout = false
+   
+   // 🚀 NEW: Matchup caching toggle
+   @AppStorage("MatchupCacheEnabled") private var matchupCacheEnabled = true
 
 	  // 🎰 Preferred sportsbook for odds display
    @AppStorage("PreferredSportsbook") private var preferredSportsbookRaw: String = Sportsbook.bestLine.rawValue
@@ -219,8 +222,81 @@ struct AppSettingsView: View {
 					 Toggle("", isOn: $useBarLayout)
 						.labelsHidden()
 				  }
+				  
+				  // 🚀 NEW: Matchup Caching Toggle
+				  VStack(alignment: .leading, spacing: 12) {
+					 HStack {
+						Image(systemName: "bolt.fill")
+						   .foregroundColor(.gpGreen)
+						   .frame(width: 24)
 
-					 // Sportsbook Preference for Schedule Odds
+						VStack(alignment: .leading, spacing: 2) {
+						   Text("Enable Matchup Caching")
+							  .font(.subheadline)
+							  .fontWeight(.medium)
+
+						   Text("Cache matchup structure per week for faster loading")
+							  .font(.caption)
+							  .foregroundColor(.secondary)
+						}
+
+						Spacer()
+
+						Toggle("", isOn: $matchupCacheEnabled)
+						   .labelsHidden()
+						   .onChange(of: matchupCacheEnabled) { _, newValue in
+							  MatchupCacheManager.shared.setCacheEnabled(newValue)
+						   }
+					 }
+					 
+					 // Show cache info and clear button when enabled
+					 if matchupCacheEnabled {
+						VStack(alignment: .leading, spacing: 8) {
+						   HStack {
+							  Image(systemName: "info.circle.fill")
+								 .foregroundColor(.blue.opacity(0.7))
+								 .font(.system(size: 12))
+							  
+							  if let cacheInfo = MatchupCacheManager.shared.getCacheInfo() {
+								 Text(cacheInfo)
+									.font(.caption2)
+									.foregroundColor(.secondary)
+							  } else {
+								 Text("No cached data yet")
+									.font(.caption2)
+									.foregroundColor(.secondary)
+							  }
+							  
+							  Spacer()
+							  
+							  Text(MatchupCacheManager.shared.getCacheSizeString())
+								 .font(.caption2)
+								 .foregroundColor(.secondary)
+						   }
+						   
+						   Button(role: .destructive) {
+							  MatchupCacheManager.shared.clearAllCache()
+						   } label: {
+							  HStack {
+								 Image(systemName: "trash.fill")
+									.font(.system(size: 12))
+								 Text("Clear Matchup Cache")
+									.font(.caption)
+							  }
+							  .foregroundColor(.red)
+							  .padding(.vertical, 6)
+							  .padding(.horizontal, 12)
+							  .background(Color.red.opacity(0.1))
+							  .cornerRadius(6)
+						   }
+						}
+						.padding(.leading, 32)
+						.padding(.top, 4)
+					 }
+				  }
+				  .padding(.vertical, 4)
+
+				  // Sportsbook Preference for Schedule Odds
 				  VStack(alignment: .leading, spacing: 12) {
 					 HStack {
 						Image(systemName: "dollarsign.circle.fill")

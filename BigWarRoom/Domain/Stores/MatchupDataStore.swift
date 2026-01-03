@@ -894,6 +894,7 @@ final class MatchupDataStore {
     }
 }
 
+
 // MARK: - Supporting Types
 
 extension MatchupDataStore {
@@ -927,11 +928,52 @@ extension MatchupDataStore {
     }
     
     /// Loading state
-    enum LoadState {
+    enum LoadState: Codable {
         case loadingBasic    // Initial skeleton load
         case loading         // Full refresh
         case loaded          // Data available
         case error(String)   // Failed to load
+        
+        // MARK: - Codable conformance
+        enum CodingKeys: String, CodingKey {
+            case type
+            case errorMessage
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let type = try container.decode(String.self, forKey: .type)
+            
+            switch type {
+            case "loadingBasic":
+                self = .loadingBasic
+            case "loading":
+                self = .loading
+            case "loaded":
+                self = .loaded
+            case "error":
+                let errorMessage = try container.decode(String.self, forKey: .errorMessage)
+                self = .error(errorMessage)
+            default:
+                self = .loaded
+            }
+        }
+        
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            
+            switch self {
+            case .loadingBasic:
+                try container.encode("loadingBasic", forKey: .type)
+            case .loading:
+                try container.encode("loading", forKey: .type)
+            case .loaded:
+                try container.encode("loaded", forKey: .type)
+            case .error(let message):
+                try container.encode("error", forKey: .type)
+                try container.encode(message, forKey: .errorMessage)
+            }
+        }
     }
 }
 
@@ -974,19 +1016,19 @@ struct MatchupSnapshot: Identifiable {
 }
 
 /// Snapshot of a team in a matchup
-struct TeamSnapshot {
+struct TeamSnapshot: Codable {
     let info: TeamInfo
     let score: ScoreInfo
     let roster: [PlayerSnapshot]
     
-    struct TeamInfo {
+    struct TeamInfo: Codable {
         let teamID: String
         let ownerName: String
         let record: String
         let avatarURL: String?
     }
     
-    struct ScoreInfo {
+    struct ScoreInfo: Codable {
         let actual: Double
         let projected: Double
         let winProbability: Double?
@@ -995,13 +1037,13 @@ struct TeamSnapshot {
 }
 
 /// Snapshot of a player
-struct PlayerSnapshot: Identifiable {
+struct PlayerSnapshot: Identifiable, Codable {
     let id: String
     let identity: PlayerIdentity
     let metrics: PlayerMetrics
     let context: PlayerContext
     
-    struct PlayerIdentity {
+    struct PlayerIdentity: Codable {
         let playerID: String
         let sleeperID: String?
         let espnID: String?
@@ -1010,7 +1052,7 @@ struct PlayerSnapshot: Identifiable {
         let fullName: String
     }
     
-    struct PlayerMetrics {
+    struct PlayerMetrics: Codable {
         let currentScore: Double
         let projectedScore: Double
         let delta: Double
@@ -1018,7 +1060,7 @@ struct PlayerSnapshot: Identifiable {
         let gameStatus: String?  // 🔁 FIX: Store as String, not enum
     }
     
-    struct PlayerContext {
+    struct PlayerContext: Codable {
         let position: String
         let lineupSlot: String?
         let isStarter: Bool
