@@ -248,6 +248,12 @@ final class MatchupDataStore {
         // 🔥 NEW: Clear changed players at start of refresh cycle
         changedPlayerIDs.removeAll()
         
+        if force {
+            let week = weekSelectionManager.selectedWeek
+            let year = getCurrentYear()
+            _ = try? await sharedStatsService.forceRefreshWeekStats(week: week, year: year)
+        }
+        
         if let league = league {
             // Refresh specific league
             await refreshLeague(league, force: force)
@@ -366,7 +372,7 @@ final class MatchupDataStore {
         let myTeam = isHomeTeamMine ? matchup.homeTeam : matchup.awayTeam
         let opponentTeam = isHomeTeamMine ? matchup.awayTeam : matchup.homeTeam
         
-        // Build team snapshots
+        // Build team snapshots for my/opponent orientation
         let myTeamSnapshot = TeamSnapshot(
             info: TeamSnapshot.TeamInfo(
                 teamID: myTeam.id,
@@ -399,12 +405,44 @@ final class MatchupDataStore {
             roster: opponentTeam.roster.map { dataConversionService.buildPlayerSnapshot(from: $0) }
         )
         
-        // Detect playoff and elimination status
+        // Build snapshots preserving true schedule sides from provider
+        let homeSnapshot = TeamSnapshot(
+            info: TeamSnapshot.TeamInfo(
+                teamID: matchup.homeTeam.id,
+                ownerName: matchup.homeTeam.ownerName,
+                record: dataConversionService.formatRecord(matchup.homeTeam.record),
+                avatarURL: matchup.homeTeam.avatar
+            ),
+            score: TeamSnapshot.ScoreInfo(
+                actual: matchup.homeTeam.currentScore ?? 0.0,
+                projected: matchup.homeTeam.projectedScore ?? 0.0,
+                winProbability: isHomeTeamMine ? matchup.winProbability : matchup.winProbability.map { 1.0 - $0 },
+                margin: (matchup.homeTeam.currentScore ?? 0.0) - (matchup.awayTeam.currentScore ?? 0.0)
+            ),
+            roster: matchup.homeTeam.roster.map { dataConversionService.buildPlayerSnapshot(from: $0) }
+        )
+        
+        let awaySnapshot = TeamSnapshot(
+            info: TeamSnapshot.TeamInfo(
+                teamID: matchup.awayTeam.id,
+                ownerName: matchup.awayTeam.ownerName,
+                record: dataConversionService.formatRecord(matchup.awayTeam.record),
+                avatarURL: matchup.awayTeam.avatar
+            ),
+            score: TeamSnapshot.ScoreInfo(
+                actual: matchup.awayTeam.currentScore ?? 0.0,
+                projected: matchup.awayTeam.projectedScore ?? 0.0,
+                winProbability: isHomeTeamMine ? matchup.winProbability.map { 1.0 - $0 } : matchup.winProbability,
+                margin: (matchup.awayTeam.currentScore ?? 0.0) - (matchup.homeTeam.currentScore ?? 0.0)
+            ),
+            roster: matchup.awayTeam.roster.map { dataConversionService.buildPlayerSnapshot(from: $0) }
+        )
+        
+        // Detect playoff/chopped/elimination states
         let isPlayoff = detectPlayoffStatus(leagueKey: leagueKey)
         let isChopped = detectChoppedLeague(leagueKey: leagueKey)
         let isEliminated = detectEliminationStatus(matchup: matchup, isChopped: isChopped)
         
-        // Build metadata
         let metadata = MatchupSnapshot.Metadata(
             status: matchup.status.rawValue,
             startTime: matchup.startTime,
@@ -413,7 +451,6 @@ final class MatchupDataStore {
             isEliminated: isEliminated
         )
         
-        // Create snapshot ID
         let snapshotID = MatchupSnapshot.ID(
             leagueID: leagueKey.leagueID,
             matchupID: matchup.id,
@@ -427,7 +464,10 @@ final class MatchupDataStore {
             myTeam: myTeamSnapshot,
             opponentTeam: opponentTeamSnapshot,
             league: leagueDescriptor,
-            lastUpdated: Date()
+            lastUpdated: Date(),
+            homeTeam: homeSnapshot,
+            awayTeam: awaySnapshot,
+            myTeamSide: isHomeTeamMine ? .home : .away
         )
     }
     
@@ -998,7 +1038,12 @@ struct MatchupSnapshot: Identifiable {
     let opponentTeam: TeamSnapshot
     let league: LeagueDescriptor
     let lastUpdated: Date
-    
+
+    enum TeamSide { case home, away }
+    let homeTeam: TeamSnapshot
+    let awayTeam: TeamSnapshot
+    let myTeamSide: TeamSide
+
     struct ID: Hashable {
         let leagueID: String
         let matchupID: String

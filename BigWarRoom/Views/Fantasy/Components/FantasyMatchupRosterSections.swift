@@ -92,7 +92,7 @@ struct FantasyMatchupActiveRosterSection: View {
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
             HStack(spacing: 4) {
-                Text("\(label): \(String(format: "%.2f", score))")
+                Text("*\(label)*: \(String(format: "%.2f", score))")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -117,7 +117,7 @@ struct FantasyMatchupActiveRosterSection: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
         } else {
-            Text("\(label): \(String(format: "%.2f", score))")
+            Text("*\(label)*: \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
@@ -270,7 +270,7 @@ struct FantasyMatchupBenchSection: View {
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
             HStack(spacing: 4) {
-                Text("\(label): \(String(format: "%.2f", score))")
+                Text("*\(label)*: \(String(format: "%.2f", score))")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -295,7 +295,7 @@ struct FantasyMatchupBenchSection: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
         } else {
-            Text("\(label): \(String(format: "%.2f", score))")
+            Text("*\(label)*: \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
@@ -405,33 +405,7 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 .padding(.horizontal, 16)
             
             HStack(alignment: .top, spacing: 16) {
-                // Home Team Active Roster (Left column - to match header)
-                VStack(spacing: 16) {
-                    let homeActiveRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: false)
-                    ForEach(homeActiveRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player,
-                            fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
-                            teamIndex: 1,
-                            isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
-                        )
-                    }
-                    
-                    let homeScore = fantasyViewModel.getScore(for: matchup, teamIndex: 1)
-                    let awayScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
-                    let homeWinning = homeScore > awayScore
-                    
-                    teamScoreCard(
-                        score: homeScore,
-                        isWinning: homeWinning,
-                        label: "Active Total"
-                    )
-                }
-                
-                // Away Team Active Roster (Right column - to match header)
+                // Away Team Active Roster (Left column - to match header)
                 VStack(spacing: 16) {
                     let awayActiveRoster = getRosterSorted(for: matchup, teamIndex: 0, isBench: false)
                     ForEach(awayActiveRoster, id: \.id) { player in
@@ -456,6 +430,32 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                         label: "Active Total"
                     )
                 }
+                
+                // Home Team Active Roster (Right column - to match header)
+                VStack(spacing: 16) {
+                    let homeActiveRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: false)
+                    ForEach(homeActiveRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel,
+                            matchup: matchup,
+                            teamIndex: 1,
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
+                        )
+                    }
+                    
+                    let homeScore = fantasyViewModel.getScore(for: matchup, teamIndex: 1)
+                    let awayScore = fantasyViewModel.getScore(for: matchup, teamIndex: 0)
+                    let homeWinning = homeScore > awayScore
+                    
+                    teamScoreCard(
+                        score: homeScore,
+                        isWinning: homeWinning,
+                        label: "Active Total"
+                    )
+                }
             }
             .padding(.horizontal, 16)
         }
@@ -463,7 +463,7 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
     
     @ViewBuilder
     private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
+        Text("*\(label)*: \(String(format: "%.2f", score))")
             .font(.subheadline)
             .fontWeight(.semibold)
             .foregroundColor(isWinning ? .gpGreen : .white)
@@ -500,7 +500,6 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 if order1 != order2 {
                     return highToLow ? order1 > order2 : order1 < order2
                 } else {
-                    // If same position, sort by score (high to low)
                     let points1 = player1.currentPoints ?? 0.0
                     let points2 = player2.currentPoints ?? 0.0
                     return points1 > points2
@@ -522,14 +521,12 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                // Live players first, then sort by score (most active = highest scoring)
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
-                    return live1 // Live players come first
+                    return live1
                 }
-                // Secondary sort by score (highest first)
                 let points1 = player1.currentPoints ?? 0.0
                 let points2 = player2.currentPoints ?? 0.0
                 return points1 > points2
@@ -575,30 +572,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                 .padding(.horizontal, 16)
             
             HStack(alignment: .top, spacing: 16) {
-                // Home Team Bench (Left column - to match header)
-                VStack(spacing: 16) {
-                    let homeBenchRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: true)
-                    ForEach(homeBenchRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player,
-                            fantasyViewModel: fantasyViewModel,
-                            matchup: matchup,
-                            teamIndex: 1,
-                            isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
-                        )
-                    }
-                    
-                    let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
-                    teamScoreCard(
-                        score: benchTotal,
-                        isWinning: false,
-                        label: "Total"
-                    )
-                }
-                
-                // Away Team Bench (Right column - to match header)
+                // Away Team Bench (Left column - to match header)
                 VStack(spacing: 16) {
                     let awayBenchRoster = getRosterSorted(for: matchup, teamIndex: 0, isBench: true)
                     ForEach(awayBenchRoster, id: \.id) { player in
@@ -620,6 +594,29 @@ struct FantasyMatchupBenchSectionSorted: View {
                         label: "Total"
                     )
                 }
+                
+                // Home Team Bench (Right column - to match header)
+                VStack(spacing: 16) {
+                    let homeBenchRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: true)
+                    ForEach(homeBenchRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel,
+                            matchup: matchup,
+                            teamIndex: 1,
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
+                        )
+                    }
+                    
+                    let benchTotal = homeBenchRoster.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    teamScoreCard(
+                        score: benchTotal,
+                        isWinning: false,
+                        label: "Total"
+                    )
+                }
             }
             .padding(.horizontal, 16)
         }
@@ -627,7 +624,7 @@ struct FantasyMatchupBenchSectionSorted: View {
     
     @ViewBuilder
     private func teamScoreCard(score: Double, isWinning: Bool, label: String) -> some View {
-        Text("\(label): \(String(format: "%.2f", score))")
+        Text("*\(label)*: \(String(format: "%.2f", score))")
             .font(.subheadline)
             .fontWeight(.semibold)
             .foregroundColor(.white)
@@ -682,13 +679,14 @@ struct FantasyMatchupBenchSectionSorted: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                // Live players first, then sort by score
+                // Live players first, then sort by score (most active = highest scoring)
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
-                    return live1
+                    return live1 // Live players come first
                 }
+                // Secondary sort by score (highest first)
                 let points1 = player1.currentPoints ?? 0.0
                 let points2 = player2.currentPoints ?? 0.0
                 return points1 > points2
@@ -713,8 +711,6 @@ struct FantasyMatchupBenchSectionSorted: View {
     }
 }
 
-// MARK: - FILTERED Roster Sections (with comprehensive filtering)
-
 /// **Active Roster Section with Full Filtering Capabilities**
 struct FantasyMatchupActiveRosterSectionFiltered: View {
     @Environment(MatchupsHubViewModel.self) private var matchupsHub
@@ -731,12 +727,10 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     let showActiveOnly: Bool
     let showYetToPlayOnly: Bool
     
-    // Local @State copies of filter values to prevent reset during parent re-renders
     @State private var localSelectedPosition: FantasyPosition = .all
     @State private var localShowActiveOnly: Bool = false
     @State private var localShowYetToPlayOnly: Bool = false
     
-    // LIVE UPDATES: Get fresh matchup data from hub (not stale parameter)
     private var currentMatchup: FantasyMatchup {
         let targetID = matchup.id
         let hubMatchupCount = matchupsHub.myMatchups.count
@@ -763,7 +757,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     @State private var projectionsLoaded = false
     @State private var lastHubUpdate = Date.distantPast
     
-    // POLLING FIX: Store hub update time locally to trigger view updates
     @State private var observedHubUpdateTime = Date.distantPast
     @State private var pollingTask: Task<Void, Never>?
     
@@ -773,33 +766,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         VStack(alignment: .leading, spacing: 12) {
             
             HStack(alignment: .top, spacing: 24) {
-                // Home Team Active Roster (Left column - to match header)
-                VStack(spacing: 20) {
-                    ForEach(cachedHomeRoster, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player,
-                            fantasyViewModel: fantasyViewModel,
-                            matchup: currentMatchup,
-                            teamIndex: 1,
-                            isBench: false,
-                            allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
-                        )
-                    }
-                    
-                    let homeScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 1)
-                    let awayScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 0)
-                    let homeWinning = homeScore > awayScore
-                    
-                    teamScoreCard(
-                        score: homeScore,
-                        projected: homeProjected,
-                        isWinning: homeWinning,
-                        label: "Total"
-                    )
-                }
-                
-                // Away Team Active Roster (Right column - to match header)
+                // Away Team Active Roster (Left column - to match header)
                 VStack(spacing: 20) {
                     ForEach(cachedAwayRoster, id: \.id) { player in
                         FantasyPlayerCard(
@@ -821,6 +788,32 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                         score: awayScore,
                         projected: awayProjected,
                         isWinning: awayWinning,
+                        label: "Total"
+                    )
+                }
+                
+                // Home Team Active Roster (Right column - to match header)
+                VStack(spacing: 20) {
+                    ForEach(cachedHomeRoster, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel,
+                            matchup: currentMatchup,
+                            teamIndex: 1,
+                            isBench: false,
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
+                        )
+                    }
+                    
+                    let homeScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 1)
+                    let awayScore = fantasyViewModel.getScore(for: currentMatchup, teamIndex: 0)
+                    let homeWinning = homeScore > awayScore
+                    
+                    teamScoreCard(
+                        score: homeScore,
+                        projected: homeProjected,
+                        isWinning: homeWinning,
                         label: "Total"
                     )
                 }
@@ -886,7 +879,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     }
     
     private var homeActiveRoster: [FantasyPlayer] {
-        let roster = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: false)
+        let roster = getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: false)
         
         if let firstPlayer = roster.first {
             DebugPrint(mode: .matchupLoading, "🏠 HOME ROSTER: \(firstPlayer.fullName) score=\(firstPlayer.currentPoints ?? -1)")
@@ -895,12 +888,12 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     }
     
     private var awayActiveRoster: [FantasyPlayer] {
-        return getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: false)
+        return getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: false)
     }
     
     private func updateCachedRosters() {
-        let newHome = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: false)
-        let newAway = getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: false)
+        let newHome = getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: false)
+        let newAway = getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: false)
         
         if let oldFirst = cachedHomeRoster.first, let newFirst = newHome.first {
             DebugPrint(mode: .matchupLoading, "🔄 UPDATE ROSTERS: \(newFirst.fullName) OLD=\(oldFirst.currentPoints ?? -1) NEW=\(newFirst.currentPoints ?? -1)")
@@ -928,7 +921,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
             HStack(spacing: 4) {
-                Text("\(label): \(String(format: "%.2f", score))")
+                Text("*\(label)*: \(String(format: "%.2f", score))")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -953,7 +946,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
         } else {
-            Text("\(label): \(String(format: "%.2f", score))")
+            Text("*\(label)*: \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
@@ -972,9 +965,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         }
     }
     
-    private func getFilteredRoster(for matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> [FantasyPlayer] {
-        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
-        
+    private func getFilteredRoster(forTeam team: FantasyTeam, isBench: Bool) -> [FantasyPlayer] {
         var filteredPlayers = team.roster.filter { player in
             isBench ? !player.isStarter : player.isStarter
         }
@@ -1123,30 +1114,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 .padding(.horizontal, 16)
             
             HStack(alignment: .top, spacing: 24) {
-                // Home Team Bench (Left column - to match header)
-                VStack(spacing: 20) {
-                    ForEach(cachedHomeBench, id: \.id) { player in
-                        FantasyPlayerCard(
-                            player: player,
-                            fantasyViewModel: fantasyViewModel,
-                            matchup: currentMatchup,
-                            teamIndex: 1,
-                            isBench: true,
-                            allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
-                        )
-                    }
-                    
-                    let benchTotal = cachedHomeBench.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
-                    teamScoreCard(
-                        score: benchTotal,
-                        projected: homeBenchProjected,
-                        isWinning: false,
-                        label: "Total"
-                    )
-                }
-                
-                // Away Team Bench (Right column - to match header)
+                // Away Team Bench (Left column - to match header)
                 VStack(spacing: 20) {
                     ForEach(cachedAwayBench, id: \.id) { player in
                         FantasyPlayerCard(
@@ -1164,6 +1132,29 @@ struct FantasyMatchupBenchSectionFiltered: View {
                     teamScoreCard(
                         score: benchTotal,
                         projected: awayBenchProjected,
+                        isWinning: false,
+                        label: "Total"
+                    )
+                }
+                
+                // Home Team Bench (Right column - to match header)
+                VStack(spacing: 20) {
+                    ForEach(cachedHomeBench, id: \.id) { player in
+                        FantasyPlayerCard(
+                            player: player,
+                            fantasyViewModel: fantasyViewModel,
+                            matchup: currentMatchup,
+                            teamIndex: 1,
+                            isBench: true,
+                            allLivePlayersViewModel: allLivePlayersViewModel,
+                            nflWeekService: nflWeekService
+                        )
+                    }
+                    
+                    let benchTotal = cachedHomeBench.reduce(0.0) { $0 + ($1.currentPoints ?? 0.0) }
+                    teamScoreCard(
+                        score: benchTotal,
+                        projected: homeBenchProjected,
                         isWinning: false,
                         label: "Total"
                     )
@@ -1230,16 +1221,16 @@ struct FantasyMatchupBenchSectionFiltered: View {
     }
     
     private var homeBenchRoster: [FantasyPlayer] {
-        return getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: true)
+        return getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: true)
     }
     
     private var awayBenchRoster: [FantasyPlayer] {
-        return getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: true)
+        return getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: true)
     }
     
     private func updateCachedRosters() {
-        cachedHomeBench = getFilteredRoster(for: currentMatchup, teamIndex: 1, isBench: true)
-        cachedAwayBench = getFilteredRoster(for: currentMatchup, teamIndex: 0, isBench: true)
+        cachedHomeBench = getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: true)
+        cachedAwayBench = getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: true)
         lastFilterUpdate = Date()
     }
     
@@ -1277,7 +1268,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
     private func teamScoreCard(score: Double, projected: Double, isWinning: Bool, label: String) -> some View {
         if projectionsLoaded && projected > 0 {
             HStack(spacing: 4) {
-                Text("\(label): \(String(format: "%.2f", score))")
+                Text("*\(label)*: \(String(format: "%.2f", score))")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
@@ -1302,7 +1293,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
             .lineLimit(1)
             .minimumScaleFactor(0.7)
         } else {
-            Text("\(label): \(String(format: "%.2f", score))")
+            Text("*\(label)*: \(String(format: "%.2f", score))")
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundColor(.white)
@@ -1321,9 +1312,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
         }
     }
     
-    private func getFilteredRoster(for matchup: FantasyMatchup, teamIndex: Int, isBench: Bool) -> [FantasyPlayer] {
-        let team = teamIndex == 0 ? matchup.awayTeam : matchup.homeTeam
-        
+    private func getFilteredRoster(forTeam team: FantasyTeam, isBench: Bool) -> [FantasyPlayer] {
         var filteredPlayers = team.roster.filter { player in
             isBench ? !player.isStarter : player.isStarter
         }
@@ -1386,21 +1375,20 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 return highToLow ? name1 > name2 : name1 < name2
                 
             case .team:
-                let team1 = player1.team?.lowercased() ?? ""
-                let team2 = player2.team?.lowercased() ?? ""
-                return highToLow ? team1 > team2 : team1 < team2
+                let t1 = player1.team?.lowercased() ?? ""
+                let t2 = player2.team?.lowercased() ?? ""
+                return highToLow ? t1 > t2 : t1 < t2
                 
             case .recentActivity:
-                // Live players first, then sort by score
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
                     return live1
                 }
-                let points1 = player1.currentPoints ?? 0.0
-                let points2 = player2.currentPoints ?? 0.0
-                return points1 > points2
+                let p1 = player1.currentPoints ?? 0.0
+                let p2 = player2.currentPoints ?? 0.0
+                return p1 > p2
             }
         }
         

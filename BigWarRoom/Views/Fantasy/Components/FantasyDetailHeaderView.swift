@@ -178,175 +178,27 @@ struct FantasyDetailHeaderView: View {
     
     private var teamComparisonRow: some View {
         HStack(spacing: 8) {
-            // Home team (left side) - COMPACT
+            // Away team (left side)
             VStack(spacing: 3) {
-                // Manager name FIRST
-                Text(matchup.homeTeam.ownerName)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.yellow)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                
-                // Avatar and Record on same line
-                HStack(spacing: 6) {
-                    // Smaller Avatar with border
-                    ZStack {
-                        if let url = matchup.homeTeam.avatarURL {
-                            AsyncTeamAvatarView(
-                                url: url,
-                                size: 32,
-                                fallbackInitials: getInitials(from: matchup.homeTeam.ownerName)
-                            )
-                        } else {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 32, height: 32)
-                                .overlay(
-                                    Text(getInitials(from: matchup.homeTeam.ownerName))
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.white)
-                                )
-                        }
-                        
-                        if homeTeamIsWinning {
-                            Circle()
-                                .strokeBorder(Color.gpGreen, lineWidth: 2)
-                                .frame(width: 36, height: 36)
-                        }
-                    }
-                    
-                    // Record (lose "Record:" label)
-                    let homeRecordText: String = {
-                        let managerID = matchup.homeTeam.id
-                        
-                        if let record = matchup.homeTeam.record {
-                            return record.displayString
-                        }
-                        
-                        if let teamId = Int(managerID),
-                           let record = fantasyViewModel?.espnTeamRecords[teamId] {
-                            return record.displayString
-                        }
-                        
-                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
-                            return record
-                        }
-                        
-                        return "N/A"
-                    }()
-                    Text(homeRecordText)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.gray)
-                }
-                
-                // SCORE
-                Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
-                
-                // Projected scores thermometer (if loaded)
-                if projectionsLoaded && homeProjected > 0 && awayProjected > 0 {
-                    projectedThermometerView(
-                        myProjected: homeProjected,
-                        opponentProjected: awayProjected,
-                        isHomeTeam: true
-                    )
-                    .padding(.vertical, 4)
-                }
-                
-                // Yet to play - larger number with projected points
-                VStack(spacing: 2) {
-                    Text("Yet to play:")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 4) {
-                        Text("\(homeTeamYetToPlay)")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
-                        
-                        if homeYetToPlayProjected > 0 {
-                            Text("~ +\(String(format: "%.1f", homeYetToPlayProjected))")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.gpGreen.opacity(0.8))
-                        }
-                    }
-                }
-            }
-            .frame(maxWidth: 140)
-            
-            // Center VS section - COMPACT
-            VStack(spacing: 2) {
-                Text("VS")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
-                    .font(.system(size: 10))
-                    .foregroundColor(.gray)
-                
-                if let scoreDiff = fantasyViewModel?.scoreDifferenceText(matchup: matchup), !scoreDiff.isEmpty {
-                    Text(scoreDiff)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.gpGreen)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.black.opacity(0.4))
-                        )
-                }
-                
-                // 🔥 NEW: Countdown timer (only during live games)
-                if SmartRefreshManager.shared.hasLiveGames {
-                    RefreshCountdownTimerView()
-                        .scaleEffect(0.8)
-                        .padding(.top, 4)
-                }
-            }
-            .frame(width: 60)
-            
-            // Away team (right side) - COMPACT
-            VStack(spacing: 3) {
-                // Manager name FIRST
                 Text(matchup.awayTeam.ownerName)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.yellow)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
-                
-                // Avatar and Record on same line
+
                 HStack(spacing: 6) {
-                    // Record (lose "Record:" label)
                     let awayRecordText: String = {
                         let managerID = matchup.awayTeam.id
-                        
-                        if let record = matchup.awayTeam.record {
-                            return record.displayString
-                        }
-                        
+                        if let record = matchup.awayTeam.record { return record.displayString }
                         if let teamId = Int(managerID),
-                           let record = fantasyViewModel?.espnTeamRecords[teamId] {
-                            return record.displayString
-                        }
-                        
-                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty {
-                            return record
-                        }
-                        
+                           let record = fantasyViewModel?.espnTeamRecords[teamId] { return record.displayString }
+                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty { return record }
                         return "N/A"
                     }()
                     Text(awayRecordText)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.gray)
-                    
-                    // Smaller Avatar with border
+
                     ZStack {
                         if let url = matchup.awayTeam.avatarURL {
                             AsyncTeamAvatarView(
@@ -370,7 +222,6 @@ struct FantasyDetailHeaderView: View {
                                         .foregroundColor(.white)
                                 )
                         }
-                        
                         if awayTeamIsWinning {
                             Circle()
                                 .strokeBorder(Color.gpGreen, lineWidth: 2)
@@ -378,13 +229,11 @@ struct FantasyDetailHeaderView: View {
                         }
                     }
                 }
-                
-                // SCORE
+
                 Text(String(format: "%.2f", matchup.awayTeam.currentScore ?? 0.0))
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
-                
-                // Projected scores thermometer (if loaded)
+
                 if projectionsLoaded && homeProjected > 0 && awayProjected > 0 {
                     projectedThermometerView(
                         myProjected: awayProjected,
@@ -393,20 +242,126 @@ struct FantasyDetailHeaderView: View {
                     )
                     .padding(.vertical, 4)
                 }
-                
-                // Yet to play - larger number with projected points
+
                 VStack(spacing: 2) {
                     Text("Yet to play:")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundColor(.secondary)
-                    
                     HStack(spacing: 4) {
                         Text("\(awayTeamYetToPlay)")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(awayTeamIsWinning ? .gpGreen : .red)
-                        
                         if awayYetToPlayProjected > 0 {
                             Text("~ +\(String(format: "%.1f", awayYetToPlayProjected))")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.gpGreen.opacity(0.8))
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: 140)
+
+            // Center VS section stays the same
+            VStack(spacing: 2) {
+                Text("VS")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                Text("Week \(fantasyViewModel?.selectedWeek ?? matchup.week)")
+                    .font(.system(size: 10))
+                    .foregroundColor(.gray)
+                if let scoreDiff = fantasyViewModel?.scoreDifferenceText(matchup: matchup), !scoreDiff.isEmpty {
+                    Text(scoreDiff)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.gpGreen)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.4))
+                        )
+                }
+                if SmartRefreshManager.shared.hasLiveGames {
+                    RefreshCountdownTimerView()
+                        .scaleEffect(0.8)
+                        .padding(.top, 4)
+                }
+            }
+            .frame(width: 60)
+
+            // Home team (right side)
+            VStack(spacing: 3) {
+                Text(matchup.homeTeam.ownerName)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.yellow)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+
+                HStack(spacing: 6) {
+                    ZStack {
+                        if let url = matchup.homeTeam.avatarURL {
+                            AsyncTeamAvatarView(
+                                url: url,
+                                size: 32,
+                                fallbackInitials: getInitials(from: matchup.homeTeam.ownerName)
+                            )
+                        } else {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 32, height: 32)
+                                .overlay(
+                                    Text(getInitials(from: matchup.homeTeam.ownerName))
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.white)
+                                )
+                        }
+                        if homeTeamIsWinning {
+                            Circle()
+                                .strokeBorder(Color.gpGreen, lineWidth: 2)
+                                .frame(width: 36, height: 36)
+                        }
+                    }
+
+                    let homeRecordText: String = {
+                        let managerID = matchup.homeTeam.id
+                        if let record = matchup.homeTeam.record { return record.displayString }
+                        if let teamId = Int(managerID),
+                           let record = fantasyViewModel?.espnTeamRecords[teamId] { return record.displayString }
+                        if let record = fantasyViewModel?.getManagerRecord(managerID: managerID), !record.isEmpty { return record }
+                        return "N/A"
+                    }()
+                    Text(homeRecordText)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+
+                Text(String(format: "%.2f", matchup.homeTeam.currentScore ?? 0.0))
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+
+                if projectionsLoaded && homeProjected > 0 && awayProjected > 0 {
+                    projectedThermometerView(
+                        myProjected: homeProjected,
+                        opponentProjected: awayProjected,
+                        isHomeTeam: true
+                    )
+                    .padding(.vertical, 4)
+                }
+
+                VStack(spacing: 2) {
+                    Text("Yet to play:")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Text("\(homeTeamYetToPlay)")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(homeTeamIsWinning ? .gpGreen : .red)
+                        if homeYetToPlayProjected > 0 {
+                            Text("~ +\(String(format: "%.1f", homeYetToPlayProjected))")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.gpGreen.opacity(0.8))
                         }

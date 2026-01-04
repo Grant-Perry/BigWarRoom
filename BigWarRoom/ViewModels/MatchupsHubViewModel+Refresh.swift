@@ -78,11 +78,13 @@ extension MatchupsHubViewModel {
         var refreshedMatchups: [UnifiedMatchup] = []
         
         for matchup in myMatchups {
+            let leagueID = matchup.league.id
+            let currentWeek = getCurrentWeek()
             let snapshotID = MatchupSnapshot.ID(
-                leagueID: matchup.league.league.leagueID,
-                matchupID: matchup.id,
+                leagueID: leagueID,
+                matchupID: "\(leagueID)_\(currentWeek)",
                 platform: matchup.league.source,
-                week: getCurrentWeek()
+                week: currentWeek
             )
             
             do {

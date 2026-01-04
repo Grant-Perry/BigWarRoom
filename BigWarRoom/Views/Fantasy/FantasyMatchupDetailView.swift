@@ -107,8 +107,8 @@ struct FantasyMatchupDetailView: View {
 
     // FIX: Extract content to separate view with proper padding
     private var contentView: some View {
-        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
+        let awayTeamScore = fantasyViewModel?.getScore(for: currentMatchup, teamIndex: 0) ?? currentMatchup.awayTeam.currentScore ?? 0.0
+        let homeTeamScore = fantasyViewModel?.getScore(for: currentMatchup, teamIndex: 1) ?? currentMatchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
         let homeTeamIsWinning = homeTeamScore > awayTeamScore
         
@@ -116,7 +116,7 @@ struct FantasyMatchupDetailView: View {
             // Fantasy detail header with team comparison
             FantasyDetailHeaderView(
                 leagueName: leagueName,
-                matchup: matchup,
+                matchup: currentMatchup,
                 awayTeamIsWinning: awayTeamIsWinning,
                 homeTeamIsWinning: homeTeamIsWinning,
                 fantasyViewModel: fantasyViewModel,
@@ -170,6 +170,13 @@ struct FantasyMatchupDetailView: View {
         return fantasyViewModel != nil
     }
 
+    private var currentMatchup: FantasyMatchup {
+        if let updated = matchupsHubViewModel.myMatchups.first(where: { $0.fantasyMatchup?.id == matchup.id })?.fantasyMatchup {
+            return updated
+        }
+        return matchup
+    }
+
     private var rosterScrollView: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -208,18 +215,18 @@ struct FantasyMatchupDetailView: View {
         VStack(spacing: 16) {
             // HOME team roster first
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(matchup.homeTeam.name) Roster")
+                Text("\(currentMatchup.homeTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(matchup.homeTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(currentMatchup.homeTeam.roster.filter { $0.isStarter }) { player in
                         // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 1,
                             isBench: false,
                             allLivePlayersViewModel: livePlayersViewModel,
@@ -232,18 +239,18 @@ struct FantasyMatchupDetailView: View {
 
             // AWAY team roster second
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(matchup.awayTeam.name) Roster")
+                Text("\(currentMatchup.awayTeam.name) Roster")
                     .font(.headline)
                     .foregroundColor(.white)
                     .padding(.horizontal)
 
                 LazyVGrid(columns: [GridItem(.flexible())], spacing: 8) {
-                    ForEach(matchup.awayTeam.roster.filter { $0.isStarter }) { player in
+                    ForEach(currentMatchup.awayTeam.roster.filter { $0.isStarter }) { player in
                         // 🔥 PURE DI: Pass injected instance
                         FantasyPlayerCard(
                             player: player,
                             fantasyViewModel: fantasyViewModel ?? defaultFantasyViewModel,
-                            matchup: matchup,
+                            matchup: currentMatchup,
                             teamIndex: 0,
                             isBench: false,
                             allLivePlayersViewModel: livePlayersViewModel,

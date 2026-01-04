@@ -99,6 +99,12 @@ final class MatchupCacheManager {
         do {
             let data = try Data(contentsOf: fileURL)
             let cachedData = try JSONDecoder().decode(CachedMatchupData.self, from: data)
+
+            let version = cachedData.schemaVersion ?? 1
+            if version < 2 {
+                DebugPrint(mode: .matchupLoading, "⚠️ Cache schema v\(version) < 2 (missing schedule sides). Ignoring cache for SSOT correctness.")
+                return nil
+            }
             
             // Update observable state
             lastCachedWeek = week
@@ -131,7 +137,8 @@ final class MatchupCacheManager {
             week: week,
             year: year,
             cacheDate: Date(),
-            snapshots: cachedSnapshots
+            snapshots: cachedSnapshots,
+            schemaVersion: 2
         )
         
         let fileURL = getCacheFileURL(week: week, year: year)
@@ -254,6 +261,7 @@ struct CachedMatchupData: Codable {
     let year: String
     let cacheDate: Date
     let snapshots: [CachedMatchupSnapshot]
+    let schemaVersion: Int?
 }
 
 /// Simplified snapshot for caching (uses String instead of LeagueSource enum)
@@ -264,7 +272,10 @@ struct CachedMatchupSnapshot: Codable {
     let opponentTeam: TeamSnapshot
     let league: CachedLeagueDescriptor
     let lastUpdated: Date
-    
+    let homeTeam: TeamSnapshot
+    let awayTeam: TeamSnapshot
+    let myTeamSide: String
+
     struct CachedMatchupID: Codable {
         let leagueID: String
         let matchupID: String
@@ -297,7 +308,7 @@ extension CachedMatchupSnapshot {
         self.id = CachedMatchupID(
             leagueID: snapshot.id.leagueID,
             matchupID: snapshot.id.matchupID,
-            platform: snapshot.id.platform.rawValue,  // Convert enum to String
+            platform: snapshot.id.platform.rawValue,
             week: snapshot.id.week
         )
         self.metadata = MatchupMetadata(
@@ -312,10 +323,13 @@ extension CachedMatchupSnapshot {
         self.league = CachedLeagueDescriptor(
             id: snapshot.league.id,
             name: snapshot.league.name,
-            platform: snapshot.league.platform.rawValue,  // Convert enum to String
+            platform: snapshot.league.platform.rawValue,
             avatarURL: snapshot.league.avatarURL
         )
         self.lastUpdated = snapshot.lastUpdated
+        self.homeTeam = snapshot.homeTeam
+        self.awayTeam = snapshot.awayTeam
+        self.myTeamSide = (snapshot.myTeamSide == .home) ? "home" : "away"
     }
     
     /// Convert back to MatchupSnapshot
@@ -347,7 +361,10 @@ extension CachedMatchupSnapshot {
                 platform: platformEnum,
                 avatarURL: league.avatarURL
             ),
-            lastUpdated: lastUpdated
+            lastUpdated: lastUpdated,
+            homeTeam: homeTeam,
+            awayTeam: awayTeam,
+            myTeamSide: (myTeamSide.lowercased() == "home") ? .home : .away
         )
     }
 }
