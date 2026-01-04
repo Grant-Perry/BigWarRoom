@@ -159,16 +159,9 @@ extension FantasyViewModel {
         }
         
         do {
-            // 🔥 PHASE 4: Use MatchupDataStore.refresh() with LeagueKey
-            let key = MatchupDataStore.LeagueKey(
-                leagueID: league.league.leagueID,
-                platform: league.source,
-                seasonYear: selectedYear,
-                week: selectedWeek
-            )
-            
-            await matchupDataStore.refresh(league: key, force: true)
-            
+            // 🔥 PHASE 4: Use MatchupDataStore.refresh() with league wrapper (not LeagueKey)
+            await matchupDataStore.refresh(league: league, force: true) // FIXED: Use wrapper, not LeagueKey
+
             // Now fetch the refreshed snapshot
             let snapshotID = MatchupSnapshot.ID(
                 leagueID: league.league.leagueID,

@@ -301,17 +301,28 @@ final class NFLGameDataService {
         let currentYear = year ?? AppConstants.currentSeasonYearInt
         let requestKey = "\(week)_\(currentYear)"
         
+        // 🚨 LOUD DEBUG - ALWAYS PRINT
+        print("🚨🚨🚨 NFLGameDataService.fetchGameData CALLED")
+        print("   Week: \(week)")
+        print("   Year: \(currentYear)")
+        print("   Force Refresh: \(forceRefresh)")
+        print("   Request Key: \(requestKey)")
+        
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Called with week=\(week), year=\(currentYear), forceRefresh=\(forceRefresh)")
         
         // Prevent duplicate requests
         guard !pendingRequests.contains(requestKey) else {
+            print("🚨 BLOCKED: Request already pending for \(requestKey)")
             DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Request already pending for \(requestKey)")
             return
         }
         
         // Throttle requests to prevent spam
         if !forceRefresh, let lastRequest = lastRequestTimestamp,
-           Date().timeIntervalSince(lastRequest) < minimumRequestInterval { return }
+           Date().timeIntervalSince(lastRequest) < minimumRequestInterval {
+            print("🚨 THROTTLED: Too soon since last request")
+            return
+        }
         
         // 🔥 DEBUG: Always force refresh during debugging of quarter issues
         let shouldForceRefresh = forceRefresh || true  // Temporary: always refresh
@@ -370,6 +381,9 @@ final class NFLGameDataService {
     
     /// Process ESPN API response into game info
     private func processGameData(_ response: NFLScoreboardResponse) {
+        print("🚨🚨🚨 NFLGameDataService.processGameData CALLED")
+        print("   Events count: \(response.events.count)")
+        
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processing \(response.events.count) events from ESPN API")
         
         var newGameData: [String: NFLGameInfo] = [:]
@@ -440,6 +454,11 @@ final class NFLGameDataService {
         
         gameData = newGameData
         
+        print("🚨 PROCESSED GAME DATA:")
+        print("   Total entries: \(newGameData.count)")
+        print("   Teams: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
+        print("   Live games: \(newGameData.values.filter { $0.isLive }.count)")
+        
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processed \(newGameData.count) game entries, teams playing: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
     }
 
@@ -452,6 +471,12 @@ final class NFLGameDataService {
         if gameInfo == nil && !isLoading {
             // 🔥 PHASE 4 DI: Use injected WeekSelectionManager
             let selectedWeek = weekSelectionManager.selectedWeek
+            
+            // 🔥 FIX: Don't fetch if we're still waiting for the real week from Sleeper API
+            guard !weekSelectionManager.isWaitingForRealWeek else {
+                DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.getGameInfo: Skipping fetch - still waiting for real week from Sleeper API")
+                return nil
+            }
             
             DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.getGameInfo: No data for team \(normalizedTeam), fetching week \(selectedWeek)")
             

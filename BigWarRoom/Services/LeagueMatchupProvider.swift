@@ -148,54 +148,14 @@ final class LeagueMatchupProvider {
                 request.addValue("SWID=\(AppConstants.SWID); espn_s2=\(espnToken)", forHTTPHeaderField: "Cookie")
 
                 let (data, _) = try await URLSession.shared.data(for: request)
+                DebugPrint(mode: .espnAPI, "🟣 RAW ESPN DATA (first 800 chars): \(String(data: data.prefix(800), encoding: .utf8) ?? "nil")")
+                DebugPrint(mode: .espnAPI, "🟣 (If you see a 'scoreboard' field or real stats here, you're getting data!)")
                 let model = try JSONDecoder().decode(ESPNFantasyLeagueModel.self, from: data)
-
-                // Process each matchup to determine winner/loser
-                guard let schedule = model.schedule else {
-                    DebugPrint(mode: .recordCalculation, "No schedule for week \(pastWeek), skipping")
-                    continue
+                DebugPrint(mode: .matchupLoading, "✅ fetchESPNData: Successfully decoded model with \(model.teams.count) teams, schedule: \(model.schedule?.count ?? 0) entries")
+                if let fullLeagueData = try? JSONDecoder().decode(ESPNLeague.self, from: data) {
+                    OPRKService.shared.updateOPRKData(from: fullLeagueData)
                 }
-                
-                for scheduleEntry in schedule {
-                    guard let awayTeam = scheduleEntry.away else {
-                        continue // Skip bye weeks where away team doesn't exist
-                    }
-                    let homeTeam = scheduleEntry.home
-
-                    // Calculate scores for this specific week
-                    let awayScore = calculateTeamScoreForWeek(team: awayTeam, week: pastWeek)
-                    let homeScore = calculateTeamScoreForWeek(team: homeTeam, week: pastWeek)
-
-                    // Initialize records if not exists
-                    if teamRecords[awayTeam.teamId] == nil {
-                        teamRecords[awayTeam.teamId] = TeamRecord(wins: 0, losses: 0, ties: 0)
-                    }
-                    if teamRecords[homeTeam.teamId] == nil {
-                        teamRecords[homeTeam.teamId] = TeamRecord(wins: 0, losses: 0, ties: 0)
-                    }
-
-                    // Determine winner
-                    if awayScore > homeScore {
-                        // Away team wins
-                        let currentAway = teamRecords[awayTeam.teamId]!
-                        let currentHome = teamRecords[homeTeam.teamId]!
-                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins + 1, losses: currentAway.losses, ties: currentAway.ties)
-                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins, losses: currentHome.losses + 1, ties: currentHome.ties)
-                    } else if homeScore > awayScore {
-                        // Home team wins
-                        let currentAway = teamRecords[awayTeam.teamId]!
-                        let currentHome = teamRecords[homeTeam.teamId]!
-                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins + 1, losses: currentHome.losses, ties: currentHome.ties)
-                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins, losses: currentAway.losses + 1, ties: currentAway.ties)
-                    } else {
-                        // Tie
-                        let currentAway = teamRecords[awayTeam.teamId]!
-                        let currentHome = teamRecords[homeTeam.teamId]!
-                        teamRecords[awayTeam.teamId] = TeamRecord(wins: currentAway.wins, losses: currentAway.losses, ties: (currentAway.ties ?? 0) + 1)
-                        teamRecords[homeTeam.teamId] = TeamRecord(wins: currentHome.wins, losses: currentHome.losses, ties: (currentHome.ties ?? 0) + 1)
-                    }
-                }
-
+                await processESPNData(model)
             } catch {
                 continue
             }
@@ -487,59 +447,15 @@ final class LeagueMatchupProvider {
         var fantasyPlayers: [FantasyPlayer] = []
         
         if let roster = espnTeam.roster {
-            // DebugPrint(mode: .lineupRX, "🔍 ESPN ROSTER DEBUG for team \(espnTeam.id):")
-            fantasyPlayers = roster.entries.map { entry in
+            for (i, entry) in roster.entries.prefix(5).enumerated() {
                 let player = entry.playerPoolEntry.player
                 let slotId = entry.lineupSlotId
                 let isActive = LineupSlots.isActiveSlot(slotId)
-                
-                // DebugPrint(mode: .lineupRX, "  Player: \(player.fullName.firstName ?? "") \(player.fullName.lastName ?? "") | Slot: \(slotId) (\(positionString(slotId))) | isStarter: \(isActive)")
-                
                 let weeklyScore = player.stats.first { stat in
                     stat.scoringPeriodId == week && stat.statSourceId == 0
                 }?.appliedTotal ?? 0.0
-                
-                // 💊 MAP ESPN ID TO SLEEPER ID for Lineup RX projections
-                let espnIDString = String(player.id)
-                var sleeperPlayer = playerDirectoryStore.playerByESPNID(espnIDString)
-                var sleeperID = sleeperPlayer?.playerID
-                
-                // Fallback: Search by name if ESPN ID mapping fails
-                if sleeperID == nil {
-                    let firstName = player.fullName.firstName ?? ""
-                    let lastName = player.fullName.lastName ?? ""
-                    let fullName = "\(firstName) \(lastName)".trimmingCharacters(in: .whitespaces)
-                    
-                    // Search through all players for a name match
-                    sleeperPlayer = playerDirectoryStore.players.values.first { sleeperPlayer in
-                        let sleeperFullName = "\(sleeperPlayer.firstName ?? "") \(sleeperPlayer.lastName ?? "")".trimmingCharacters(in: .whitespaces)
-                        return sleeperFullName.lowercased() == fullName.lowercased()
-                    }
-                    sleeperID = sleeperPlayer?.playerID
-                }
-                
-                // 🔥 CRITICAL FIX: Use player's ACTUAL position from Sleeper, not slot position
-                let actualPosition = sleeperPlayer?.position ?? positionString(entry.lineupSlotId)
-                
-                // 🔥 MODEL-BASED ENRICHMENT: Get injury status from looked-up Sleeper player
-                let injuryStatus = sleeperPlayer?.injuryStatus
-                
-                return FantasyPlayer(
-                    id: String(player.id),
-                    sleeperID: sleeperID,
-                    espnID: espnIDString,
-                    firstName: player.fullName.firstName,
-                    lastName: player.fullName.lastName,
-                    position: actualPosition,  // 🔥 Use ACTUAL position, not slot!
-                    team: player.nflTeamAbbreviation,
-                    jerseyNumber: getJerseyNumberForPlayer(espnID: espnIDString, team: player.nflTeamAbbreviation, name: "\(player.fullName.firstName) \(player.fullName.lastName)"),
-                    currentPoints: weeklyScore,
-                    projectedPoints: weeklyScore * 1.1,
-                    gameStatus: GameStatusService.shared.getGameStatusWithFallback(for: player.nflTeamAbbreviation),
-                    isStarter: LineupSlots.isActiveSlot(entry.lineupSlotId),
-                    lineupSlot: positionString(entry.lineupSlotId),
-                    injuryStatus: injuryStatus  // 🔥 NEW: Pass injury status from looked-up Sleeper player
-                )
+
+                DebugPrint(mode: .espnAPI, "🟢 ESPN Player [\(i)]: \(player.fullName.firstName ?? "") \(player.fullName.lastName ?? "") | slot: \(slotId) | week: \(week) | stat.appliedTotal: \(weeklyScore)")
             }
         }
         

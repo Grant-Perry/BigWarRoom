@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = .matchupLoading // [.liveUpdates, .matchupLoading] // .scoring // []
+   static var activeMode: DebugMode = [] // [.espnAPI, .matchupLoading, .globalRefresh]
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -126,7 +126,7 @@ private var debugPrintIterations: [String: Int] = [:]
 /// ```
 func DebugPrint(
     mode: DebugMode = .all,
-    limit: Int = 0, // 0 = infinite
+    limit: Int = 0,
     file: String = #file,
     line: Int = #line,
     function: String = #function,
@@ -136,6 +136,10 @@ func DebugPrint(
     guard !DebugConfig.activeMode.intersection(mode).isEmpty else {
         return
     }
+    
+    // Build the actual message
+    let fileName = (file as NSString).lastPathComponent
+    let actualMessage = message()
     
     // Handle iteration limiting
     if limit > 0 {
@@ -149,10 +153,10 @@ func DebugPrint(
         debugPrintIterations[key] = count + 1
         
         // Print with iteration info
-        let fileName = (file as NSString).lastPathComponent
         let iterInfo = "[\(count + 1)/\(limit)]"
+        print("[\(fileName):\(line)] \(iterInfo) \(actualMessage)")
     } else {
         // Unlimited printing
-        let fileName = (file as NSString).lastPathComponent
+        print("[\(fileName):\(line)] \(actualMessage)")
     }
 }

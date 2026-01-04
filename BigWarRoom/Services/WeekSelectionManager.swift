@@ -60,8 +60,10 @@ final class WeekSelectionManager {
     init(nflWeekService: NFLWeekService) {
         self.nflWeekService = nflWeekService
         
-        // Start with current NFL week (even if it's the default 1)
-        self.selectedWeek = nflWeekService.currentWeek
+        // 🔥 FIX: Start with a reasonable default (Week 18 for playoffs) instead of 1
+        // This prevents premature Week 1 fetches while waiting for Sleeper API
+        let fallbackWeek = 18 // Current week during playoffs
+        self.selectedWeek = nflWeekService.currentWeek == 1 ? fallbackWeek : nflWeekService.currentWeek
         
         DebugPrint(mode: .weekCheck, "📅 WeekSelectionManager.init: Initialized to Week \(selectedWeek) (from NFLWeekService.currentWeek)")
         
@@ -79,6 +81,7 @@ final class WeekSelectionManager {
         guard week != selectedWeek else { return }
         
         DebugPrint(mode: .weekCheck, "📅 WeekSelectionManager.selectWeek: User changed week from \(selectedWeek) to \(week)")
+        DebugPrint(mode: .weekCheck, "   ⚠️ CALL STACK: \(Thread.callStackSymbols.prefix(5).joined(separator: "\n   "))")
         
         selectedWeek = week
         lastChanged = Date()
@@ -116,6 +119,8 @@ final class WeekSelectionManager {
         }
         
         let realWeek = nflWeekService.currentWeek
+        
+        DebugPrint(mode: .weekCheck, "📅 WeekSelectionManager.fetchInitialWeekFromSleeper: realWeek=\(realWeek), isWaitingForRealWeek=\(isWaitingForRealWeek), currentSelectedWeek=\(selectedWeek)")
         
         // Only update if we're still on default week 1
         guard isWaitingForRealWeek && realWeek != 1 else {

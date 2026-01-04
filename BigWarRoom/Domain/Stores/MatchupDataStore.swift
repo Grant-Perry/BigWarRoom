@@ -212,8 +212,36 @@ final class MatchupDataStore {
     
     /// Get all cached matchups for a league
     func cachedMatchups(for league: LeagueKey) -> [MatchupSnapshot] {
-        guard let cache = leagueCaches[league] else { return [] }  // 🔥 FIX: Handle nil safely
+        guard let cache = leagueCaches[league] else { return [] }
         return Array(cache.matchups.values)
+    }
+    
+    /// 🔥 NEW: Add a snapshot to the store's cache (used when loading from file cache)
+    func cacheSnapshot(_ snapshot: MatchupSnapshot, for key: LeagueKey) {
+        // Ensure league cache exists
+        if leagueCaches[key] == nil {
+            leagueCaches[key] = LeagueCache(
+                summary: LeagueSummary(
+                    leagueID: key.leagueID,
+                    leagueName: snapshot.league.name,
+                    platform: key.platform,
+                    week: key.week,
+                    totalMatchups: 1,
+                    playoffWeekStart: nil,
+                    isChopped: false
+                ),
+                matchups: [:],
+                state: .loaded,
+                pendingTasks: [:],
+                lastRefreshed: Date()
+            )
+        }
+        
+        // Add snapshot to cache
+        leagueCaches[key]?.matchups[snapshot.id] = snapshot
+        leagueCaches[key]?.state = .loaded
+        
+        DebugPrint(mode: .liveUpdates, "✅ STORE: Cached snapshot for \(snapshot.league.name)")
     }
     
     /// Observe league updates (returns AsyncStream)
@@ -243,28 +271,42 @@ final class MatchupDataStore {
         }
     }
     
-    /// Refresh league data (manual or automatic)
-    func refresh(league: LeagueKey?, force: Bool) async {
-        // 🔥 NEW: Clear changed players at start of refresh cycle
-        changedPlayerIDs.removeAll()
+    /// Refresh data from the network, optionally force-bypassing cache
+    func refresh(league: UnifiedLeagueManager.LeagueWrapper?, force: Bool = false) async {
+        DebugPrint(mode: .globalRefresh, "📡 MatchupDataStore.refresh CALLED: league=\(league?.id ?? "ALL"), force=\(force)")
         
-        if force {
-            let week = weekSelectionManager.selectedWeek
-            let year = getCurrentYear()
-            _ = try? await sharedStatsService.forceRefreshWeekStats(week: week, year: year)
-        }
-        
+        // Case 1: Refresh specific league
         if let league = league {
-            // Refresh specific league
-            await refreshLeague(league, force: force)
-        } else {
-            // Refresh all leagues
+            let currentYear = getCurrentYear()
+            let currentWeek = weekSelectionManager.selectedWeek
+            
+            let key = LeagueKey(
+                leagueID: league.id,
+                platform: league.source,
+                seasonYear: currentYear,
+                week: currentWeek
+            )
+            
+            if leagueCaches[key] != nil {
+                DebugPrint(mode: .globalRefresh, "🔄 STORE: Refreshing single league \(league.league.name)")
+                await refreshLeague(key, force: force)
+            } else {
+                DebugPrint(mode: .globalRefresh, "⚠️ STORE: League \(league.id) not in cache - skipping refresh")
+            }
+        } 
+        // Case 2: Refresh all cached leagues
+        else {
+            DebugPrint(mode: .globalRefresh, "🔄 STORE: Refreshing ALL \(leagueCaches.count) cached leagues")
+            
             for key in leagueCaches.keys {
                 await refreshLeague(key, force: force)
             }
         }
         
+        // Update global refresh timestamp
         lastRefreshTime = Date()
+        
+        DebugPrint(mode: .globalRefresh, "✅ MatchupDataStore.refresh COMPLETE")
     }
     
     /// Clear all caches (for debugging / logout)
@@ -801,29 +843,33 @@ final class MatchupDataStore {
             return
         }
         
-        DebugPrint(mode: .liveUpdates, "🔄 STORE: Refreshing league \(key.leagueID)")
+        DebugPrint(mode: .liveUpdates, "🔄 STORE: Refreshing league \(key.leagueID) (force=\(force), \(cache.matchups.count) cached matchups)")
         
         cache.state = .loading
         leagueCaches[key] = cache
         emitSnapshot(for: key)
         
         // Refresh all cached matchups for this league
+        var refreshCount = 0
         for (matchupID, _) in cache.matchups {
             do {
+                DebugPrint(mode: .liveUpdates, "   🔄 Fetching fresh snapshot for \(matchupID.matchupID)...")
                 let newSnapshot = try await fetchMatchupSnapshot(id: matchupID, key: key)
                 
                 // 🔁 NEW: Detect changed players
                 if let oldSnapshot = previousSnapshots[matchupID] {
                     let changedPlayers = detectChangedPlayers(old: oldSnapshot, new: newSnapshot)
                     changedPlayerIDs.formUnion(changedPlayers)
+                    DebugPrint(mode: .liveUpdates, "   📊 Score: \(oldSnapshot.myTeam.score.actual) → \(newSnapshot.myTeam.score.actual) (\(changedPlayers.count) players changed)")
                 }
                 
                 // Update snapshots
-                previousSnapshots[matchupID] = cache.matchups[matchupID] // Store old before updating
+                previousSnapshots[matchupID] = cache.matchups[matchupID]
                 cache.matchups[matchupID] = newSnapshot
+                refreshCount += 1
                 
             } catch {
-                DebugPrint(mode: .liveUpdates, "❌ STORE: Failed to refresh matchup \(matchupID.matchupID): \(error)")
+                DebugPrint(mode: .liveUpdates, "   ❌ STORE: Failed to refresh matchup \(matchupID.matchupID): \(error)")
             }
         }
         
@@ -832,7 +878,7 @@ final class MatchupDataStore {
         leagueCaches[key] = cache
         emitSnapshot(for: key)
         
-        DebugPrint(mode: .liveUpdates, "✅ STORE: Refreshed \(cache.matchups.count) matchups for \(key.leagueID) - \(changedPlayerIDs.count) players changed")
+        DebugPrint(mode: .liveUpdates, "✅ STORE: Refreshed \(refreshCount)/\(cache.matchups.count) matchups for \(key.leagueID) - \(changedPlayerIDs.count) total players changed")
     }
     
     /// Calculate TTL for a league (shorter during live games)

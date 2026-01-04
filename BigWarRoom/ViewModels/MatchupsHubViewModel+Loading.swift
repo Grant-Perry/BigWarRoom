@@ -165,6 +165,18 @@ extension MatchupsHubViewModel {
             season: cachedData.year
         )
         
+        // 🔥 CRITICAL: Warm the store with league descriptors so refresh() can work
+        let currentWeek = getCurrentWeek()
+        let leagueDescriptors = unifiedLeagueManager.allLeagues.map { league in
+            LeagueDescriptor(
+                id: league.id,
+                name: league.league.name,
+                platform: league.source,
+                avatarURL: nil
+            )
+        }
+        await matchupDataStore.warmLeagues(leagueDescriptors, week: currentWeek)
+        
         await updateProgress(0.50, message: "Building matchups from cache...", sessionId: "CACHE")
         
         var loadedMatchups: [UnifiedMatchup] = []
@@ -175,6 +187,17 @@ extension MatchupsHubViewModel {
                 DebugPrint(mode: .matchupLoading, "⚠️ Failed to convert cached snapshot")
                 continue
             }
+            
+            // 🔥 CRITICAL: Pre-populate the store cache with this snapshot
+            // This ensures refresh() can find and update it later
+            let key = MatchupDataStore.LeagueKey(
+                leagueID: snapshot.id.leagueID,
+                platform: snapshot.id.platform,
+                seasonYear: cachedData.year,
+                week: snapshot.id.week
+            )
+            
+            await matchupDataStore.cacheSnapshot(snapshot, for: key)
             
             // Find the corresponding league wrapper
             if let league = unifiedLeagueManager.allLeagues.first(where: { $0.id == snapshot.league.id }) {
@@ -190,9 +213,9 @@ extension MatchupsHubViewModel {
         }
         
         await updateProgress(1.0, message: "Loaded from cache!", sessionId: "CACHE")
-        await finalizeLoading()
+        await finalizeCacheLoading()
         
-        DebugPrint(mode: .matchupLoading, "⚡ CACHE: Loaded \(myMatchups.count) matchups from cache in <1 second!")
+        DebugPrint(mode: .matchupLoading, "⚡ CACHE: Loaded \(myMatchups.count) matchups from cache + warmed store!")
     }
     
     /// 🔥 NEW: Bulletproof progress update that forces UI refresh
@@ -211,6 +234,22 @@ extension MatchupsHubViewModel {
             self.isLoading = false
             self.currentLoadingLeague = ""
             self.lastUpdateTime = Date()
+            
+            // Sort final matchups by priority
+            self.myMatchups.sort { $0.priority > $1.priority }
+        }
+        
+        // 💊 RX: Check optimization status for all matchups after loading
+        await refreshAllOptimizationStatuses()
+    }
+    
+    /// 🚀 NEW: Finalize cache loading WITHOUT setting lastUpdateTime
+    /// This allows immediate refresh after loading from cache
+    private func finalizeCacheLoading() async {
+        await MainActor.run {
+            self.isLoading = false
+            self.currentLoadingLeague = ""
+            // 🔥 DON'T set lastUpdateTime here - let the first refresh set it
             
             // Sort final matchups by priority
             self.myMatchups.sort { $0.priority > $1.priority }
