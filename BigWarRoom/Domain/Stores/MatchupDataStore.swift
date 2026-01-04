@@ -514,8 +514,8 @@ final class MatchupDataStore {
     }
     
     /// Fetch a matchup snapshot from providers
-    private func fetchMatchupSnapshot(id: MatchupSnapshot.ID, key: LeagueKey) async throws -> MatchupSnapshot {
-        DebugPrint(mode: .liveUpdates, "🔥 STORE: Fetching matchup snapshot for \(id.matchupID)")
+    private func fetchMatchupSnapshot(id: MatchupSnapshot.ID, key: LeagueKey, force: Bool = false) async throws -> MatchupSnapshot {
+        DebugPrint(mode: .liveUpdates, "🔥 STORE: Fetching matchup snapshot for \(id.matchupID) (force=\(force))")
         
         // Step 1: Get league descriptor
         guard let leagueDescriptor = leagueCaches[key]?.summary else {
@@ -577,9 +577,9 @@ final class MatchupDataStore {
             )
         }
         
-        // Step 5: Fetch matchup data from provider
-        DebugPrint(mode: .liveUpdates, "🔄 STORE: Fetching matchups from provider for \(leagueDescriptor.leagueName)")
-        let matchups = try await provider.fetchMatchups()
+        // Step 5: Fetch matchup data from provider WITH FORCE PARAMETER
+        DebugPrint(mode: .liveUpdates, "🔄 STORE: Fetching matchups from provider for \(leagueDescriptor.leagueName) (force=\(force))")
+        let matchups = try await provider.fetchMatchups(forceRefresh: force)
         DebugPrint(mode: .liveUpdates, "📦 STORE: Received \(matchups.count) matchups for \(leagueDescriptor.leagueName)")
         
         // 🔥 STEP 5A: Check for playoff elimination (empty matchups during playoffs) using service
@@ -851,17 +851,73 @@ final class MatchupDataStore {
         
         // Refresh all cached matchups for this league
         var refreshCount = 0
-        for (matchupID, _) in cache.matchups {
+        for (matchupID, oldSnapshot) in cache.matchups {
             do {
                 DebugPrint(mode: .liveUpdates, "   🔄 Fetching fresh snapshot for \(matchupID.matchupID)...")
-                let newSnapshot = try await fetchMatchupSnapshot(id: matchupID, key: key)
+                var newSnapshot = try await fetchMatchupSnapshot(id: matchupID, key: key, force: force)
                 
-                // 🔁 NEW: Detect changed players
-                if let oldSnapshot = previousSnapshots[matchupID] {
-                    let changedPlayers = detectChangedPlayers(old: oldSnapshot, new: newSnapshot)
-                    changedPlayerIDs.formUnion(changedPlayers)
-                    DebugPrint(mode: .liveUpdates, "   📊 Score: \(oldSnapshot.myTeam.score.actual) → \(newSnapshot.myTeam.score.actual) (\(changedPlayers.count) players changed)")
+                // 🔁 NEW: Update lastActivity timestamps for changed players
+                let myTeamUpdated = newSnapshot.myTeam.roster.map { player in
+                    if let oldPlayer = oldSnapshot.myTeam.roster.first(where: { $0.id == player.id }) {
+                        return updatePlayerActivityTime(player, oldScore: oldPlayer.metrics.currentScore)
+                    }
+                    return player
                 }
+                
+                let opponentTeamUpdated = newSnapshot.opponentTeam.roster.map { player in
+                    if let oldPlayer = oldSnapshot.opponentTeam.roster.first(where: { $0.id == player.id }) {
+                        return updatePlayerActivityTime(player, oldScore: oldPlayer.metrics.currentScore)
+                    }
+                    return player
+                }
+                
+                let homeTeamUpdated = newSnapshot.homeTeam.roster.map { player in
+                    if let oldPlayer = oldSnapshot.homeTeam.roster.first(where: { $0.id == player.id }) {
+                        return updatePlayerActivityTime(player, oldScore: oldPlayer.metrics.currentScore)
+                    }
+                    return player
+                }
+                
+                let awayTeamUpdated = newSnapshot.awayTeam.roster.map { player in
+                    if let oldPlayer = oldSnapshot.awayTeam.roster.first(where: { $0.id == player.id }) {
+                        return updatePlayerActivityTime(player, oldScore: oldPlayer.metrics.currentScore)
+                    }
+                    return player
+                }
+                
+                // Rebuild snapshot with updated timestamps
+                newSnapshot = MatchupSnapshot(
+                    id: newSnapshot.id,
+                    metadata: newSnapshot.metadata,
+                    myTeam: TeamSnapshot(
+                        info: newSnapshot.myTeam.info,
+                        score: newSnapshot.myTeam.score,
+                        roster: myTeamUpdated
+                    ),
+                    opponentTeam: TeamSnapshot(
+                        info: newSnapshot.opponentTeam.info,
+                        score: newSnapshot.opponentTeam.score,
+                        roster: opponentTeamUpdated
+                    ),
+                    league: newSnapshot.league,
+                    lastUpdated: Date(),
+                    homeTeam: TeamSnapshot(
+                        info: newSnapshot.homeTeam.info,
+                        score: newSnapshot.homeTeam.score,
+                        roster: homeTeamUpdated
+                    ),
+                    awayTeam: TeamSnapshot(
+                        info: newSnapshot.awayTeam.info,
+                        score: newSnapshot.awayTeam.score,
+                        roster: awayTeamUpdated
+                    ),
+                    myTeamSide: newSnapshot.myTeamSide
+                )
+                
+                // Detect changed players
+                let changedPlayers = detectChangedPlayers(old: oldSnapshot, new: newSnapshot)
+                changedPlayerIDs.formUnion(changedPlayers)
+                DebugPrint(mode: .liveUpdates, "   📊 Score: \(oldSnapshot.myTeam.score.actual) → \(newSnapshot.myTeam.score.actual) (\(changedPlayers.count) players changed)")
                 
                 // Update snapshots
                 previousSnapshots[matchupID] = cache.matchups[matchupID]
@@ -958,6 +1014,25 @@ final class MatchupDataStore {
         }
         
         return false
+    }
+    
+    /// 🔁 NEW: Update player snapshot with activity timestamp if score changed
+    private func updatePlayerActivityTime(_ player: PlayerSnapshot, oldScore: Double) -> PlayerSnapshot {
+        let scoreChanged = abs(player.metrics.currentScore - oldScore) > 0.01
+        let updatedMetrics = PlayerSnapshot.PlayerMetrics(
+            currentScore: player.metrics.currentScore,
+            projectedScore: player.metrics.projectedScore,
+            delta: player.metrics.currentScore - oldScore,
+            lastActivity: scoreChanged ? Date() : player.metrics.lastActivity,
+            gameStatus: player.metrics.gameStatus
+        )
+        
+        return PlayerSnapshot(
+            id: player.id,
+            identity: player.identity,
+            metrics: updatedMetrics,
+            context: player.context
+        )
     }
     
     /// 🔁 NEW: Get changed players since last refresh

@@ -34,6 +34,9 @@ struct FantasyMatchupDetailView: View {
     @State private var showActiveOnly: Bool = false
     @State private var showRosteredOnly: Bool = false
     @State private var showYetToPlayOnly: Bool = false
+    
+    // 🔥 NEW: Force view update when hub refreshes
+    @State private var observedUpdateTime: Date = Date.distantPast
 
     // MARK: - Initializers
 
@@ -58,13 +61,6 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        // 🔥 FIX: Trust the matchup data passed in, don't try to fetch from hub
-        // The parent view (LeagueMatchupsTabView or Mission Control) already has the correct data
-        let awayTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 0) ?? matchup.awayTeam.currentScore ?? 0.0
-        let homeTeamScore = fantasyViewModel?.getScore(for: matchup, teamIndex: 1) ?? matchup.homeTeam.currentScore ?? 0.0
-        let awayTeamIsWinning = awayTeamScore > homeTeamScore
-        let homeTeamIsWinning = homeTeamScore > awayTeamScore
-
         // FIX: Only add background when NOT embedded in LeagueMatchupsTabView
         Group {
             if isEmbeddedInTabView {
@@ -107,6 +103,9 @@ struct FantasyMatchupDetailView: View {
 
     // FIX: Extract content to separate view with proper padding
     private var contentView: some View {
+        // 🔥 FIX: Observe matchupsHub update time to trigger re-render
+        let _ = observedUpdateTime
+        
         let awayTeamScore = fantasyViewModel?.getScore(for: currentMatchup, teamIndex: 0) ?? currentMatchup.awayTeam.currentScore ?? 0.0
         let homeTeamScore = fantasyViewModel?.getScore(for: currentMatchup, teamIndex: 1) ?? currentMatchup.homeTeam.currentScore ?? 0.0
         let awayTeamIsWinning = awayTeamScore > homeTeamScore
@@ -162,6 +161,11 @@ struct FantasyMatchupDetailView: View {
         .task {
             await handleViewTask()
         }
+        .onChange(of: matchupsHubViewModel.lastUpdateTime) { _, newValue in
+            // 🔥 NEW: Update observed time to force view re-render when hub refreshes
+            DebugPrint(mode: .globalRefresh, "🔄 MATCHUP DETAIL: Hub updated at \(newValue), refreshing view")
+            observedUpdateTime = newValue
+        }
     }
 
     // FIX: Detect if this view is embedded in LeagueMatchupsTabView
@@ -188,7 +192,8 @@ struct FantasyMatchupDetailView: View {
                         highToLow: sortHighToLow,
                         selectedPosition: selectedPosition,
                         showActiveOnly: showActiveOnly,
-                        showYetToPlayOnly: showYetToPlayOnly
+                        showYetToPlayOnly: showYetToPlayOnly,
+                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
@@ -198,7 +203,8 @@ struct FantasyMatchupDetailView: View {
                         highToLow: sortHighToLow,
                         selectedPosition: selectedPosition,
                         showActiveOnly: showActiveOnly,
-                        showYetToPlayOnly: showYetToPlayOnly
+                        showYetToPlayOnly: showYetToPlayOnly,
+                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime
                     )
                 }
             }

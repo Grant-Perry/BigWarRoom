@@ -13,12 +13,16 @@ extension MatchupsHubViewModel {
     
     // MARK: - Auto Refresh Setup
     internal func setupAutoRefresh() {
+        DebugPrint(mode: .globalRefresh, "🎬 SETUP AUTO REFRESH: Called")
+        
         refreshTimer?.invalidate()
         
         guard autoRefreshEnabled else {
             DebugPrint(mode: .globalRefresh, "⏸️ AUTO REFRESH: Disabled by user setting")
             return
         }
+        
+        DebugPrint(mode: .globalRefresh, "✅ AUTO REFRESH: autoRefreshEnabled=true, proceeding...")
         
         // 🔥 SMART REFRESH: Calculate optimal interval based on game status
         SmartRefreshManager.shared.calculateOptimalRefresh()
@@ -27,8 +31,13 @@ extension MatchupsHubViewModel {
         DebugPrint(mode: .globalRefresh, "⏱️ AUTO REFRESH: Setting up timer with \(Int(interval))s interval, hasLiveGames=\(SmartRefreshManager.shared.hasLiveGames)")
         
         refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            DebugPrint(mode: .globalRefresh, "⏰ TIMER CALLBACK: Timer fired!")
+            
             Task { @MainActor [weak self] in
-                guard let self = self else { return }
+                guard let self = self else { 
+                    DebugPrint(mode: .globalRefresh, "⏰ TIMER CALLBACK: self is nil, skipping")
+                    return 
+                }
                 
                 let isActive = await AppLifecycleManager.shared.isActive
                 DebugPrint(mode: .globalRefresh, "⏰ TIMER FIRED: isLoading=\(self.isLoading), isActive=\(isActive)")
@@ -49,21 +58,26 @@ extension MatchupsHubViewModel {
             }
         }
         
-        DebugPrint(mode: .globalRefresh, "✅ AUTO REFRESH: Timer scheduled successfully")
+        DebugPrint(mode: .globalRefresh, "✅ AUTO REFRESH: Timer scheduled successfully, interval=\(Int(interval))s")
     }
     
     /// Refresh existing matchups without full reload
     /// 🔥 REFACTORED: Now uses MatchupDataStore for efficient refresh
     internal func refreshMatchups() async {
+        DebugPrint(mode: .globalRefresh, "🎬 refreshMatchups() ENTRY: Called!")
+        
         // 🔋 BATTERY FIX: Skip refresh if app is not active
-        guard AppLifecycleManager.shared.isActive || myMatchups.isEmpty else {
+        let isActive = await AppLifecycleManager.shared.isActive
+        DebugPrint(mode: .globalRefresh, "   📱 App active check: \(isActive), myMatchups.count=\(myMatchups.count)")
+        
+        guard isActive || myMatchups.isEmpty else {
             DebugPrint(mode: .globalRefresh, "REFRESH SKIPPED: App is not active (backgrounded)")
             return
         }
         
         guard !myMatchups.isEmpty && !isLoading else {
             // If no matchups loaded yet, do a full load
-            DebugPrint(mode: .globalRefresh, "🔄 REFRESH: No matchups loaded, performing full load")
+            DebugPrint(mode: .globalRefresh, "🔄 REFRESH: No matchups loaded or isLoading=true, performing full load")
             await performLoadAllMatchups()
             return
         }
@@ -76,6 +90,9 @@ extension MatchupsHubViewModel {
         // 🔥 LIGHT THROTTLING: Prevent rapid duplicate calls (3 seconds minimum)
         let now = Date()
         let timeSinceLastUpdate = now.timeIntervalSince(lastUpdateTime)
+        
+        DebugPrint(mode: .globalRefresh, "   ⏱️ Time since last update: \(String(format: "%.1f", timeSinceLastUpdate))s")
+        
         guard timeSinceLastUpdate >= 3.0 else {
             DebugPrint(mode: .globalRefresh, "REFRESH THROTTLED: Only \(String(format: "%.1f", timeSinceLastUpdate))s since last update (min: 3s)")
             isUpdating = false
@@ -95,9 +112,11 @@ extension MatchupsHubViewModel {
         for matchup in myMatchups {
             let leagueID = matchup.league.id
             let currentWeek = getCurrentWeek()
+            
+            // 🔥 FIX: Use the ACTUAL matchup ID, not a constructed one!
             let snapshotID = MatchupSnapshot.ID(
                 leagueID: leagueID,
-                matchupID: "\(leagueID)_\(currentWeek)",
+                matchupID: matchup.id,  // ✅ Use the real matchup ID from UnifiedMatchup
                 platform: matchup.league.source,
                 week: currentWeek
             )
@@ -126,6 +145,16 @@ extension MatchupsHubViewModel {
             self.isUpdating = false
             
             DebugPrint(mode: .globalRefresh, "✅ REFRESH: UI updated, myMatchups now has \(self.myMatchups.count) matchups")
+        }
+        
+        // 🔥 FIX: Recalculate optimal interval and reschedule timer if needed
+        SmartRefreshManager.shared.calculateOptimalRefresh()
+        let newInterval = SmartRefreshManager.shared.currentRefreshInterval
+        let currentInterval = refreshTimer?.timeInterval ?? 3600.0
+        
+        if abs(newInterval - currentInterval) > 1.0 {
+            DebugPrint(mode: .globalRefresh, "🔄 REFRESH: Interval changed (\(Int(currentInterval))s → \(Int(newInterval))s), rescheduling timer")
+            setupAutoRefresh()
         }
         
         DebugPrint(mode: .globalRefresh, "✅ REFRESH: Complete via store")

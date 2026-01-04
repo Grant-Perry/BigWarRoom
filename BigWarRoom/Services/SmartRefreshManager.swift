@@ -217,8 +217,11 @@ final class SmartRefreshManager {
     private func determineGameStatus() -> GameStatus {
         let games = Array(nflGameDataService.gameData.values)
         
+        DebugPrint(mode: .globalRefresh, "🎮 GAME STATUS CHECK: gameData has \(games.count) games")
+        
         // No games loaded
         guard !games.isEmpty else {
+            DebugPrint(mode: .globalRefresh, "   ⚠️ No games loaded in NFLGameDataService!")
             return .noGamesToday
         }
         
@@ -232,20 +235,29 @@ final class SmartRefreshManager {
             return calendar.isDate(gameDate, inSameDayAs: today)
         }
         
+        DebugPrint(mode: .globalRefresh, "   📅 Today's games: \(todaysGames.count) of \(games.count) total")
+        
         guard !todaysGames.isEmpty else {
+            DebugPrint(mode: .globalRefresh, "   ⚠️ No games scheduled for today")
             return .noGamesToday
         }
         
         // Check for live games using the isLive property or gameStatus
         let liveGames = todaysGames.filter { game in
-            game.isLive || game.gameStatus.lowercased().contains("in") || 
-            game.gameStatus.lowercased().contains("1st") || 
-            game.gameStatus.lowercased().contains("2nd") || 
-            game.gameStatus.lowercased().contains("3rd") || 
-            game.gameStatus.lowercased().contains("4th") ||
-            game.gameStatus.lowercased().contains("ot") ||
-            game.gameStatus.lowercased() == "halftime"
+            let status = game.gameStatus.lowercased()
+            let isCurrentlyLive = game.isLive || status.contains("in") || 
+                status.contains("1st") || status.contains("2nd") || 
+                status.contains("3rd") || status.contains("4th") ||
+                status.contains("ot") || status == "halftime"
+            
+            if isCurrentlyLive {
+                DebugPrint(mode: .globalRefresh, limit: 5, "   🔴 LIVE: \(game.homeTeam) vs \(game.awayTeam) - status: '\(game.gameStatus)'")
+            }
+            
+            return isCurrentlyLive
         }
+        
+        DebugPrint(mode: .globalRefresh, "   🔴 Live games: \(liveGames.count)")
         
         if !liveGames.isEmpty {
             return .liveGamesPlaying
@@ -258,6 +270,8 @@ final class SmartRefreshManager {
             return timeUntilGame > 0 && timeUntilGame <= 1800 // 30 minutes
         }
         
+        DebugPrint(mode: .globalRefresh, "   ⏰ Games starting soon: \(soonGames.count)")
+        
         if !soonGames.isEmpty {
             return .gamesStartingSoon
         }
@@ -268,11 +282,14 @@ final class SmartRefreshManager {
             return gameDate > now
         }
         
+        DebugPrint(mode: .globalRefresh, "   📆 Upcoming games today: \(upcomingGames.count)")
+        
         if !upcomingGames.isEmpty {
             return .gamesScheduledToday
         }
         
         // All games must be finished
+        DebugPrint(mode: .globalRefresh, "   ✅ All games finished")
         return .allGamesFinished
     }
 }

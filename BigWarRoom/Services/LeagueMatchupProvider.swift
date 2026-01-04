@@ -79,8 +79,8 @@ final class LeagueMatchupProvider {
     // MARK: -> Data Fetching
     
     /// Fetch all matchup data for this league
-    func fetchMatchups() async throws -> [FantasyMatchup] {
-        DebugPrint(mode: .leagueProvider, "fetchMatchups() called for \(league.league.leagueID), source=\(league.source)")
+    func fetchMatchups(forceRefresh: Bool = false) async throws -> [FantasyMatchup] {
+        DebugPrint(mode: .leagueProvider, "fetchMatchups() called for \(league.league.leagueID), source=\(league.source), force=\(forceRefresh)")
         // Clear previous state
         matchups = []
         byeWeekTeams = []
@@ -91,8 +91,8 @@ final class LeagueMatchupProvider {
             DebugPrint(mode: .leagueProvider, "Fetching ESPN data")
             await fetchESPNData()
         } else {
-            DebugPrint(mode: .leagueProvider, "Fetching Sleeper data")
-            await fetchSleeperData()
+            DebugPrint(mode: .leagueProvider, "Fetching Sleeper data (force=\(forceRefresh))")
+            await fetchSleeperData(forceRefresh: forceRefresh)
         }
         
         DebugPrint(mode: .leagueProvider, "Returning \(matchups.count) matchups")
@@ -536,7 +536,7 @@ final class LeagueMatchupProvider {
     
     // MARK: -> Sleeper Data Fetching
     
-    private func fetchSleeperData() async {
+    private func fetchSleeperData(forceRefresh: Bool = false) async {
         // 🔥 PERF: We already have a `SleeperLeague` from `UnifiedLeagueManager.fetchAllLeagues()`.
         // Avoid re-fetching `/league/{id}` per league when possible.
         if sleeperLeague == nil {
@@ -559,7 +559,7 @@ final class LeagueMatchupProvider {
         // CRITICAL: We MUST await rosters/users before processing matchups because matchup processing
         // needs manager names + roster->owner mapping. A previous implementation accidentally didn't
         // await these tasks, causing intermittent "Manager 1/2" fallbacks (race condition).
-        async let statsTask: Void = fetchSleeperWeeklyStats()
+        async let statsTask: Void = fetchSleeperWeeklyStats(forceRefresh: forceRefresh)
         async let usersRostersTask: Void = fetchSleeperUsersAndRosters()
         _ = await (statsTask, usersRostersTask)
 
@@ -585,15 +585,15 @@ final class LeagueMatchupProvider {
         }
     }
     
-    private func fetchSleeperWeeklyStats() async {
+    private func fetchSleeperWeeklyStats(forceRefresh: Bool = false) async {
         do {
-            // IMPORTANT: Never force-refresh week stats from inside per-league providers.
-            // When multiple leagues load concurrently, force-refresh causes SharedStatsService to cancel
-            // in-flight requests and re-fetch repeatedly, which blows up load times.
+            // 🔥 FIX: Pass through forceRefresh parameter from caller
+            // When force=true (live refresh), we need fresh stats from API
+            // When force=false (initial load), we can use cache
             let sharedStats = try await SharedStatsService.shared.loadWeekStats(
                 week: week, 
                 year: year, 
-                forceRefresh: false
+                forceRefresh: forceRefresh
             )
             playerStats = sharedStats
             

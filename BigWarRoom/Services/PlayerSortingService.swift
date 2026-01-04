@@ -142,11 +142,19 @@ final class PlayerSortingService {
         gameDataService: NFLGameDataService
     ) -> [FantasyPlayer] {
         return players.sorted { player1, player2 in
-            // Check if players are in live games
+            // 🔥 FIX: Sort by lastActivityTime first (most recent activity first)
+            let time1 = player1.lastActivityTime ?? Date.distantPast
+            let time2 = player2.lastActivityTime ?? Date.distantPast
+            
+            if time1 != time2 {
+                return time1 > time2 // Most recent first
+            }
+            
+            // Fallback: Check if players are in live games
             let isLive1 = player1.isLive(gameDataService: gameDataService)
             let isLive2 = player2.isLive(gameDataService: gameDataService)
             
-            // Live players first
+            // Live players next
             if isLive1 != isLive2 {
                 return isLive1
             }

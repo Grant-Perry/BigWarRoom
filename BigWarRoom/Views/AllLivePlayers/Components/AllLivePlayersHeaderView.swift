@@ -35,6 +35,7 @@ struct AllLivePlayersHeaderView: View {
 
     // NEW: Track delta since session start (first observed total), not per-update
     @State private var baselineTotalPoints: Double? = nil
+    @State private var baselineLivePoints: Double? = nil
     @State private var sessionDeltaPoints: Double = 0
     @State private var showBaselineToast: Bool = false
     
@@ -116,12 +117,17 @@ struct AllLivePlayersHeaderView: View {
         }
         .onChange(of: allLivePlayersViewModel.lastUpdateTime) { _, _ in
             // Set baseline once, then compute session delta from baseline
+            // 🔥 FIX: Use LIVE players only for delta calculation
             let newTotal = totalPoints
+            let newLiveTotal = livePlayersTotal
+            
             if baselineTotalPoints == nil {
                 baselineTotalPoints = newTotal
+                baselineLivePoints = newLiveTotal
                 sessionDeltaPoints = 0
-            } else if let base = baselineTotalPoints {
-                sessionDeltaPoints = newTotal - base
+            } else if let liveBase = baselineLivePoints {
+                // 🔥 CRITICAL: Delta only reflects LIVE players (excludes FINAL games)
+                sessionDeltaPoints = newLiveTotal - liveBase
             }
         }
     }
@@ -254,6 +260,7 @@ struct AllLivePlayersHeaderView: View {
             .onLongPressGesture(minimumDuration: 0.5) {
                 // Long press: Reset BOTH total delta AND all player deltas
                 baselineTotalPoints = totalPoints
+                baselineLivePoints = livePlayersTotal
                 sessionDeltaPoints = 0
                 allLivePlayersViewModel.resetAllPlayerDeltas()  // 🔥 Also reset per-player deltas
                 #if canImport(UIKit)
@@ -583,7 +590,34 @@ struct AllLivePlayersHeaderView: View {
     
     // MARK: - Helper Methods
     
-    // 🔥 NEW: Total points calculation - GUARANTEED LIVE
+    // 🔥 LIVE PLAYERS TOTAL: Only players in active games (excludes FINAL)
+    private var livePlayersTotal: Double {
+        let updateTime = allLivePlayersViewModel.lastUpdateTime
+        
+        let liveTotal = allLivePlayersViewModel.filteredPlayers
+            .filter { isPlayerGameLive($0) }
+            .reduce(0) { sum, player in
+                sum + player.currentScore
+            }
+        
+        DebugPrint(mode: .liveUpdates, limit: 5, "🟢 LIVE TOTAL: \(liveTotal) from LIVE players only (updateTime: \(updateTime))")
+        
+        return liveTotal
+    }
+    
+    // 🔥 CHECK: Is this player's game still live (not FINAL)?
+    private func isPlayerGameLive(_ player: AllLivePlayersViewModel.LivePlayerEntry) -> Bool {
+        guard let gameStatus = player.player.gameStatus else {
+            // No game status = assume live
+            return true
+        }
+        
+        // Game is NOT live if status contains "final"
+        let isFinal = gameStatus.status.lowercased().contains("final")
+        return !isFinal
+    }
+    
+    // 🔥 NEW: Total points calculation - GUARANTEED LIVE (ALL PLAYERS)
     private var totalPoints: Double {
         // 🔥 Force recalculation on every live update by depending on lastUpdateTime
         let updateTime = allLivePlayersViewModel.lastUpdateTime
@@ -768,6 +802,7 @@ struct AllLivePlayersHeaderView: View {
 
     private func resetDeltaBaseline() {
         baselineTotalPoints = totalPoints
+        baselineLivePoints = livePlayersTotal
         sessionDeltaPoints = 0
         #if canImport(UIKit)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()

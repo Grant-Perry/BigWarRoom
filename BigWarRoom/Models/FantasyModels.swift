@@ -212,10 +212,10 @@ struct FantasyPlayer: Identifiable, Codable {
     let isStarter: Bool
     let lineupSlot: String?
     
-    // 🔥 MODEL-BASED ENRICHMENT: Injury status from API data (defaults to nil)
-    let injuryStatus: String?  // "Out", "Questionable", "Doubtful", "ProbableToPlay", "IR", etc.
+    let injuryStatus: String?
     
-    // 🔥 CONVENIENCE: Memberwise initializer with default for injuryStatus
+    var lastActivityTime: Date?
+    
     init(
         id: String,
         sleeperID: String? = nil,
@@ -230,7 +230,8 @@ struct FantasyPlayer: Identifiable, Codable {
         gameStatus: GameStatus? = nil,
         isStarter: Bool,
         lineupSlot: String? = nil,
-        injuryStatus: String? = nil  // Default to nil for backward compatibility
+        injuryStatus: String? = nil,
+        lastActivityTime: Date? = nil
     ) {
         self.id = id
         self.sleeperID = sleeperID
@@ -246,6 +247,7 @@ struct FantasyPlayer: Identifiable, Codable {
         self.isStarter = isStarter
         self.lineupSlot = lineupSlot
         self.injuryStatus = injuryStatus
+        self.lastActivityTime = lastActivityTime
     }
 
     // MARK: -> COMPUTED PROPERTIES FOR LIGHTWEIGHT CHECKS

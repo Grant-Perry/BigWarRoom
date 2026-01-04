@@ -301,18 +301,17 @@ final class NFLGameDataService {
         let currentYear = year ?? AppConstants.currentSeasonYearInt
         let requestKey = "\(week)_\(currentYear)"
         
-        // 🚨 LOUD DEBUG - ALWAYS PRINT
-        print("🚨🚨🚨 NFLGameDataService.fetchGameData CALLED")
-        print("   Week: \(week)")
-        print("   Year: \(currentYear)")
-        print("   Force Refresh: \(forceRefresh)")
-        print("   Request Key: \(requestKey)")
+        DebugPrint(mode: .nflData, "🚨🚨🚨 NFLGameDataService.fetchGameData CALLED")
+        DebugPrint(mode: .nflData, "   Week: \(week)")
+        DebugPrint(mode: .nflData, "   Year: \(currentYear)")
+        DebugPrint(mode: .nflData, "   Force Refresh: \(forceRefresh)")
+        DebugPrint(mode: .nflData, "   Request Key: \(requestKey)")
         
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Called with week=\(week), year=\(currentYear), forceRefresh=\(forceRefresh)")
         
         // Prevent duplicate requests
         guard !pendingRequests.contains(requestKey) else {
-            print("🚨 BLOCKED: Request already pending for \(requestKey)")
+            DebugPrint(mode: .nflData, "🚨 BLOCKED: Request already pending for \(requestKey)")
             DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.fetchGameData: Request already pending for \(requestKey)")
             return
         }
@@ -320,7 +319,7 @@ final class NFLGameDataService {
         // Throttle requests to prevent spam
         if !forceRefresh, let lastRequest = lastRequestTimestamp,
            Date().timeIntervalSince(lastRequest) < minimumRequestInterval {
-            print("🚨 THROTTLED: Too soon since last request")
+            DebugPrint(mode: .nflData, "🚨 THROTTLED: Too soon since last request")
             return
         }
         
@@ -381,8 +380,8 @@ final class NFLGameDataService {
     
     /// Process ESPN API response into game info
     private func processGameData(_ response: NFLScoreboardResponse) {
-        print("🚨🚨🚨 NFLGameDataService.processGameData CALLED")
-        print("   Events count: \(response.events.count)")
+        DebugPrint(mode: .nflData, "🚨🚨🚨 NFLGameDataService.processGameData CALLED")
+        DebugPrint(mode: .nflData, "   Events count: \(response.events.count)")
         
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processing \(response.events.count) events from ESPN API")
         
@@ -454,10 +453,10 @@ final class NFLGameDataService {
         
         gameData = newGameData
         
-        print("🚨 PROCESSED GAME DATA:")
-        print("   Total entries: \(newGameData.count)")
-        print("   Teams: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
-        print("   Live games: \(newGameData.values.filter { $0.isLive }.count)")
+        DebugPrint(mode: .nflData, "🚨 PROCESSED GAME DATA:")
+        DebugPrint(mode: .nflData, "   Total entries: \(newGameData.count)")
+        DebugPrint(mode: .nflData, "   Teams: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
+        DebugPrint(mode: .nflData, "   Live games: \(newGameData.values.filter { $0.isLive }.count)")
         
         DebugPrint(mode: .weekCheck, "📅 NFLGameDataService.processGameData: Processed \(newGameData.count) game entries, teams playing: \(Set(newGameData.keys).sorted().joined(separator: ", "))")
     }

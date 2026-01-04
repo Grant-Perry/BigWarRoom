@@ -80,7 +80,8 @@ final class DataConversionService {
             gameStatus: gameStatus,
             isStarter: snapshot.context.isStarter,
             lineupSlot: snapshot.context.lineupSlot,
-            injuryStatus: snapshot.context.injuryStatus
+            injuryStatus: snapshot.context.injuryStatus,
+            lastActivityTime: snapshot.metrics.lastActivity
         )
     }
     
@@ -101,7 +102,7 @@ final class DataConversionService {
                 currentScore: player.currentPoints ?? 0.0,
                 projectedScore: player.projectedPoints ?? 0.0,
                 delta: 0.0,  // Calculated during delta updates
-                lastActivity: nil,  // Tracked during delta updates
+                lastActivity: player.lastActivityTime,
                 gameStatus: player.gameStatus?.status
             ),
             context: PlayerSnapshot.PlayerContext(

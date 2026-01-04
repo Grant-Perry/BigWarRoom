@@ -15,13 +15,14 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [] // [.espnAPI, .matchupLoading, .globalRefresh]
+   static var activeMode: DebugMode = [] // .liveRefresh
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
 	  debugPrintIterations.removeAll()
    }
 }
+
 /// Debug mode flags - combine multiple modes to focus on specific areas
 struct DebugMode: OptionSet {
     let rawValue: Int
@@ -56,10 +57,12 @@ struct DebugMode: OptionSet {
     static let draft              	= DebugMode(rawValue: 1 << 24)  // 16777216
     static let contention         	= DebugMode(rawValue: 1 << 25)  // 33554432
     static let winProb            	= DebugMode(rawValue: 1 << 26)  // 67108864
+    static let liveScores         	= DebugMode(rawValue: 1 << 27)  // 134217728
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
     static let allData: DebugMode 	= [.statsLookup, .caching, .dataSync]
+    static let liveRefresh: DebugMode = [.globalRefresh, .liveUpdates, .leagueProvider, .liveScores]
     static let all: DebugMode 		= [
         .globalRefresh,
         .espnAPI,
@@ -87,11 +90,10 @@ struct DebugMode: OptionSet {
         .playerIDMapping,
         .draft,
         .contention,
-        .winProb
+        .winProb,
+        .liveScores
     ]
 }
-
-
 
 // MARK: - Iteration Tracking
 
