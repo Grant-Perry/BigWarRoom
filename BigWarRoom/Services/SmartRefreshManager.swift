@@ -29,7 +29,6 @@ final class SmartRefreshManager {
     private(set) var hasLiveGames: Bool = false
     
     // MARK: - Constants
-    private let fastRefreshInterval: TimeInterval = TimeInterval(AppConstants.MatchupRefresh) // 15s for live games
     private let mediumRefreshInterval: TimeInterval = 60.0  // 1 minute for games starting soon
     private let slowRefreshInterval: TimeInterval = 900.0   // 15 minutes for games scheduled today
     private let dormantRefreshInterval: TimeInterval = 3600.0 // 1 hour for no-game days
@@ -76,11 +75,11 @@ final class SmartRefreshManager {
         
         switch gameStatus {
         case .liveGamesPlaying:
-            currentRefreshInterval = fastRefreshInterval
+            currentRefreshInterval = TimeInterval(AppConstants.MatchupRefresh)
             shouldShowCountdownTimer = true
             hasLiveGames = true
             refreshReason = "Live games in progress"
-            DebugPrint(mode: .globalRefresh, "🔥 SMART REFRESH: Live games - \(Int(fastRefreshInterval))s interval")
+            DebugPrint(mode: .globalRefresh, "🔥 SMART REFRESH: Live games - \(AppConstants.MatchupRefresh)s interval")
             
         case .gamesStartingSoon:
             currentRefreshInterval = mediumRefreshInterval
