@@ -25,9 +25,13 @@ struct FantasyMatchupDetailView: View {
     // 🔥 PHASE 3 DI: Injected via initializer
     @State private var livePlayersViewModel: AllLivePlayersViewModel
     
-    // Sorting state for matchup details
-    @State private var sortingMethod: MatchupSortingMethod = .position
-    @State private var sortHighToLow = false // Position: A-Z, Score: High-Low by default
+    // 🔥 FIX: Persist sorting state across ALL matchup views using AppStorage
+    @AppStorage("MatchupDetail_SortMethod") private var sortingMethodRaw: String = MatchupSortingMethod.position.rawValue
+    @AppStorage("MatchupDetail_SortHighToLow") private var sortHighToLow: Bool = false
+    
+    private var sortingMethod: MatchupSortingMethod {
+        MatchupSortingMethod(rawValue: sortingMethodRaw) ?? .position
+    }
     
     // NEW: Filter states - now managed at the parent level
     @State private var selectedPosition: FantasyPosition = .all
@@ -99,6 +103,12 @@ struct FantasyMatchupDetailView: View {
                 }
             }
         }
+        .onChange(of: sortingMethodRaw) { oldValue, newValue in
+            DebugPrint(mode: .matchupSort, "🎯 SORT METHOD CHANGED: \(oldValue) → \(newValue)")
+        }
+        .onChange(of: sortHighToLow) { oldValue, newValue in
+            DebugPrint(mode: .matchupSort, "🎯 SORT DIRECTION CHANGED: \(oldValue) → \(newValue)")
+        }
     }
 
     // FIX: Extract content to separate view with proper padding
@@ -122,16 +132,20 @@ struct FantasyMatchupDetailView: View {
                 sortingMethod: sortingMethod,
                 sortHighToLow: sortHighToLow,
                 onSortingMethodChanged: { method in
+                    DebugPrint(mode: .matchupSort, "🎯 HEADER: Sort method tapped: \(method.displayName)")
                     withAnimation(.easeInOut(duration: 0.3)) {
-                        sortingMethod = method
+                        sortingMethodRaw = method.rawValue
                         // Reset sort direction to logical default for each method
                         // Score & Recent Activity: High-Low, others: A-Z
                         sortHighToLow = (method == .score || method == .recentActivity)
+                        DebugPrint(mode: .matchupSort, "🎯 HEADER: After change - method=\(method.displayName), direction=\(sortHighToLow)")
                     }
                 },
                 onSortDirectionChanged: {
+                    DebugPrint(mode: .matchupSort, "🎯 HEADER: Sort direction tapped")
                     withAnimation(.easeInOut(duration: 0.3)) {
                         sortHighToLow.toggle()
+                        DebugPrint(mode: .matchupSort, "🎯 HEADER: After toggle - direction=\(sortHighToLow)")
                     }
                 },
                 selectedPosition: $selectedPosition,
@@ -161,9 +175,9 @@ struct FantasyMatchupDetailView: View {
         .task {
             await handleViewTask()
         }
-        .onChange(of: matchupsHubViewModel.lastUpdateTime) { _, newValue in
+        .onChange(of: matchupsHubViewModel.lastUpdateTime) { oldValue, newValue in
             // 🔥 NEW: Update observed time to force view re-render when hub refreshes
-            DebugPrint(mode: .globalRefresh, "🔄 MATCHUP DETAIL: Hub updated at \(newValue), refreshing view")
+            DebugPrint(mode: .matchupSort, "🔄 MATCHUP DETAIL: Hub updated at \(newValue), refreshing view")
             observedUpdateTime = newValue
         }
     }
@@ -182,28 +196,34 @@ struct FantasyMatchupDetailView: View {
     }
 
     private var rosterScrollView: some View {
-        ScrollView {
+        // 🔥 FIX: Create a @Binding-compatible wrapper for sortingMethod
+        let sortingBinding = Binding<MatchupSortingMethod>(
+            get: { self.sortingMethod },
+            set: { self.sortingMethodRaw = $0.rawValue }
+        )
+        
+        return ScrollView {
             VStack(spacing: 16) {
                 if let viewModel = fantasyViewModel {
                     FantasyMatchupActiveRosterSectionFiltered(
-                        matchup: matchup,
+                        matchup: currentMatchup,
                         fantasyViewModel: viewModel,
-                        sortMethod: sortingMethod,
-                        highToLow: sortHighToLow,
-                        selectedPosition: selectedPosition,
-                        showActiveOnly: showActiveOnly,
-                        showYetToPlayOnly: showYetToPlayOnly,
+                        sortMethod: sortingBinding,
+                        highToLow: $sortHighToLow,
+                        selectedPosition: $selectedPosition,
+                        showActiveOnly: $showActiveOnly,
+                        showYetToPlayOnly: $showYetToPlayOnly,
                         hubUpdateTime: matchupsHubViewModel.lastUpdateTime
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
-                        matchup: matchup,
+                        matchup: currentMatchup,
                         fantasyViewModel: viewModel,
-                        sortMethod: sortingMethod,
-                        highToLow: sortHighToLow,
-                        selectedPosition: selectedPosition,
-                        showActiveOnly: showActiveOnly,
-                        showYetToPlayOnly: showYetToPlayOnly,
+                        sortMethod: sortingBinding,
+                        highToLow: $sortHighToLow,
+                        selectedPosition: $selectedPosition,
+                        showActiveOnly: $showActiveOnly,
+                        showYetToPlayOnly: $showYetToPlayOnly,
                         hubUpdateTime: matchupsHubViewModel.lastUpdateTime
                     )
                 }
@@ -272,11 +292,33 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Private Methods
 
     private func handleViewAppearance() {
+        // 🔥 FIX: Ensure NFL game data is loaded for filtering to work
+        Task {
+            await ensureGameDataLoaded()
+        }
+        
         // 🔥 REMOVED: Don't trigger full hub refresh on view appear - causes 15+ second hang
         // The matchup data is already fresh from the previous view (Mission Control or LeagueMatchupsTabView)
         // If we need live updates, they'll come from the background auto-refresh in MatchupsHubViewModel
         
         // Keep the stats loading task in handleViewTask() - that's lightweight and doesn't block
+    }
+    
+    // 🔥 NEW: Ensure game data is loaded for Active Only filter
+    private func ensureGameDataLoaded() async {
+        let selectedWeek = WeekSelectionManager.shared.selectedWeek
+        
+        if livePlayersViewModel.nflGameDataService.gameData.isEmpty {
+            livePlayersViewModel.nflGameDataService.fetchGameData(forWeek: selectedWeek, forceRefresh: false)
+            
+            // 🔥 CRITICAL: Wait for the fetch to complete before returning
+            // Give it up to 2 seconds to load
+            var attempts = 0
+            while livePlayersViewModel.nflGameDataService.gameData.isEmpty && attempts < 20 {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                attempts += 1
+            }
+        }
     }
 
     private func handleViewTask() async {

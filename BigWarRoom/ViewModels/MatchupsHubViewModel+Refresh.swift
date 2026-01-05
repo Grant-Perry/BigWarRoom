@@ -101,6 +101,17 @@ extension MatchupsHubViewModel {
         
         DebugPrint(mode: .globalRefresh, "🔄 REFRESH: Using MatchupDataStore with force refresh")
         
+        // 🔥 NEW: Build player score tracking map BEFORE refresh
+        var playerScoreMap: [String: (oldScore: Double, lastActivityTime: Date?)] = [:]
+        for matchup in myMatchups {
+            if let fantasyMatchup = matchup.fantasyMatchup {
+                for player in fantasyMatchup.homeTeam.roster + fantasyMatchup.awayTeam.roster {
+                    let key = "\(matchup.id)_\(player.id)"
+                    playerScoreMap[key] = (player.currentPoints ?? 0.0, player.lastActivityTime)
+                }
+            }
+        }
+        
         // Step 1: Force refresh via store (invalidates cache)
         await matchupDataStore.refresh(league: nil, force: true)
         
@@ -125,7 +136,119 @@ extension MatchupsHubViewModel {
             
             do {
                 let snapshot = try await matchupDataStore.hydrateMatchup(snapshotID)
-                let refreshed = convertSnapshotToUnifiedMatchup(snapshot, league: matchup.league)
+                var refreshed = convertSnapshotToUnifiedMatchup(snapshot, league: matchup.league)
+                
+                // 🔥 NEW: Update lastActivityTime for players whose scores changed
+                if var fantasyMatchup = refreshed.fantasyMatchup {
+                    var updatedHomeRoster = fantasyMatchup.homeTeam.roster.map { player -> FantasyPlayer in
+                        let key = "\(matchup.id)_\(player.id)"
+                        if let (oldScore, oldActivityTime) = playerScoreMap[key] {
+                            let newScore = player.currentPoints ?? 0.0
+                            let scoreChanged = abs(newScore - oldScore) > 0.01
+                            
+                            return FantasyPlayer(
+                                id: player.id,
+                                sleeperID: player.sleeperID,
+                                espnID: player.espnID,
+                                firstName: player.firstName,
+                                lastName: player.lastName,
+                                position: player.position,
+                                team: player.team,
+                                jerseyNumber: player.jerseyNumber,
+                                currentPoints: player.currentPoints,
+                                projectedPoints: player.projectedPoints,
+                                gameStatus: player.gameStatus,
+                                isStarter: player.isStarter,
+                                lineupSlot: player.lineupSlot,
+                                injuryStatus: player.injuryStatus,
+                                lastActivityTime: scoreChanged ? Date() : oldActivityTime
+                            )
+                        }
+                        return player
+                    }
+                    
+                    var updatedAwayRoster = fantasyMatchup.awayTeam.roster.map { player -> FantasyPlayer in
+                        let key = "\(matchup.id)_\(player.id)"
+                        if let (oldScore, oldActivityTime) = playerScoreMap[key] {
+                            let newScore = player.currentPoints ?? 0.0
+                            let scoreChanged = abs(newScore - oldScore) > 0.01
+                            
+                            return FantasyPlayer(
+                                id: player.id,
+                                sleeperID: player.sleeperID,
+                                espnID: player.espnID,
+                                firstName: player.firstName,
+                                lastName: player.lastName,
+                                position: player.position,
+                                team: player.team,
+                                jerseyNumber: player.jerseyNumber,
+                                currentPoints: player.currentPoints,
+                                projectedPoints: player.projectedPoints,
+                                gameStatus: player.gameStatus,
+                                isStarter: player.isStarter,
+                                lineupSlot: player.lineupSlot,
+                                injuryStatus: player.injuryStatus,
+                                lastActivityTime: scoreChanged ? Date() : oldActivityTime
+                            )
+                        }
+                        return player
+                    }
+                    
+                    let updatedHomeTeam = FantasyTeam(
+                        id: fantasyMatchup.homeTeam.id,
+                        name: fantasyMatchup.homeTeam.name,
+                        ownerName: fantasyMatchup.homeTeam.ownerName,
+                        record: fantasyMatchup.homeTeam.record,
+                        avatar: fantasyMatchup.homeTeam.avatar,
+                        currentScore: fantasyMatchup.homeTeam.currentScore,
+                        projectedScore: fantasyMatchup.homeTeam.projectedScore,
+                        roster: updatedHomeRoster,
+                        rosterID: fantasyMatchup.homeTeam.rosterID,
+                        faabTotal: fantasyMatchup.homeTeam.faabTotal,
+                        faabUsed: fantasyMatchup.homeTeam.faabUsed
+                    )
+                    
+                    let updatedAwayTeam = FantasyTeam(
+                        id: fantasyMatchup.awayTeam.id,
+                        name: fantasyMatchup.awayTeam.name,
+                        ownerName: fantasyMatchup.awayTeam.ownerName,
+                        record: fantasyMatchup.awayTeam.record,
+                        avatar: fantasyMatchup.awayTeam.avatar,
+                        currentScore: fantasyMatchup.awayTeam.currentScore,
+                        projectedScore: fantasyMatchup.awayTeam.projectedScore,
+                        roster: updatedAwayRoster,
+                        rosterID: fantasyMatchup.awayTeam.rosterID,
+                        faabTotal: fantasyMatchup.awayTeam.faabTotal,
+                        faabUsed: fantasyMatchup.awayTeam.faabUsed
+                    )
+                    
+                    fantasyMatchup = FantasyMatchup(
+                        id: fantasyMatchup.id,
+                        leagueID: fantasyMatchup.leagueID,
+                        week: fantasyMatchup.week,
+                        year: fantasyMatchup.year,
+                        homeTeam: updatedHomeTeam,
+                        awayTeam: updatedAwayTeam,
+                        status: fantasyMatchup.status,
+                        winProbability: fantasyMatchup.winProbability,
+                        startTime: fantasyMatchup.startTime,
+                        sleeperMatchups: fantasyMatchup.sleeperMatchups
+                    )
+                    
+                    refreshed = UnifiedMatchup(
+                        id: refreshed.id,
+                        league: refreshed.league,
+                        fantasyMatchup: fantasyMatchup,
+                        choppedSummary: refreshed.choppedSummary,
+                        lastUpdated: refreshed.lastUpdated,
+                        myTeamRanking: refreshed.myTeamRanking,
+                        myIdentifiedTeamID: refreshed.myIdentifiedTeamID,
+                        authenticatedUsername: sleeperCredentials.currentUsername,
+                        allLeagueMatchups: refreshed.allLeagueMatchups,
+                        gameDataService: refreshed.gameDataService
+                    )
+                }
+                
                 refreshedMatchups.append(refreshed)
                 
                 DebugPrint(mode: .globalRefresh, "   ✅ Refreshed \(matchup.league.league.name) - new score: \(snapshot.myTeam.score.actual)")

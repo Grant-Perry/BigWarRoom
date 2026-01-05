@@ -518,23 +518,36 @@ struct FantasyMatchupActiveRosterSectionSorted: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                // 🔥 FIX: Sort by lastActivityTime first (most recent activity first)
+                // 🔥 FIX: Enhanced Recent Activity sort with fallback logic
                 let time1 = player1.lastActivityTime ?? Date.distantPast
                 let time2 = player2.lastActivityTime ?? Date.distantPast
                 
-                if time1 != time2 {
+                // If both have recent activity times (within last 5 minutes), use those
+                let fiveMinutesAgo = Date().addingTimeInterval(-300)
+                let hasRecentActivity1 = time1 > fiveMinutesAgo
+                let hasRecentActivity2 = time2 > fiveMinutesAgo
+                
+                if hasRecentActivity1 && hasRecentActivity2 {
                     return time1 > time2 // Most recent first
                 }
                 
-                // Fallback: Live players next
+                if hasRecentActivity1 {
+                    return true // Player 1 has recent activity, prioritize them
+                }
+                
+                if hasRecentActivity2 {
+                    return false // Player 2 has recent activity, prioritize them
+                }
+                
+                // Neither has recent activity - check if currently in live games
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
-                    return live1
+                    return live1 // Live players next
                 }
                 
-                // Then by score
+                // Both in same live status - sort by score
                 let points1 = player1.currentPoints ?? 0.0
                 let points2 = player2.currentPoints ?? 0.0
                 return points1 > points2
@@ -602,7 +615,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                     )
                 }
                 
-                // Home Team Bench (Right column - to match header)
+                // Home Team Bench (Right column -to match header)
                 VStack(spacing: 16) {
                     let homeBenchRoster = getRosterSorted(for: matchup, teamIndex: 1, isBench: true)
                     ForEach(homeBenchRoster, id: \.id) { player in
@@ -691,7 +704,7 @@ struct FantasyMatchupBenchSectionSorted: View {
                 let time2 = player2.lastActivityTime ?? Date.distantPast
                 
                 if time1 != time2 {
-                    return time1 > time2 // Most recent first
+                    return time1 > time2
                 }
                 
                 // Fallback: Live players next
@@ -738,16 +751,12 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
 
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
-    let sortMethod: MatchupSortingMethod
-    let highToLow: Bool
-    let selectedPosition: FantasyPosition
-    let showActiveOnly: Bool
-    let showYetToPlayOnly: Bool
-    let hubUpdateTime: Date  // 🔥 NEW: Force re-compute when hub updates
-    
-    @State private var localSelectedPosition: FantasyPosition = .all
-    @State private var localShowActiveOnly: Bool = false
-    @State private var localShowYetToPlayOnly: Bool = false
+    @Binding var sortMethod: MatchupSortingMethod
+    @Binding var highToLow: Bool
+    @Binding var selectedPosition: FantasyPosition
+    @Binding var showActiveOnly: Bool
+    @Binding var showYetToPlayOnly: Bool
+    let hubUpdateTime: Date
     
     @State private var cachedHomeRoster: [FantasyPlayer] = []
     @State private var cachedAwayRoster: [FantasyPlayer] = []
@@ -818,7 +827,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             .padding(.horizontal, 16)
         }
         .onAppear {
-            syncLocalFilters()
             updateCachedRosters()
             Task {
                 await loadProjectedScores()
@@ -830,31 +838,22 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
         .onChange(of: highToLow) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: selectedPosition) { _, newValue in
-            localSelectedPosition = newValue
+        .onChange(of: selectedPosition) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: showActiveOnly) { _, newValue in
-            localShowActiveOnly = newValue
+        .onChange(of: showActiveOnly) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: showYetToPlayOnly) { _, newValue in
-            localShowYetToPlayOnly = newValue
+        .onChange(of: showYetToPlayOnly) { _, _ in
             updateCachedRosters()
         }
         .onChange(of: hubUpdateTime) { _, _ in
-            // 🔥 NEW: Hub updated - refresh rosters with new data
             updateCachedRosters()
         }
     }
     
-    private func syncLocalFilters() {
-        localSelectedPosition = selectedPosition
-        localShowActiveOnly = showActiveOnly
-        localShowYetToPlayOnly = showYetToPlayOnly
-    }
-    
     private func updateCachedRosters() {
+        DebugPrint(mode: .matchupSort, "🎯 UPDATING CACHED ROSTERS: sortMethod=\(sortMethod.displayName), highToLow=\(highToLow)")
         cachedHomeRoster = getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: false)
         cachedAwayRoster = getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: false)
     }
@@ -923,10 +922,13 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        if localSelectedPosition != .all {
+        // 🔥 DEBUG: Log initial player count
+        DebugPrint(mode: .matchupSort, "🔍 FILTER START: Team=\(team.name), Bench=\(isBench), Count=\(filteredPlayers.count), sortMethod=\(sortMethod.displayName)")
+        
+        if selectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
-                let filterPosition = localSelectedPosition.rawValue.uppercased()
+                let filterPosition = selectedPosition.rawValue.uppercased()
                 
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
@@ -934,29 +936,40 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 
                 return playerPosition == filterPosition
             }
+            DebugPrint(mode: .matchupSort, "🔍 AFTER POSITION FILTER: Count=\(filteredPlayers.count)")
         }
         
-        if localShowActiveOnly {
-            let liveTeams = Set(nflGameDataService.gameData.values
-                .filter { $0.isLive }
-                .flatMap { [$0.homeTeam, $0.awayTeam] })
-            
+        if showActiveOnly {
+            // 🔥 FIX: Use same logic as Live Players - check each player via service
             filteredPlayers = filteredPlayers.filter { player in
                 guard let playerTeam = player.team else { return false }
-                return liveTeams.contains(playerTeam)
+                
+                // 🔥 Use NFLGameDataService which handles team normalization internally
+                if let gameInfo = nflGameDataService.getGameInfo(for: playerTeam) {
+                    return gameInfo.isLive
+                } else {
+                    return false
+                }
             }
+            
+            DebugPrint(mode: .matchupSort, "🔍 AFTER ACTIVE ONLY FILTER: Count=\(filteredPlayers.count)")
         }
         
-        if localShowYetToPlayOnly {
+        if showYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
                     playerTeam: player.team,
                     currentPoints: player.currentPoints
                 )
             }
+            DebugPrint(mode: .matchupSort, "🔍 AFTER YET TO PLAY FILTER: Count=\(filteredPlayers.count)")
         }
         
+        DebugPrint(mode: .matchupSort, "🔍 SORTING: method=\(sortMethod.displayName), direction=\(highToLow ? "High→Low" : "Low→High")")
+        
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
+            DebugPrint(mode: .matchupSort, limit: 3, "   🔄 Comparing: \(player1.fullName) vs \(player2.fullName) using \(sortMethod.displayName)")
+            
             switch sortMethod {
             case .position:
                 let order1 = positionSortOrder(player1.position)
@@ -990,8 +1003,10 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 let time1 = player1.lastActivityTime ?? Date.distantPast
                 let time2 = player2.lastActivityTime ?? Date.distantPast
                 
+                DebugPrint(mode: .matchupSort, limit: 5, "   🕐 Comparing \(player1.fullName) (\(time1 == Date.distantPast ? "NO TIME" : "\(time1)")) vs \(player2.fullName) (\(time2 == Date.distantPast ? "NO TIME" : "\(time2)"))")
+                
                 if time1 != time2 {
-                    return time1 > time2 // Most recent first
+                    return time1 > time2
                 }
                 
                 // Fallback: Live players next
@@ -999,14 +1014,21 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
+                    DebugPrint(mode: .matchupSort, limit: 5, "   🔴 Live status: \(player1.fullName)=\(live1) vs \(player2.fullName)=\(live2)")
                     return live1
                 }
                 
                 // Then by score
-                let points1 = player1.currentPoints ?? 0.0
-                let points2 = player2.currentPoints ?? 0.0
-                return points1 > points2
+                let p1 = player1.currentPoints ?? 0.0
+                let p2 = player2.currentPoints ?? 0.0
+                DebugPrint(mode: .matchupSort, limit: 5, "   📊 Score: \(player1.fullName)=\(p1) vs \(player2.fullName)=\(p2)")
+                return p1 > p2
             }
+        }
+        
+        DebugPrint(mode: .matchupSort, "✅ SORTING COMPLETE: Final count=\(filteredPlayers.count)")
+        if filteredPlayers.count > 0 {
+            DebugPrint(mode: .matchupSort, "   First 3 players: \(filteredPlayers.prefix(3).map { $0.fullName }.joined(separator: ", "))")
         }
         
         return filteredPlayers
@@ -1037,16 +1059,12 @@ struct FantasyMatchupBenchSectionFiltered: View {
 
     let matchup: FantasyMatchup
     let fantasyViewModel: FantasyViewModel
-    let sortMethod: MatchupSortingMethod
-    let highToLow: Bool
-    let selectedPosition: FantasyPosition
-    let showActiveOnly: Bool
-    let showYetToPlayOnly: Bool
-    let hubUpdateTime: Date  // 🔥 NEW: Force re-compute when hub updates
-
-    @State private var localSelectedPosition: FantasyPosition = .all
-    @State private var localShowActiveOnly: Bool = false
-    @State private var localShowYetToPlayOnly: Bool = false
+    @Binding var sortMethod: MatchupSortingMethod
+    @Binding var highToLow: Bool
+    @Binding var selectedPosition: FantasyPosition
+    @Binding var showActiveOnly: Bool
+    @Binding var showYetToPlayOnly: Bool
+    let hubUpdateTime: Date
     
     @State private var cachedHomeBench: [FantasyPlayer] = []
     @State private var cachedAwayBench: [FantasyPlayer] = []
@@ -1116,7 +1134,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             .padding(.horizontal, 16)
         }
         .onAppear {
-            syncLocalFilters()
             updateCachedRosters()
             Task {
                 await loadBenchProjectedScores()
@@ -1128,31 +1145,22 @@ struct FantasyMatchupBenchSectionFiltered: View {
         .onChange(of: highToLow) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: selectedPosition) { _, newValue in
-            localSelectedPosition = newValue
+        .onChange(of: selectedPosition) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: showActiveOnly) { _, newValue in
-            localShowActiveOnly = newValue
+        .onChange(of: showActiveOnly) { _, _ in
             updateCachedRosters()
         }
-        .onChange(of: showYetToPlayOnly) { _, newValue in
-            localShowYetToPlayOnly = newValue
+        .onChange(of: showYetToPlayOnly) { _, _ in
             updateCachedRosters()
         }
         .onChange(of: hubUpdateTime) { _, _ in
-            // 🔥 NEW: Hub updated - refresh rosters with new data
             updateCachedRosters()
         }
     }
     
-    private func syncLocalFilters() {
-        localSelectedPosition = selectedPosition
-        localShowActiveOnly = showActiveOnly
-        localShowYetToPlayOnly = showYetToPlayOnly
-    }
-    
     private func updateCachedRosters() {
+        DebugPrint(mode: .matchupSort, "🎯 UPDATING BENCH ROSTERS: sortMethod=\(sortMethod.displayName), highToLow=\(highToLow)")
         cachedHomeBench = getFilteredRoster(forTeam: currentMatchup.homeTeam, isBench: true)
         cachedAwayBench = getFilteredRoster(forTeam: currentMatchup.awayTeam, isBench: true)
     }
@@ -1240,10 +1248,10 @@ struct FantasyMatchupBenchSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        if localSelectedPosition != .all {
+        if selectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
-                let filterPosition = localSelectedPosition.rawValue.uppercased()
+                let filterPosition = selectedPosition.rawValue.uppercased()
                 
                 if filterPosition == "D/ST" {
                     return playerPosition == "D/ST" || playerPosition == "DST" || playerPosition == "DEF"
@@ -1253,18 +1261,24 @@ struct FantasyMatchupBenchSectionFiltered: View {
             }
         }
         
-        if localShowActiveOnly {
+        if showActiveOnly {
             let liveTeams = Set(nflGameDataService.gameData.values
                 .filter { $0.isLive }
                 .flatMap { [$0.homeTeam, $0.awayTeam] })
             
             filteredPlayers = filteredPlayers.filter { player in
                 guard let playerTeam = player.team else { return false }
-                return liveTeams.contains(playerTeam)
+                
+                // 🔥 Use NFLGameDataService which handles team normalization internally
+                if let gameInfo = nflGameDataService.getGameInfo(for: playerTeam) {
+                    return gameInfo.isLive
+                } else {
+                    return false
+                }
             }
         }
         
-        if localShowYetToPlayOnly {
+        if showYetToPlayOnly {
             filteredPlayers = filteredPlayers.filter { player in
                 GameStatusService.shared.isPlayerYetToPlay(
                     playerTeam: player.team,
@@ -1308,7 +1322,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 let time2 = player2.lastActivityTime ?? Date.distantPast
                 
                 if time1 != time2 {
-                    return time1 > time2 // Most recent first
+                    return time1 > time2
                 }
                 
                 // Fallback: Live players next

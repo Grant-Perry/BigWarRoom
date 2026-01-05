@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [] // .liveRefresh
+   static var activeMode: DebugMode = []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -58,6 +58,7 @@ struct DebugMode: OptionSet {
     static let contention         	= DebugMode(rawValue: 1 << 25)  // 33554432
     static let winProb            	= DebugMode(rawValue: 1 << 26)  // 67108864
     static let liveScores         	= DebugMode(rawValue: 1 << 27)  // 134217728
+    static let matchupSort        	= DebugMode(rawValue: 1 << 28)  // 268435456
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -91,7 +92,8 @@ struct DebugMode: OptionSet {
         .draft,
         .contention,
         .winProb,
-        .liveScores
+        .liveScores,
+        .matchupSort
     ]
 }
 
@@ -156,9 +158,9 @@ func DebugPrint(
         
         // Print with iteration info
         let iterInfo = "[\(count + 1)/\(limit)]"
-        print("[\(fileName):\(line)] \(iterInfo) \(actualMessage)")
+        print("[\(fileName):\(line)] \(function) \(iterInfo) - \(actualMessage)")
     } else {
-        // Unlimited printing
-        print("[\(fileName):\(line)] \(actualMessage)")
+        // Normal print without iteration tracking
+        print("[\(fileName):\(line)] \(function) - \(actualMessage)")
     }
 }

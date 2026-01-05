@@ -46,7 +46,22 @@ extension AllLivePlayersViewModel {
                     let freshDelta = calculatedScore - oldCurrent
                     let newAccumulatedDelta = abs(freshDelta) > 0.01 ? (priorDelta + freshDelta) : priorDelta
 
-                    let activityTime = (abs(freshDelta) > 0.01) ? Date() : previousActivityTime
+                    // 🔥 FIX: Set activity time properly for Recent Activity sort
+                    let activityTime: Date?
+                    if abs(freshDelta) > 0.01 {
+                        // Score changed - mark as active NOW
+                        activityTime = Date()
+                    } else if let prevTime = previousActivityTime {
+                        // No change - keep previous time
+                        activityTime = prevTime
+                    } else if calculatedScore > 0 {
+                        // 🔥 NEW: First time seeing this player and they have points - use now
+                        // This ensures players with scores show up in Recent Activity sort
+                        activityTime = Date()
+                    } else {
+                        // No score yet
+                        activityTime = nil
+                    }
 
                     // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                     // Injury status and jersey number are already populated during player creation
@@ -132,7 +147,22 @@ extension AllLivePlayersViewModel {
                 let freshDelta = calculatedScore - oldCurrent
                 let newAccumulatedDelta = abs(freshDelta) > 0.01 ? (priorDelta + freshDelta) : priorDelta
 
-                let activityTime = (abs(freshDelta) > 0.01) ? Date() : previousActivityTime
+                // 🔥 FIX: Set activity time properly for Recent Activity sort
+                let activityTime: Date?
+                if abs(freshDelta) > 0.01 {
+                    // Score changed - mark as active NOW
+                    activityTime = Date()
+                } else if let prevTime = previousActivityTime {
+                    // No change - keep previous time
+                    activityTime = prevTime
+                } else if calculatedScore > 0 {
+                    // 🔥 NEW: First time seeing this player and they have points - use now
+                    // This ensures players with scores show up in Recent Activity sort
+                    activityTime = Date()
+                } else {
+                    // No score yet
+                    activityTime = nil
+                }
 
                 // 🔥 MODEL-BASED: No lookups needed! Data already on player model ✅
                 // Injury status and jersey number are already populated during player creation
