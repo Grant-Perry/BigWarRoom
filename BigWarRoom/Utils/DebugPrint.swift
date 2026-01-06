@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = []
+   static var activeMode: DebugMode = [] //.nflData // []
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {

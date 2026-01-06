@@ -320,6 +320,7 @@ struct BigWarRoom: View {
                 .environment(nflGameData)
                 .environment(nflWeek)
                 .environment(espnCreds)
+                .environment(AppLifecycleManager.shared)
         } else {
             Text("Loading services...")
         }

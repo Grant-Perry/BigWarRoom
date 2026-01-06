@@ -47,12 +47,12 @@ final class SeasonYearManager {
     var lastChanged: Date = Date()
     
     /// Available years for picker - Use @ObservationIgnored for constants
+    /// 🔥 Shows current + previous year for historical viewing
     @ObservationIgnored let availableYears = ["2024", "2025", "2026"]
     
     // MARK: - Initialization
     init() {
-        // 🔥 FIXED: Default to current NFL FISCAL season year (Sep-Aug logic)
-        // Check if user has a saved preference, otherwise calculate current NFL season
+        // 🔥 FIXED: Use existing baseline - respect saved year or calculate current NFL season
         let savedYear = AppConstants.ESPNLeagueYear
         let currentNFLYear = String(NFLWeekCalculator.getCurrentSeasonYear())
         

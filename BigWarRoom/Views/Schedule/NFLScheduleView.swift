@@ -1,4 +1,3 @@
-//
 //  NFLScheduleView.swift
 //  BigWarRoom
 //
@@ -24,6 +23,9 @@ struct NFLScheduleView: View {
     
     // 🔥 NEW: Store SleeperAPIClient locally (not observable, so can't be @Environment)
     @State private var sleeperAPIClient: SleeperAPIClient?
+    
+    // 🏈 NEW: Playoff bracket service
+    @State private var playoffBracketService: NFLPlayoffBracketService?
     
     // Keep legend pills same width so the explanation text aligns
     private let legendPillWidth: CGFloat = 78
@@ -74,14 +76,19 @@ struct NFLScheduleView: View {
                 .ignoresSafeArea()
             
             if let viewModel = viewModel {
-                VStack(spacing: 0) {
-                    // Header Section
-                    scheduleHeader(viewModel: viewModel)
-                        .padding(.top, 12)
-                        .padding(.bottom, 16)
-                    
-                    // Games List
-                    gamesList(viewModel: viewModel)
+                // 🏈 NEW: Show playoff bracket for weeks > 18
+                if weekSelectionManager.selectedWeek > 18 {
+                    playoffBracketContent
+                } else {
+                    VStack(spacing: 0) {
+                        // Header Section
+                        scheduleHeader(viewModel: viewModel)
+                            .padding(.top, 12)
+                            .padding(.bottom, 16)
+                        
+                        // Games List
+                        gamesList(viewModel: viewModel)
+                    }
                 }
             } else {
                 ProgressView("Loading...")
@@ -166,6 +173,13 @@ struct NFLScheduleView: View {
         .onChange(of: weekSelectionManager.selectedWeek) { _, newWeek in
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: WeekSelectionManager changed to week \(newWeek), updating view model")
             viewModel?.selectWeek(newWeek)
+            
+            // 🏈 NEW: Load playoff bracket if in playoffs
+            ensurePlayoffServiceCreated()
+            if newWeek > 18, let service = playoffBracketService {
+                let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
+                service.fetchPlayoffBracket(for: season)
+            }
         }
         .onAppear {
             
@@ -176,7 +190,25 @@ struct NFLScheduleView: View {
             
             // Start global auto-refresh for live scores
             viewModel?.refreshSchedule() // Initial load only
+            
+            // 🏈 NEW: Create playoff service and load bracket if in playoffs
+            ensurePlayoffServiceCreated()
+            if weekSelectionManager.selectedWeek > 18, let service = playoffBracketService {
+                let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
+                service.fetchPlayoffBracket(for: season)
+            }
         }
+    }
+    
+    // 🏈 NEW: Create playoff service if needed
+    private func ensurePlayoffServiceCreated() {
+        guard playoffBracketService == nil else { return }
+        
+        // Create service using AppLifecycleManager.shared (since it's a singleton)
+        playoffBracketService = NFLPlayoffBracketService(
+            weekSelectionManager: weekSelectionManager,
+            appLifecycleManager: AppLifecycleManager.shared
+        )
     }
     
     // MARK: -> FOX Style Background
@@ -187,6 +219,61 @@ struct NFLScheduleView: View {
             .aspectRatio(contentMode: .fill)
             .opacity(0.35)
             .ignoresSafeArea(.all)
+    }
+    
+    // 🏈 NEW: Playoff Bracket Content
+    @ViewBuilder
+    private var playoffBracketContent: some View {
+        if let service = playoffBracketService {
+            VStack(spacing: 0) {
+                // Header with week picker
+                playoffBracketHeader
+                    .padding(.top, 12)
+                
+                // Bracket view
+                NFLPlayoffBracketView(
+                    weekSelectionManager: weekSelectionManager,
+                    appLifecycleManager: AppLifecycleManager.shared,
+                    fantasyViewModel: nil, // TODO: Pass fantasy VM for player highlighting
+                    initialSeason: Int(SeasonYearManager.shared.selectedYear)
+                )
+            }
+        } else {
+            ProgressView("Loading playoffs...")
+        }
+    }
+    
+    // 🏈 NEW: Playoff Bracket Header
+    private var playoffBracketHeader: some View {
+        VStack(spacing: 8) {
+            // 🔥 ONLY show TheWeekPicker when it's NOT playoff time
+            if weekSelectionManager.selectedWeek <= 18 {
+                TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
+            }
+            
+            // Playoff indicator
+            HStack(spacing: 6) {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(.purple)
+                
+                Text("NFL PLAYOFFS")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundColor(.white)
+                    .kerning(1.5)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(Color.purple.opacity(0.2))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.purple.opacity(0.6), lineWidth: 1.5)
+                    )
+            )
+        }
+        .padding(.horizontal, 20)
     }
     
     // MARK: -> Header Section

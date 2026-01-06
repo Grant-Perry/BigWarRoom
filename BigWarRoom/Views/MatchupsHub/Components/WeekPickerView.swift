@@ -27,9 +27,12 @@ struct WeekPickerView: View {
     private let weekManager: WeekSelectionManager
     private let yearManager: SeasonYearManager
     
+    // 🏈 Callback for playoff navigation
+    var onPlayoffsSelected: (() -> Void)?
+    
     @State private var animateIn = false
     
-    /// NFL season has 18 weeks (17 regular + playoffs)
+    /// NFL season has 18 weeks (17 regular + 1 playoff)
     private let maxWeeks = 18
     
     /// NFL season start date - calculated from SeasonYearManager (SOT)
@@ -55,11 +58,13 @@ struct WeekPickerView: View {
     // 🔥 PHASE 2.5: Dependency injection initializer
     init(
         weekManager: WeekSelectionManager,
-        isPresented: Binding<Bool>
+        isPresented: Binding<Bool>,
+        onPlayoffsSelected: (() -> Void)? = nil
     ) {
         self.weekManager = weekManager
         self.yearManager = SeasonYearManager.shared // TODO: Convert this too
         self._isPresented = isPresented
+        self.onPlayoffsSelected = onPlayoffsSelected
     }
 
     var body: some View {
@@ -158,6 +163,7 @@ struct WeekPickerView: View {
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.gray)
                 
+                // Show all available years (user can switch to view historical data)
                 ForEach(yearManager.availableYears, id: \.self) { year in
                     yearPickerButton(for: year)
                 }
@@ -287,7 +293,7 @@ struct WeekPickerView: View {
             Divider()
                 .background(Color.gpGreen.opacity(0.3))
             
-            HStack(spacing: 20) {
+            HStack(spacing: 12) {
                 // Current Week Quick Select
                 Button(action: {
                     selectCurrentWeek()
@@ -295,11 +301,12 @@ struct WeekPickerView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "calendar.circle.fill")
                             .foregroundColor(.gpGreen)
-                        Text("Current Week")
-                            .font(.system(size: 14, weight: .semibold))
+                        Text("Current")
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.gpGreen)
+                            .fixedSize()
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
@@ -307,6 +314,30 @@ struct WeekPickerView: View {
                             .overlay(
                                 RoundedRectangle(cornerRadius: 20)
                                     .stroke(Color.gpGreen.opacity(0.4), lineWidth: 1)
+                            )
+                    )
+                }
+                
+                // 🏈 Playoffs Button
+                Button(action: {
+                    selectPlayoffs()
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trophy.fill")
+                            .foregroundColor(.purple)
+                        Text("Playoffs")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.purple)
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(Color.purple.opacity(0.15))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(Color.purple.opacity(0.4), lineWidth: 1)
                             )
                     )
                 }
@@ -323,8 +354,9 @@ struct WeekPickerView: View {
                         Text("Week \(weekManager.selectedWeek)")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundColor(.white)
+                            .fixedSize()
                     }
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
                     .padding(.vertical, 10)
                     .background(
                         RoundedRectangle(cornerRadius: 20)
@@ -346,7 +378,7 @@ struct WeekPickerView: View {
     // MARK: - Helper Functions
     
     private func weekLabel(for week: Int) -> String {
-        if week > 17 {
+        if week > 18 {
             return "PLAYOFFS"
         } else if week == weekManager.currentNFLWeek {
             return "CURRENT"
@@ -399,12 +431,6 @@ struct WeekPickerView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        } else if week > 17 {
-            return LinearGradient(
-                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.15)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
         } else {
             return LinearGradient(
                 colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.05)],
@@ -419,8 +445,6 @@ struct WeekPickerView: View {
             return .white.opacity(0.8)
         } else if week == weekManager.currentNFLWeek {
             return .gpGreen.opacity(0.6)
-        } else if week > 17 {
-            return .purple.opacity(0.4)
         } else {
             return .gray.opacity(0.2)
         }
@@ -473,6 +497,25 @@ struct WeekPickerView: View {
         }
     }
     
+    private func selectPlayoffs() {
+        // Haptic feedback for playoffs selection
+        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+        impactFeedback.impactOccurred()
+        
+        // Select Week 19 to trigger playoff view in Schedule tab
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            weekManager.selectWeek(19)
+        }
+        
+        // Dismiss picker
+        dismissPicker()
+        
+        // Trigger playoff navigation callback after dismiss animation
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            onPlayoffsSelected?()
+        }
+    }
+    
     private func confirmSelection() {
         // Haptic feedback for confirmation
         let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
@@ -499,7 +542,10 @@ struct WeekPickerView: View {
         
         WeekPickerView(
             weekManager: WeekSelectionManager(nflWeekService: NFLWeekService(apiClient: SleeperAPIClient())),
-            isPresented: .constant(true)
+            isPresented: .constant(true),
+            onPlayoffsSelected: {
+                print("Navigate to playoffs")
+            }
         )
     }
     .preferredColorScheme(.dark)

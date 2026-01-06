@@ -183,7 +183,12 @@ extension MatchupsHubView {
     func buildWeekPickerSheet() -> some View {
         WeekPickerView(
             weekManager: weekManager,
-            isPresented: $showingWeekPicker
+            isPresented: $showingWeekPicker,
+            onPlayoffsSelected: {
+                DebugPrint(mode: .navigation, "🏈 PLAYOFFS BUTTON TAPPED - Navigating to Schedule tab")
+                // Post notification to switch to Schedule tab (tag 2)
+                NotificationCenter.default.post(name: NSNotification.Name("SwitchToSchedule"), object: nil)
+            }
         )
     }
     

@@ -22,6 +22,7 @@ struct MatchupsHubView: View {
     @State internal var showingSettings = false
     @State internal var showingWeekPicker = false
     @State internal var showingWatchedPlayers = false
+    @State internal var showingPlayoffs = false
     
     // MARK: - UI State
     @State internal var refreshing = false
@@ -118,6 +119,15 @@ struct MatchupsHubView: View {
         .sheet(isPresented: $showingWatchedPlayers) {
             // 🔥 TODO: Convert PlayerWatchService to @Observable and inject
             WatchedPlayersSheet(watchService: PlayerWatchService.shared)
+        }
+        .sheet(isPresented: $showingPlayoffs) {
+            NavigationView {
+                NFLPlayoffBracketView(
+                    weekSelectionManager: weekManager,
+                    appLifecycleManager: AppLifecycleManager.shared,
+                    fantasyViewModel: nil
+                )
+            }
         }
         .onChange(of: weekManager.selectedWeek) { oldValue, newValue in
             if oldValue != newValue {

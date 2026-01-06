@@ -270,6 +270,9 @@ struct BigWarRoomModified: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToMissionControl"))) { _ in
                 selectedTab = 0
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SwitchToSchedule"))) { _ in
+                selectedTab = 2
+            }
             
             // Version display
             VStack {

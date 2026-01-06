@@ -113,16 +113,23 @@ struct TheWeekPicker: View {
             showingWeekPicker = true
         }) {
             HStack(spacing: 8) {
-                // Week label
-                Text(labelText)
+                // Week label - show "Playoffs" for weeks 19+
+                Text(weekManager.selectedWeek >= 19 ? "Playoffs" : labelText)
                     .font(.system(size: labelFontSize, weight: labelFontWeight))
                     .foregroundColor(labelColor)
                 
                 // Week number with year underneath, trailing aligned
+                // For playoffs, show the week number still but smaller
                 VStack(alignment: .trailing, spacing: 0) {
-                    Text("\(weekManager.selectedWeek)")
-                        .font(.system(size: weekNumberFontSize, weight: weekNumberFontWeight, design: .rounded))
-                        .foregroundColor(weekNumberColor)
+                    if weekManager.selectedWeek >= 19 {
+                        // For playoffs, we might not want to show the week number at all
+                        // or show it very subtly
+                        EmptyView()
+                    } else {
+                        Text("\(weekManager.selectedWeek)")
+                            .font(.system(size: weekNumberFontSize, weight: weekNumberFontWeight, design: .rounded))
+                            .foregroundColor(weekNumberColor)
+                    }
                     
                     if showYear {
                         Text("\(yearManager.selectedYear)")
