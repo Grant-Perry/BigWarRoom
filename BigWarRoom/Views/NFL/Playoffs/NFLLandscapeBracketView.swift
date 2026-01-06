@@ -10,6 +10,7 @@ import SwiftUI
 
 struct NFLLandscapeBracketView: View {
    @Environment(TeamAssetManager.self) private var teamAssets
+   @Environment(NFLStandingsService.self) private var standingsService
    let bracket: PlayoffBracket
 
 	  // --- 1. PRECISE LAYOUT CONSTANTS ---
@@ -180,40 +181,41 @@ struct NFLLandscapeBracketView: View {
    @ViewBuilder
    private func teamCell(_ team: PlayoffTeam?, isReversed: Bool) -> some View {
 	  ZStack {
-		 // Conditionally apply gradient or solid color
+		 // Gradient background or solid gray for empty
 		 if let team = team {
 			let color = teamColor(for: team.abbreviation)
 			RoundedRectangle(cornerRadius: 6)
-			   .fill(
-				  LinearGradient(
-					 gradient: Gradient(colors: [color.opacity(0.8), color]),
-					 startPoint: .top,
-					 endPoint: .bottom
-				  )
-			   )
+			   .fill(LinearGradient(gradient: Gradient(colors: [color, color.opacity(0.7)]), startPoint: .top, endPoint: .bottom))
 		 } else {
-			// Dark Background for empty slots
 			RoundedRectangle(cornerRadius: 6)
 			   .fill(Color(UIColor.systemGray6).opacity(0.15))
 		 }
 
-		 // The original overlay for a nice border effect
+		 // Border Overlay
 		 RoundedRectangle(cornerRadius: 6)
 			.stroke(Color.white.opacity(0.1), lineWidth: 0.5)
 
 		 if let team = team {
+			// Watermarked Seed Number from Portrait View
+			Text("#\(team.seed ?? 0)")
+			   .font(.system(size: 40, weight: .black))
+			   .foregroundColor(.white.opacity(0.1))
+			   .frame(maxWidth: .infinity, alignment: isReversed ? .leading : .trailing)
+			   .padding(.horizontal, 10)
+			   .offset(y: 2)
+
 			HStack(spacing: 6) {
 			   if isReversed {
 				  Spacer()
 				  teamInfo(team, align: .trailing)
-				  teamLogo(team)
+				  teamLogo(team) // Logo on the inside
 			   } else {
-				  teamLogo(team)
+				  teamLogo(team) // Logo on the inside
 				  teamInfo(team, align: .leading)
 				  Spacer()
 			   }
 			}
-			.padding(.horizontal, 4)
+			.padding(.horizontal, 6)
 		 }
 	  }
 	  .frame(width: cellWidth, height: cellHeight)
@@ -222,23 +224,29 @@ struct NFLLandscapeBracketView: View {
    @ViewBuilder
    private func teamLogo(_ team: PlayoffTeam) -> some View {
 	  if let logo = teamAssets.logo(for: team.abbreviation) {
-		 logo.resizable().scaledToFit().frame(height: 20)
+		 logo.resizable().scaledToFit().frame(height: 32) // Increased logo size
 	  } else {
-		 Circle().fill(Color.gray.opacity(0.3)).frame(width: 20, height: 20)
+		 Circle().fill(Color.gray.opacity(0.3)).frame(width: 32, height: 32)
 	  }
    }
 
    @ViewBuilder
    private func teamInfo(_ team: PlayoffTeam, align: HorizontalAlignment) -> some View {
-	  VStack(alignment: align, spacing: 0) {
-		 Text(team.name.uppercased())
-			.font(.system(size: 9, weight: .bold))
-			.foregroundColor(.white)
-			.lineLimit(1)
-		 Text("SEED #\(team.seed ?? 0)")
-			.font(.system(size: 6, weight: .medium))
-			.foregroundColor(.gray)
-	  }
+      let record = standingsService.getTeamRecord(for: team.abbreviation)
+      
+      VStack(alignment: align, spacing: 1) {
+         Text(team.abbreviation)
+            .font(.system(size: 10, weight: .bold))
+            .foregroundColor(.white)
+            .lineLimit(1)
+         
+         Text(record)
+            .font(.system(size: 10, weight: .medium))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .foregroundColor(.gray)
+      }
    }
 
 	  // MARK: - Helper Methods
@@ -324,18 +332,3 @@ struct DivisionalConnector: View {
 	  }
    }
 }
-
-//   // MARK: - Preview
-//#Preview("Landscape NFL Bracket") {
-//    let assets = TeamAssetManager()
-//    let mockData = PlayoffBracket(
-//        season: 2025,
-//        afcGames: [
-//             .init(id: "afc1", round: .wildCard, conference: .afc, homeTeam: .init(abbreviation: "PIT", name: "Steelers", seed: 4, score: nil, logoURL: ""), awayTeam: .init(abbreviation: "HOU", name: "Texans", seed: 5, score: nil, logoURL: ""), gameDate: .now, status: .scheduled),
-//             .init(id: "afc2", round: .wildCard, conference: .afc, homeTeam: .init(abbreviation: "JAX", name: "Jaguars", seed: 3, score: nil, logoURL: ""), awayTeam: .init(abbreviation: "BUF", name: "Bills", seed: 6, score: nil, logoURL: ""), gameDate: .now, status: .scheduled),
-//             .init(id: "afc3", round: .wildCard, conference: .afc, homeTeam: .init(abbreviation: "NE", name: "Patriots", seed: 2, score: nil, logoURL: ""), awayTeam: .init(abbreviation: "LAC", name: "Chargers", seed: 7, score: nil, logoURL: ""), gameDate: .now, status: .scheduled)
-//        ],
-//        nfcGames: [
-//            .init(id: "nfc1", round: .wildCard, conference: .nfc, homeTeam: .init(abbreviation: "CAR", name: "Panthers", seed: 4, score: nil, logoURL: ""), awayTeam: .init(abbreviation: "LAR", name: "Rams", seed: 5, score: nil, logoURL: ""), gameDate: .now, status: .scheduled),
-//            .init(id: "nfc2", round: .wildCard, conference: .nfc, homeTeam: .init(abbreviation: "PHI", name: "Eagles", seed: 3, score: nil, logoURL: ""), awayTeam: .init(abbreviation: "SF", name: "49ers", seed: 6, score: nil, logoURL: ""), gameDate: .now, status: .scheduled),
-//            .init(id: "nfc3
