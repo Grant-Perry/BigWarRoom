@@ -1,4 +1,4 @@
-   //
+//
    //  BracketTeamCell.swift
    //  BigWarRoom
    //
@@ -39,19 +39,20 @@ struct BracketTeamCell: View {
 			.stroke(Color.white.opacity(0.35), lineWidth: 1)
 
 		 if let team = team {
-			   // Background Seed #
-			   // We force alignment to .trailing explicitly
-			HStack(alignment: .top, spacing: 0) {
-			   Text("#")
-				  .font(.system(size: 18, weight: .black))
-				  .foregroundColor(.white.opacity(0.25))
-				  .offset(y: -1)
-			   Text("\(team.seed ?? 0)")
-				  .font(.system(size: 36, weight: .black))
-				  .foregroundColor(.white.opacity(0.3))
+			   // Background Seed # - only show if seed exists and is > 0
+			if let seed = team.seed, seed > 0 {
+			   HStack(alignment: .top, spacing: 0) {
+				  Text("#")
+					 .font(.system(size: 18, weight: .black))
+					 .foregroundColor(.white.opacity(0.25))
+					 .offset(y: -1)
+				  Text("\(seed)")
+					 .font(.system(size: 36, weight: .black))
+					 .foregroundColor(.white.opacity(0.3))
+			   }
+			   .frame(maxWidth: .infinity, alignment: .trailing)
+			   .padding(.horizontal, 4)
 			}
-			.frame(maxWidth: .infinity, alignment: .trailing)
-			.padding(.horizontal, 4)
 
 			   // Content Row
 			   // Standard order: Logo -> Info -> Spacer

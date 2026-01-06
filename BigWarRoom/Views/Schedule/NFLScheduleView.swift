@@ -225,18 +225,19 @@ struct NFLScheduleView: View {
     @ViewBuilder
     private var playoffBracketContent: some View {
         if let service = playoffBracketService {
-            VStack(spacing: 0) {
-                // Header with week picker
-                playoffBracketHeader
-                    .padding(.top, 12)
-                
-                // Bracket view
+            ZStack(alignment: .top) {
+                // Bracket view (full screen)
                 NFLPlayoffBracketView(
                     weekSelectionManager: weekSelectionManager,
                     appLifecycleManager: AppLifecycleManager.shared,
-                    fantasyViewModel: nil, // TODO: Pass fantasy VM for player highlighting
+                    fantasyViewModel: nil,
                     initialSeason: Int(SeasonYearManager.shared.selectedYear)
                 )
+                
+                // Header with week picker (floating on top)
+                playoffBracketHeader
+                    .padding(.top, 12)
+                    .zIndex(1) // Ensure it's above the bracket view
             }
         } else {
             ProgressView("Loading playoffs...")
@@ -246,32 +247,8 @@ struct NFLScheduleView: View {
     // 🏈 NEW: Playoff Bracket Header
     private var playoffBracketHeader: some View {
         VStack(spacing: 8) {
-            // 🔥 ONLY show TheWeekPicker when it's NOT playoff time
-            if weekSelectionManager.selectedWeek <= 18 {
-                TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
-            }
-            
-            // Playoff indicator
-            HStack(spacing: 6) {
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.purple)
-                
-                Text("NFL PLAYOFFS")
-                    .font(.system(size: 14, weight: .black))
-                    .foregroundColor(.white)
-                    .kerning(1.5)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.purple.opacity(0.2))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.purple.opacity(0.6), lineWidth: 1.5)
-                    )
-            )
+            // Week picker for navigation back to regular season
+            TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
         }
         .padding(.horizontal, 20)
     }

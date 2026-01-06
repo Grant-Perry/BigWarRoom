@@ -13,51 +13,43 @@ struct NFLLandscapeBracketView: View {
 	  // --- Layout Configuration ---
    private let cellWidth: CGFloat = 95
    private let cellHeight: CGFloat = 40
-   private let matchupSpacing: CGFloat = 4      // Gap between teams in one matchup
-   private let groupSpacing: CGFloat = 20       // Gap between different matchups
+   private let matchupSpacing: CGFloat = 4
+   private let groupSpacing: CGFloat = 20
    private let connectorWidth: CGFloat = 30
    private let headerHeight: CGFloat = 24
 
 	  // --- Vertical Coordinate System ---
-	  // We calculate Y-positions manually to ensure lines hit exactly where we want.
-
-	  // Height of one matchup block (2 cells + spacing)
    private var matchH: CGFloat { (cellHeight * 2) + matchupSpacing }
 
-	  // 1. Wild Card Centers (Source Points)
-	  // WC1 is at the top (y=0 relative to content). Center is half height.
+	  // 1. Wild Card Centers
    private var yWC1: CGFloat { matchH / 2 }
-	  // WC2 is one full matchup + group spacing down.
    private var yWC2: CGFloat { matchH + groupSpacing + (matchH / 2) }
-	  // WC3 is two matchups + two group spacings down.
    private var yWC3: CGFloat { (matchH + groupSpacing) * 2 + (matchH / 2) }
 
-	  // 2. Divisional Slots (Destination Points)
-	  // Div 1 Top Slot: Aligns perfectly with WC1 for a straight line.
+	  // 2. Divisional Slots
    private var yDiv1_Top: CGFloat { yWC1 }
-	  // Div 1 Bot Slot (#1 Seed): Sits below Top Slot.
    private var yDiv1_Bot: CGFloat { yDiv1_Top + cellHeight + matchupSpacing }
-	  // Div 1 Matchup Center (for output line): Average of Top and Bot slots.
    private var yDiv1_Center: CGFloat { (yDiv1_Top + yDiv1_Bot) / 2 }
 
-	  // Div 2 Matchup: Centered between WC2 and WC3 inputs.
-	  // The Matchup Center is the average of WC2 and WC3.
    private var yDiv2_Center: CGFloat { (yWC2 + yWC3) / 2 }
-	  // Div 2 Top Slot: Above center.
    private var yDiv2_Top: CGFloat { yDiv2_Center - (cellHeight/2) - (matchupSpacing/2) }
-	  // Div 2 Bot Slot: Below center.
    private var yDiv2_Bot: CGFloat { yDiv2_Center + (cellHeight/2) + (matchupSpacing/2) }
 
 	  // 3. Championship Slots
-	  // Champ Top Slot: Input from Div 1 Center.
-	  // Champ Bot Slot: Input from Div 2 Center.
-	  // Actually, we want the Champ Matchup to be visually centered relative to the whole block.
-	  // Let's center it between Div 1 and Div 2 Centers.
    private var yChamp_Center: CGFloat { (yDiv1_Center + yDiv2_Center) / 2 }
    private var yChamp_Top: CGFloat { yChamp_Center - (cellHeight/2) - (matchupSpacing/2) }
    private var yChamp_Bot: CGFloat { yChamp_Center + (cellHeight/2) + (matchupSpacing/2) }
 
-	  // Total Content Height
+	  // 4. Super Bowl Coordinates (Calculated for Perfect Alignment)
+	  // We want the matchup centered in the view, vertically.
+   private var ySB_Matchup_Center: CGFloat { totalContentHeight / 2 }
+
+	  // The AFC Box is above the center. (Half height (20) + Half spacing (6) = 26 up)
+   private var ySB_AFC: CGFloat { ySB_Matchup_Center - 26 }
+
+	  // The NFC Box is below the center. (Half height (20) + Half spacing (6) = 26 down)
+   private var ySB_NFC: CGFloat { ySB_Matchup_Center + 26 }
+
    private var totalContentHeight: CGFloat { (matchH * 3) + (groupSpacing * 2) }
 
 	  // --- Zoom State ---
@@ -67,7 +59,8 @@ struct NFLLandscapeBracketView: View {
    @State private var dragOffset: CGSize = .zero
 
    private var idealTotalWidth: CGFloat {
-	  let side = cellWidth + connectorWidth + cellWidth + connectorWidth + cellWidth
+		 // Width = 2 sides + Center + Extra Spacing
+	  let side = cellWidth + connectorWidth + cellWidth + connectorWidth + cellWidth + connectorWidth
 	  let center = cellWidth + 50
 	  return (side * 2) + center + 60
    }
@@ -76,49 +69,30 @@ struct NFLLandscapeBracketView: View {
 	  GeometryReader { geo in
 		 let availableWidth = geo.size.width
 		 let availableHeight = geo.size.height
-
 		 let baseScale = min(1.0, availableWidth / idealTotalWidth)
-		 let zoomFactor = min(max(steadyZoom * pinchZoom, 1.0), 3.0)
-		 let finalScale = baseScale * zoomFactor
-
-		 let totalOffset = CGSize(
-			width: steadyOffset.width + dragOffset.width,
-			height: steadyOffset.height + dragOffset.height
-		 )
+		 let finalScale = baseScale * min(max(steadyZoom * pinchZoom, 1.0), 3.0)
+		 let totalOffset = CGSize(width: steadyOffset.width + dragOffset.width, height: steadyOffset.height + dragOffset.height)
 
 		 ZStack {
-			Color.black
-			   .opacity(0.5)
-			   .ignoresSafeArea()
-
+			Color.black.opacity(0.5).ignoresSafeArea()
 
 			VStack(spacing: 0) {
-				  // Header
-			   Text("2025 NFL PLAYOFF PICTURE")
+			   Text("\(String(bracket.season)) NFL PLAYOFF PICTURE")
 				  .font(.custom("BebasNeue-Regular", size: 32))
 				  .foregroundColor(.white)
-				  .padding(.top, 20)
+				  .padding(.top, 30)
 				  .padding(.bottom, 10)
 
-				  // Bracket Container
 			   HStack(alignment: .top, spacing: 0) {
 				  conferenceSide(conference: .afc, isReversed: false)
 				  superBowlColumn
-				  conferenceSide(conference: .nfc, isReversed: true) // this was true, reverses the seed text
+				  conferenceSide(conference: .nfc, isReversed: true)
 			   }
 			   .scaleEffect(finalScale)
 			   .offset(totalOffset)
 			   .frame(width: idealTotalWidth * baseScale, height: totalContentHeight + headerHeight + 50)
-			   .simultaneousGesture(
-				  MagnificationGesture()
-					 .onChanged { pinchZoom = $0 }
-					 .onEnded { steadyZoom = min(max(steadyZoom * $0, 1.0), 3.0); pinchZoom = 1.0 }
-			   )
-			   .simultaneousGesture(
-				  DragGesture()
-					 .onChanged { dragOffset = $0.translation }
-					 .onEnded { steadyOffset.width += $0.translation.width; steadyOffset.height += $0.translation.height; dragOffset = .zero }
-			   )
+			   .simultaneousGesture(MagnificationGesture().onChanged { pinchZoom = $0 }.onEnded { steadyZoom = min(max(steadyZoom * $0, 1.0), 3.0); pinchZoom = 1.0 })
+			   .simultaneousGesture(DragGesture().onChanged { dragOffset = $0.translation }.onEnded { steadyOffset.width += $0.translation.width; steadyOffset.height += $0.translation.height; dragOffset = .zero })
 			}
 			.position(x: availableWidth / 2, y: availableHeight / 2)
 		 }
@@ -130,93 +104,120 @@ struct NFLLandscapeBracketView: View {
    private func conferenceSide(conference: PlayoffGame.Conference, isReversed: Bool) -> some View {
 	  let seeds = getSeedsForConference(bracket: bracket, conference: conference)
 	  let seed1 = conference == .afc ? bracket.afcSeed1 : bracket.nfcSeed1
+	  let games = conference == .afc ? bracket.afcGames : bracket.nfcGames
 
-	  HStack(alignment: .top, spacing: 0) {
+	  let wildCardGames = games.filter { game in
+		 let homeSeed = game.homeTeam.seed ?? 99
+		 let awaySeed = game.awayTeam.seed ?? 99
+		 return game.round == .wildCard && homeSeed <= 7 && awaySeed <= 7
+	  }.sorted { $0.gameDate < $1.gameDate }
+
+	  let allDivisionalGames = games.filter { $0.round == .divisional }.sorted { $0.gameDate < $1.gameDate }
+	  let allConferenceGames = games.filter { $0.round == .conference }
+	  let divisionalGamesResult = sortDivisionalGames(allDivisionalGames)
+	  let divGame1 = divisionalGamesResult.0
+	  let divGame2 = divisionalGamesResult.1
+	  let champGame = allConferenceGames.first
+
+	  let game_5v4 = findWildCardGame(wildCardGames, highSeed: 4, lowSeed: 5)
+	  let game_6v3 = findWildCardGame(wildCardGames, highSeed: 3, lowSeed: 6)
+	  let game_7v2 = findWildCardGame(wildCardGames, highSeed: 2, lowSeed: 7)
+
+	  var wcGame1: PlayoffGame?
+	  var wcGame2: PlayoffGame?
+	  var wcGame3: PlayoffGame?
+
+	  if let dGame = divGame1 {
+		 let seedA = dGame.homeTeam.seed ?? 99
+		 let opponentAbbr = (seedA == 1) ? dGame.awayTeam.abbreviation : dGame.homeTeam.abbreviation
+		 wcGame1 = wildCardGames.first { g in g.homeTeam.abbreviation == opponentAbbr || g.awayTeam.abbreviation == opponentAbbr }
+	  }
+	  if wcGame1 == nil { wcGame1 = game_5v4 }
+	  let allPotentialGames = [game_5v4, game_6v3, game_7v2].compactMap { $0 }
+	  let remainingGames = allPotentialGames.filter { $0.id != wcGame1?.id }
+	  wcGame2 = remainingGames.first
+	  wcGame3 = remainingGames.last
+
+	  return HStack(alignment: .top, spacing: 0) {
 			// COL 1: Wild Card
 		 ZStack(alignment: .top) {
 			Color.clear.frame(width: cellWidth, height: totalContentHeight)
-
 			Text(conference == .afc ? "AFC" : "NFC")
-			   .font(.custom("BebasNeue-Regular", size: 20))
+			   .font(.custom("BebasNeue-Regular", size: 30))
 			   .foregroundColor(.white)
 			   .frame(height: headerHeight, alignment: .top)
-			   .offset(y: -headerHeight - 4)
-
+			   .offset(x: conference == .afc ? 125 : 125, y: -headerHeight - 4) // center the header
 
 			BracketHeader(text: "WILD CARD")
 
-			   // WC 1
-			matchupView(top: seeds[5], bot: seeds[4], isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yWC1 + headerHeight)
+			if let game = wcGame1 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight) }
+			else { matchupView(top: seeds[5], bot: seeds[4], isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight) }
 
-			   // WC 2
-			matchupView(top: seeds[6], bot: seeds[3], isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yWC2 + headerHeight)
+			if let game = wcGame2 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
+			else { matchupView(top: seeds[6], bot: seeds[3], isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
 
-			   // WC 3
-			matchupView(top: seeds[7], bot: seeds[2], isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yWC3 + headerHeight)
-		 }
-		 .frame(width: cellWidth)
+			if let game = wcGame3 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight) }
+			else { matchupView(top: seeds[7], bot: seeds[2], isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight) }
+		 }.frame(width: cellWidth)
 
 			// COL 2: WC -> Div Connectors
 		 ZStack(alignment: .top) {
 			Color.clear.frame(width: connectorWidth, height: totalContentHeight)
 			BracketHeader(text: "")
-
-			WC_Div_Connector(
-			   isReversed: isReversed,
-			   src1: yWC1, src2: yWC2, src3: yWC3,
-			   dst1: yDiv1_Top, dst2_top: yDiv2_Top, dst2_bot: yDiv2_Bot
-			)
-			.offset(y: headerHeight) // Shift down for header
-		 }
-		 .frame(width: connectorWidth)
+			WC_Div_Connector(isReversed: isReversed, src1: yWC1, src2: yWC2, src3: yWC3, dst1: yDiv1_Top, dst2_top: yDiv2_Top, dst2_bot: yDiv2_Bot)
+			   .offset(y: headerHeight)
+		 }.frame(width: connectorWidth)
 
 			// COL 3: Divisional
 		 ZStack(alignment: .top) {
 			Color.clear.frame(width: cellWidth, height: totalContentHeight)
 			BracketHeader(text: "DIVISIONAL")
+			if let game = divGame1 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Center + headerHeight) }
+			else { BracketTeamCell(team: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Top + headerHeight); BracketTeamCell(team: seed1, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Bot + headerHeight) }
 
-			   // Div 1 (Top Slot Empty, Bot Slot #1)
-			BracketTeamCell(team: nil, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yDiv1_Top + headerHeight)
-			BracketTeamCell(team: seed1, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yDiv1_Bot + headerHeight)
-
-			   // Div 2 (Both Empty)
-			BracketTeamCell(team: nil, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yDiv2_Top + headerHeight)
-			BracketTeamCell(team: nil, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yDiv2_Bot + headerHeight)
-		 }
-		 .frame(width: cellWidth)
+			if let game = divGame2 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Center + headerHeight) }
+			else { BracketTeamCell(team: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Top + headerHeight); BracketTeamCell(team: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Bot + headerHeight) }
+		 }.frame(width: cellWidth)
 
 			// COL 4: Div -> Champ Connectors
 		 ZStack(alignment: .top) {
 			Color.clear.frame(width: connectorWidth, height: totalContentHeight)
 			BracketHeader(text: "")
-
 			Div_Champ_Connector(
 			   isReversed: isReversed,
-			   src1: yDiv1_Center, src2: yDiv2_Center,
-			   dst_top: yChamp_Top, dst_bot: yChamp_Bot
+			   src1: yDiv1_Center,
+			   src2: yDiv2_Center,
+			   dst_top: yChamp_Top,
+			   dst_bot: yChamp_Bot
 			)
 			.offset(y: headerHeight)
-		 }
-		 .frame(width: connectorWidth)
+			.scaleEffect(x: isReversed ? -1 : 1, y: 1)
+		 }.frame(width: connectorWidth)
 
 			// COL 5: Championship
 		 ZStack(alignment: .top) {
 			Color.clear.frame(width: cellWidth, height: totalContentHeight)
 			BracketHeader(text: conference == .afc ? "AFC CHAMP" : "NFC CHAMP")
 
-			BracketTeamCell(team: nil, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yChamp_Top + headerHeight)
-			BracketTeamCell(team: nil, isReversed: isReversed)
-			   .position(x: cellWidth/2, y: yChamp_Bot + headerHeight)
-		 }
-		 .frame(width: cellWidth)
+			if let game = champGame {
+			   championshipMatchupView(game: game, topDivGame: divGame1, isReversed: isReversed)
+			} else {
+			   BracketTeamCell(team: nil, isReversed: isReversed).position(x: cellWidth/2, y: yChamp_Top + headerHeight)
+			   BracketTeamCell(team: nil, isReversed: isReversed).position(x: cellWidth/2, y: yChamp_Bot + headerHeight)
+			}
+		 }.frame(width: cellWidth)
+
+			// COL 6: Champ -> Super Bowl Connector
+		 ZStack(alignment: .top) {
+			Color.clear.frame(width: connectorWidth, height: totalContentHeight)
+			BracketHeader(text: "")
+			Champ_SB_Connector(
+			   isReversed: isReversed,
+			   src: yChamp_Center + headerHeight,
+			   dst: (conference == .afc ? ySB_AFC : ySB_NFC) + headerHeight // Use the exact targets
+			)
+			.scaleEffect(x: isReversed ? -1 : 1, y: 1)
+		 }.frame(width: connectorWidth)
 	  }
 	  .environment(\.layoutDirection, isReversed ? .rightToLeft : .leftToRight)
    }
@@ -225,122 +226,102 @@ struct NFLLandscapeBracketView: View {
    private var superBowlColumn: some View {
 	  VStack(spacing: 0) {
 		 Text("SUPER BOWL")
-			.font(.system(size: 18, weight: .heavy)) // Bumped Size
-			.foregroundColor(.gpGreen)               // Green Color
+			.font(.system(size: 18, weight: .heavy))
+			.foregroundColor(.gpGreen)
 			.frame(height: headerHeight, alignment: .bottom)
-			.padding(.bottom, 4)
+			.padding(.bottom, 10)
 
 		 ZStack {
 			Color.clear.frame(height: totalContentHeight)
 
-			   // Vertically centered in the block
-			VStack(spacing: 12) {
-			   BracketTeamCell(team: nil, isReversed: false)
+			   // --- Data Prep ---
+			let afcChampGame = bracket.afcGames.filter { $0.round == .conference }.first
+			let nfcChampGame = bracket.nfcGames.filter { $0.round == .conference }.first
+			let afcWinner = afcChampGame != nil ? getWinner(from: afcChampGame!) : nil
+			let nfcWinner = nfcChampGame != nil ? getWinner(from: nfcChampGame!) : nil
+			let sbGame = bracket.superBowl
+
+			let afcTeam = (sbGame != nil && !isGenericTeam(sbGame!.awayTeam.abbreviation)) ? (isAFCTeam(sbGame!.awayTeam.abbreviation) ? sbGame!.awayTeam : sbGame!.homeTeam) : afcWinner
+			let nfcTeam = (sbGame != nil && !isGenericTeam(sbGame!.awayTeam.abbreviation)) ? (isAFCTeam(sbGame!.awayTeam.abbreviation) ? sbGame!.homeTeam : sbGame!.awayTeam) : nfcWinner
+
+			   // --- 1. Champion Box (Moved to TOP) ---
+			if let sbGame = sbGame, sbGame.isCompleted {
+			   let sbWinner = getWinner(from: sbGame)
+			   let actualWinner = (sbWinner != nil && !isGenericTeam(sbWinner!.abbreviation)) ? sbWinner : (sbGame.homeTeam.score ?? 0 > sbGame.awayTeam.score ?? 0) ? (isAFCTeam(sbGame.homeTeam.abbreviation) ? afcTeam : nfcTeam) : (isAFCTeam(sbGame.awayTeam.abbreviation) ? afcTeam : nfcTeam)
+
+			   if let winner = actualWinner {
+				  VStack(spacing: 4) {
+					 Text("CHAMPION")
+						.font(.system(size: 12, weight: .black))
+						.foregroundColor(.gpGreen)
+						.offset(y: -8)
+
+					 BracketTeamCell(team: winner, isReversed: false)
+						.overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.clear, lineWidth: 3))
+						.scaleEffect(1.3)
+				  }
+					 // Position this near the top, under the header
+				  .position(x: (cellWidth + 30)/2, y: 50)
+			   }
+			}
+
+			   // --- 2. Super Bowl Matchup (Centered) ---
+			   // We use specific positions so the lines connect perfectly
+
+			   // AFC Team (Top of Stack)
+			Group {
+			   let offSpace: CGFloat = 10
+			   BracketTeamCell(team: afcTeam, isReversed: false)
+				  .position(x: (cellWidth + 30)/2, y: ySB_AFC + headerHeight - offSpace)
+
+				  // VS Text (Center) - VS is centered between the two teams
 			   Text("VS")
 				  .font(.system(size: 14, weight: .black))
+				  .padding() // added to give some space
 				  .foregroundColor(.white.opacity(0.5))
-			   BracketTeamCell(team: nil, isReversed: true)
+				  .position(x: (cellWidth + 30)/2, y: ySB_Matchup_Center + headerHeight)
+
+				  // NFC Team (Bottom of Stack)
+			   BracketTeamCell(team: nfcTeam, isReversed: true)
+				  .position(x: (cellWidth + 30)/2, y: ySB_NFC + headerHeight + offSpace)
 			}
+			.offset(y: -10)
 		 }
+		 .offset(y: -23)
 	  }
 	  .frame(width: cellWidth + 30)
 	  .offset(y: -15)
    }
 
-	  // MARK: - Components
-
-   @ViewBuilder
-   private func matchupView(top: PlayoffTeam?, bot: PlayoffTeam?, isReversed: Bool) -> some View {
+	  // MARK: - Components (Helpers)
+   @ViewBuilder private func matchupView(top: PlayoffTeam?, bot: PlayoffTeam?, isReversed: Bool) -> some View { VStack(spacing: matchupSpacing) { BracketTeamCell(team: top, isReversed: isReversed); BracketTeamCell(team: bot, isReversed: isReversed) } }
+   @ViewBuilder private func matchupView(game: PlayoffGame, isReversed: Bool) -> some View { VStack(spacing: matchupSpacing) { BracketTeamCell(team: game.awayTeam, isReversed: isReversed); BracketTeamCell(team: game.homeTeam, isReversed: isReversed) } }
+   @ViewBuilder private func championshipMatchupView(game: PlayoffGame, topDivGame: PlayoffGame?, isReversed: Bool) -> some View {
+	  let topBracketWinnerAbbr = topDivGame != nil ? getWinner(from: topDivGame!)?.abbreviation : nil
+	  let isHomeFromTop = topBracketWinnerAbbr != nil && game.homeTeam.abbreviation == topBracketWinnerAbbr
+	  let isAwayFromTop = topBracketWinnerAbbr != nil && game.awayTeam.abbreviation == topBracketWinnerAbbr
 	  VStack(spacing: matchupSpacing) {
-		 BracketTeamCell(team: top, isReversed: isReversed)
-		 BracketTeamCell(team: bot, isReversed: isReversed)
-	  }
+		 if isHomeFromTop { BracketTeamCell(team: game.homeTeam, isReversed: isReversed); BracketTeamCell(team: game.awayTeam, isReversed: isReversed) }
+		 else if isAwayFromTop { BracketTeamCell(team: game.awayTeam, isReversed: isReversed); BracketTeamCell(team: game.homeTeam, isReversed: isReversed) }
+		 else { let homeS = game.homeTeam.seed ?? 999; let awayS = game.awayTeam.seed ?? 999; if homeS < awayS { BracketTeamCell(team: game.homeTeam, isReversed: isReversed); BracketTeamCell(team: game.awayTeam, isReversed: isReversed) } else { BracketTeamCell(team: game.awayTeam, isReversed: isReversed); BracketTeamCell(team: game.homeTeam, isReversed: isReversed) } }
+	  }.position(x: cellWidth/2, y: (yChamp_Top + yChamp_Bot) / 2 + headerHeight)
    }
 
+	  // Helpers
    private func getSeedsForConference(bracket: PlayoffBracket, conference: PlayoffGame.Conference) -> [Int: PlayoffTeam] {
 	  var seeds: [Int: PlayoffTeam] = [:]
 	  let games = (conference == .afc ? bracket.afcGames : bracket.nfcGames)
 	  games.forEach { game in
-		 if let awaySeed = game.awayTeam.seed { seeds[awaySeed] = game.awayTeam }
-		 if let homeSeed = game.homeTeam.seed { seeds[homeSeed] = game.homeTeam }
+		 if let awaySeed = game.awayTeam.seed { seeds[awaySeed] = PlayoffTeam(abbreviation: normalizeTeamCode(game.awayTeam.abbreviation), name: game.awayTeam.name, seed: awaySeed, score: game.awayTeam.score, logoURL: game.awayTeam.logoURL) }
+		 if let homeSeed = game.homeTeam.seed { seeds[homeSeed] = PlayoffTeam(abbreviation: normalizeTeamCode(game.homeTeam.abbreviation), name: game.homeTeam.name, seed: homeSeed, score: game.homeTeam.score, logoURL: game.homeTeam.logoURL) }
 	  }
-	  if let s1 = (conference == .afc ? bracket.afcSeed1 : bracket.nfcSeed1) { seeds[1] = s1 }
+	  if let s1 = (conference == .afc ? bracket.afcSeed1 : bracket.nfcSeed1) { seeds[1] = PlayoffTeam(abbreviation: normalizeTeamCode(s1.abbreviation), name: s1.name, seed: s1.seed, score: s1.score, logoURL: s1.logoURL) }
 	  return seeds
    }
+   private func sortDivisionalGames(_ games: [PlayoffGame]) -> (PlayoffGame?, PlayoffGame?) { var divGame1: PlayoffGame? = nil; var divGame2: PlayoffGame? = nil; for game in games { let homeS = game.homeTeam.seed ?? 0; let awayS = game.awayTeam.seed ?? 0; if homeS == 1 || awayS == 1 { divGame1 = game } else { divGame2 = game } }; return (divGame1, divGame2) }
+   private func findWildCardGame(_ games: [PlayoffGame], highSeed: Int, lowSeed: Int) -> PlayoffGame? { return games.first { game in let homeS = game.homeTeam.seed ?? 0; let awayS = game.awayTeam.seed ?? 0; return (homeS == highSeed && awayS == lowSeed) || (homeS == lowSeed && awayS == highSeed) } }
+   private func normalizeTeamCode(_ code: String) -> String { return (code == "WASH" || code == "WSH") ? "WSH" : code }
+   private func getWinner(from game: PlayoffGame) -> PlayoffTeam? { guard game.isCompleted else { return nil }; return (game.homeTeam.score ?? 0 > game.awayTeam.score ?? 0) ? game.homeTeam : (game.awayTeam.score ?? 0 > game.homeTeam.score ?? 0) ? game.awayTeam : nil }
+   private func isAFCTeam(_ abbr: String) -> Bool { return NFLTeam.team(for: abbr)?.conference == .afc }
+   private func isGenericTeam(_ abbr: String) -> Bool { return abbr == "AFC" || abbr == "NFC" || abbr.isEmpty }
 }
-
-   // MARK: - Connectors
-
-struct WC_Div_Connector: View {
-   let isReversed: Bool
-   let src1: CGFloat; let src2: CGFloat; let src3: CGFloat
-   let dst1: CGFloat; let dst2_top: CGFloat; let dst2_bot: CGFloat
-
-   var body: some View {
-	  GeometryReader { geo in
-		 Path { path in
-			let w = geo.size.width
-
-			   // 1. WC1 -> Div 1 Top (Straight Horizontal)
-			drawLink(path: &path, fromY: src1, toY: dst1, w: w, isReversed: false) // isReversed handled by parent env
-
-			   // 2. WC2 -> Div 2 Top (Elbow Down)
-			drawLink(path: &path, fromY: src2, toY: dst2_top, w: w, isReversed: false)
-
-			   // 3. WC3 -> Div 2 Bot (Elbow Up)
-			drawLink(path: &path, fromY: src3, toY: dst2_bot, w: w, isReversed: false)
-		 }
-		 .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
-	  }
-   }
-}
-
-struct Div_Champ_Connector: View {
-   let isReversed: Bool
-   let src1: CGFloat; let src2: CGFloat
-   let dst_top: CGFloat; let dst_bot: CGFloat
-
-   var body: some View {
-	  GeometryReader { geo in
-		 Path { path in
-			let w = geo.size.width
-			   // 1. Div 1 Center -> Champ Top
-			drawLink(path: &path, fromY: src1, toY: dst_top, w: w, isReversed: false)
-
-			   // 2. Div 2 Center -> Champ Bot
-			drawLink(path: &path, fromY: src2, toY: dst_bot, w: w, isReversed: false)
-		 }
-		 .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
-	  }
-   }
-}
-
-   // Helper: Draws horizontal-vertical-horizontal link
-private func drawLink(path: inout Path, fromY: CGFloat, toY: CGFloat, w: CGFloat, isReversed: Bool) {
-	  // Note: Since we flip the parent HStack layout direction, we always draw Left->Right in local coords
-   let startX: CGFloat = 0
-   let endX: CGFloat = w
-   let midX = w / 2
-
-   path.move(to: CGPoint(x: startX, y: fromY))
-   path.addLine(to: CGPoint(x: midX, y: fromY))
-   path.addLine(to: CGPoint(x: midX, y: toY))
-   path.addLine(to: CGPoint(x: endX, y: toY))
-}
-
-   // MARK: - Visuals
-
-struct BracketHeader: View {
-   let text: String
-   var body: some View {
-	  Text(text)
-		 .font(.custom("BebasNeue-Regular", size: 12))
-		 .foregroundColor(.white.opacity(0.6))
-		 .frame(height: 24, alignment: .bottom) // Matches headerHeight
-		 .padding(.bottom, 4)
-   }
-}
-
-
-
-

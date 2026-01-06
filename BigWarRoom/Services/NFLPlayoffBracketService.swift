@@ -58,37 +58,13 @@ final class NFLPlayoffBracketService {
             return
         }
         
-        guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=\(season)") else {
-            errorMessage = "Failed to build standings API URL"
-            return
-        }
-        
-        DebugPrint(mode: .nflData, "🌐 Fetching standings from: \(url.absoluteString)")
-        
         isLoading = true
         errorMessage = nil
         
-        cancellable = URLSession.shared.dataTaskPublisher(for: url)
-            .tryMap { data, response -> Data in
-                DebugPrint(mode: .nflData, "📦 Received \(data.count) bytes from ESPN")
-                return data
-            }
-            .decode(type: ESPNStandingsV2Response.self, decoder: JSONDecoder())
-            .receive(on: DispatchQueue.main)
-            .sink(
-                receiveCompletion: { [weak self] completion in
-                    self?.isLoading = false
-                    
-                    if case .failure(let error) = completion {
-                        DebugPrint(mode: .nflData, "❌ Standings fetch failed: \(error)")
-                        self?.errorMessage = "Failed to load standings: \(error.localizedDescription)"
-                    }
-                },
-                receiveValue: { [weak self] response in
-                    DebugPrint(mode: .nflData, "✅ Received standings data")
-                    self?.processStandingsData(response, season: season)
-                }
-            )
+        // Fetch both standings (for seeds) and scoreboard (for actual games)
+        Task {
+            await fetchBracketData(for: season)
+        }
     }
     
     /// Start live updates for active playoff games
@@ -130,8 +106,46 @@ final class NFLPlayoffBracketService {
     
     // MARK: - Private Methods
     
-    /// Process standings data and build playoff bracket from seeds
-    private func processStandingsData(_ response: ESPNStandingsV2Response, season: Int) {
+    /// Fetch bracket data from both standings and scoreboard APIs
+    private func fetchBracketData(for season: Int) async {
+        // First, fetch standings to get seeds
+        guard let standingsURL = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=\(season)") else {
+            errorMessage = "Failed to build standings API URL"
+            isLoading = false
+            return
+        }
+        
+        do {
+            // Fetch standings
+            let (standingsData, _) = try await URLSession.shared.data(from: standingsURL)
+            let standingsResponse = try JSONDecoder().decode(ESPNStandingsV2Response.self, from: standingsData)
+            
+            // Extract seeds
+            let (afcSeeds, nfcSeeds) = extractSeeds(from: standingsResponse)
+            
+            // Fetch actual playoff games from scoreboard
+            let playoffYear = season + 1  // Playoffs are in January of following year
+            guard let scoreboardURL = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=\(playoffYear)0101-\(playoffYear)0228&seasontype=3") else {
+                // Fallback to seed-based prediction if scoreboard fails
+                await buildBracketFromSeeds(afcSeeds: afcSeeds, nfcSeeds: nfcSeeds, season: season)
+                return
+            }
+            
+            let (scoreboardData, _) = try await URLSession.shared.data(from: scoreboardURL)
+            let scoreboardResponse = try JSONDecoder().decode(ESPNScoreboardResponse.self, from: scoreboardData)
+            
+            // Build bracket from actual games
+            await buildBracketFromGames(scoreboardResponse, afcSeeds: afcSeeds, nfcSeeds: nfcSeeds, season: season)
+            
+        } catch {
+            DebugPrint(mode: .nflData, "❌ Failed to fetch bracket data: \(error)")
+            errorMessage = "Failed to load playoff data: \(error.localizedDescription)"
+            isLoading = false
+        }
+    }
+    
+    /// Extract seeds from standings data
+    private func extractSeeds(from response: ESPNStandingsV2Response) -> (afc: [Int: PlayoffTeam], nfc: [Int: PlayoffTeam]) {
         var afcSeeds: [Int: PlayoffTeam] = [:]
         var nfcSeeds: [Int: PlayoffTeam] = [:]
         
@@ -139,9 +153,8 @@ final class NFLPlayoffBracketService {
         for child in children {
             let entries = child.standings?.entries ?? []
             for entry in entries {
-                let teamAbbr = entry.team.abbreviation.uppercased()
+                let teamAbbrRaw = entry.team.abbreviation.uppercased()
                 
-                // Get playoff seed
                 guard let seedValue = entry.stats?.first(where: { ($0.name ?? $0.type) == "playoffSeed" })?.value else {
                     continue
                 }
@@ -151,8 +164,16 @@ final class NFLPlayoffBracketService {
                     continue
                 }
                 
-                // Get team info
+                // 🔥 Normalize team code before lookup
+                let teamAbbr = normalizeTeamCode(teamAbbrRaw)
+                
+                // 🔥 DEBUG: Log Washington specifically
+                if teamAbbrRaw.contains("WAS") || teamAbbrRaw.contains("WSH") {
+                    DebugPrint(mode: .nflData, "🔍 Found Washington in standings: '\(teamAbbrRaw)' → normalized to '\(teamAbbr)' with seed \(seed)")
+                }
+                
                 guard let nflTeam = NFLTeam.team(for: teamAbbr) else {
+                    DebugPrint(mode: .nflData, "⚠️ Could not find NFLTeam for '\(teamAbbr)' (original: '\(teamAbbrRaw)')")
                     continue
                 }
                 
@@ -161,10 +182,9 @@ final class NFLPlayoffBracketService {
                     name: nflTeam.fullName,
                     seed: seed,
                     score: nil,
-                    logoURL: nil  // We can add this later if needed
+                    logoURL: nil
                 )
                 
-                // Sort into conference
                 if nflTeam.conference == .afc {
                     afcSeeds[seed] = team
                 } else {
@@ -173,40 +193,192 @@ final class NFLPlayoffBracketService {
             }
         }
         
-        DebugPrint(mode: .nflData, """
-        ✅ Extracted playoff seeds:
-           - AFC: \(afcSeeds.keys.sorted().map { "#\($0) \(afcSeeds[$0]?.abbreviation ?? "")" }.joined(separator: ", "))
-           - NFC: \(nfcSeeds.keys.sorted().map { "#\($0) \(nfcSeeds[$0]?.abbreviation ?? "")" }.joined(separator: ", "))
-        """)
+        DebugPrint(mode: .nflData, "🏈 Extracted seeds from standings - NFC seed 6: \(nfcSeeds[6]?.abbreviation ?? "MISSING")")
         
-        // Build Wild Card matchups
-        let afcGames = buildWildCardGames(seeds: afcSeeds, conference: .afc, season: season)
-        let nfcGames = buildWildCardGames(seeds: nfcSeeds, conference: .nfc, season: season)
+        return (afcSeeds, nfcSeeds)
+    }
+    
+    /// Build bracket from actual playoff games
+    private func buildBracketFromGames(
+        _ scoreboardResponse: ESPNScoreboardResponse,
+        afcSeeds: [Int: PlayoffTeam],
+        nfcSeeds: [Int: PlayoffTeam],
+        season: Int
+    ) async {
+        var afcGames: [PlayoffGame] = []
+        var nfcGames: [PlayoffGame] = []
+        var superBowl: PlayoffGame?
         
-        // Get #1 seeds
-        let afcSeed1 = afcSeeds[1]
-        let nfcSeed1 = nfcSeeds[1]
+        for event in scoreboardResponse.events ?? [] {
+            guard let competition = event.competitions?.first else { continue }
+            
+            // Extract teams
+            guard competition.competitors?.count == 2 else { continue }
+            let competitors = competition.competitors!
+            
+            let homeComp = competitors.first { $0.homeAway == "home" }
+            let awayComp = competitors.first { $0.homeAway == "away" }
+            
+            guard let homeTeamRaw = homeComp?.team.abbreviation.uppercased(),
+                  let awayTeamRaw = awayComp?.team.abbreviation.uppercased() else { continue }
+            
+            // 🔥 Normalize team codes (handle Washington WASH/WSH)
+            let homeTeam = normalizeTeamCode(homeTeamRaw)
+            let awayTeam = normalizeTeamCode(awayTeamRaw)
+            
+            // Get scores
+            let homeScore = Int(homeComp?.score ?? "0")
+            let awayScore = Int(awayComp?.score ?? "0")
+            
+            // Determine round from week/date
+            let round = determinePlayoffRound(from: event)
+            
+            // Get seeds - use normalized team codes
+            let homeNFLTeam = NFLTeam.team(for: homeTeam)
+            let awayNFLTeam = NFLTeam.team(for: awayTeam)
+            
+            let homeSeed = (homeNFLTeam?.conference == .afc ? afcSeeds : nfcSeeds).first(where: { $0.value.abbreviation == homeTeam })?.key
+            let awaySeed = (awayNFLTeam?.conference == .afc ? afcSeeds : nfcSeeds).first(where: { $0.value.abbreviation == awayTeam })?.key
+            
+            // 🔥 DEBUG: Log seed assignment
+            if homeSeed == nil || awaySeed == nil {
+                DebugPrint(mode: .nflData, "⚠️ Missing seed for game: \(awayTeam) (seed \(awaySeed ?? -1)) @ \(homeTeam) (seed \(homeSeed ?? -1))")
+            }
+            
+            // Create playoff teams with scores
+            let homePlayoffTeam = PlayoffTeam(
+                abbreviation: homeTeam,
+                name: homeNFLTeam?.fullName ?? homeTeam,
+                seed: homeSeed,
+                score: homeScore,
+                logoURL: nil
+            )
+            
+            let awayPlayoffTeam = PlayoffTeam(
+                abbreviation: awayTeam,
+                name: awayNFLTeam?.fullName ?? awayTeam,
+                seed: awaySeed,
+                score: awayScore,
+                logoURL: nil
+            )
+            
+            // Parse game date
+            let gameDate = ISO8601DateFormatter().date(from: event.date ?? "") ?? Date()
+            
+            // Determine game status
+            let status: PlayoffGame.GameStatus
+            if competition.status?.type?.completed == true {
+                status = .final
+            } else if competition.status?.type?.state == "in" {
+                let quarter = "Q\(competition.status?.period ?? 1)"
+                let time = competition.status?.displayClock ?? ""
+                status = .inProgress(quarter: quarter, timeRemaining: time)
+            } else {
+                status = .scheduled
+            }
+            
+            // Determine conference
+            let conference: PlayoffGame.Conference
+            if round == .superBowl {
+                conference = .afc  // Doesn't matter for Super Bowl
+            } else if homeNFLTeam?.conference == .afc && awayNFLTeam?.conference == .afc {
+                conference = .afc
+            } else {
+                conference = .nfc
+            }
+            
+            let game = PlayoffGame(
+                id: event.id ?? UUID().uuidString,
+                round: round,
+                conference: conference,
+                homeTeam: homePlayoffTeam,
+                awayTeam: awayPlayoffTeam,
+                gameDate: gameDate,
+                status: status
+            )
+            
+            // Sort into proper arrays
+            if round == .superBowl {
+                superBowl = game
+            } else if conference == .afc {
+                afcGames.append(game)
+            } else {
+                nfcGames.append(game)
+            }
+        }
+        
+        // Sort games by date
+        afcGames.sort { $0.gameDate < $1.gameDate }
+        nfcGames.sort { $0.gameDate < $1.gameDate }
         
         let bracket = PlayoffBracket(
             season: season,
             afcGames: afcGames,
             nfcGames: nfcGames,
-            superBowl: nil,
-            afcSeed1: afcSeed1,
-            nfcSeed1: nfcSeed1
+            superBowl: superBowl,
+            afcSeed1: afcSeeds[1],
+            nfcSeed1: nfcSeeds[1]
         )
         
         // Update cache
         cache[season] = bracket
         cacheTimestamps[season] = Date()
         currentBracket = bracket
+        isLoading = false
         
         DebugPrint(mode: .nflData, """
-        ✅ Built playoff bracket:
+        ✅ Built playoff bracket from games:
            - Season: \(season)
            - AFC Games: \(afcGames.count)
            - NFC Games: \(nfcGames.count)
+           - Super Bowl: \(superBowl != nil ? "✓" : "✗")
         """)
+    }
+    
+    /// Fallback: Build bracket from seeds only (prediction mode)
+    private func buildBracketFromSeeds(afcSeeds: [Int: PlayoffTeam], nfcSeeds: [Int: PlayoffTeam], season: Int) async {
+        let afcGames = buildWildCardGames(seeds: afcSeeds, conference: .afc, season: season)
+        let nfcGames = buildWildCardGames(seeds: nfcSeeds, conference: .nfc, season: season)
+        
+        let bracket = PlayoffBracket(
+            season: season,
+            afcGames: afcGames,
+            nfcGames: nfcGames,
+            superBowl: nil,
+            afcSeed1: afcSeeds[1],
+            nfcSeed1: nfcSeeds[1]
+        )
+        
+        cache[season] = bracket
+        cacheTimestamps[season] = Date()
+        currentBracket = bracket
+        isLoading = false
+    }
+    
+    /// Determine playoff round from ESPN event data
+    private func determinePlayoffRound(from event: ESPNScoreboardResponse.Event) -> PlayoffRound {
+        // Check week or seasonType
+        if let week = event.week?.number {
+            switch week {
+            case 1: return .wildCard
+            case 2: return .divisional
+            case 3: return .conference
+            case 4: return .superBowl
+            default: return .wildCard
+            }
+        }
+        
+        // Fallback to name parsing
+        let name = (event.name ?? "").lowercased()
+        if name.contains("super bowl") {
+            return .superBowl
+        } else if name.contains("championship") {
+            return .conference
+        } else if name.contains("divisional") {
+            return .divisional
+        } else {
+            return .wildCard
+        }
     }
     
     /// Build Wild Card games from seeds
@@ -264,6 +436,15 @@ final class NFLPlayoffBracketService {
         return calendar.date(byAdding: .day, value: daysToAdd, to: wildCardSaturday)!
     }
     
+    /// Normalize team codes (handle Washington WASH/WSH inconsistency)
+    private func normalizeTeamCode(_ code: String) -> String {
+        // Handle all Washington variations - convert to WAS (our internal code)
+        if code == "WASH" || code == "WSH" {
+            return "WAS"
+        }
+        return code
+    }
+    
     deinit {
         DebugPrint(mode: .nflData, "♻️ NFLPlayoffBracketService deinit - cleaning up")
         refreshTimer?.invalidate()
@@ -300,5 +481,49 @@ private struct ESPNStandingsV2Response: Decodable {
         let type: String?
         let value: Double?
         let displayValue: String?
+    }
+}
+
+// MARK: - ESPN Scoreboard Response Model
+
+private struct ESPNScoreboardResponse: Decodable {
+    let events: [Event]?
+    
+    struct Event: Decodable {
+        let id: String?
+        let name: String?
+        let date: String?
+        let week: Week?
+        let competitions: [Competition]?
+    }
+    
+    struct Week: Decodable {
+        let number: Int?
+    }
+    
+    struct Competition: Decodable {
+        let competitors: [Competitor]?
+        let status: Status?
+    }
+    
+    struct Competitor: Decodable {
+        let homeAway: String?
+        let team: Team
+        let score: String?
+    }
+    
+    struct Team: Decodable {
+        let abbreviation: String
+    }
+    
+    struct Status: Decodable {
+        let type: StatusType?
+        let period: Int?
+        let displayClock: String?
+    }
+    
+    struct StatusType: Decodable {
+        let state: String?
+        let completed: Bool?
     }
 }
