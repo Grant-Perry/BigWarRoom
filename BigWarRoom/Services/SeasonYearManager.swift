@@ -46,18 +46,27 @@ final class SeasonYearManager {
     /// Track when the year was last changed (for debugging/logging)
     var lastChanged: Date = Date()
     
-    /// Available years for picker - Use @ObservationIgnored for constants
-    /// 🔥 Shows current + previous year for historical viewing
-    @ObservationIgnored let availableYears = ["2024", "2025", "2026"]
+    /// Available years for picker
+    /// 🔥 FIX: Expand to match WeekPickerView's year range (2015 to current+1)
+    static func getAvailableYears() -> [String] {
+        let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
+        let maxYear = currentNFLYear + 1
+        return (2015...maxYear).map { String($0) }
+    }
+    
+    var availableYears: [String] {
+        return Self.getAvailableYears()
+    }
     
     // MARK: - Initialization
     init() {
         // 🔥 FIXED: Use existing baseline - respect saved year or calculate current NFL season
         let savedYear = AppConstants.ESPNLeagueYear
         let currentNFLYear = String(NFLWeekCalculator.getCurrentSeasonYear())
+        let available = Self.getAvailableYears()
         
         // Use saved year if valid, otherwise use calculated NFL season year
-        if availableYears.contains(savedYear) {
+        if available.contains(savedYear) {
             self.selectedYear = savedYear
         } else {
             self.selectedYear = currentNFLYear
@@ -74,13 +83,24 @@ final class SeasonYearManager {
     /// Change the selected year (typically called by WeekPickerView)
     /// This will propagate to ALL subscribers across the app
     func selectYear(_ year: String) {
-        guard year != selectedYear, availableYears.contains(year) else { return }
+        DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Attempting to select year '\(year)'")
+        DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Current year: '\(selectedYear)'")
+        DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Available years: \(availableYears.joined(separator: ", "))")
+        
+        guard year != selectedYear, availableYears.contains(year) else {
+            DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Guard failed - year==selectedYear: \(year == selectedYear), contains: \(availableYears.contains(year))")
+            return
+        }
+        
+        DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Guard passed, changing year from '\(selectedYear)' to '\(year)'")
         
         selectedYear = year
         lastChanged = Date()
         
         // Update AppConstants ESPNLeagueYear for backward compatibility
         AppConstants.ESPNLeagueYear = year
+        
+        DebugPrint(mode: .weekCheck, "📅 SeasonYearManager.selectYear: Year changed successfully to '\(selectedYear)', AppConstants: '\(AppConstants.ESPNLeagueYear)'")
     }
     
     /// Get the current year as Int for API calls

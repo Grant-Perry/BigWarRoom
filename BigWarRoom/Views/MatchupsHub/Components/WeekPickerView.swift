@@ -24,16 +24,26 @@ struct WeekPickerView: View {
     @Binding var isPresented: Bool
     
     // 🔥 PHASE 2.5: Accept dependencies instead of using .shared
-    private let weekManager: WeekSelectionManager
-    private let yearManager: SeasonYearManager
+    // 🔥 FIX: Use @Bindable to properly observe changes to these @Observable objects
+    // Must be `var` for @Bindable to work
+    @Bindable var weekManager: WeekSelectionManager
+    @Bindable var yearManager: SeasonYearManager
     
     // 🏈 Callback for playoff navigation
     var onPlayoffsSelected: (() -> Void)?
     
     @State private var animateIn = false
+    @State private var showYearPicker = false
     
     /// NFL season has 18 weeks (17 regular + 1 playoff)
     private let maxWeeks = 18
+    
+    /// Year range for picker: 2015 through (current NFL season year + 1)
+    private var yearRange: [String] {
+        let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
+        let maxYear = currentNFLYear + 1
+        return (2015...maxYear).map { String($0) }.reversed()
+    }
     
     /// NFL season start date - calculated from SeasonYearManager (SOT)
     private var seasonStartDate: Date {
@@ -58,11 +68,12 @@ struct WeekPickerView: View {
     // 🔥 PHASE 2.5: Dependency injection initializer
     init(
         weekManager: WeekSelectionManager,
+        yearManager: SeasonYearManager,
         isPresented: Binding<Bool>,
         onPlayoffsSelected: (() -> Void)? = nil
     ) {
         self.weekManager = weekManager
-        self.yearManager = SeasonYearManager.shared // TODO: Convert this too
+        self.yearManager = yearManager
         self._isPresented = isPresented
         self.onPlayoffsSelected = onPlayoffsSelected
     }
@@ -73,7 +84,11 @@ struct WeekPickerView: View {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
                 .onTapGesture {
-                    dismissPicker()
+                    if showYearPicker {
+                        showYearPicker = false
+                    } else {
+                        dismissPicker()
+                    }
                 }
             
             // 🔥 FIX: Add proper vertical centering for sheet presentation
@@ -125,6 +140,11 @@ struct WeekPickerView: View {
                 
                 Spacer()
             }
+            
+            // Year Picker Overlay
+            if showYearPicker {
+                yearPickerOverlay
+            }
         }
         .onAppear {
             animateIn = true
@@ -138,7 +158,7 @@ struct WeekPickerView: View {
                 Text("🗓️")
                     .font(.system(size: 24))
                 
-                Text("SELECT WEEK")
+                Text("Select Week or Season Year")
                     .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
@@ -157,15 +177,36 @@ struct WeekPickerView: View {
                 }
             }
             
-            // Year Picker Row
+            // Year Picker Button (tappable)
             HStack(spacing: 8) {
                 Text("Season:")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.gray)
                 
-                // Show all available years (user can switch to view historical data)
-                ForEach(yearManager.availableYears, id: \.self) { year in
-                    yearPickerButton(for: year)
+                Button(action: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        showYearPicker.toggle()
+                    }
+                }) {
+                    HStack(spacing: 6) {
+                        Text(yearManager.selectedYear)
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .foregroundColor(.black)
+                        
+                        Image(systemName: showYearPicker ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.black)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
+                            )
+                    )
                 }
                 
                 Spacer()
@@ -183,30 +224,114 @@ struct WeekPickerView: View {
         .padding(.bottom, 16)
     }
     
-    private func yearPickerButton(for year: String) -> some View {
+    // MARK: - Year Picker Overlay
+    private var yearPickerOverlay: some View {
+        VStack {
+            Spacer()
+            
+            yearPickerContent
+            
+            Spacer()
+        }
+    }
+    
+    private var yearPickerContent: some View {
+        VStack(spacing: 0) {
+            yearPickerHeader
+            
+            Divider()
+                .background(Color.gpGreen.opacity(0.3))
+            
+            yearPickerScrollList
+        }
+        .background(yearPickerBackground)
+        .padding(.horizontal, 40)
+        .padding(.bottom, 80)
+        .transition(.scale.combined(with: .opacity))
+    }
+    
+    private var yearPickerHeader: some View {
+        HStack {
+            Text("Select Season")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            Button(action: {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    showYearPicker = false
+                }
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 20))
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+    
+    private var yearPickerScrollList: some View {
+        ScrollView {
+            VStack(spacing: 8) {
+                ForEach(yearRange, id: \.self) { year in
+                    yearRowButton(for: year)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .frame(maxHeight: 300)
+    }
+    
+    private func yearRowButton(for year: String) -> some View {
         let isSelected = year == yearManager.selectedYear
         
         return Button(action: {
             selectYear(year)
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                showYearPicker = false
+            }
         }) {
-            Text(year)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundColor(isSelected ? .black : .white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isSelected ? 
-                              LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing) :
-                              LinearGradient(colors: [Color.gray.opacity(0.2)], startPoint: .leading, endPoint: .trailing))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(isSelected ? Color.white.opacity(0.6) : Color.gray.opacity(0.3), lineWidth: 1)
-                        )
-                )
-                .scaleEffect(isSelected ? 1.05 : 1.0)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
+            HStack {
+                Text(year)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isSelected ? .black : .white)
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.black)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ?
+                          AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing)) :
+                          AnyShapeStyle(Color.gray.opacity(0.1)))
+            )
         }
+    }
+    
+    private var yearPickerBackground: some View {
+        RoundedRectangle(cornerRadius: 20)
+            .fill(Color.black.opacity(0.95))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: 2
+                    )
+            )
     }
     
     // MARK: - Week Grid (Fixed: Left-to-Right Layout + All Weeks Fit)
@@ -460,12 +585,26 @@ struct WeekPickerView: View {
     // MARK: - Actions
     
     private func selectYear(_ year: String) {
+        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: selectYear called with year: \(year)")
+        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: Current yearManager.selectedYear BEFORE: \(yearManager.selectedYear)")
+        
         // Haptic feedback for year selection
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
         impactFeedback.impactOccurred()
         
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            yearManager.selectYear(year)
+        // 🔥 FIX: Call selectYear directly
+        yearManager.selectYear(year)
+        
+        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: Current yearManager.selectedYear AFTER: \(yearManager.selectedYear)")
+        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: AppConstants.ESPNLeagueYear: \(AppConstants.ESPNLeagueYear)")
+        
+        // 🔥 FIX: Trigger immediate data refresh by re-selecting current week with new year
+        // This ensures year changes fire immediately just like week changes
+        weekManager.selectWeek(weekManager.selectedWeek)
+        
+        // 🔥 FIX: Auto-dismiss the ENTIRE week picker after year selection
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            dismissPicker()
         }
     }
     
@@ -542,6 +681,7 @@ struct WeekPickerView: View {
         
         WeekPickerView(
             weekManager: WeekSelectionManager(nflWeekService: NFLWeekService(apiClient: SleeperAPIClient())),
+            yearManager: SeasonYearManager.shared,
             isPresented: .constant(true),
             onPlayoffsSelected: {
                 print("Navigate to playoffs")

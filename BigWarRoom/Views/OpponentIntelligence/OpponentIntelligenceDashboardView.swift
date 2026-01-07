@@ -144,6 +144,7 @@ struct OpponentIntelligenceDashboardView: View {
         .sheet(isPresented: $showingWeekPicker) {
             WeekPickerView(
                 weekManager: WeekSelectionManager.shared,
+                yearManager: SeasonYearManager.shared,
                 isPresented: $showingWeekPicker
             )
         }

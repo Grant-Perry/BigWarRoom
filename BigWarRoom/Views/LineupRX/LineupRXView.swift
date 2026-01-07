@@ -118,6 +118,7 @@ struct LineupRXView: View {
         .fullScreenCover(isPresented: $showingWeekPicker) {
             WeekPickerView(
                 weekManager: WeekSelectionManager.shared,
+                yearManager: SeasonYearManager.shared,
                 isPresented: $showingWeekPicker
             )
         }

@@ -136,7 +136,11 @@ struct AllLivePlayersView: View {
             }
         }
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(weekManager: weekManager, isPresented: $showingWeekPicker)
+            WeekPickerView(
+                weekManager: weekManager,
+                yearManager: SeasonYearManager.shared,
+                isPresented: $showingWeekPicker
+            )
         }
         .sheet(isPresented: $showingFilters) {
             AllLivePlayersFiltersSheet(allLivePlayersViewModel: allLivePlayersViewModel)

@@ -142,6 +142,7 @@ struct AppSettingsView: View {
       if showWeekPicker {
          WeekPickerView(
             weekManager: weekSelectionManager,
+            yearManager: SeasonYearManager.shared,
             isPresented: $showWeekPicker
          )
       }

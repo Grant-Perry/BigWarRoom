@@ -10,8 +10,12 @@ import SwiftUI
 struct NFLPlayoffBracketView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(NFLStandingsService.self) private var standingsService
     @State private var bracketService: NFLPlayoffBracketService
     @State private var selectedSeason: Int
+    
+    // 🔥 FIX: Observe the year manager
+    @State private var yearManager = SeasonYearManager.shared
     
     // Dependencies
     let weekSelectionManager: WeekSelectionManager
@@ -78,8 +82,24 @@ struct NFLPlayoffBracketView: View {
         }
         .onChange(of: selectedSeason) { _, newSeason in
             Task {
+                // 🔥 FIX: Fetch standings for new season
+                standingsService.fetchStandings(forceRefresh: true, season: newSeason)
                 await loadBracket(forceRefresh: true)
             }
+        }
+        // 🔥 NEW: Watch for year changes from SeasonYearManager
+        .onChange(of: yearManager.selectedYear) { _, newYear in
+            if let year = Int(newYear), year != selectedSeason {
+                selectedSeason = year
+            }
+        }
+        .onAppear {
+            // 🔥 FIX: Sync with year manager on appear
+            if let year = Int(yearManager.selectedYear), year != selectedSeason {
+                selectedSeason = year
+            }
+            // Fetch standings for selected season on appear
+            standingsService.fetchStandings(season: selectedSeason)
         }
         .onDisappear {
             // Stop live updates when view disappears to prevent crashes

@@ -54,6 +54,7 @@ struct TeamRostersView: View {
             .sheet(isPresented: $showingWeekPicker) {
                 WeekPickerView(
                     weekManager: weekManager,
+                    yearManager: SeasonYearManager.shared,
                     isPresented: $showingWeekPicker
                 )
             }

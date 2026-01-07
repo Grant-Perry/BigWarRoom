@@ -124,6 +124,7 @@ struct FantasyMatchupListView: View {
     private var weekPickerSheet: some View {
         WeekPickerView(
             weekManager: weekManager,
+            yearManager: SeasonYearManager.shared,
             isPresented: Binding(
                 get: { fantasyViewModel.showWeekSelector },
                 set: { fantasyViewModel.showWeekSelector = $0 }

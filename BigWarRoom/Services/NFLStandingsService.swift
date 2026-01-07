@@ -198,13 +198,16 @@ final class NFLStandingsService {
     }
     
     /// Fetch real NFL standings from ESPN APIs (records + calculated playoff status)
-    func fetchStandings(forceRefresh: Bool = false) {
-        // Check cache first
+    func fetchStandings(forceRefresh: Bool = false, season: Int? = nil) {
+        // Use provided season or default to SeasonYearManager's selected year
+        let targetSeason = season ?? (Int(SeasonYearManager.shared.selectedYear) ?? NFLWeekCalculator.getCurrentSeasonYear())
+        
+        // Check cache first (now season-aware)
         if !forceRefresh,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration,
            !teamRecords.isEmpty {
-            DebugPrint(mode: .espnAPI, "🏈 Using cached team records")
+            DebugPrint(mode: .espnAPI, "🏈 Using cached team records for season \(targetSeason)")
             return
         }
         
@@ -219,18 +222,17 @@ final class NFLStandingsService {
                 self.errorMessage = nil
             }
             
-            DebugPrint(mode: .espnAPI, "🏈 Fetching NFL team records from ESPN API...")
+            DebugPrint(mode: .espnAPI, "🏈 Fetching NFL team records from ESPN API for season \(targetSeason)...")
             
             // Prefer ESPN standings flags (clincher/eliminated + playoff seed) for playoff status.
             // Fallback to our calculation only if the standings endpoint fails.
-            let selectedYear = Int(SeasonYearManager.shared.selectedYear) ?? NFLWeekCalculator.getCurrentSeasonYear()
-            let espnStatusMap = await self.fetchPlayoffStatusMapFromESPNStandings(season: selectedYear)
+            let espnStatusMap = await self.fetchPlayoffStatusMapFromESPNStandings(season: targetSeason)
             
             // Fetch individual team records
             await withTaskGroup(of: (String, NFLTeamRecord?).self) { group in
                 for (teamCode, teamId) in self.teamIdMap {
                     group.addTask {
-                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId, playoffStatusMap: espnStatusMap)
+                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId, playoffStatusMap: espnStatusMap, season: targetSeason)
                     }
                 }
                 
@@ -246,7 +248,7 @@ final class NFLStandingsService {
                     self.teamRecords = newTeamRecords
                     
                     // 🔥 DEBUG: Log all team codes we have
-                    DebugPrint(mode: .contention, "🏈 Team records loaded: \(Array(newTeamRecords.keys).sorted().joined(separator: ", "))")
+                    DebugPrint(mode: .contention, "🏈 Team records loaded for \(targetSeason): \(Array(newTeamRecords.keys).sorted().joined(separator: ", "))")
                     
                     // 🔥 FIX: Ensure WSH and WAS are synced before calculating statuses
                     if let wasRecord = newTeamRecords["WAS"], newTeamRecords["WSH"] == nil {
@@ -280,7 +282,7 @@ final class NFLStandingsService {
                     self.isLoading = false
                     self.cacheTimestamp = Date()
                     
-                    DebugPrint(mode: .espnAPI, "🏈 Successfully fetched \(self.teamRecords.count) team records")
+                    DebugPrint(mode: .espnAPI, "🏈 Successfully fetched \(self.teamRecords.count) team records for season \(targetSeason)")
                     for record in self.teamRecords.values.sorted(by: { $0.teamCode < $1.teamCode }) {
                         let statusEmoji = record.playoffStatus == .eliminated ? "💀" : record.playoffStatus == .clinched ? "🎉" : record.playoffStatus == .bubble ? "⚠️" : "⚡️"
                         DebugPrint(mode: .espnAPI, "🏈 \(record.teamCode): \(record.displayRecord) \(statusEmoji) \(record.playoffStatus.displayText)")
@@ -466,11 +468,10 @@ final class NFLStandingsService {
         return statusMap
     }
     
-    /// Fetch single team record (now includes playoff status)
-    private func fetchSingleTeamRecord(teamCode: String, teamId: String, playoffStatusMap: [String: PlayoffStatus]) async -> (String, NFLTeamRecord?) {
-        let currentYear = NFLWeekCalculator.getCurrentSeasonYear()
-        // 🔥 FIXED: Add season and seasontype parameters
-        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?season=\(currentYear)&seasontype=2") else {
+    /// Fetch single team record (now includes playoff status and season parameter)
+    private func fetchSingleTeamRecord(teamCode: String, teamId: String, playoffStatusMap: [String: PlayoffStatus], season: Int) async -> (String, NFLTeamRecord?) {
+        // 🔥 FIXED: Use passed season instead of hardcoded current year
+        guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?season=\(season)&seasontype=2") else {
             return (teamCode, nil)
         }
         
@@ -483,7 +484,7 @@ final class NFLStandingsService {
                    let team = json["team"] as? [String: Any],
                    let record = team["record"] as? [String: Any],
                    let items = record["items"] as? [[String: Any]] {
-                    DebugPrint(mode: .espnAPI, "🏈 CHI has \(items.count) record items:")
+                    DebugPrint(mode: .espnAPI, "🏈 CHI has \(items.count) record items for season \(season):")
                     for (index, item) in items.enumerated() {
                         let type = item["type"] as? String ?? "unknown"
                         let summary = item["summary"] as? String ?? "unknown"
@@ -505,7 +506,7 @@ final class NFLStandingsService {
             
             return (teamCode, record)
         } catch {
-            DebugPrint(mode: .espnAPI, "🏈 Error fetching record for \(teamCode): \(error)")
+            DebugPrint(mode: .espnAPI, "🏈 Error fetching record for \(teamCode) in season \(season): \(error)")
             return (teamCode, nil)
         }
     }
@@ -590,9 +591,9 @@ final class NFLStandingsService {
         }
     }
     
-    /// Force refresh standings
-    func refreshStandings() {
-        fetchStandings(forceRefresh: true)
+    /// Force refresh standings with optional season parameter
+    func refreshStandings(season: Int? = nil) {
+        fetchStandings(forceRefresh: true, season: season)
     }
     
     // MARK: - Cleanup

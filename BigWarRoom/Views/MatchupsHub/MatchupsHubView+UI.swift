@@ -183,6 +183,7 @@ extension MatchupsHubView {
     func buildWeekPickerSheet() -> some View {
         WeekPickerView(
             weekManager: weekManager,
+            yearManager: SeasonYearManager.shared,
             isPresented: $showingWeekPicker,
             onPlayoffsSelected: {
                 DebugPrint(mode: .navigation, "🏈 PLAYOFFS BUTTON TAPPED - Navigating to Schedule tab")

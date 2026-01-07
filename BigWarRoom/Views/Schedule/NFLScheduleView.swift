@@ -167,7 +167,11 @@ struct NFLScheduleView: View {
         // BEFORE: .sheet(isPresented: $showingTeamMatchups) { TeamFilteredMatchupsView(...) }
         // AFTER: NavigationLinks in game cards handle navigation
         .sheet(isPresented: $showingWeekPicker) {
-            WeekPickerView(weekManager: weekSelectionManager, isPresented: $showingWeekPicker)
+            WeekPickerView(
+                weekManager: weekSelectionManager,
+                yearManager: SeasonYearManager.shared,
+                isPresented: $showingWeekPicker
+            )
         }
         // Sync with shared week manager
         .onChange(of: weekSelectionManager.selectedWeek) { _, newWeek in
@@ -179,6 +183,23 @@ struct NFLScheduleView: View {
             if newWeek > 18, let service = playoffBracketService {
                 let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
                 service.fetchPlayoffBracket(for: season)
+            }
+        }
+        // 🔥 NEW: Also observe year changes to refresh playoff bracket
+        .onChange(of: SeasonYearManager.shared.selectedYear) { oldYear, newYear in
+            DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Year changed from \(oldYear) to \(newYear)")
+            
+            // Refresh schedule for new year
+            viewModel?.refreshSchedule()
+            
+            // If we're viewing playoffs, refresh the bracket with new year
+            if weekSelectionManager.selectedWeek > 18 {
+                ensurePlayoffServiceCreated()
+                if let service = playoffBracketService {
+                    let season = Int(newYear) ?? AppConstants.currentSeasonYearInt
+                    DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Fetching playoff bracket for season \(season)")
+                    service.fetchPlayoffBracket(for: season, forceRefresh: true)
+                }
             }
         }
         .onAppear {
