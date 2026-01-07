@@ -80,7 +80,7 @@ struct NFLLandscapeBracketView: View {
 			   Text("\(String(bracket.season)) NFL PLAYOFF PICTURE")
 				  .font(.custom("BebasNeue-Regular", size: 32))
 				  .foregroundColor(.white)
-				  .padding(.top, 30)
+				  .padding(.top, 45)
 				  .padding(.bottom, 10)
 
 			   HStack(alignment: .top, spacing: 0) {
@@ -88,6 +88,7 @@ struct NFLLandscapeBracketView: View {
 				  superBowlColumn
 				  conferenceSide(conference: .nfc, isReversed: true)
 			   }
+			   .scaleEffect(1.1)  // Scale up just the bracket
 			   .scaleEffect(finalScale)
 			   .offset(totalOffset)
 			   .frame(width: idealTotalWidth * baseScale, height: totalContentHeight + headerHeight + 50)
@@ -216,7 +217,7 @@ struct NFLLandscapeBracketView: View {
 			   src: yChamp_Center + headerHeight,
 			   dst: (conference == .afc ? ySB_AFC : ySB_NFC) + headerHeight // Use the exact targets
 			)
-			.scaleEffect(x: isReversed ? -1 : 1, y: 1)
+//			.scaleEffect(x: isReversed ? -1 : 1, y: 1)
 		 }.frame(width: connectorWidth)
 	  }
 	  .environment(\.layoutDirection, isReversed ? .rightToLeft : .leftToRight)
