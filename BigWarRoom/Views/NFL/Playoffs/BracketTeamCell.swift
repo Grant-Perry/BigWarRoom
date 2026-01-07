@@ -55,16 +55,11 @@ struct BracketTeamCell: View {
          if let team = team, !isTBDTeam(team) {
             // 🔥 UPDATED: Watermark - show COLORED SCORE for any game with scores (active or completed), SEED otherwise
             if let game = game, let score = team.score, score > 0 {
-               // Show score as watermark for active/completed games with WIN/LOSS color
-               // Only color-code if game is completed, otherwise white
-               let scoreColor: Color = {
-                  if game.isCompleted {
-                     return winner ? Color.gpGreen.opacity(0.4) : Color.gpRedPink.opacity(0.4)
-                  } else {
-                     // In-progress games show white score
-                     return Color.white.opacity(0.3)
-                  }
-               }()
+               // Show score as watermark for active/completed games
+               // Unified styling: always white, preserve previous transparency per status
+               let scoreColor: Color = game.isCompleted
+                  ? Color.white.opacity(0.2)
+                  : Color.white.opacity(0.4)
                
                Text("\(score)")
                   .font(.system(size: 36, weight: .black))
@@ -106,7 +101,7 @@ struct BracketTeamCell: View {
             logo.resizable().scaledToFit()
          } else { Circle().fill(Color.gray.opacity(0.3)) }
       }
-      .frame(width: 26, height: 26)
+      .frame(width: 38, height: 38)
    }
 
    private func infoView(team: PlayoffTeam) -> some View {
