@@ -168,11 +168,21 @@ struct NFLLandscapeBracketView: View {
       return HStack(alignment: .top, spacing: 0) {
          ZStack(alignment: .top) {
             Color.clear.frame(width: cellWidth, height: totalContentHeight)
-            Text(conference == .afc ? "AFC" : "NFC")
-               .font(.custom("BebasNeue-Regular", size: 30))
-               .foregroundColor(.white)
-               .frame(height: headerHeight, alignment: .top)
-               .offset(x: conference == .afc ? 125 : 125, y: -headerHeight - 4)
+            // Use conference logo (AFC/NFC) instead of text; slightly larger for prominence
+            if let confLogo = teamAssets.logo(for: (conference == .afc ? "AFC" : "NFC")) {
+               confLogo
+                  .resizable()
+                  .aspectRatio(contentMode: .fit)
+                  .frame(width: 56, height: 56)
+                  .offset(x: conference == .afc ? 120 : 120, y: -headerHeight - 22)
+            } else {
+               // Fallback to text if logo unavailable
+               Text(conference == .afc ? "AFC" : "NFC")
+                  .font(.custom("BebasNeue-Regular", size: 30))
+                  .foregroundColor(.white)
+                  .frame(height: headerHeight, alignment: .top)
+                  .offset(x: conference == .afc ? 125 : 125, y: -headerHeight - 4)
+            }
 
             BracketHeader(text: "WILD CARD")
 
@@ -273,68 +283,31 @@ struct NFLLandscapeBracketView: View {
             let nfcWinner = nfcChampGame != nil ? getWinner(from: nfcChampGame!) : nil
             let sbGame = bracket.superBowl
 
-            // Derive AF/NF teams; prefer actual SB teams if present, otherwise use winners
-            let afcTeam = (sbGame != nil && !isGenericTeam(sbGame!.awayTeam.abbreviation))
-               ? (isAFCTeam(sbGame!.awayTeam.abbreviation) ? sbGame!.awayTeam : sbGame!.homeTeam)
-               : afcWinner
-            let nfcTeam = (sbGame != nil && !isGenericTeam(sbGame!.awayTeam.abbreviation))
-               ? (isAFCTeam(sbGame!.awayTeam.abbreviation) ? sbGame!.homeTeam : sbGame!.awayTeam)
-               : nfcWinner
-
-            // Build a corrected SB game if ESPN returns AFC/NFC placeholders,
-            // and force scores to nil so we never leak conference-champ scores.
-            let correctedSBGame: PlayoffGame? = {
-               guard let sbGame = sbGame, let afcTeam = afcTeam, let nfcTeam = nfcTeam else {
-                  return sbGame
-               }
-               if isGenericTeam(sbGame.homeTeam.abbreviation) || isGenericTeam(sbGame.awayTeam.abbreviation) {
-                  let afcNoScore = PlayoffTeam(
-                     abbreviation: afcTeam.abbreviation,
-                     name: afcTeam.name,
-                     seed: afcTeam.seed,
-                     score: nil,
-                     logoURL: afcTeam.logoURL
-                  )
-                  let nfcNoScore = PlayoffTeam(
-                     abbreviation: nfcTeam.abbreviation,
-                     name: nfcTeam.name,
-                     seed: nfcTeam.seed,
-                     score: nil,
-                     logoURL: nfcTeam.logoURL
-                  )
-                  return PlayoffGame(
-                     id: sbGame.id,
-                     round: .superBowl,
-                     conference: .none,
-                     homeTeam: nfcNoScore,   // NFC on bottom
-                     awayTeam: afcNoScore,   // AFC on top
-                     gameDate: sbGame.gameDate,
-                     status: sbGame.status
-                  )
-               }
-               return sbGame
+            // Only display an SB matchup if the ESPN SB event has real teams (not AFC/NFC placeholders).
+            // If no real matchup, render neutral/empty cards (no logo, no solid team color), same as other empty cells.
+            let sbDisplayGame: PlayoffGame? = {
+               guard let sb = sbGame else { return nil }
+               let homeAbbr = sb.homeTeam.abbreviation
+               let awayAbbr = sb.awayTeam.abbreviation
+               if isGenericTeam(homeAbbr) || isGenericTeam(awayAbbr) { return nil }
+               return sb
             }()
-
-            // Use correctedSBGame teams for the cells so scores never leak.
-            // If correctedSBGame is nil, sanitize winners to nil scores before passing.
-            let afcSanitized = afcTeam.map { PlayoffTeam(abbreviation: $0.abbreviation, name: $0.name, seed: $0.seed, score: nil, logoURL: $0.logoURL) }
-            let nfcSanitized = nfcTeam.map { PlayoffTeam(abbreviation: $0.abbreviation, name: $0.name, seed: $0.seed, score: nil, logoURL: $0.logoURL) }
-            let sbTopTeam   = correctedSBGame?.awayTeam ?? afcSanitized
-            let sbBottomTeam = correctedSBGame?.homeTeam ?? nfcSanitized
 
             Group {
                // Center SB cards in the SB column (keeps the whole matchup centered visually)
-               BracketTeamCell(team: sbTopTeam, game: correctedSBGame, isReversed: false)
+               BracketTeamCell(team: sbDisplayGame?.awayTeam, game: sbDisplayGame, isReversed: false)
                   .position(x: (cellWidth + 30)/2, y: ySB_AFC + headerHeight - sbCardYOffset)
                   .scaleEffect(sbScale)
 
-               Text("VS")
-                  .font(.system(size: 14, weight: .black))
-                  .padding()
-                  .foregroundColor(.white.opacity(0.5))
-                  .position(x: (cellWidth + 30)/2, y: ySB_Matchup_Center + headerHeight)
+               if sbDisplayGame != nil {
+                  Text("VS")
+                     .font(.system(size: 14, weight: .black))
+                     .padding()
+                     .foregroundColor(.white.opacity(0.5))
+                     .position(x: (cellWidth + 30)/2, y: ySB_Matchup_Center + headerHeight)
+               }
 
-               BracketTeamCell(team: sbBottomTeam, game: correctedSBGame, isReversed: true)
+               BracketTeamCell(team: sbDisplayGame?.homeTeam, game: sbDisplayGame, isReversed: true)
                   .position(x: (cellWidth + 30)/2, y: ySB_NFC + headerHeight + sbCardYOffset)
                   .scaleEffect(sbScale)
             }
