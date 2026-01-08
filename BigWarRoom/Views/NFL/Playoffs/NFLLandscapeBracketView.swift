@@ -91,12 +91,17 @@ struct NFLLandscapeBracketView: View {
                         }
                      }
                   }
-               } label: {
-                  Text("\(yearManager.selectedYear) NFL PLAYOFF PICTURE")
-                     .font(.custom("BebasNeue-Regular", size: headerFontSize))
-                     .foregroundColor(.white)
-                     .contentShape(Rectangle())
-               }
+			   } label: {
+				  (
+					 Text("\(yearManager.selectedYear) ")
+						.foregroundColor(.gpScheduledTop)
+					 +
+					 Text("NFL PLAYOFF BRACKET")
+						.foregroundColor(.white)
+				  )
+				  .font(.custom("BebasNeue-Regular", size: headerFontSize))
+				  .contentShape(Rectangle())
+			   }
                .padding(.top, topPadding)
                .padding(.bottom, bottomPadding)
                .zIndex(10)

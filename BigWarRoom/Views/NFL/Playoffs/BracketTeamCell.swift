@@ -109,17 +109,19 @@ struct BracketTeamCell: View {
       let hasScores = (game?.status.isLive ?? false) || (game?.isCompleted ?? false)
       
       return VStack(alignment: .leading, spacing: 0) {
-         Text(team.abbreviation.uppercased())
-            .font(.system(size: 10, weight: .heavy))
-            .foregroundColor(.white)
+		 // Team abbreviation name
+//         Text(team.abbreviation.uppercased())
+//            .font(.system(size: 10, weight: .heavy))
+//            .foregroundColor(.white)
          
          if hasScores {
             // 🔥 SWAPPED: Show #seed where score was (in white, no color coding)
             if let seed = team.seed {
                Text("#\(seed)")
-                  .font(.system(size: 9, weight: .bold))
+                  .font(.system(size: 10, weight: .bold))
                   .monospacedDigit()
-                  .foregroundColor(.white.opacity(0.7))
+                  .foregroundColor(.white.opacity(0.45))
+				  .offset(x: -18, y: 13)
             }
          } else {
             // Show record for scheduled games (no scores yet)
