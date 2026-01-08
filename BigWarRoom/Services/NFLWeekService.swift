@@ -48,8 +48,8 @@ final class NFLWeekService {
     // MARK: -> Static Helper
     /// Simple fallback calculation (no Tuesday/Wednesday logic - trust Sleeper API instead)
     private static func calculateCurrentWeek() -> Int {
-        // Just return a safe default - we'll get the real week from Sleeper API
-        return 1
+        // Use NFLWeekCalculator to get the actual current week instead of defaulting to 1
+        return NFLWeekCalculator.calculateCurrentWeek()
     }
     
     // MARK: -> Public Methods

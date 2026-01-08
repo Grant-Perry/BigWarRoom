@@ -42,9 +42,9 @@ struct NFLWeekCalculator {
         let daysSinceStart = calendar.dateComponents([.day], from: seasonStartDate, to: now).day ?? 0
         let weeksSinceStart = daysSinceStart / 7
         
-        // NFL regular season is 18 weeks (Week 1 through Week 18)
-        // Playoffs would be after Week 18
-        let calculatedWeek = min(max(weeksSinceStart + 1, 1), 18)
+        // 🔥 FIX: Allow weeks > 18 for playoffs (don't cap at 18)
+        // Playoffs are weeks 19-22 (Wild Card, Divisional, Conference Championships, Super Bowl)
+        let calculatedWeek = max(weeksSinceStart + 1, 1) // Remove the min(..., 18) cap
         
         DebugPrint(mode: .weekCheck, "📅 NFLWeekCalculator.calculateCurrentWeek: Calculated week \(calculatedWeek) based on date")
         

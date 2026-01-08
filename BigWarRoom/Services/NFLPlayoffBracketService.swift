@@ -127,18 +127,18 @@ final class NFLPlayoffBracketService {
             // Extract seeds
             let (afcSeeds, nfcSeeds) = extractSeeds(from: standingsResponse)
             
-            // Prefer per-week postseason fetch (weeks 1..4). If empty, fall back to date range.
-            let playoffYear = season + 1
-            let weeklyEvents = try await fetchWeeklyPlayoffEvents(for: playoffYear)
+            // Prefer per-week postseason fetch (weeks 1..5). Pass season (not playoffYear) to the fetch function.
+            let weeklyEvents = try await fetchWeeklyPlayoffEvents(for: season)
             
             if !weeklyEvents.isEmpty {
-                DebugPrint(mode: .nflData, "📅 Using weekly postseason fetch (weeks 1–4) – events: \(weeklyEvents.count)")
+                DebugPrint(mode: .nflData, "📅 Using weekly postseason fetch (weeks 1–5) – events: \(weeklyEvents.count)")
                 let merged = ESPNScoreboardResponse(events: weeklyEvents)
                 await buildBracketFromGames(merged, afcSeeds: afcSeeds, nfcSeeds: nfcSeeds, season: season)
                 return
             }
             
             // Fallback to date-range scoreboard (defensive)
+            let playoffYear = season + 1
             guard let scoreboardURL = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=\(playoffYear)0101-\(playoffYear)0228&seasontype=3") else {
                 await buildBracketFromSeeds(afcSeeds: afcSeeds, nfcSeeds: nfcSeeds, season: season)
                 return
@@ -222,7 +222,13 @@ final class NFLPlayoffBracketService {
         var nfcGames: [PlayoffGame] = []
         var superBowl: PlayoffGame?
         
+        // 🔥 DEBUG: Log all events ESPN returned
+        DebugPrint(mode: .nflData, "🔍 ESPN returned \(scoreboardResponse.events?.count ?? 0) total events for season \(season)")
+        
         for event in scoreboardResponse.events ?? [] {
+            // 🔥 DEBUG: Log each event before processing
+            DebugPrint(mode: .nflData, "🔍 Processing event: id=\(event.id ?? "?"), name='\(event.name ?? "")', week=\(event.week?.number ?? -1)")
+            
             guard let competition = event.competitions?.first else { continue }
             
             // Extract teams
@@ -242,6 +248,9 @@ final class NFLPlayoffBracketService {
             // Get scores
             let homeScore = Int(homeComp?.score ?? "0")
             let awayScore = Int(awayComp?.score ?? "0")
+            
+            // 🔥 DEBUG: Log team info and scores
+            DebugPrint(mode: .nflData, "🔍   Teams: \(awayTeam) @ \(homeTeam), Score: \(awayScore ?? 0)-\(homeScore ?? 0)")
             
             // Determine round from week/date
             guard let round = determinePlayoffRound(from: event, season: season) else {
@@ -450,14 +459,47 @@ final class NFLPlayoffBracketService {
     
     /// Determine playoff round from ESPN event data
     private func determinePlayoffRound(from event: ESPNScoreboardResponse.Event, season: Int) -> PlayoffRound? {
+        // 🔥 DEBUG: Log what we're checking
+        let weekNum = event.week?.number ?? -1
+        let eventName = event.name ?? ""
+        DebugPrint(mode: .nflData, "🔍 determinePlayoffRound: week=\(weekNum), name='\(eventName)'")
+        
+        // 🔥 SKIP PRO BOWL - it's tagged as postseason but isn't part of the bracket
+        let nameLower = eventName.lowercased()
+        if nameLower.contains("all-star") || nameLower.contains("pro bowl") {
+            DebugPrint(mode: .nflData, "⏭️ Skipping Pro Bowl game: '\(eventName)'")
+            return nil
+        }
+        
         if let week = event.week?.number {
+            // Postseason weeks from weekly fetch (weeks 1-5 with seasontype=3)
+            // Note: ESPN includes Pro Bowl as week 4, actual Super Bowl is week 5
             switch week {
-            case 1: return .wildCard
-            case 2: return .divisional
-            case 3: return .conference
-            case 4: return .superBowl
-            default: break
+            case 1: 
+                DebugPrint(mode: .nflData, "✅ Week 1 -> wildCard")
+                return .wildCard
+            case 2: 
+                DebugPrint(mode: .nflData, "✅ Week 2 -> divisional")
+                return .divisional
+            case 3: 
+                DebugPrint(mode: .nflData, "✅ Week 3 -> conference")
+                return .conference
+            case 4, 5:  // Super Bowl can be week 4 or 5 depending on Pro Bowl
+                DebugPrint(mode: .nflData, "✅ Week \(week) -> checking if superBowl")
+                // Double-check it's actually the Super Bowl by name
+                if nameLower.contains("super bowl") || 
+                   (!nameLower.contains("all-star") && !nameLower.contains("pro bowl")) {
+                    DebugPrint(mode: .nflData, "✅ Confirmed superBowl")
+                    return .superBowl
+                }
+                DebugPrint(mode: .nflData, "⚠️ Week \(week) but not Super Bowl name")
+                break
+            default: 
+                DebugPrint(mode: .nflData, "⚠️ Week \(week) doesn't match postseason weeks 1-5")
+                break
             }
+            
+            // Legacy: absolute week numbers (shouldn't hit these with seasontype=3)
             switch week {
             case 19: return .wildCard
             case 20: return .divisional
@@ -481,14 +523,27 @@ final class NFLPlayoffBracketService {
             }
         }
         
-        // Fallback to name parsing – if we can’t confidently tag it, return nil.
+        // Fallback to name parsing
         let name = (event.name ?? "").lowercased()
-        if name.contains("super bowl")       { return .superBowl }
-        if name.contains("championship")     { return .conference }
-        if name.contains("divisional")       { return .divisional }
-        if name.contains("wild card") || name.contains("wild-card") { return .wildCard }
+        if name.contains("super bowl")       { 
+            DebugPrint(mode: .nflData, "✅ Name contains 'super bowl' -> superBowl")
+            return .superBowl 
+        }
+        if name.contains("championship")     { 
+            DebugPrint(mode: .nflData, "✅ Name contains 'championship' -> conference")
+            return .conference 
+        }
+        if name.contains("divisional")       { 
+            DebugPrint(mode: .nflData, "✅ Name contains 'divisional' -> divisional")
+            return .divisional 
+        }
+        if name.contains("wild card") || name.contains("wild-card") { 
+            DebugPrint(mode: .nflData, "✅ Name contains 'wild card' -> wildCard")
+            return .wildCard 
+        }
         
         // Unknown/non-postseason event
+        DebugPrint(mode: .nflData, "❌ Could not determine round - returning nil")
         return nil
     }
     
@@ -705,11 +760,11 @@ private struct ESPNScoreboardResponse: Decodable {
     }
 }
 
-// MARK: - Weekly postseason fetch (weeks 1..4)
-    private func fetchWeeklyPlayoffEvents(for playoffYear: Int) async throws -> [ESPNScoreboardResponse.Event] {
+// MARK: - Weekly postseason fetch (weeks 1..5 to include Super Bowl after Pro Bowl)
+    private func fetchWeeklyPlayoffEvents(for season: Int) async throws -> [ESPNScoreboardResponse.Event] {
         var all: [ESPNScoreboardResponse.Event] = []
-        for wk in 1...4 {
-            guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard?year=\(playoffYear)&seasontype=3&week=\(wk)") else { continue }
+        for wk in 1...5 {
+            guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard?season=\(season)&seasontype=3&week=\(wk)") else { continue }
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
                 let resp = try JSONDecoder().decode(ESPNScoreboardResponse.self, from: data)
@@ -717,7 +772,7 @@ private struct ESPNScoreboardResponse: Decodable {
                 DebugPrint(mode: .nflData, "📥 Week \(wk) postseason events fetched: \(events.count)")
                 all.append(contentsOf: events)
             } catch {
-                DebugPrint(mode: .nflData, "⚠️ Failed weekly fetch for week \(wk), year \(playoffYear): \(error)")
+                DebugPrint(mode: .nflData, "⚠️ Failed weekly fetch for week \(wk), season \(season): \(error)")
             }
         }
         return all
@@ -735,20 +790,20 @@ private struct ESPNScoreboardResponse: Decodable {
 
 // MARK: - Historical SB fallback 2012–2024 (season year)
     private func fallbackSuperBowl(for season: Int) -> PlayoffGame? {
-        let results: [Int: (winner: String, loser: String, wScore: Int, lScore: Int)] = [
-            2012: ("BAL","SF",34,31),
-            2013: ("SEA","DEN",43,8),
-            2014: ("NE","SEA",28,24),
-            2015: ("DEN","CAR",24,10),
-            2016: ("NE","ATL",34,28),
-            2017: ("PHI","NE",41,33),
-            2018: ("NE","LAR",13,3),
-            2019: ("KC","SF",31,20),
-            2020: ("TB","KC",31,9),
-            2021: ("LAR","CIN",23,20),
-            2022: ("KC","PHI",38,35),
-            2023: ("KC","SF",25,22),
-            2024: ("PHI","KC",40,22)
+        let results: [Int: (winner: String, loser: String, wScore: Int, lScore: Int, venue: String, city: String, state: String)] = [
+            2012: ("BAL","SF",34,31, "Mercedes-Benz Superdome", "New Orleans", "LA"),
+            2013: ("SEA","DEN",43,8, "MetLife Stadium", "East Rutherford", "NJ"),
+            2014: ("NE","SEA",28,24, "University of Phoenix Stadium", "Glendale", "AZ"),
+            2015: ("DEN","CAR",24,10, "Levi's Stadium", "Santa Clara", "CA"),
+            2016: ("NE","ATL",34,28, "NRG Stadium", "Houston", "TX"),
+            2017: ("PHI","NE",41,33, "U.S. Bank Stadium", "Minneapolis", "MN"),
+            2018: ("NE","LAR",13,3, "Mercedes-Benz Stadium", "Atlanta", "GA"),
+            2019: ("KC","SF",31,20, "Hard Rock Stadium", "Miami Gardens", "FL"),
+            2020: ("TB","KC",31,9, "Raymond James Stadium", "Tampa", "FL"),
+            2021: ("LAR","CIN",23,20, "SoFi Stadium", "Inglewood", "CA"),
+            2022: ("KC","PHI",38,35, "State Farm Stadium", "Glendale", "AZ"),
+            2023: ("KC","SF",25,22, "Allegiant Stadium", "Las Vegas", "NV"),
+            2024: ("PHI","KC",40,22, "Caesars Superdome", "New Orleans", "LA")
         ]
         guard let r = results[season] else { return nil }
         
@@ -772,6 +827,12 @@ private struct ESPNScoreboardResponse: Decodable {
         let home = PlayoffTeam(abbreviation: nfcAbbr, name: nfcName, seed: nil, score: nfcScore, logoURL: nil)
         let away = PlayoffTeam(abbreviation: afcAbbr, name: afcName, seed: nil, score: afcScore, logoURL: nil)
         
+        let venue = PlayoffGame.Venue(
+            fullName: r.venue,
+            city: r.city,
+            state: r.state
+        )
+        
         return PlayoffGame(
             id: "SB_\(season)",
             round: .superBowl,
@@ -780,7 +841,7 @@ private struct ESPNScoreboardResponse: Decodable {
             awayTeam: away,
             gameDate: date,
             status: .final,
-            venue: nil,
+            venue: venue,
             broadcasts: nil
         )
     }

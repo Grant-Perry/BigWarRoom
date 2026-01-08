@@ -115,7 +115,7 @@ struct NFLPlayoffBracketView: View {
         
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
             VStack(spacing: 0) { // Using a safe space value to prevent crash
-                // Title - CENTERED with dynamic year (no comma formatting)
+                // Title - CENTERED with dynamic year (no comma formatting) - 🔥 ADD TOP PADDING
                 VStack(spacing: 2) {
                     Text("CURRENT \(String(currentYear))")
                         .font(.system(size: 16, weight: .black))
@@ -128,6 +128,7 @@ struct NFLPlayoffBracketView: View {
                         .italic()
                 }
                 .frame(maxWidth: .infinity)
+                .padding(.top, 24)  // 🔥 Add padding to separate from week picker
                 
                 // Add this new view right below the header
                 topSeedsView(bracket: bracket)

@@ -11,7 +11,7 @@ struct WC_Div_Connector: View {
    let isReversed: Bool
    let src1: CGFloat
    let src2: CGFloat
-   let src3: CGFloat
+   let src3: CGFloat?  // 🔥 Make optional
    let dst1: CGFloat
    let dst2_top: CGFloat
    let dst2_bot: CGFloat
@@ -27,8 +27,10 @@ struct WC_Div_Connector: View {
             // 2. WC2 -> Div 2 Top (Elbow Down)
             drawLink(path: &path, fromY: src2, toY: dst2_top, w: w)
 
-            // 3. WC3 -> Div 2 Bot (Elbow Up)
-            drawLink(path: &path, fromY: src3, toY: dst2_bot, w: w)
+            // 3. WC3 -> Div 2 Bot (Elbow Up) - 🔥 Only draw if src3 exists
+            if let src3Y = src3 {
+               drawLink(path: &path, fromY: src3Y, toY: dst2_bot, w: w)
+            }
          }
          .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)
       }

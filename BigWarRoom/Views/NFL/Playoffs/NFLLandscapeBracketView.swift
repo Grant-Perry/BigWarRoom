@@ -241,8 +241,14 @@ struct NFLLandscapeBracketView: View {
       if wcGame1 == nil { wcGame1 = game_5v4 }
       let allPotentialGames = [game_5v4, game_6v3, game_7v2].compactMap { $0 }
       let remainingGames = allPotentialGames.filter { $0.id != wcGame1?.id }
-      wcGame2 = remainingGames.first
-      wcGame3 = remainingGames.last
+      
+      // 🔥 FIX: Only assign wcGame2 and wcGame3 if we have enough games
+      if remainingGames.count >= 1 {
+         wcGame2 = remainingGames[0]
+      }
+      if remainingGames.count >= 2 {
+         wcGame3 = remainingGames[1]
+      }
 
       return HStack(alignment: .top, spacing: 0) {
          ZStack(alignment: .top) {
@@ -271,14 +277,24 @@ struct NFLLandscapeBracketView: View {
             if let game = wcGame2 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
             else { matchupView(top: seeds[6], bot: seeds[3], isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
 
-            if let game = wcGame3 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight) }
-            else { matchupView(top: seeds[7], bot: seeds[2], isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight) }
+            // 🔥 Only show 3rd Wild Card slot if game exists
+            if let game = wcGame3 {
+               matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight)
+            }
          }.frame(width: cellWidth)
 
          ZStack(alignment: .top) {
             Color.clear.frame(width: connectorWidth, height: totalContentHeight)
             BracketHeader(text: "")
-            WC_Div_Connector(isReversed: isReversed, src1: yWC1, src2: yWC2, src3: yWC3, dst1: yDiv1_Top, dst2_top: yDiv2_Top, dst2_bot: yDiv2_Bot)
+            WC_Div_Connector(
+               isReversed: isReversed, 
+               src1: yWC1, 
+               src2: yWC2, 
+               src3: wcGame3 != nil ? yWC3 : nil,  // 🔥 Pass nil if no 3rd game
+               dst1: yDiv1_Top, 
+               dst2_top: yDiv2_Top, 
+               dst2_bot: yDiv2_Bot
+            )
                .offset(y: headerHeight)
          }.frame(width: connectorWidth)
 
