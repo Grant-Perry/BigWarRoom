@@ -18,11 +18,11 @@ struct NFLLandscapeBracketView: View {
    private let groupSpacing: CGFloat = 20
    private let connectorWidth: CGFloat = 30
    private let headerHeight: CGFloat = 24
-   private let sbCardYOffset: CGFloat = 10   // Shared Y offset for SB card vertical center
-   private let sbGroupYOffset: CGFloat = -10 // Group .offset(y:) used below
-   private let sbScale: CGFloat = 1.15       // Scale used for SB cards
-   private var sbInsetX: CGFloat {           // Extend NFC connector into SB card edge (accounts for scale)
-      15 + (cellWidth * (sbScale - 1.0)) / 2 // 15 + half the growth from scaling
+   private let sbCardYOffset: CGFloat = 10
+   private let sbGroupYOffset: CGFloat = -10
+   private let sbScale: CGFloat = 1.15
+   private var sbInsetX: CGFloat {
+      15 + (cellWidth * (sbScale - 1.0)) / 2
    }
 
    private var matchH: CGFloat { (cellHeight * 2) + matchupSpacing }
@@ -49,11 +49,6 @@ struct NFLLandscapeBracketView: View {
 
    private var totalContentHeight: CGFloat { (matchH * 3) + (groupSpacing * 2) }
 
-   @State private var steadyZoom: CGFloat = 1.0
-   @State private var pinchZoom: CGFloat = 1.0
-   @State private var steadyOffset: CGSize = .zero
-   @State private var dragOffset: CGSize = .zero
-
    private var idealTotalWidth: CGFloat {
       let side = cellWidth + connectorWidth + cellWidth + connectorWidth + cellWidth + connectorWidth
       let center = cellWidth + 50
@@ -64,9 +59,16 @@ struct NFLLandscapeBracketView: View {
       GeometryReader { geo in
          let availableWidth = geo.size.width
          let availableHeight = geo.size.height
-         let baseScale = min(1.0, availableWidth / idealTotalWidth)
-         let finalScale = baseScale * min(max(steadyZoom * pinchZoom, 1.0), 3.0)
-         let totalOffset = CGSize(width: steadyOffset.width + dragOffset.width, height: steadyOffset.height + dragOffset.height)
+         
+         // Calculate scale to fit both dimensions (with padding for safe areas)
+         let widthScale = (availableWidth - 40) / idealTotalWidth
+         let heightScale = (availableHeight - 180) / (totalContentHeight + headerHeight + 50)
+         let finalScale = min(widthScale, heightScale, 1.0)
+         
+         // Dynamic header font size based on screen width
+         let headerFontSize: CGFloat = availableWidth < 700 ? 24 : 32
+         let topPadding: CGFloat = availableWidth < 700 ? 20 : 45
+         let bottomPadding: CGFloat = availableWidth < 700 ? 10 : 20
 
          ZStack {
             Image("BG3")
@@ -91,38 +93,24 @@ struct NFLLandscapeBracketView: View {
                   }
                } label: {
                   Text("\(yearManager.selectedYear) NFL PLAYOFF PICTURE")
-                     .font(.custom("BebasNeue-Regular", size: 32))
+                     .font(.custom("BebasNeue-Regular", size: headerFontSize))
                      .foregroundColor(.white)
-					 .offset(y: 15)
+                     .contentShape(Rectangle())
                }
-               .padding(.top, 45)
-               .padding(.bottom, 20)
+               .padding(.top, topPadding)
+               .padding(.bottom, bottomPadding)
+               .zIndex(10)
 
                HStack(alignment: .top, spacing: 0) {
                   conferenceSide(conference: .afc, isReversed: false)
                   superBowlColumn
                   conferenceSide(conference: .nfc, isReversed: true)
                }
-               .scaleEffect(1.02)
+               .scaleEffect(1.1)
                .scaleEffect(finalScale)
-               .offset(totalOffset)
-               .frame(width: idealTotalWidth * baseScale, height: totalContentHeight + headerHeight + 50)
-               .simultaneousGesture(
-                  MagnificationGesture()
-                     .onChanged { pinchZoom = $0 }
-                     .onEnded { steadyZoom = min(max(steadyZoom * $0, 1.0), 3.0); pinchZoom = 1.0 }
-               )
-               .simultaneousGesture(
-                  DragGesture()
-                     .onChanged { dragOffset = $0.translation }
-                     .onEnded {
-                        steadyOffset.width += $0.translation.width
-                        steadyOffset.height += $0.translation.height
-                        dragOffset = .zero
-                     }
-               )
+               .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)
             }
-            .position(x: availableWidth / 2, y: availableHeight / 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
       }
    }
@@ -248,13 +236,22 @@ struct NFLLandscapeBracketView: View {
          ZStack(alignment: .top) {
             Color.clear.frame(width: connectorWidth, height: totalContentHeight)
             BracketHeader(text: "")
-            Champ_SB_Connector(
-               isReversed: isReversed,
-               src: yChamp_Center + headerHeight,
-               dst: ((conference == .afc ? (ySB_AFC - sbCardYOffset) : (ySB_NFC + sbCardYOffset)) + headerHeight + sbGroupYOffset)
-            )
-            .scaleEffect(x: 1, y: isReversed ? -1 : 1, anchor: .center)
-			.offset(y: isReversed ? -10 : 0)
+            
+            if conference == .afc {
+               Champ_SB_Connector(
+                  isReversed: false,
+                  src: yChamp_Center + headerHeight,
+                  dst: ySB_AFC + headerHeight + sbGroupYOffset - 23
+               )
+            } else {
+               Champ_SB_Connector(
+                  isReversed: false,
+                  src: yChamp_Center + headerHeight,
+                  dst: ySB_AFC + headerHeight + sbGroupYOffset - 23
+               )
+               .scaleEffect(x: -1, y: 1)
+			   .offset(y: 45)
+            }
          }.frame(width: connectorWidth)
       }
       .environment(\.layoutDirection, isReversed ? .rightToLeft : .leftToRight)
