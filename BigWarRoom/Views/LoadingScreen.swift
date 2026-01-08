@@ -200,13 +200,18 @@ struct LoadingScreen: View {
     
     /// 🔥 NEW: Load essential data before showing main app
     private func startEssentialDataLoading() {
+        DebugPrint(mode: .appLoad, "🚀 LoadingScreen.startEssentialDataLoading - START at \(Date())")
+        
         // Check if user has any valid credentials
         let hasESPNCredentials = espnCredentials.hasValidCredentials
         let hasSleeperCredentials = sleeperCredentials.hasValidCredentials
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
+        DebugPrint(mode: .appLoad, "🔐 LoadingScreen: hasESPN=\(hasESPNCredentials), hasSleeper=\(hasSleeperCredentials)")
+        
         // If no credentials, skip data loading and go straight to onboarding
         if !hasAnyCredentials {
+            DebugPrint(mode: .appLoad, "⏭️ LoadingScreen: No credentials, skipping to onboarding")
             completeLoading()
             return
         }
@@ -215,15 +220,23 @@ struct LoadingScreen: View {
         isDataLoading = true
         loadingMessage = "Loading your leagues..."
         
+        DebugPrint(mode: .appLoad, "📦 LoadingScreen: Starting matchupsHub.loadAllMatchups at \(Date())")
+        
         Task {
+            let startTime = Date()
+            
             // Load the essential Mission Control data
             await matchupsHub.loadAllMatchups()
+            
+            let loadDuration = Date().timeIntervalSince(startTime)
+            DebugPrint(mode: .appLoad, "✅ LoadingScreen: loadAllMatchups completed in \(String(format: "%.2f", loadDuration))s")
             
             // TODO: Update this when AllLivePlayersViewModel.shared is eliminated
             // await AllLivePlayersViewModel.shared.loadAllPlayers()
             
             
             await MainActor.run {
+                DebugPrint(mode: .appLoad, "🏁 LoadingScreen: Calling completeLoading at \(Date())")
                 completeLoading()
             }
         }
@@ -231,7 +244,12 @@ struct LoadingScreen: View {
     
     /// Checks if user has persistent data and completes loading
     private func completeLoading() {
-        guard !isComplete else { return } // Prevent multiple calls
+        DebugPrint(mode: .appLoad, "🎬 LoadingScreen.completeLoading - START at \(Date())")
+        
+        guard !isComplete else { 
+            DebugPrint(mode: .appLoad, "⚠️ LoadingScreen.completeLoading - ALREADY COMPLETE, ignoring")
+            return 
+        }
         isComplete = true
         
         // Check if user has any valid credentials setup
@@ -241,6 +259,7 @@ struct LoadingScreen: View {
         // If user has EITHER ESPN OR Sleeper credentials, skip onboarding
         let hasAnyCredentials = hasESPNCredentials || hasSleeperCredentials
         
+        DebugPrint(mode: .appLoad, "🔐 LoadingScreen.completeLoading: hasCredentials=\(hasAnyCredentials)")
         
         withAnimation(.easeInOut(duration: 0.5)) {
             // Add exit animation here if needed
@@ -249,6 +268,7 @@ struct LoadingScreen: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             // Only show onboarding if NO credentials exist
             let shouldShowOnboarding = !hasAnyCredentials
+            DebugPrint(mode: .appLoad, "🏁 LoadingScreen: Loading complete - showing onboarding: \(shouldShowOnboarding)")
             onComplete(shouldShowOnboarding)
         }
     }

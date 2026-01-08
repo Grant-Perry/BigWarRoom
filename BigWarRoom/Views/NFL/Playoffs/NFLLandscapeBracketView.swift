@@ -82,7 +82,7 @@ struct NFLLandscapeBracketView: View {
 
             VStack(spacing: 0) {
                Menu {
-                  ForEach((2015...2025).reversed(), id: \.self) { year in
+                  ForEach((2012...2026).reversed(), id: \.self) { year in
                      Button(action: {
                         yearManager.selectedYear = String(year)
                      }) {
@@ -211,6 +211,10 @@ struct NFLLandscapeBracketView: View {
       let seeds = getSeedsForConference(bracket: bracket, conference: conference)
       let seed1 = conference == .afc ? bracket.afcSeed1 : bracket.nfcSeed1
       let games = conference == .afc ? bracket.afcGames : bracket.nfcGames
+      
+      // 🔥 FIXED: Compare against ACTUAL current season, not selected year
+      let actualCurrentSeasonYear = NFLWeekCalculator.getCurrentSeasonYear()
+      let isCurrentSeason = (bracket.season == actualCurrentSeasonYear)
 
       let wildCardGames = games.filter { game in
          let homeSeed = game.homeTeam.seed ?? 99
@@ -233,6 +237,10 @@ struct NFLLandscapeBracketView: View {
       var wcGame2: PlayoffGame?
       var wcGame3: PlayoffGame?
 
+      // 🔥 DEBUG: Log what games we found
+      DebugPrint(mode: .nflData, "🏈 2012 WC Games - 5v4: \(game_5v4 != nil), 6v3: \(game_6v3 != nil), 7v2: \(game_7v2 != nil)")
+      DebugPrint(mode: .nflData, "🏈 2012 Total wildCardGames: \(wildCardGames.count)")
+
       if let dGame = divGame1 {
          let seedA = dGame.homeTeam.seed ?? 99
          let opponentAbbr = (seedA == 1) ? dGame.awayTeam.abbreviation : dGame.homeTeam.abbreviation
@@ -242,13 +250,18 @@ struct NFLLandscapeBracketView: View {
       let allPotentialGames = [game_5v4, game_6v3, game_7v2].compactMap { $0 }
       let remainingGames = allPotentialGames.filter { $0.id != wcGame1?.id }
       
-      // 🔥 FIX: Only assign wcGame2 and wcGame3 if we have enough games
+      // 🔥 FIXED: Only assign if games actually exist
       if remainingGames.count >= 1 {
          wcGame2 = remainingGames[0]
       }
       if remainingGames.count >= 2 {
          wcGame3 = remainingGames[1]
       }
+      
+      // 🔥 DEBUG: Log final assignment AND what will render
+      DebugPrint(mode: .nflData, "🏈 \(bracket.season) Final - wcGame1: \(wcGame1 != nil), wcGame2: \(wcGame2 != nil), wcGame3: \(wcGame3 != nil)")
+      DebugPrint(mode: .nflData, "🎨 \(bracket.season) Render WC1: \(wcGame1 != nil || isCurrentSeason), WC2: \(wcGame2 != nil || isCurrentSeason), WC3: \(wcGame3 != nil || isCurrentSeason)")
+      DebugPrint(mode: .nflData, "🎨 \(bracket.season) isCurrentSeason: \(isCurrentSeason)")
 
       return HStack(alignment: .top, spacing: 0) {
          ZStack(alignment: .top) {
@@ -271,15 +284,23 @@ struct NFLLandscapeBracketView: View {
 
             BracketHeader(text: "WILD CARD")
 
-            if let game = wcGame1 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight) }
-            else { matchupView(top: seeds[5], bot: seeds[4], isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight) }
+            // 🔥 ONLY render Wild Card games if they exist (or if current season to show empty bracket)
+            if let game = wcGame1 {
+               matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight)
+            } else if isCurrentSeason {
+               matchupView(top: seeds[5], bot: seeds[4], isReversed: isReversed).position(x: cellWidth/2, y: yWC1 + headerHeight)
+            }
 
-            if let game = wcGame2 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
-            else { matchupView(top: seeds[6], bot: seeds[3], isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight) }
+            if let game = wcGame2 {
+               matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight)
+            } else if isCurrentSeason {
+               matchupView(top: seeds[6], bot: seeds[3], isReversed: isReversed).position(x: cellWidth/2, y: yWC2 + headerHeight)
+            }
 
-            // 🔥 Only show 3rd Wild Card slot if game exists
             if let game = wcGame3 {
                matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight)
+            } else if isCurrentSeason {
+               matchupView(top: seeds[7], bot: seeds[2], isReversed: isReversed).position(x: cellWidth/2, y: yWC3 + headerHeight)
             }
          }.frame(width: cellWidth)
 
@@ -288,9 +309,9 @@ struct NFLLandscapeBracketView: View {
             BracketHeader(text: "")
             WC_Div_Connector(
                isReversed: isReversed, 
-               src1: yWC1, 
-               src2: yWC2, 
-               src3: wcGame3 != nil ? yWC3 : nil,  // 🔥 Pass nil if no 3rd game
+               src1: (wcGame1 != nil || isCurrentSeason) ? yWC1 : nil,
+               src2: (wcGame2 != nil || isCurrentSeason) ? yWC2 : nil,
+               src3: (wcGame3 != nil || isCurrentSeason) ? yWC3 : nil,
                dst1: yDiv1_Top, 
                dst2_top: yDiv2_Top, 
                dst2_bot: yDiv2_Bot
@@ -301,14 +322,19 @@ struct NFLLandscapeBracketView: View {
          ZStack(alignment: .top) {
             Color.clear.frame(width: cellWidth, height: totalContentHeight)
             BracketHeader(text: "DIVISIONAL")
-            if let game = divGame1 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Center + headerHeight) }
-            else {
+            
+            // 🔥 Divisional Game 1: Only render if exists (or current season)
+            if let game = divGame1 {
+               matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Center + headerHeight)
+            } else if isCurrentSeason {
                BracketTeamCell(team: nil, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Top + headerHeight)
                BracketTeamCell(team: seed1, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv1_Bot + headerHeight)
             }
 
-            if let game = divGame2 { matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Center + headerHeight) }
-            else {
+            // 🔥 Divisional Game 2: Only render if exists (or current season)
+            if let game = divGame2 {
+               matchupView(game: game, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Center + headerHeight)
+            } else if isCurrentSeason {
                BracketTeamCell(team: nil, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Top + headerHeight)
                BracketTeamCell(team: nil, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yDiv2_Bot + headerHeight)
             }
@@ -319,8 +345,8 @@ struct NFLLandscapeBracketView: View {
             BracketHeader(text: "")
             Div_Champ_Connector(
                isReversed: isReversed,
-               src1: yDiv1_Center,
-               src2: yDiv2_Center,
+               src1: divGame1 != nil ? yDiv1_Center : nil,
+               src2: divGame2 != nil ? yDiv2_Center : nil,
                dst_top: yChamp_Top,
                dst_bot: yChamp_Bot
             )
@@ -332,9 +358,10 @@ struct NFLLandscapeBracketView: View {
             Color.clear.frame(width: cellWidth, height: totalContentHeight)
             BracketHeader(text: conference == .afc ? "AFC CHAMP" : "NFC CHAMP")
 
+            // 🔥 Conference Championship: Only render if exists (or current season)
             if let game = champGame {
                championshipMatchupView(game: game, topDivGame: divGame1, isReversed: isReversed)
-            } else {
+            } else if isCurrentSeason {
                BracketTeamCell(team: nil, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yChamp_Top + headerHeight)
                BracketTeamCell(team: nil, game: nil, isReversed: isReversed).position(x: cellWidth/2, y: yChamp_Bot + headerHeight)
             }
@@ -347,13 +374,13 @@ struct NFLLandscapeBracketView: View {
             if conference == .afc {
                Champ_SB_Connector(
                   isReversed: false,
-                  src: yChamp_Center + headerHeight,
+                  src: champGame != nil ? yChamp_Center + headerHeight : nil,
                   dst: ySB_AFC + headerHeight + sbGroupYOffset - 23
                )
             } else {
                Champ_SB_Connector(
                   isReversed: false,
-                  src: yChamp_Center + headerHeight,
+                  src: champGame != nil ? yChamp_Center + headerHeight : nil,
                   dst: ySB_AFC + headerHeight + sbGroupYOffset - 23
                )
                .scaleEffect(x: -1, y: 1)

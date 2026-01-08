@@ -1,4 +1,4 @@
-   //
+//
    //  Div_Champ_Connector.swift
    //  BigWarRoom
    //
@@ -7,8 +7,8 @@ import SwiftUI
 
 struct Div_Champ_Connector: View {
    let isReversed: Bool
-   let src1: CGFloat      // Top Divisional Game Center
-   let src2: CGFloat      // Bottom Divisional Game Center
+   let src1: CGFloat?     // Top Divisional Game Center (optional)
+   let src2: CGFloat?     // Bottom Divisional Game Center (optional)
    let dst_top: CGFloat   // Top Championship Slot
    let dst_bot: CGFloat   // Bottom Championship Slot
 
@@ -22,20 +22,27 @@ struct Div_Champ_Connector: View {
 				  // Draw from Right (w) to Left (0)
 
 				  // 1. Force Top Div (src1) to connect to Top Champ (dst_top)
-				  // This FLIPS the previous logic that was sending it to dst_bot
-			   drawLink(path: &path, startX: w, startY: src1, endX: 0, endY: dst_top, w: w)
+			   if let src1 = src1 {
+				  drawLink(path: &path, startX: w, startY: src1, endX: 0, endY: dst_top, w: w)
+			   }
 
 				  // 2. Force Bottom Div (src2) to connect to Bottom Champ (dst_bot)
-			   drawLink(path: &path, startX: w, startY: src2, endX: 0, endY: dst_bot, w: w)
+			   if let src2 = src2 {
+				  drawLink(path: &path, startX: w, startY: src2, endX: 0, endY: dst_bot, w: w)
+			   }
 
 			} else {
 				  // --- AFC SIDE (Left) ---
 				  // Draw from Left (0) to Right (w)
 
 				  // Top -> Top
-			   drawLink(path: &path, startX: 0, startY: src1, endX: w, endY: dst_top, w: w)
+			   if let src1 = src1 {
+				  drawLink(path: &path, startX: 0, startY: src1, endX: w, endY: dst_top, w: w)
+			   }
 				  // Bot -> Bot
-			   drawLink(path: &path, startX: 0, startY: src2, endX: w, endY: dst_bot, w: w)
+			   if let src2 = src2 {
+				  drawLink(path: &path, startX: 0, startY: src2, endX: w, endY: dst_bot, w: w)
+			   }
 			}
 		 }
 		 .stroke(Color.gray.opacity(0.5), lineWidth: 1.5)

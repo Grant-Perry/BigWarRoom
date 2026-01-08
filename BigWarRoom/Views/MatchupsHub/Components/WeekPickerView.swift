@@ -42,7 +42,7 @@ struct WeekPickerView: View {
     private var yearRange: [String] {
         let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
         let maxYear = currentNFLYear + 1
-        return (2015...maxYear).map { String($0) }.reversed()
+        return (2012...maxYear).map { String($0) }.reversed()
     }
     
     /// NFL season start date - calculated from SeasonYearManager (SOT)

@@ -51,7 +51,7 @@ final class SeasonYearManager {
     static func getAvailableYears() -> [String] {
         let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
         let maxYear = currentNFLYear + 1
-        return (2015...maxYear).map { String($0) }
+        return (2012...maxYear).map { String($0) }
     }
     
     var availableYears: [String] {

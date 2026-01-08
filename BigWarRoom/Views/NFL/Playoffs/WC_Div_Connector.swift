@@ -9,9 +9,9 @@ import SwiftUI
 
 struct WC_Div_Connector: View {
    let isReversed: Bool
-   let src1: CGFloat
-   let src2: CGFloat
-   let src3: CGFloat?  // 🔥 Make optional
+   let src1: CGFloat?  // 🔥 Make all optional
+   let src2: CGFloat?
+   let src3: CGFloat?
    let dst1: CGFloat
    let dst2_top: CGFloat
    let dst2_bot: CGFloat
@@ -21,11 +21,15 @@ struct WC_Div_Connector: View {
          Path { path in
             let w = geo.size.width
 
-            // 1. WC1 -> Div 1 Top (Straight Horizontal)
-            drawLink(path: &path, fromY: src1, toY: dst1, w: w)
+            // 1. WC1 -> Div 1 Top (Straight Horizontal) - 🔥 Only draw if src1 exists
+            if let src1Y = src1 {
+               drawLink(path: &path, fromY: src1Y, toY: dst1, w: w)
+            }
 
-            // 2. WC2 -> Div 2 Top (Elbow Down)
-            drawLink(path: &path, fromY: src2, toY: dst2_top, w: w)
+            // 2. WC2 -> Div 2 Top (Elbow Down) - 🔥 Only draw if src2 exists
+            if let src2Y = src2 {
+               drawLink(path: &path, fromY: src2Y, toY: dst2_top, w: w)
+            }
 
             // 3. WC3 -> Div 2 Bot (Elbow Up) - 🔥 Only draw if src3 exists
             if let src3Y = src3 {

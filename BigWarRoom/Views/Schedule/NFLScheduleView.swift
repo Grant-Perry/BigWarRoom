@@ -204,19 +204,29 @@ struct NFLScheduleView: View {
         }
         .onAppear {
             
+            DebugPrint(mode: .appLoad, "📅 NFLScheduleView.onAppear - START at \(Date())")
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(weekSelectionManager.selectedWeek)")
             
             // Sync initial week
             viewModel?.selectWeek(weekSelectionManager.selectedWeek)
             
-            // Start global auto-refresh for live scores
-            viewModel?.refreshSchedule() // Initial load only
+            // 🔥 ASYNC: Wrap heavy operations in Task to prevent blocking main thread
+            Task {
+                DebugPrint(mode: .appLoad, "📅 NFLScheduleView: Starting refreshSchedule at \(Date())")
+                // Start global auto-refresh for live scores
+                viewModel?.refreshSchedule() // Initial load only
+                DebugPrint(mode: .appLoad, "📅 NFLScheduleView: refreshSchedule completed at \(Date())")
+            }
             
-            // 🏈 NEW: Create playoff service and load bracket if in playoffs
-            ensurePlayoffServiceCreated()
-            if weekSelectionManager.selectedWeek > 18, let service = playoffBracketService {
-                let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
-                service.fetchPlayoffBracket(for: season)
+            // 🏈 ASYNC: Create playoff service and load bracket if in playoffs
+            Task {
+                ensurePlayoffServiceCreated()
+                if weekSelectionManager.selectedWeek > 18, let service = playoffBracketService {
+                    DebugPrint(mode: .appLoad, "🏈 NFLScheduleView: Fetching playoff bracket (week > 18) at \(Date())")
+                    let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
+                    service.fetchPlayoffBracket(for: season)
+                    DebugPrint(mode: .appLoad, "🏈 NFLScheduleView: Playoff bracket fetch initiated at \(Date())")
+                }
             }
         }
     }

@@ -37,6 +37,7 @@ struct AppEntryView: View {
                 // 🔥 PHASE 3 DI: Pass dependencies to LoadingScreen
                 LoadingScreen(
                     onComplete: { needsOnboarding in
+                        DebugPrint(mode: .appLoad, "🎬 AppEntryView: LoadingScreen completed, transitioning to main app")
                         shouldShowOnboarding = needsOnboarding
                         showingLoading = false
                     },
@@ -51,6 +52,9 @@ struct AppEntryView: View {
                     matchupsHub: getOrCreateMatchupsHub(),
                     allLivePlayersViewModel: getOrCreateAllLivePlayersViewModel()
                 )
+                .onAppear {
+                    DebugPrint(mode: .appLoad, "🎬 AppEntryView: BigWarRoom appeared on screen")
+                }
             }
         }
         .animation(.easeInOut(duration: 0.5), value: showingLoading)

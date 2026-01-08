@@ -7,12 +7,14 @@ import SwiftUI
 
 struct Champ_SB_Connector: View {
    let isReversed: Bool
-   let src: CGFloat
+   let src: CGFloat?      // Optional - only draw if championship game exists
    let dst: CGFloat
 
    var body: some View {
       GeometryReader { geo in
          Path { path in
+            guard let src = src else { return }
+            
             let w = geo.size.width
             let midX = w / 2
 
