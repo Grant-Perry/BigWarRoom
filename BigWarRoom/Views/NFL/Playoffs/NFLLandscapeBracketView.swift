@@ -9,8 +9,11 @@ struct NFLLandscapeBracketView: View {
    @Environment(TeamAssetManager.self) private var teamAssets
    @Environment(NFLStandingsService.self) private var standingsService
    let bracket: PlayoffBracket
+   let playoffService: NFLPlayoffBracketService?
 
    @State private var yearManager = SeasonYearManager.shared
+   @State private var selectedGame: PlayoffGame?
+   @State private var showingGameDetail = false
 
    private let cellWidth: CGFloat = 95
    private let cellHeight: CGFloat = 40
@@ -116,6 +119,89 @@ struct NFLLandscapeBracketView: View {
                .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+         }
+         
+         // Custom modal overlay instead of sheet
+         if showingGameDetail, let game = selectedGame {
+            ZStack {
+               // Dimmed background
+               Color.black.opacity(0.4)
+                  .ignoresSafeArea()
+                  .onTapGesture {
+                     showingGameDetail = false
+                     selectedGame = nil
+                  }
+               
+               // Modal card
+               VStack(spacing: 0) {
+                  // Header
+                  HStack {
+                     Text(game.round.displayName)
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                     
+                     Spacer()
+                     
+                     Button {
+                        showingGameDetail = false
+                        selectedGame = nil
+                     } label: {
+                        Image(systemName: "xmark.circle.fill")
+                           .font(.title2)
+                           .foregroundStyle(.white.opacity(0.7))
+                     }
+                  }
+                  .padding()
+                  .background(Color(.systemGray6))
+                  
+                  // Matchup Card (exactly like week 1-18)
+                  matchupCardView(game: game)
+                     .padding()
+                  
+                  // Odds section only
+                  VStack(alignment: .leading, spacing: 12) {
+                     let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                     let odds = playoffService?.gameOdds[gameID]
+                     
+                     if let odds = odds {
+                        oddsRow(odds: odds)
+                     } else {
+                        HStack(alignment: .top, spacing: 12) {
+                           Image(systemName: "dollarsign.circle")
+                              .font(.title3)
+                              .foregroundStyle(.secondary)
+                              .frame(width: 24)
+                           
+                           VStack(alignment: .leading, spacing: 4) {
+                              Text("Odds")
+                                 .font(.subheadline)
+                                 .foregroundStyle(.secondary)
+                              
+                              Text("Not available yet - check back")
+                                 .font(.caption)
+                                 .foregroundStyle(.secondary.opacity(0.7))
+                           }
+                           
+                           Spacer()
+                        }
+                     }
+                  }
+                  .padding()
+                  .background(Color(.secondarySystemGroupedBackground))
+                  .cornerRadius(12)
+                  .padding(.horizontal)
+                  .padding(.top, 8)
+                  .padding(.bottom, 16)
+               }
+               .frame(width: 500)
+               .fixedSize(horizontal: false, vertical: true)
+               .background(Color(.systemBackground))
+               .cornerRadius(20)
+               .shadow(color: .black.opacity(0.3), radius: 20)
+            }
+            .transition(.opacity)
+            .animation(.easeInOut(duration: 0.2), value: showingGameDetail)
          }
       }
    }
@@ -327,6 +413,14 @@ struct NFLLandscapeBracketView: View {
          BracketTeamCell(team: top, game: game, isReversed: isReversed)
          BracketTeamCell(team: bot, game: game, isReversed: isReversed)
       }
+      .contentShape(Rectangle())
+      .onTapGesture {
+         if let game = game {
+            DebugPrint(mode: .nflData, "🎯 Tapped game: \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation) on \(game.gameDate)")
+            selectedGame = game
+            showingGameDetail = true
+         }
+      }
    }
 
    @ViewBuilder
@@ -334,6 +428,12 @@ struct NFLLandscapeBracketView: View {
       VStack(spacing: matchupSpacing) {
          BracketTeamCell(team: game.awayTeam, game: game, isReversed: isReversed)
          BracketTeamCell(team: game.homeTeam, game: game, isReversed: isReversed)
+      }
+      .contentShape(Rectangle())
+      .onTapGesture {
+         DebugPrint(mode: .nflData, "🎯 Tapped game: \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation) on \(game.gameDate)")
+         selectedGame = game
+         showingGameDetail = true
       }
    }
 
@@ -362,7 +462,14 @@ struct NFLLandscapeBracketView: View {
                BracketTeamCell(team: game.homeTeam, game: game, isReversed: isReversed)
             }
          }
-      }.position(x: cellWidth/2, y: (yChamp_Top + yChamp_Bot) / 2 + headerHeight)
+      }
+      .position(x: cellWidth/2, y: (yChamp_Top + yChamp_Bot) / 2 + headerHeight)
+      .contentShape(Rectangle())
+      .onTapGesture {
+         DebugPrint(mode: .nflData, "🎯 Tapped championship game: \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation)")
+         selectedGame = game
+         showingGameDetail = true
+      }
    }
 
    private func getSeedsForConference(bracket: PlayoffBracket, conference: PlayoffGame.Conference) -> [Int: PlayoffTeam] {
@@ -460,5 +567,245 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
 """)
 //      }
 //#endif
+   }
+   
+   private func detailRow(icon: String, title: String, value: String) -> some View {
+      HStack(alignment: .top, spacing: 12) {
+         Image(systemName: icon)
+            .font(.title3)
+            .foregroundStyle(.blue)
+            .frame(width: 24)
+         
+         VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+               .font(.subheadline)
+               .foregroundStyle(.secondary)
+            
+            Text(value)
+               .font(.body)
+               .fontWeight(.medium)
+         }
+         
+         Spacer()
+      }
+   }
+
+   // MARK: - Matchup Card (Duplicate from GameDetailSheet)
+   
+   @ViewBuilder
+   private func matchupCardView(game: PlayoffGame) -> some View {
+      let awayColor = teamAssets.team(for: game.awayTeam.abbreviation)?.primaryColor ?? .blue
+      let homeColor = teamAssets.team(for: game.homeTeam.abbreviation)?.primaryColor ?? .red
+      
+      HStack(spacing: 0) {
+         // Away team logo (left side)
+         ZStack(alignment: .bottomTrailing) {
+            if let logo = teamAssets.logo(for: game.awayTeam.abbreviation) {
+               logo
+                  .resizable()
+                  .aspectRatio(contentMode: .fill)
+                  .scaleEffect(1.5)
+                  .frame(width: 90, height: 90)
+                  .clipped()
+            }
+            
+            // Seed badge
+            if let seed = game.awayTeam.seed {
+               Text("#\(seed)")
+                  .font(.system(size: 12, weight: .black))
+                  .foregroundStyle(.white)
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Capsule().fill(Color.black.opacity(0.85)))
+                  .padding(6)
+            }
+         }
+         .frame(width: 100, height: 100)
+         
+         Spacer()
+         
+         // Center: Game info
+         VStack(spacing: 3) {
+            // Day name (smart format)
+            if !game.smartFormattedDate.isEmpty {
+               Text(game.smartFormattedDate.uppercased())
+                  .font(.system(size: 12, weight: .bold))
+                  .foregroundColor(.white)
+                  .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            }
+            
+            // Date & Time
+            Text(game.formattedTime)
+               .font(.system(size: 16, weight: .black))
+               .foregroundColor(.white)
+               .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            
+            // Stadium
+            if let venue = game.venue, let venueName = venue.fullName {
+               Text(venueName)
+                  .font(.system(size: 11, weight: .semibold))
+                  .foregroundColor(.white.opacity(0.9))
+                  .lineLimit(1)
+                  .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+               
+               // City, State
+               if let city = venue.city, let state = venue.state {
+                  Text("\(city), \(state)")
+                     .font(.system(size: 10, weight: .medium))
+                     .foregroundColor(.white.opacity(0.8))
+                     .lineLimit(1)
+                     .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+               } else if let city = venue.city {
+                  Text(city)
+                     .font(.system(size: 10, weight: .medium))
+                     .foregroundColor(.white.opacity(0.8))
+                     .lineLimit(1)
+                     .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+               }
+            }
+            
+            // Network
+            if let broadcasts = game.broadcasts, !broadcasts.isEmpty {
+               HStack(spacing: 4) {
+                  Image(systemName: "antenna.radiowaves.left.and.right")
+                     .font(.system(size: 9, weight: .semibold))
+                     .foregroundColor(.white.opacity(0.7))
+                  
+                  Text(broadcasts.joined(separator: ", "))
+                     .font(.system(size: 10, weight: .semibold))
+                     .foregroundColor(.white.opacity(0.7))
+                     .lineLimit(1)
+               }
+               .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            }
+         }
+         .frame(maxWidth: .infinity)
+         .padding(.vertical, 8)
+         
+         Spacer()
+         
+         // Home team logo (right side)
+         ZStack(alignment: .bottomTrailing) {
+            if let logo = teamAssets.logo(for: game.homeTeam.abbreviation) {
+               logo
+                  .resizable()
+                  .aspectRatio(contentMode: .fill)
+                  .scaleEffect(1.5)
+                  .frame(width: 90, height: 90)
+                  .clipped()
+            }
+            
+            // Seed badge
+            if let seed = game.homeTeam.seed {
+               Text("#\(seed)")
+                  .font(.system(size: 12, weight: .black))
+                  .foregroundStyle(.white)
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Capsule().fill(Color.black.opacity(0.85)))
+                  .padding(6)
+            }
+         }
+         .frame(width: 100, height: 100)
+      }
+      .frame(height: 100)
+      .background(
+         // GRADIENT from away team color to home team color - EXACTLY like week 1-18 cards
+         Rectangle()
+            .fill(
+               LinearGradient(
+                  colors: [
+                     awayColor.opacity(0.7),
+                     awayColor.opacity(0.5),
+                     homeColor.opacity(0.5),
+                     homeColor.opacity(0.7)
+                  ],
+                  startPoint: .leading,
+                  endPoint: .trailing
+               )
+            )
+      )
+      .overlay(
+         Rectangle()
+            .stroke(
+               LinearGradient(
+                  colors: [awayColor, homeColor],
+                  startPoint: .leading,
+                  endPoint: .trailing
+               ),
+               lineWidth: 2
+            )
+      )
+      .clipShape(Rectangle())
+      .cornerRadius(12)
+      .shadow(color: .black.opacity(0.3), radius: 8)
+   }
+   
+   @ViewBuilder
+   private func oddsRow(odds: GameBettingOdds) -> some View {
+      HStack(alignment: .top, spacing: 12) {
+         Image(systemName: "dollarsign.circle.fill")
+            .font(.title3)
+            .foregroundStyle(.green)
+            .frame(width: 24)
+         
+         VStack(alignment: .leading, spacing: 8) {
+            Text("Odds")
+               .font(.subheadline)
+               .foregroundStyle(.secondary)
+            
+            VStack(alignment: .leading, spacing: 6) {
+               // Spread
+               if let spread = odds.spreadDisplay {
+                  HStack(spacing: 6) {
+                     Text("Spread:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     Text(spread)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                  }
+               }
+               
+               // Total
+               if let total = odds.totalDisplay {
+                  HStack(spacing: 6) {
+                     Text("Total:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     Text(total)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                  }
+               }
+               
+               // Moneyline
+               if let favTeam = odds.favoriteMoneylineTeamCode,
+                  let favOdds = odds.favoriteMoneylineOdds {
+                  HStack(spacing: 6) {
+                     Text("Favorite:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     Text("\(favTeam) \(favOdds)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.green)
+                  }
+               }
+               
+               // Sportsbook
+               if let book = odds.sportsbookEnum {
+                  HStack(spacing: 4) {
+                     Text("via")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                     SportsbookBadge(book: book, size: 9)
+                  }
+               }
+            }
+         }
+         
+         Spacer()
+      }
    }
 }

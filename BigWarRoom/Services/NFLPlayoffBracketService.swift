@@ -18,6 +18,7 @@ final class NFLPlayoffBracketService {
     var currentBracket: PlayoffBracket?
     var isLoading = false
     var errorMessage: String?
+    var gameOdds: [String: GameBettingOdds] = [:]  // Keyed by game ID
     
     // MARK: - Private Properties
     
@@ -31,15 +32,18 @@ final class NFLPlayoffBracketService {
     // Dependencies
     private let weekSelectionManager: WeekSelectionManager
     private let appLifecycleManager: AppLifecycleManager
+    private let bettingOddsService: BettingOddsService
     
     // MARK: - Initialization
     
     init(
         weekSelectionManager: WeekSelectionManager,
-        appLifecycleManager: AppLifecycleManager
+        appLifecycleManager: AppLifecycleManager,
+        bettingOddsService: BettingOddsService = .shared
     ) {
         self.weekSelectionManager = weekSelectionManager
         self.appLifecycleManager = appLifecycleManager
+        self.bettingOddsService = bettingOddsService
     }
     
     // MARK: - Public Methods
@@ -276,7 +280,65 @@ final class NFLPlayoffBracketService {
             )
             
             // Parse game date
-            let gameDate = ISO8601DateFormatter().date(from: event.date ?? "") ?? Date()
+            let gameDate: Date = {
+                if let dateString = event.date {
+                    DebugPrint(mode: .nflData, "📅 RAW ESPN date string: '\(dateString)' for game \(awayTeam) @ \(homeTeam)")
+                    
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    if let date = formatter.date(from: dateString) {
+                        DebugPrint(mode: .nflData, "✅ Parsed date WITH fractional: \(date)")
+                        return date
+                    }
+                    
+                    // Try without fractional seconds
+                    formatter.formatOptions = [.withInternetDateTime]
+                    if let date = formatter.date(from: dateString) {
+                        DebugPrint(mode: .nflData, "✅ Parsed date WITHOUT fractional: \(date)")
+                        return date
+                    }
+                    
+                    // Try with Z timezone
+                    let dateFormatter = DateFormatter()
+                    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+                    dateFormatter.timeZone = TimeZone(abbreviation: "UTC")
+                    if let date = dateFormatter.date(from: dateString) {
+                        DebugPrint(mode: .nflData, "✅ Parsed date with Z format: \(date)")
+                        return date
+                    }
+                    
+                    DebugPrint(mode: .nflData, "❌ ALL DATE PARSING FAILED for '\(dateString)'")
+                }
+                DebugPrint(mode: .nflData, "⚠️ No date string provided - using current date")
+                return Date()
+            }()
+            
+            // Parse venue
+            let venueData = event.venue ?? competition.venue
+            let venue: PlayoffGame.Venue? = {
+                guard let v = venueData else { return nil }
+                return PlayoffGame.Venue(
+                    fullName: v.fullName,
+                    city: v.address?.city,
+                    state: v.address?.state
+                )
+            }()
+            
+            // Parse broadcasts
+            let broadcastData = event.broadcasts ?? competition.broadcasts
+            let broadcasts: [String]? = {
+                guard let bcasts = broadcastData else { return nil }
+                var networks: [String] = []
+                for broadcast in bcasts {
+                    if let market = broadcast.market {
+                        networks.append(market)
+                    }
+                    if let names = broadcast.names {
+                        networks.append(contentsOf: names)
+                    }
+                }
+                return networks.isEmpty ? nil : Array(Set(networks))  // Remove duplicates
+            }()
             
             // Determine game status
             let status: PlayoffGame.GameStatus
@@ -307,7 +369,9 @@ final class NFLPlayoffBracketService {
                 homeTeam: homePlayoffTeam,
                 awayTeam: awayPlayoffTeam,
                 gameDate: gameDate,
-                status: status
+                status: status,
+                venue: venue,
+                broadcasts: broadcasts
             )
             
             // Sort into proper arrays
@@ -348,6 +412,9 @@ final class NFLPlayoffBracketService {
         cacheTimestamps[season] = Date()
         currentBracket = bracket
         isLoading = false
+        
+        // Fetch odds for playoff games
+        await fetchPlayoffGameOdds(bracket: bracket, season: season)
         
         DebugPrint(mode: .nflData, """
         ✅ Built playoff bracket from games:
@@ -449,7 +516,9 @@ final class NFLPlayoffBracketService {
                 homeTeam: homeTeam,
                 awayTeam: awayTeam,
                 gameDate: gameDate,
-                status: .scheduled
+                status: .scheduled,
+                venue: nil,
+                broadcasts: nil
             )
             
             games.append(game)
@@ -496,6 +565,47 @@ final class NFLPlayoffBracketService {
         cancellable?.cancel()
         cancellable = nil
     }
+    
+    // MARK: - Fetch Playoff Game Odds
+    
+    private func fetchPlayoffGameOdds(bracket: PlayoffBracket, season: Int) async {
+        // Convert playoff games to schedule game format for odds API
+        let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
+        
+        DebugPrint(mode: .nflData, "🎰 Fetching odds for \(allGames.count) playoff games")
+        
+        var scheduleGames: [ScheduleGame] = []
+        for game in allGames {
+            let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+            DebugPrint(mode: .nflData, "🎰 Creating ScheduleGame with ID: '\(gameID)'")
+            
+            let scheduleGame = ScheduleGame(
+                id: gameID,
+                awayTeam: game.awayTeam.abbreviation,
+                homeTeam: game.homeTeam.abbreviation,
+                awayScore: game.awayTeam.score ?? 0,
+                homeScore: game.homeTeam.score ?? 0,
+                gameStatus: game.status.isCompleted ? "final" : "pre",
+                gameTime: "",
+                startDate: game.gameDate,
+                isLive: game.isLive
+            )
+            scheduleGames.append(scheduleGame)
+        }
+        
+        // Fetch odds (playoffs are in following year)
+        let playoffYear = season + 1
+        let week = 19 // Use week 19 as proxy for playoffs
+        
+        DebugPrint(mode: .nflData, "🎰 Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
+        let odds = await bettingOddsService.fetchGameOdds(for: scheduleGames, week: week, year: playoffYear)
+        
+        // Store odds keyed by game ID
+        gameOdds = odds
+        
+        DebugPrint(mode: .nflData, "🎰 Fetched odds for \(odds.count) playoff games")
+        DebugPrint(mode: .nflData, "🎰 Odds keys: \(odds.keys.joined(separator: ", "))")
+    }
 }
 
 // MARK: - ESPN Standings V2 Response Model
@@ -539,6 +649,8 @@ private struct ESPNScoreboardResponse: Decodable {
         let date: String?
         let week: Week?
         let competitions: [Competition]?
+        let venue: Venue?
+        let broadcasts: [Broadcast]?
     }
     
     struct Week: Decodable {
@@ -548,6 +660,12 @@ private struct ESPNScoreboardResponse: Decodable {
     struct Competition: Decodable {
         let competitors: [Competitor]?
         let status: Status?
+        let venue: Venue?
+        let broadcasts: [Broadcast]?
+    }
+    
+    struct Note: Decodable {
+        let headline: String?
     }
     
     struct Competitor: Decodable {
@@ -569,6 +687,21 @@ private struct ESPNScoreboardResponse: Decodable {
     struct StatusType: Decodable {
         let state: String?
         let completed: Bool?
+    }
+    
+    struct Venue: Decodable {
+        let fullName: String?
+        let address: VenueAddress?
+        
+        struct VenueAddress: Decodable {
+            let city: String?
+            let state: String?
+        }
+    }
+    
+    struct Broadcast: Decodable {
+        let market: String?
+        let names: [String]?
     }
 }
 
@@ -646,7 +779,9 @@ private struct ESPNScoreboardResponse: Decodable {
             homeTeam: home,
             awayTeam: away,
             gameDate: date,
-            status: .final
+            status: .final,
+            venue: nil,
+            broadcasts: nil
         )
     }
 

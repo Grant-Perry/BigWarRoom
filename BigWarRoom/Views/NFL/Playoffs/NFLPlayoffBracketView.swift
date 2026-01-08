@@ -55,7 +55,7 @@ struct NFLPlayoffBracketView: View {
             if verticalSizeClass == .compact {
                 // --- LANDSCAPE ---
                 if let bracket = bracketService.currentBracket {
-                    NFLLandscapeBracketView(bracket: bracket)
+                    NFLLandscapeBracketView(bracket: bracket, playoffService: bracketService)
                 } else {
                     ZStack {
                         Color.black.ignoresSafeArea()

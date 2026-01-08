@@ -156,8 +156,6 @@ struct PlayoffGameCardView: View {
     }
 }
 
-// MARK: - Preview
-
 #Preview("Bracket Style") {
     VStack(spacing: 16) {
         PlayoffGameCardView(
@@ -180,7 +178,9 @@ struct PlayoffGameCardView: View {
                     logoURL: nil
                 ),
                 gameDate: Date().addingTimeInterval(86400),
-                status: .scheduled
+                status: .scheduled,
+                venue: nil,
+                broadcasts: nil
             ),
             showFantasyHighlight: false,
             onTap: {}
@@ -206,13 +206,12 @@ struct PlayoffGameCardView: View {
                     logoURL: nil
                 ),
                 gameDate: Date(),
-                status: .final
+                status: .final,
+                venue: nil,
+                broadcasts: nil
             ),
             showFantasyHighlight: false,
             onTap: {}
         )
     }
-    .padding()
-    .frame(width: 350)
-    .background(Color.black)
 }

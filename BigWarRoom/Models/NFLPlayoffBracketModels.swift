@@ -60,21 +60,48 @@ struct PlayoffGame: Identifiable, Codable, Equatable {
     
     let gameDate: Date
     let status: GameStatus
+    let venue: Venue?
+    let broadcasts: [String]?  // Network names: ["CBS", "Paramount+"]
     
     var formattedDate: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "E, MMM d"  // "Sun, Jan 14"
+        formatter.dateFormat = "EEEE, M/d/yy"  // "Saturday, 1/10/26"
+        formatter.timeZone = .current  // Use local timezone
+        return formatter.string(from: gameDate)
+    }
+    
+    var smartFormattedDate: String {
+        let now = Date()
+        let daysUntilGame = Calendar.current.dateComponents([.day], from: now, to: gameDate).day ?? 999
+        
+        // If game is within 7 days, just show day name
+        if daysUntilGame >= 0 && daysUntilGame <= 7 {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"  // "SUNDAY"
+            formatter.timeZone = .current
+            return formatter.string(from: gameDate).uppercased()
+        }
+        
+        // Otherwise show full date
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, M/d/yy"  // "SUNDAY, 1/11/26"
+        formatter.timeZone = .current
         return formatter.string(from: gameDate)
     }
     
     var formattedTime: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"  // "1:00 PM"
+        formatter.dateFormat = "h:mm a"  // "4:30 PM"
+        formatter.timeZone = .current  // Use local timezone
         return formatter.string(from: gameDate)
     }
     
     var formattedDateTime: String {
         "\(formattedDate) • \(formattedTime)"
+    }
+    
+    var fullGameDateTime: String {
+        "\(formattedDate) \(formattedTime)"
     }
     
     /// Check if this game is currently live
@@ -135,6 +162,26 @@ struct PlayoffGame: Identifiable, Codable, Equatable {
             case .final:
                 return .gray
             }
+        }
+    }
+    
+    struct Venue: Codable, Equatable {
+        let fullName: String?
+        let city: String?
+        let state: String?
+        
+        var displayName: String {
+            guard let name = fullName else { return "TBD" }
+            if let city = city, let state = state {
+                return "\(name) – \(city), \(state)"
+            } else if let city = city {
+                return "\(name) – \(city)"
+            }
+            return name
+        }
+        
+        var shortName: String {
+            fullName ?? "TBD"
         }
     }
 }

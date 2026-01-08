@@ -97,7 +97,9 @@ struct PlayoffRoundView: View {
             homeTeam: PlayoffTeam(abbreviation: "KC", name: "Kansas City Chiefs", seed: 1, score: 27, logoURL: nil),
             awayTeam: PlayoffTeam(abbreviation: "MIA", name: "Miami Dolphins", seed: 6, score: 24, logoURL: nil),
             gameDate: Date(),
-            status: .final
+            status: .final,
+            venue: PlayoffGame.Venue(fullName: "Arrowhead Stadium", city: "Kansas City", state: "MO"),
+            broadcasts: ["CBS", "Paramount+"]
         ),
         PlayoffGame(
             id: "2",
@@ -106,7 +108,9 @@ struct PlayoffRoundView: View {
             homeTeam: PlayoffTeam(abbreviation: "BUF", name: "Buffalo Bills", seed: 2, score: nil, logoURL: nil),
             awayTeam: PlayoffTeam(abbreviation: "PIT", name: "Pittsburgh Steelers", seed: 7, score: nil, logoURL: nil),
             gameDate: Date().addingTimeInterval(7200),
-            status: .scheduled
+            status: .scheduled,
+            venue: PlayoffGame.Venue(fullName: "Highmark Stadium", city: "Buffalo", state: "NY"),
+            broadcasts: ["NBC", "Peacock"]
         )
     ]
     
