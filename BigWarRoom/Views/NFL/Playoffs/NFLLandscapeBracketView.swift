@@ -392,7 +392,7 @@ struct NFLLandscapeBracketView: View {
                      .font(.system(size: 14, weight: .black))
                      .padding()
                      .foregroundColor(.white.opacity(0.5))
-                     .position(x: (cellWidth + 30)/2, y: ySB_Matchup_Center + headerHeight)
+                     .position(x: (cellWidth + 30)/2, y: ySB_Matchup_Center + headerHeight + 3)
                }
 
                BracketTeamCell(team: sbDisplayGame?.homeTeam, game: sbDisplayGame, isReversed: true)
@@ -400,6 +400,14 @@ struct NFLLandscapeBracketView: View {
                   .scaleEffect(sbScale)
             }
             .offset(y: -10)
+            .contentShape(Rectangle())
+            .onTapGesture {
+               if let game = sbDisplayGame {
+                  DebugPrint(mode: .nflData, "🎯 Tapped Super Bowl: \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation)")
+                  selectedGame = game
+                  showingGameDetail = true
+               }
+            }
          }
          .offset(y: -23)
       }
