@@ -342,6 +342,7 @@ struct SpinningOrbsLoadingScreen: View {
     @State private var loadingMessage = "Loading your fantasy empire..."
     @State private var loadingProgress: Double = 0.0
     @State private var isDataLoading = false
+    @State private var monitorTask: Task<Void, Never>? = nil
     
     var body: some View {
         ZStack {
@@ -442,8 +443,14 @@ struct SpinningOrbsLoadingScreen: View {
             await loadLeagues()
             
             await updateProgress(0.6, "Loading matchup data...")
-            await loadMatchups()
             
+            DebugPrint(mode: .appLoad, "🧭 SpinningOrbs: Spawning background loadAllMatchups()")
+            let loadTask = Task { await matchupsHubViewModel.loadAllMatchups() }
+            
+            // Start monitoring VM progress and messages until done
+            await monitorMatchupsUntilDone()
+            
+            // Continue flow
             await updateProgress(0.8, "Processing players...")
             await loadPlayers()
             
@@ -454,7 +461,53 @@ struct SpinningOrbsLoadingScreen: View {
             await MainActor.run {
                 completeLoading()
             }
+            
+            // Ensure background task is not dangling
+            _ = loadTask   // keep a strong ref inside scope
         }
+    }
+    
+    private func monitorMatchupsUntilDone() async {
+        let start = Date()
+        var lastLog = Date()
+        var warned = false
+        
+        DebugPrint(mode: .appLoad, "🧭 SpinningOrbs: monitorMatchupsUntilDone START")
+        
+        while matchupsHubViewModel.isLoading {
+            await MainActor.run {
+                let vmProgress = matchupsHubViewModel.loadingProgress
+                // Map 0.0…1.0 from VM → 0.60…0.95 on UI
+                let mapped = 0.60 + (0.35 * vmProgress)
+                loadingProgress = max(loadingProgress, mapped)
+                
+                let vmMessage = matchupsHubViewModel.currentLoadingLeague
+                if !vmMessage.isEmpty {
+                    loadingMessage = vmMessage
+                }
+            }
+            
+            // Soft timeout warning at 15s
+            if !warned && Date().timeIntervalSince(start) > 15 {
+                warned = true
+                DebugPrint(mode: .appLoad, "⚠️ SpinningOrbs: matchupsHub still loading after 15s; vmProgress=\(String(format: "%.2f", matchupsHubViewModel.loadingProgress))")
+            }
+            
+            // Log a heartbeat every ~1s
+            if Date().timeIntervalSince(lastLog) > 1 {
+                lastLog = Date()
+                DebugPrint(mode: .appLoad, "⏱️ SpinningOrbs: VM progress=\(String(format: "%.2f", matchupsHubViewModel.loadingProgress)) | UI progress=\(Int(loadingProgress*100))% | msg='\(matchupsHubViewModel.currentLoadingLeague)'")
+            }
+            
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        
+        await MainActor.run {
+            // Nudge to 95% minimum when VM completes
+            loadingProgress = max(loadingProgress, 0.95)
+        }
+        
+        DebugPrint(mode: .appLoad, "✅ SpinningOrbs: monitorMatchupsUntilDone COMPLETE")
     }
     
     @MainActor
@@ -473,7 +526,7 @@ struct SpinningOrbsLoadingScreen: View {
     }
     
     private func loadMatchups() async {
-        await matchupsHubViewModel.loadAllMatchups()
+        // await matchupsHubViewModel.loadAllMatchups()
     }
     
     private func loadPlayers() async {

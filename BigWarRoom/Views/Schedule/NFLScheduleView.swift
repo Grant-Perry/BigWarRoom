@@ -24,8 +24,9 @@ struct NFLScheduleView: View {
     // 🔥 NEW: Store SleeperAPIClient locally (not observable, so can't be @Environment)
     @State private var sleeperAPIClient: SleeperAPIClient?
     
-    // 🏈 NEW: Playoff bracket service
+    // 🏈 NEW: Playoff bracket service - use @State with explicit binding to observe changes
     @State private var playoffBracketService: NFLPlayoffBracketService?
+    @State private var bracketLoaded = false  // 🔥 Re-add this to force UI updates!
     
     // Keep legend pills same width so the explanation text aligns
     private let legendPillWidth: CGFloat = 78
@@ -78,7 +79,21 @@ struct NFLScheduleView: View {
             if let viewModel = viewModel {
                 // 🏈 NEW: Show playoff bracket for weeks > 18
                 if weekSelectionManager.selectedWeek > 18 {
-                    playoffBracketContent
+                    // 🔥 SIMPLIFIED: Check bracketLoaded flag instead of service state
+                    if bracketLoaded, let service = playoffBracketService, service.currentBracket != nil {
+                        playoffBracketContent
+                    } else {
+                        VStack(spacing: 16) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                            
+                            Text("Loading playoff bracket...")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
                     VStack(spacing: 0) {
                         // Header Section
@@ -181,8 +196,12 @@ struct NFLScheduleView: View {
             // 🏈 NEW: Load playoff bracket if in playoffs
             ensurePlayoffServiceCreated()
             if newWeek > 18, let service = playoffBracketService {
-                let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
-                service.fetchPlayoffBracket(for: season)
+                Task {
+                    let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
+                    bracketLoaded = false  // 🔥 Reset flag before fetch
+                    await service.fetchPlayoffBracket(for: season)
+                    bracketLoaded = true   // 🔥 Set flag after fetch to trigger UI update
+                }
             }
         }
         // 🔥 NEW: Also observe year changes to refresh playoff bracket
@@ -196,14 +215,17 @@ struct NFLScheduleView: View {
             if weekSelectionManager.selectedWeek > 18 {
                 ensurePlayoffServiceCreated()
                 if let service = playoffBracketService {
-                    let season = Int(newYear) ?? AppConstants.currentSeasonYearInt
-                    DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Fetching playoff bracket for season \(season)")
-                    service.fetchPlayoffBracket(for: season, forceRefresh: true)
+                    Task {
+                        let season = Int(newYear) ?? AppConstants.currentSeasonYearInt
+                        DebugPrint(mode: .appLoad, "📅 NFLScheduleView: Fetching playoff bracket for season \(season)")
+                        bracketLoaded = false  // 🔥 Reset flag before fetch
+                        await service.fetchPlayoffBracket(for: season, forceRefresh: true)
+                        bracketLoaded = true   // 🔥 Set flag after fetch to trigger UI update
+                    }
                 }
             }
         }
         .onAppear {
-            
             DebugPrint(mode: .appLoad, "📅 NFLScheduleView.onAppear - START at \(Date())")
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(weekSelectionManager.selectedWeek)")
             
@@ -224,8 +246,9 @@ struct NFLScheduleView: View {
                 if weekSelectionManager.selectedWeek > 18, let service = playoffBracketService {
                     DebugPrint(mode: .appLoad, "🏈 NFLScheduleView: Fetching playoff bracket (week > 18) at \(Date())")
                     let season = Int(SeasonYearManager.shared.selectedYear) ?? AppConstants.currentSeasonYearInt
-                    service.fetchPlayoffBracket(for: season)
-                    DebugPrint(mode: .appLoad, "🏈 NFLScheduleView: Playoff bracket fetch initiated at \(Date())")
+                    await service.fetchPlayoffBracket(for: season)
+                    bracketLoaded = true  // 🔥 Set flag after fetch completes
+                    DebugPrint(mode: .appLoad, "🏈 NFLScheduleView: Playoff bracket fetch task completed at \(Date())")
                 }
             }
         }
@@ -235,7 +258,6 @@ struct NFLScheduleView: View {
     private func ensurePlayoffServiceCreated() {
         guard playoffBracketService == nil else { return }
         
-        // Create service using AppLifecycleManager.shared (since it's a singleton)
         playoffBracketService = NFLPlayoffBracketService(
             weekSelectionManager: weekSelectionManager,
             appLifecycleManager: AppLifecycleManager.shared
@@ -244,7 +266,6 @@ struct NFLScheduleView: View {
     
     // MARK: -> FOX Style Background
     private var foxStyleBackground: some View {
-        // Use BG3 asset with reduced opacity
         Image("BG3")
             .resizable()
             .aspectRatio(contentMode: .fill)
@@ -257,18 +278,17 @@ struct NFLScheduleView: View {
     private var playoffBracketContent: some View {
         if let service = playoffBracketService {
             ZStack(alignment: .top) {
-                // Bracket view (full screen)
                 NFLPlayoffBracketView(
                     weekSelectionManager: weekSelectionManager,
                     appLifecycleManager: AppLifecycleManager.shared,
                     fantasyViewModel: nil,
-                    initialSeason: Int(SeasonYearManager.shared.selectedYear)
+                    initialSeason: Int(SeasonYearManager.shared.selectedYear),
+                    bracketService: service  
                 )
                 
-                // Header with week picker (floating on top)
                 playoffBracketHeader
                     .padding(.top, 12)
-                    .zIndex(1) // Ensure it's above the bracket view
+                    .zIndex(1) 
             }
         } else {
             ProgressView("Loading playoffs...")
@@ -278,7 +298,6 @@ struct NFLScheduleView: View {
     // 🏈 NEW: Playoff Bracket Header
     private var playoffBracketHeader: some View {
         VStack(spacing: 8) {
-            // Week picker for navigation back to regular season
             TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
         }
         .padding(.horizontal, 20)
@@ -287,12 +306,9 @@ struct NFLScheduleView: View {
     // MARK: -> Header Section
     private func scheduleHeader(viewModel: NFLScheduleViewModel) -> some View {
         VStack(spacing: 8) {
-            // Week picker - using reusable TheWeekPicker component
             TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
             
-            // Week starting date + Card style toggle
             HStack {
-                // Week starting date with calendar icon
                 HStack(spacing: 6) {
                     Image(systemName: "calendar")
                         .font(.system(size: 12, weight: .medium))
@@ -306,7 +322,6 @@ struct NFLScheduleView: View {
                 
                 Spacer()
                 
-                // Card style toggle (cycles: Compact -> Full -> Classic -> Morg)
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         cardStyle = (cardStyle + 1) % 4
@@ -332,7 +347,6 @@ struct NFLScheduleView: View {
                 }
             }
             
-            // Live indicator (only show if live games)
             if viewModel.games.contains(where: { $0.isLive }) {
                 HStack(spacing: 6) {
                     Circle()
@@ -370,11 +384,9 @@ struct NFLScheduleView: View {
             } else if viewModel.games.isEmpty {
                 emptyStateView
             } else {
-                // Classic mode = flat list, otherwise grouped
                 if cardStyle == 2 {
                     classicFlatListView(viewModel: viewModel)
                 } else {
-                    // Compact, Full, and Morg all use grouped view
                     gamesScrollView(viewModel: viewModel)
                 }
             }
@@ -435,8 +447,6 @@ struct NFLScheduleView: View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
                 ForEach(viewModel.games, id: \.id) { game in
-                    // 🏈 Original 12/25 layout: NavigationLink with ScheduleGameCard at 92% width
-                    // Original card: no odds display, just day/time for upcoming games
                     NavigationLink(destination: TeamFilteredMatchupsView(
                         awayTeam: game.awayTeam,
                         homeTeam: game.homeTeam,
@@ -446,7 +456,7 @@ struct NFLScheduleView: View {
                     )) {
                         ScheduleGameCard(
                             game: game,
-                            odds: viewModel.gameOddsByGameID[game.id],  // Now showing moneyline
+                            odds: viewModel.gameOddsByGameID[game.id],  
                             action: {},
                             showDayTime: true
                         )
@@ -457,7 +467,6 @@ struct NFLScheduleView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 
-                // BYE Week Section - original layout
                 if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
@@ -472,7 +481,6 @@ struct NFLScheduleView: View {
                     VStack(spacing: 10) {
                         noByeWeeksBanner
                         
-                        // Playoff Status Key
                         if shouldShowPlayoffKey(for: viewModel) {
                             playoffStatusKey
                         }
@@ -507,7 +515,6 @@ struct NFLScheduleView: View {
                     }
                 }
                 .onAppear {
-                    // Morg mode: expand everything
                     if useMinimalHeaders && !morgInitialized {
                         morgInitialized = true
                         for day in sortedDays {
@@ -518,11 +525,8 @@ struct NFLScheduleView: View {
                                 }
                             }
                         }
-                    }
-                    // Other modes: expand first day initially (if nothing is expanded yet)
-                    else if expandedDays.isEmpty, let firstDay = sortedDays.first {
+                    } else if expandedDays.isEmpty, let firstDay = sortedDays.first {
                         expandedDays.insert(firstDay)
-                        // Expand ALL time slots in the first day
                         if let timeSlots = groupedByDay[firstDay] {
                             for time in timeSlots.keys {
                                 expandedTimeSlots.insert("\(firstDay)_\(time)")
@@ -531,7 +535,6 @@ struct NFLScheduleView: View {
                     }
                 }
                 .onChange(of: cardStyle) { _, newStyle in
-                    // When switching TO Morg mode, expand everything
                     if newStyle == 3 {
                         for day in sortedDays {
                             expandedDays.insert(day)
@@ -544,7 +547,6 @@ struct NFLScheduleView: View {
                     }
                 }
                 
-                // BYE Week Section
                 if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
                         byeTeams: viewModel.byeWeekTeams,
@@ -557,7 +559,6 @@ struct NFLScheduleView: View {
                     .padding(.top, 12)
                 }
                 
-                // FULL SLATE banner + key
                 if viewModel.byeWeekTeams.isEmpty {
                     VStack(spacing: 10) {
                         noByeWeeksBanner
@@ -580,10 +581,11 @@ struct NFLScheduleView: View {
         var grouped: [String: [String: [ScheduleGame]]] = [:]
         
         let dayFormatter = DateFormatter()
-        dayFormatter.dateFormat = "EEEE" // e.g., "Sunday"
+        dayFormatter.dateFormat = "EEEE" 
+        
         
         let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "h:mm a" // e.g., "1:00 PM"
+        timeFormatter.dateFormat = "h:mm a" 
         
         for game in games {
             let dayKey: String
@@ -615,47 +617,35 @@ struct NFLScheduleView: View {
         timeSlots: [String: [ScheduleGame]],
         viewModel: NFLScheduleViewModel
     ) -> some View {
-        // Check if day has any LIVE games (not just completed)
         let allGamesInDay = timeSlots.values.flatMap { $0 }
         let hasLiveGames = allGamesInDay.contains { $0.isLive }
         
-        // Force-expand if LIVE games
         let isDayExpanded = hasLiveGames || expandedDays.contains(day)
         let totalGames = allGamesInDay.count
         
-        // Sort time slots by actual time
         let sortedTimeSlots = timeSlots.keys.sorted { time1, time2 in
             guard let game1 = timeSlots[time1]?.first?.startDate,
                   let game2 = timeSlots[time2]?.first?.startDate else { return false }
             return game1 < game2
         }
         
-        // Morg mode: flatten all games sorted by time
         let allGamesSorted = sortedTimeSlots.flatMap { timeSlots[$0] ?? [] }
         
         return VStack(spacing: 0) {
-            // Day Header
             Button {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     if expandedDays.contains(day) {
-                        // Collapse this day
                         expandedDays.remove(day)
-                        // Also collapse all time slots in this day
                         for time in sortedTimeSlots {
                             expandedTimeSlots.remove("\(day)_\(time)")
                         }
                     } else {
-                        // In Morg mode: no accordion, just expand this day
-                        // In other modes: accordion behavior
                         if !useMinimalHeaders {
-                            // 🔥 Accordion: Close all other days first
                             expandedDays.removeAll()
                             expandedTimeSlots.removeAll()
                         }
                         
-                        // Now expand this day
                         expandedDays.insert(day)
-                        // Also expand all time slots in this day
                         for time in sortedTimeSlots {
                             expandedTimeSlots.insert("\(day)_\(time)")
                         }
@@ -672,10 +662,8 @@ struct NFLScheduleView: View {
             }
             .buttonStyle(.plain)
             
-            // Content when day is expanded
             if isDayExpanded {
                 if useMinimalHeaders {
-                    // 🔥 Morg mode: No time headers, just game cards with start time shown
                     VStack(spacing: 4) {
                         ForEach(allGamesSorted, id: \.id) { game in
                             NavigationLink(destination: TeamFilteredMatchupsView(
@@ -689,9 +677,9 @@ struct NFLScheduleView: View {
                                     game: game,
                                     odds: viewModel.gameOddsByGameID[game.id],
                                     action: {},
-                                    showStartTime: true  // Show start time above odds
+                                    showStartTime: true  
                                 )
-                                .padding(.horizontal, 16)  // 16px indent on each side
+                                .padding(.horizontal, 16)  
                             }
                             .buttonStyle(.plain)
                         }
@@ -699,7 +687,6 @@ struct NFLScheduleView: View {
                     .padding(.top, 4)
                     .padding(.bottom, 8)
                 } else {
-                    // Compact/Full mode: Time slot sections with headers
                     VStack(spacing: 8) {
                         ForEach(sortedTimeSlots, id: \.self) { time in
                             if let games = timeSlots[time] {
@@ -753,7 +740,6 @@ struct NFLScheduleView: View {
         hasLiveGames: Bool = false
     ) -> some View {
         HStack(spacing: 12) {
-            // Chevron
             Image(systemName: isExpanded ? "chevron.down.circle.fill" : "chevron.right.circle.fill")
                 .font(.system(size: useMinimalHeaders ? 16 : 20, weight: .bold))
                 .foregroundStyle(
@@ -764,13 +750,11 @@ struct NFLScheduleView: View {
                             : AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .topLeading, endPoint: .bottomTrailing)))
                 )
             
-            // Day name
             Text(day.uppercased())
                 .font(.system(size: useMinimalHeaders ? 16 : 18, weight: .black, design: .default))
                 .foregroundColor(.white)
                 .kerning(useMinimalHeaders ? 1.5 : 2.0)
             
-            // Live indicator
             if hasLiveGames {
                 Text("LIVE")
                     .font(.system(size: 9, weight: .black))
@@ -779,38 +763,9 @@ struct NFLScheduleView: View {
             
             Spacer()
             
-            // Game count badge
-            if useMinimalHeaders {
-                Text("\(gameCount) game\(gameCount == 1 ? "" : "s")")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white.opacity(0.5))
-            } else {
-                Text("\(gameCount)")
-                    .font(.custom("BebasNeue-Regular", size: 22))
-                    .foregroundColor(.white)
-                    .frame(minWidth: 32, minHeight: 32)
-                    .background(
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.gpGreen.opacity(0.8), Color.blue.opacity(0.6)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [Color.gpGreen.opacity(0.6), Color.blue.opacity(0.6)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-            }
+            Text("\(gameCount) game\(gameCount == 1 ? "" : "s")")
+                .font(.system(size: useMinimalHeaders ? 14 : 11, weight: .medium))
+                .foregroundColor(.white.opacity(useMinimalHeaders ? 0.5 : 0.6))
         }
         .padding(.horizontal, useMinimalHeaders ? 12 : 16)
         .padding(.vertical, useMinimalHeaders ? 8 : 14)
@@ -862,11 +817,9 @@ struct NFLScheduleView: View {
         let slotKey = "\(day)_\(time)"
         let hasLiveGames = games.contains { $0.isLive }
         
-        // Force-expand if LIVE games
         let isExpanded = hasLiveGames || expandedTimeSlots.contains(slotKey)
         
         return VStack(spacing: 0) {
-            // Time Header
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     if expandedTimeSlots.contains(slotKey) {
@@ -888,7 +841,6 @@ struct NFLScheduleView: View {
             }
             .buttonStyle(.plain)
             
-            // Games (if expanded) - indented narrower than header
             if isExpanded {
                 VStack(spacing: useMinimalHeaders ? 4 : (cardStyle == 0 ? 6 : 10)) {
                     ForEach(games, id: \.id) { game in
@@ -937,7 +889,6 @@ struct NFLScheduleView: View {
         let hasLiveGames = games.contains { $0.isLive }
         
         return HStack(spacing: 10) {
-            // Chevron
             Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                 .font(.system(size: useMinimalHeaders ? 10 : 12, weight: .bold))
                 .foregroundStyle(
@@ -949,12 +900,10 @@ struct NFLScheduleView: View {
                 )
                 .frame(width: 14)
             
-            // Time text
             Text(time)
                 .font(.system(size: useMinimalHeaders ? 14 : 16, weight: .bold, design: .default))
                 .foregroundColor(.white)
             
-            // Live indicator
             if hasLiveGames {
                 Circle()
                     .fill(Color.red)
@@ -970,12 +919,10 @@ struct NFLScheduleView: View {
             
             Spacer()
             
-            // Mini odds preview (when collapsed)
             if !isExpanded {
                 miniOddsPreview(games: games, viewModel: viewModel)
             }
             
-            // Day name on trailing
             Text(day.uppercased())
                 .font(.system(size: useMinimalHeaders ? 12 : 16, weight: .bold, design: .default))
                 .foregroundColor(.white.opacity(useMinimalHeaders ? 0.4 : 0.7))
@@ -1092,10 +1039,8 @@ struct NFLScheduleView: View {
     
     private var playoffStatusKey: some View {
         VStack(spacing: 12) {
-            // Playoff Status Section - styled like FULL SLATE
             playoffStatusSection
             
-            // Sportsbook Legend Section - only show for non-Classic views
             if cardStyle != 2 {
                 oddsSourceSection
             }
@@ -1178,7 +1123,6 @@ struct NFLScheduleView: View {
         let row2: [Sportsbook] = [.pointsbet, .betrivers, .pinnacle, .bestLine]
         
         return VStack(spacing: 12) {
-            // Row 1: DK, FD, MGM, CZR
             HStack(spacing: 0) {
                 ForEach(row1) { book in
                     VStack(spacing: 3) {
@@ -1193,7 +1137,6 @@ struct NFLScheduleView: View {
                 }
             }
             
-            // Row 2: PB, BR, PIN, Best
             HStack(spacing: 0) {
                 ForEach(row2) { book in
                     VStack(spacing: 3) {
@@ -1215,12 +1158,8 @@ struct NFLScheduleView: View {
             statusKeyPill(text: code, color: pillColor)
                 .frame(width: legendPillWidth, alignment: .center)
             
-//            Text(":")
-//                .font(.system(size: 11, weight: .bold))
-//                .foregroundColor(.white.opacity(0.85))
-            
             Text(text)
-                .font(.system(size: 11, weight: .medium)) // bump 1 step
+                .font(.system(size: 11, weight: .medium)) 
                 .foregroundColor(.white.opacity(0.75))
         }
     }
@@ -1239,7 +1178,6 @@ struct NFLScheduleView: View {
     }
     
     private func shouldShowPlayoffKey(for viewModel: NFLScheduleViewModel) -> Bool {
-        // Show the key only when at least one team on this week's slate is clinched or eliminated.
         let teamCodes = Set(viewModel.games.flatMap { [$0.awayTeam, $0.homeTeam] })
         for code in teamCodes {
             let status = standingsService.getPlayoffStatus(for: code)
@@ -1256,29 +1194,22 @@ struct NFLScheduleView: View {
         let selectedYearString = SeasonYearManager.shared.selectedYear
         let selectedYear = Int(selectedYearString) ?? 2025
         
-        // NFL season start date - Week 1 starts first Thursday of September
-        // 2024 season: September 5, 2024
-        // 2025 season: September 4, 2025
         let seasonStartDate: Date
         if selectedYear == 2025 {
             seasonStartDate = calendar.date(from: DateComponents(year: 2025, month: 9, day: 4))!
         } else if selectedYear == 2024 {
             seasonStartDate = calendar.date(from: DateComponents(year: 2024, month: 9, day: 5))!
         } else {
-            // Fallback: estimate first Thursday of September for any year
             var components = DateComponents(year: selectedYear, month: 9, day: 1)
             var startDate = calendar.date(from: components)!
-            // Find first Thursday (weekday 5)
             while calendar.component(.weekday, from: startDate) != 5 {
                 startDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
             }
             seasonStartDate = startDate
         }
         
-        // Calculate the start date for the selected week
         let weekStartDate = calendar.date(byAdding: .day, value: (weekSelectionManager.selectedWeek - 1) * 7, to: seasonStartDate)!
         
-        // Format as "Thursday, Dec 5"
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         return formatter.string(from: weekStartDate)

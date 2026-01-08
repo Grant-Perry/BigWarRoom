@@ -26,13 +26,15 @@ struct NFLPlayoffBracketView: View {
         weekSelectionManager: WeekSelectionManager,
         appLifecycleManager: AppLifecycleManager,
         fantasyViewModel: FantasyViewModel? = nil,
-        initialSeason: Int? = nil
+        initialSeason: Int? = nil,
+        bracketService: NFLPlayoffBracketService? = nil  // 🔥 NEW: Accept existing service
     ) {
         self.weekSelectionManager = weekSelectionManager
         self.appLifecycleManager = appLifecycleManager
         self.fantasyViewModel = fantasyViewModel
         
-        let service = NFLPlayoffBracketService(
+        // 🔥 FIX: Use provided service or create new one
+        let service = bracketService ?? NFLPlayoffBracketService(
             weekSelectionManager: weekSelectionManager,
             appLifecycleManager: appLifecycleManager
         )
@@ -56,10 +58,16 @@ struct NFLPlayoffBracketView: View {
                 // --- LANDSCAPE ---
                 if let bracket = bracketService.currentBracket {
                     NFLLandscapeBracketView(bracket: bracket, playoffService: bracketService)
+                        .onAppear {
+                            DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] NFLLandscapeBracketView appeared")
+                        }
                 } else {
                     ZStack {
                         Color.black.ignoresSafeArea()
                         loadingView
+                    }
+                    .onAppear {
+                        DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] Loading view shown - no bracket yet")
                     }
                 }
             } else {
@@ -78,7 +86,12 @@ struct NFLPlayoffBracketView: View {
         .navigationTitle("")
         .preferredColorScheme(.dark)
         .task {
-            await loadBracket()
+            // 🔥 FIX: Only load if bracket isn't already loaded
+            if bracketService.currentBracket == nil {
+                await loadBracket()
+            } else {
+                DebugPrint(mode: .appLoad, "✅ Bracket already loaded, skipping fetch")
+            }
         }
         .onChange(of: selectedSeason) { _, newSeason in
             Task {
@@ -427,7 +440,7 @@ struct NFLPlayoffBracketView: View {
     }
     
     private func loadBracket(forceRefresh: Bool = false) async {
-        bracketService.fetchPlayoffBracket(for: selectedSeason, forceRefresh: forceRefresh)
+        await bracketService.fetchPlayoffBracket(for: selectedSeason, forceRefresh: forceRefresh)
         
         if let bracket = bracketService.currentBracket, bracket.hasLiveGames {
             bracketService.startLiveUpdates(for: selectedSeason)

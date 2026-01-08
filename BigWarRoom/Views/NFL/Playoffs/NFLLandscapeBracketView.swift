@@ -20,10 +20,12 @@ struct NFLLandscapeBracketView: View {
    private let matchupSpacing: CGFloat = 6
    private let groupSpacing: CGFloat = 20
    private let connectorWidth: CGFloat = 30
-   private let headerHeight: CGFloat = 24
+   private let headerHeight: CGFloat = 26
    private let sbCardYOffset: CGFloat = 10
    private let sbGroupYOffset: CGFloat = -10
    private let sbScale: CGFloat = 1.15
+   private let scoreSize: CGFloat = 80  // 🔥 Score size for modal card
+   private let scoreOffset: CGFloat = 24 // padding for each side of score
    private var sbInsetX: CGFloat {
       15 + (cellWidth * (sbScale - 1.0)) / 2
    }
@@ -159,40 +161,42 @@ struct NFLLandscapeBracketView: View {
                   matchupCardView(game: game)
                      .padding()
                   
-                  // Odds section only
-                  VStack(alignment: .leading, spacing: 12) {
-                     let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-                     let odds = playoffService?.gameOdds[gameID]
-                     
-                     if let odds = odds {
-                        oddsRow(odds: odds)
-                     } else {
-                        HStack(alignment: .top, spacing: 12) {
-                           Image(systemName: "dollarsign.circle")
-                              .font(.title3)
-                              .foregroundStyle(.secondary)
-                              .frame(width: 24)
-                           
-                           VStack(alignment: .leading, spacing: 4) {
-                              Text("Odds")
-                                 .font(.subheadline)
+                  // Odds section only (hide if game is FINAL)
+                  if !game.isCompleted {
+                     VStack(alignment: .leading, spacing: 12) {
+                        let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                        let odds = playoffService?.gameOdds[gameID]
+                        
+                        if let odds = odds {
+                           oddsRow(odds: odds)
+                        } else {
+                           HStack(alignment: .top, spacing: 12) {
+                              Image(systemName: "dollarsign.circle")
+                                 .font(.title3)
                                  .foregroundStyle(.secondary)
+                                 .frame(width: 24)
                               
-                              Text("Not available yet - check back")
-                                 .font(.caption)
-                                 .foregroundStyle(.secondary.opacity(0.7))
+                              VStack(alignment: .leading, spacing: 4) {
+                                 Text("Odds")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                 
+                                 Text("Not available yet - check back")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary.opacity(0.7))
+                              }
+                              
+                              Spacer()
                            }
-                           
-                           Spacer()
                         }
                      }
+                     .padding()
+                     .background(Color(.secondarySystemGroupedBackground))
+                     .cornerRadius(12)
+                     .padding(.horizontal)
+                     .padding(.top, 8)
+                     .padding(.bottom, 16)
                   }
-                  .padding()
-                  .background(Color(.secondarySystemGroupedBackground))
-                  .cornerRadius(12)
-                  .padding(.horizontal)
-                  .padding(.top, 8)
-                  .padding(.bottom, 16)
                }
                .frame(width: 500)
                .fixedSize(horizontal: false, vertical: true)
@@ -648,8 +652,13 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
       let awayColor = teamAssets.team(for: game.awayTeam.abbreviation)?.primaryColor ?? .blue
       let homeColor = teamAssets.team(for: game.homeTeam.abbreviation)?.primaryColor ?? .red
       
+      // Determine winner/loser for score colors
+      let awayScore = game.awayTeam.score ?? 0
+      let homeScore = game.homeTeam.score ?? 0
+      let hasScores = game.awayTeam.score != nil && game.homeTeam.score != nil
+      
       HStack(spacing: 0) {
-         // Away team logo (left side)
+         // Away team logo (left side) with score overlay
          ZStack(alignment: .bottomTrailing) {
             if let logo = teamAssets.logo(for: game.awayTeam.abbreviation) {
                logo
@@ -672,6 +681,19 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
             }
          }
          .frame(width: 100, height: 100)
+         .overlay(alignment: .trailing) {
+            // Away score overlaid to the RIGHT of logo (white, transparent like bracket cards)
+            if hasScores {
+               Text("\(awayScore)")
+                  .font(.bebas(size: scoreSize))
+				  .bold()
+				  .kerning(-2)
+                  .foregroundColor(.white.opacity(0.3))
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.9)
+				  .offset(x: 60 + scoreOffset)
+            }
+         }
          
          Spacer()
          
@@ -685,11 +707,28 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
                   .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
             }
             
-            // Date & Time
-            Text(game.formattedTime)
-               .font(.system(size: 16, weight: .black))
-               .foregroundColor(.white)
-               .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            // 🔥 LIVE GAME STATUS (if in progress)
+            if game.isLive, case .inProgress(let quarter, let time) = game.status {
+               VStack(spacing: 2) {
+                  Text(quarter.uppercased())
+                     .font(.system(size: 14, weight: .black))
+                     .foregroundColor(.gpGreen)
+                     .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                  
+                  if !time.isEmpty {
+                     Text(time)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                  }
+               }
+            } else {
+               // Date & Time (when not live)
+               Text(game.formattedTime)
+                  .font(.system(size: 16, weight: .black))
+                  .foregroundColor(.white)
+                  .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            }
             
             // Stadium
             if let venue = game.venue, let venueName = venue.fullName {
@@ -735,7 +774,7 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
          
          Spacer()
          
-         // Home team logo (right side)
+         // Home team logo (right side) with score overlay
          ZStack(alignment: .bottomTrailing) {
             if let logo = teamAssets.logo(for: game.homeTeam.abbreviation) {
                logo
@@ -758,6 +797,19 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
             }
          }
          .frame(width: 100, height: 100)
+         .overlay(alignment: .leading) {
+            // Home score overlaid to the LEFT of logo (white, transparent like bracket cards)
+            if hasScores {
+               Text("\(homeScore)")
+                  .font(.bebas(size: scoreSize))
+				  .kerning(-2)
+				  .bold()
+                  .foregroundColor(.white.opacity(0.3))
+                  .lineLimit(1)
+                  .minimumScaleFactor(0.9)
+                  .offset(x: -60 + (scoreOffset * -1))
+            }
+         }
       }
       .frame(height: 100)
       .background(

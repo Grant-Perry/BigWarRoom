@@ -49,15 +49,21 @@ final class NFLPlayoffBracketService {
     // MARK: - Public Methods
     
     /// Fetch playoff bracket for a given season using ESPN Standings API
-    func fetchPlayoffBracket(for season: Int, forceRefresh: Bool = false) {
-        DebugPrint(mode: .nflData, "🏈 Fetching playoff bracket for season \(season)")
+    func fetchPlayoffBracket(for season: Int, forceRefresh: Bool = false) async {  // 🔥 FIX: Make it async!
+        DebugPrint(mode: .appLoad, "🏈 [START] Fetching playoff bracket for season \(season)")
+        
+        // 🔥 FIX: Prevent duplicate fetches
+        if isLoading && !forceRefresh {
+            DebugPrint(mode: .appLoad, "⏸️ [SKIP] Already loading bracket for season \(season)")
+            return
+        }
         
         // Check cache first
         if !forceRefresh,
            let cached = cache[season],
            let timestamp = cacheTimestamps[season],
            Date().timeIntervalSince(timestamp) < cacheExpiration {
-            DebugPrint(mode: .nflData, "✅ Using cached bracket for \(season)")
+            DebugPrint(mode: .appLoad, "✅ [CACHED] Using cached bracket for \(season)")
             currentBracket = cached
             return
         }
@@ -65,10 +71,11 @@ final class NFLPlayoffBracketService {
         isLoading = true
         errorMessage = nil
         
-        // Fetch both standings (for seeds) and scoreboard (for actual games)
-        Task {
-            await fetchBracketData(for: season)
-        }
+        DebugPrint(mode: .appLoad, "🌐 [NETWORK] Starting network fetch for season \(season)")
+        
+        // 🔥 FIX: Actually await the fetch instead of wrapping in Task
+        await fetchBracketData(for: season)
+        DebugPrint(mode: .appLoad, "✅ [COMPLETE] Bracket data fetch completed for season \(season)")
     }
     
     /// Start live updates for active playoff games
@@ -83,7 +90,7 @@ final class NFLPlayoffBracketService {
                 guard await self.appLifecycleManager.isActive else { return }
                 
                 DebugPrint(mode: .nflData, "🔄 Auto-refreshing playoff bracket")
-                self.fetchPlayoffBracket(for: season, forceRefresh: true)
+                await self.fetchPlayoffBracket(for: season, forceRefresh: true)  // 🔥 FIX: Add await
             }
         }
     }
@@ -421,6 +428,8 @@ final class NFLPlayoffBracketService {
         cacheTimestamps[season] = Date()
         currentBracket = bracket
         isLoading = false
+        
+        DebugPrint(mode: .appLoad, "✅ [BRACKET SET] currentBracket updated - AFC:\(afcGames.count), NFC:\(nfcGames.count), SB:\(superBowl != nil)")
         
         // Fetch odds for playoff games
         await fetchPlayoffGameOdds(bracket: bracket, season: season)
