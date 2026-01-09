@@ -182,7 +182,7 @@ struct NFLLandscapeBracketView: View {
    @ViewBuilder
    private func gameDetailOverlay(game: PlayoffGame) -> some View {
       ZStack {
-         Color.black.opacity(0.4)
+         Color.black.opacity(0.75)
             .ignoresSafeArea()
             .onTapGesture {
                showingGameDetail = false
@@ -240,7 +240,8 @@ struct NFLLandscapeBracketView: View {
          .fixedSize(horizontal: false, vertical: true)
          .background(Color(.systemBackground))
          .cornerRadius(20)
-         .shadow(color: .black.opacity(0.3), radius: 20)
+         .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
+         .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
       }
       .transition(.opacity)
       .animation(.easeInOut(duration: 0.2), value: showingGameDetail)
@@ -249,7 +250,7 @@ struct NFLLandscapeBracketView: View {
    @ViewBuilder
    private func bookPickerOverlay(game: PlayoffGame) -> some View {
       ZStack {
-         Color.black.opacity(0.4)
+         Color.black.opacity(0.75)
             .ignoresSafeArea()
             .onTapGesture {
                showingBookPicker = false

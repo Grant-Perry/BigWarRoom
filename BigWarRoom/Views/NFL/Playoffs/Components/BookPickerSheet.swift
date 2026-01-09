@@ -77,7 +77,12 @@ struct BookPickerSheet: View {
       } label: {
          HStack(spacing: 12) {
             // Book badge - LARGER
-            SportsbookBadge(book: book, size: 20)
+            // For "Best Line", show the actual book's logo that has the best line
+            if isBestLine, let bestBook = odds.bestMoneylineBook?.book {
+               SportsbookBadge(book: bestBook, size: 20)
+            } else {
+               SportsbookBadge(book: book, size: 20)
+            }
             
             VStack(alignment: .leading, spacing: 4) {
                Text(book.displayName)
