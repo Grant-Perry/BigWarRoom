@@ -94,19 +94,29 @@ struct SportsbookBadge: View {
     var size: CGFloat = 11
     
     var body: some View {
-        Text(book.abbreviation)
-            .font(.system(size: size, weight: .black, design: .rounded))
-            .foregroundColor(book.textColor)
-            .padding(.horizontal, book == .bestLine ? 3 : 4)
-            .padding(.vertical, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(book.primaryColor)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(book.textColor.opacity(0.3), lineWidth: 0.5)
-            )
+        // Try to load image from assets first, fall back to text badge
+        if let image = UIImage(named: book.abbreviation) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(height: size * 1.5) // Slightly larger for logo visibility
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+        } else {
+            // Fallback to text badge if image doesn't exist
+            Text(book.abbreviation)
+                .font(.system(size: size, weight: .black, design: .rounded))
+                .foregroundColor(book.textColor)
+                .padding(.horizontal, book == .bestLine ? 3 : 4)
+                .padding(.vertical, 2)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(book.primaryColor)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(book.textColor.opacity(0.3), lineWidth: 0.5)
+                )
+        }
     }
 }
 
@@ -215,6 +225,9 @@ struct BookOdds: Hashable {
     let favoriteTeamCode: String?
     let favoriteMoneylineOdds: Int?      // Raw numeric value for comparison
     let favoriteMoneylineDisplay: String? // Formatted string like "-130"
+    let underdogTeamCode: String?         // NEW: Underdog team
+    let underdogMoneylineOdds: Int?       // NEW: Raw numeric for underdog
+    let underdogMoneylineDisplay: String? // NEW: Formatted like "+425"
     let totalPoints: Double?
     let spreadPoints: Double?
     let spreadTeamCode: String?
@@ -235,6 +248,10 @@ struct GameBettingOdds: Hashable {
     /// Favorite moneyline formatted for Schedule (e.g. teamCode="JAX", odds="-150")
     let favoriteMoneylineTeamCode: String?
     let favoriteMoneylineOdds: String?
+    
+    /// NEW: Underdog moneyline (e.g. teamCode="PIT", odds="+425")
+    let underdogMoneylineTeamCode: String?
+    let underdogMoneylineOdds: String?
 
     /// Raw total points (e.g. "46.5") for Schedule display next to the up/down icon
     let totalPoints: String?
@@ -391,5 +408,3 @@ enum BettingOddsError: LocalizedError {
         }
     }
 }
-
-

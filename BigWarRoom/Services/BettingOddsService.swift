@@ -350,8 +350,8 @@ final class BettingOddsService {
             
             DebugPrint(mode: .bettingOdds, "📊 [BOOK] Markets - h2h: \(h2hMarket != nil), totals: \(totalsMarket != nil), spreads: \(spreadsMarket != nil)")
             
-            // Extract moneyline favorite
-            let favoriteML = extractFavoriteMoneylineNumeric(
+            // Extract BOTH moneylines (favorite and underdog)
+            let bothML = extractBothMoneylines(
                 homeCode: scheduleGame.homeTeam,
                 awayCode: scheduleGame.awayTeam,
                 homeName: oddsGame.homeTeam,
@@ -359,8 +359,8 @@ final class BettingOddsService {
                 market: h2hMarket
             )
             
-            if let fav = favoriteML {
-                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Favorite ML: \(fav.teamCode) \(fav.display)")
+            if let ml = bothML {
+                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Favorite ML: \(ml.favorite.teamCode) \(ml.favorite.display), Underdog ML: \(ml.underdog.teamCode) \(ml.underdog.display)")
             }
             
             // Extract total
@@ -384,9 +384,12 @@ final class BettingOddsService {
             
             let bookOdds = BookOdds(
                 book: book,
-                favoriteTeamCode: favoriteML?.teamCode,
-                favoriteMoneylineOdds: favoriteML?.odds,
-                favoriteMoneylineDisplay: favoriteML?.display,
+                favoriteTeamCode: bothML?.favorite.teamCode,
+                favoriteMoneylineOdds: bothML?.favorite.odds,
+                favoriteMoneylineDisplay: bothML?.favorite.display,
+                underdogTeamCode: bothML?.underdog.teamCode,
+                underdogMoneylineOdds: bothML?.underdog.odds,
+                underdogMoneylineDisplay: bothML?.underdog.display,
                 totalPoints: total,
                 spreadPoints: spreadInfo?.points,
                 spreadTeamCode: spreadInfo?.teamCode
@@ -465,6 +468,8 @@ final class BettingOddsService {
             totalDisplay: totalDisplay,
             favoriteMoneylineTeamCode: finalBook?.favoriteTeamCode,
             favoriteMoneylineOdds: finalBook?.favoriteMoneylineDisplay,
+            underdogMoneylineTeamCode: finalBook?.underdogTeamCode,
+            underdogMoneylineOdds: finalBook?.underdogMoneylineDisplay,
             totalPoints: totalPoints,
             moneylineDisplay: nil, // We don't need the full ML display anymore
             sportsbook: finalSportsbook?.displayName,
@@ -503,6 +508,53 @@ final class BettingOddsService {
         let display = price > 0 ? "+\(price)" : "\(price)"
         
         return (teamCode, price, display)
+    }
+    
+    // 🔥 NEW: Extract BOTH moneylines (favorite AND underdog)
+    private func extractBothMoneylines(
+        homeCode: String,
+        awayCode: String,
+        homeName: String,
+        awayName: String,
+        market: TheOddsMarket?
+    ) -> (favorite: (teamCode: String, odds: Int, display: String), underdog: (teamCode: String, odds: Int, display: String))? {
+        guard let market = market else { 
+            DebugPrint(mode: .bettingOdds, "⚠️ [ML EXTRACT] No h2h market provided")
+            return nil 
+        }
+        
+        func outcome(forTeamName name: String) -> TheOddsOutcome? {
+            return market.outcomes.first(where: { teamsMatch($0.name, name) })
+        }
+        
+        guard let homeOutcome = outcome(forTeamName: homeName),
+              let awayOutcome = outcome(forTeamName: awayName) else {
+            DebugPrint(mode: .bettingOdds, "⚠️ [ML EXTRACT] Could not find both team outcomes")
+            return nil
+        }
+        
+        let homePrice = Int(homeOutcome.price)
+        let awayPrice = Int(awayOutcome.price)
+        
+        DebugPrint(mode: .bettingOdds, "🎲 [ML EXTRACT] RAW PRICES - Home(\(homeCode)): \(homePrice), Away(\(awayCode)): \(awayPrice)")
+        
+        // Favorite is the more negative price (or less positive)
+        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
+        
+        let favTeamCode = homeIsFav ? homeCode : awayCode
+        let favPrice = homeIsFav ? homePrice : awayPrice
+        let favDisplay = favPrice > 0 ? "+\(favPrice)" : "\(favPrice)"
+        
+        let dogTeamCode = homeIsFav ? awayCode : homeCode
+        let dogPrice = homeIsFav ? awayPrice : homePrice
+        let dogDisplay = dogPrice > 0 ? "+\(dogPrice)" : "\(dogPrice)"
+        
+        DebugPrint(mode: .bettingOdds, "🎲 [ML EXTRACT] DETERMINED - Fav: \(favTeamCode) \(favPrice), Dog: \(dogTeamCode) \(dogPrice)")
+        
+        return (
+            favorite: (favTeamCode, favPrice, favDisplay),
+            underdog: (dogTeamCode, dogPrice, dogDisplay)
+        )
     }
     
     // 🔥 NEW: Extract spread info (points and team)
