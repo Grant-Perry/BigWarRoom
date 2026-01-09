@@ -636,12 +636,13 @@ final class NFLPlayoffBracketService {
         // Convert playoff games to schedule game format for odds API
         let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
         
-        DebugPrint(mode: .nflData, "🎰 Fetching odds for \(allGames.count) playoff games")
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetching odds for \(allGames.count) playoff games (season \(season))")
         
         var scheduleGames: [ScheduleGame] = []
         for game in allGames {
             let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-            DebugPrint(mode: .nflData, "🎰 Creating ScheduleGame with ID: '\(gameID)'")
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Creating ScheduleGame with ID: '\(gameID)' - \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation)")
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   Round: \(game.round.rawValue), Date: \(game.gameDate)")
             
             let scheduleGame = ScheduleGame(
                 id: gameID,
@@ -661,14 +662,18 @@ final class NFLPlayoffBracketService {
         let playoffYear = season + 1
         let week = 19 // Use week 19 as proxy for playoffs
         
-        DebugPrint(mode: .nflData, "🎰 Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
         let odds = await bettingOddsService.fetchGameOdds(for: scheduleGames, week: week, year: playoffYear)
         
         // Store odds keyed by game ID
         gameOdds = odds
         
-        DebugPrint(mode: .nflData, "🎰 Fetched odds for \(odds.count) playoff games")
-        DebugPrint(mode: .nflData, "🎰 Odds keys: \(odds.keys.joined(separator: ", "))")
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetched odds for \(odds.count) playoff games")
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Odds keys: \(odds.keys.sorted().joined(separator: ", "))")
+        
+        for (gameID, gameOdds) in odds {
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   \(gameID): spread=\(gameOdds.spreadDisplay ?? "N/A"), total=\(gameOdds.totalDisplay ?? "N/A"), book=\(gameOdds.sportsbook ?? "N/A")")
+        }
     }
 }
 

@@ -161,41 +161,14 @@ struct NFLLandscapeBracketView: View {
                   matchupCardView(game: game)
                      .padding()
                   
-                  // Odds section only (hide if game is FINAL)
+                  // Condensed odds bar below the card (only if game not FINAL)
                   if !game.isCompleted {
-                     VStack(alignment: .leading, spacing: 12) {
-                        let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-                        let odds = playoffService?.gameOdds[gameID]
-                        
-                        if let odds = odds {
-                           oddsRow(odds: odds)
-                        } else {
-                           HStack(alignment: .top, spacing: 12) {
-                              Image(systemName: "dollarsign.circle")
-                                 .font(.title3)
-                                 .foregroundStyle(.secondary)
-                                 .frame(width: 24)
-                              
-                              VStack(alignment: .leading, spacing: 4) {
-                                 Text("Odds")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                 
-                                 Text("Not available yet - check back")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary.opacity(0.7))
-                              }
-                              
-                              Spacer()
-                           }
-                        }
+                     let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                     if let odds = playoffService?.gameOdds[gameID] {
+                        oddsBarView(odds: odds)
+                           .padding(.horizontal)
+                           .padding(.bottom, 16)
                      }
-                     .padding()
-                     .background(Color(.secondarySystemGroupedBackground))
-                     .cornerRadius(12)
-                     .padding(.horizontal)
-                     .padding(.top, 8)
-                     .padding(.bottom, 16)
                   }
                }
                .frame(width: 500)
@@ -669,29 +642,44 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
                   .clipped()
             }
             
-            // Seed badge
+            // Seed badge (with optional moneyline)
             if let seed = game.awayTeam.seed {
-               Text("#\(seed)")
-                  .font(.system(size: 12, weight: .black))
-                  .foregroundStyle(.white)
-                  .padding(.horizontal, 6)
-                  .padding(.vertical, 2)
-                  .background(Capsule().fill(Color.black.opacity(0.85)))
-                  .padding(6)
+               // Get moneyline for this team if available
+               let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+               let odds = playoffService?.gameOdds[gameID]
+               let isAwayFavorite = odds?.favoriteMoneylineTeamCode == game.awayTeam.abbreviation
+               let moneyline = isAwayFavorite ? odds?.favoriteMoneylineOdds : nil
+               
+               HStack(spacing: 4) {
+                  Text("#\(seed)")
+                     .font(.system(size: 12, weight: .black))
+                     .foregroundStyle(.white)
+                  
+                  if let ml = moneyline, !game.isCompleted {
+                     Text(ml)
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.green)
+                  }
+               }
+               .padding(.horizontal, 6)
+               .padding(.vertical, 2)
+               .background(Capsule().fill(Color.black.opacity(0.85)))
+               .padding(6)
             }
          }
          .frame(width: 100, height: 100)
          .overlay(alignment: .trailing) {
-            // Away score overlaid to the RIGHT of logo (white, transparent like bracket cards)
             if hasScores {
                Text("\(awayScore)")
                   .font(.bebas(size: scoreSize))
-				  .bold()
-				  .kerning(-2)
+                  .bold()
+                  .kerning(-2)
                   .foregroundColor(.white.opacity(0.3))
                   .lineLimit(1)
-                  .minimumScaleFactor(0.9)
-				  .offset(x: 60 + scoreOffset)
+                  .minimumScaleFactor(0.1)
+                  .allowsTightening(true)
+                  .fixedSize(horizontal: true, vertical: false)
+                  .offset(x: 60 + scoreOffset)
             }
          }
          
@@ -785,28 +773,43 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
                   .clipped()
             }
             
-            // Seed badge
+            // Seed badge (with optional moneyline)
             if let seed = game.homeTeam.seed {
-               Text("#\(seed)")
-                  .font(.system(size: 12, weight: .black))
-                  .foregroundStyle(.white)
-                  .padding(.horizontal, 6)
-                  .padding(.vertical, 2)
-                  .background(Capsule().fill(Color.black.opacity(0.85)))
-                  .padding(6)
+               // Get moneyline for this team if available
+               let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+               let odds = playoffService?.gameOdds[gameID]
+               let isHomeFavorite = odds?.favoriteMoneylineTeamCode == game.homeTeam.abbreviation
+               let moneyline = isHomeFavorite ? odds?.favoriteMoneylineOdds : nil
+               
+               HStack(spacing: 4) {
+                  Text("#\(seed)")
+                     .font(.system(size: 12, weight: .black))
+                     .foregroundStyle(.white)
+                  
+                  if let ml = moneyline, !game.isCompleted {
+                     Text(ml)
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(.green)
+                  }
+               }
+               .padding(.horizontal, 6)
+               .padding(.vertical, 2)
+               .background(Capsule().fill(Color.black.opacity(0.85)))
+               .padding(6)
             }
          }
          .frame(width: 100, height: 100)
          .overlay(alignment: .leading) {
-            // Home score overlaid to the LEFT of logo (white, transparent like bracket cards)
             if hasScores {
                Text("\(homeScore)")
                   .font(.bebas(size: scoreSize))
-				  .kerning(-2)
-				  .bold()
+                  .kerning(-2)
+                  .bold()
                   .foregroundColor(.white.opacity(0.3))
                   .lineLimit(1)
-                  .minimumScaleFactor(0.9)
+                  .minimumScaleFactor(0.1)
+                  .allowsTightening(true)
+                  .fixedSize(horizontal: true, vertical: false)
                   .offset(x: -60 + (scoreOffset * -1))
             }
          }
@@ -842,6 +845,72 @@ away: \(sb.awayTeam.abbreviation) (\(sb.awayTeam.name)), score: \(sb.awayTeam.sc
       .clipShape(Rectangle())
       .cornerRadius(12)
       .shadow(color: .black.opacity(0.3), radius: 8)
+   }
+   
+   // MARK: - Condensed Odds Bar
+   
+   @ViewBuilder
+   private func oddsBarView(odds: GameBettingOdds) -> some View {
+      HStack(spacing: 16) {
+         // Spread
+         if let spread = odds.spreadDisplay {
+            VStack(alignment: .leading, spacing: 2) {
+               Text("SPREAD")
+                  .font(.system(size: 9, weight: .bold))
+                  .foregroundStyle(.secondary)
+               Text(spread)
+                  .font(.system(size: 13, weight: .bold))
+                  .foregroundStyle(.primary)
+            }
+         }
+         
+         Divider()
+            .frame(height: 30)
+         
+         // Total
+         if let total = odds.totalDisplay {
+            VStack(alignment: .leading, spacing: 2) {
+               Text("TOTAL")
+                  .font(.system(size: 9, weight: .bold))
+                  .foregroundStyle(.secondary)
+               Text(total)
+                  .font(.system(size: 13, weight: .bold))
+                  .foregroundStyle(.primary)
+            }
+         }
+         
+         Divider()
+            .frame(height: 30)
+         
+         // Favorite Moneyline
+         if let favTeam = odds.favoriteMoneylineTeamCode,
+            let favOdds = odds.favoriteMoneylineOdds {
+            VStack(alignment: .leading, spacing: 2) {
+               Text("FAVORITE")
+                  .font(.system(size: 9, weight: .bold))
+                  .foregroundStyle(.secondary)
+               Text("\(favTeam) \(favOdds)")
+                  .font(.system(size: 13, weight: .bold))
+                  .foregroundStyle(.green)
+            }
+         }
+         
+         Spacer()
+         
+         // Sportsbook badge
+         if let book = odds.sportsbookEnum {
+            HStack(spacing: 4) {
+               Text("via")
+                  .font(.system(size: 9, weight: .medium))
+                  .foregroundStyle(.secondary)
+               SportsbookBadge(book: book, size: 10)
+            }
+         }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 12)
+      .background(Color(.secondarySystemGroupedBackground))
+      .cornerRadius(10)
    }
    
    @ViewBuilder

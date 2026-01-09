@@ -8,11 +8,10 @@ import SwiftUI
 
 extension Font {
    static func bebas(size: CGFloat) -> Font {
-	  return .custom("Bebas", size: size)
+      return .custom("BebasNeue-Regular", size: size)
    }
 
    static func londrina(size: CGFloat) -> Font {
 	  return .custom("LondrinaShadow-Regular", size: size)
    }
 }
-

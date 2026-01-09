@@ -146,30 +146,51 @@ final class BettingOddsService {
     ) async -> [String: GameBettingOdds] {
         
         guard !apiKey.isEmpty else {
+            DebugPrint(mode: .bettingOdds, "❌ [ODDS] API key is empty - cannot fetch odds")
             return [:]
         }
         
         let actualYear = year ?? AppConstants.currentSeasonYearInt
         let cacheKey = "schedule_games_\(week)_\(actualYear)"
         
+        DebugPrint(mode: .bettingOdds, "🎰 [ODDS] Fetching game odds for \(scheduleGames.count) games, week \(week), year \(actualYear)")
+        for game in scheduleGames {
+            DebugPrint(mode: .bettingOdds, "🎰 [ODDS]   - Game: \(game.id) (\(game.awayTeam) @ \(game.homeTeam))")
+        }
+        
         if let (cached, timestamp) = gameOddsCache[cacheKey],
            Date().timeIntervalSince(timestamp) < gameOddsCacheExpiration {
+            DebugPrint(mode: .bettingOdds, "✅ [ODDS] Using cached odds (\(cached.count) games)")
             return cached
         }
         
         do {
             let games = try await fetchNFLGamesMarkets(markets: ["h2h", "spreads", "totals"])
+            
+            DebugPrint(mode: .bettingOdds, "📥 [ODDS] The Odds API returned \(games.count) total games")
+            for (index, game) in games.enumerated() {
+                DebugPrint(mode: .bettingOdds, "📥 [ODDS]   Game \(index + 1): \(game.awayTeam) @ \(game.homeTeam) (commence: \(game.commenceTime ?? "N/A"))")
+            }
+            
             var mapped: [String: GameBettingOdds] = [:]
             
             for scheduleGame in scheduleGames {
+                DebugPrint(mode: .bettingOdds, "🔍 [ODDS] Searching for odds: \(scheduleGame.awayTeam) @ \(scheduleGame.homeTeam)")
+                
                 if let odds = extractGameOdds(for: scheduleGame, from: games) {
                     mapped[scheduleGame.id] = odds
+                    DebugPrint(mode: .bettingOdds, "✅ [ODDS] Found odds for \(scheduleGame.id): spread=\(odds.spreadDisplay ?? "N/A"), total=\(odds.totalDisplay ?? "N/A"), ML=\(odds.favoriteMoneylineOdds ?? "N/A")")
+                } else {
+                    DebugPrint(mode: .bettingOdds, "❌ [ODDS] No odds found for \(scheduleGame.id)")
                 }
             }
+            
+            DebugPrint(mode: .bettingOdds, "✅ [ODDS] Mapped \(mapped.count) out of \(scheduleGames.count) games with odds")
             
             gameOddsCache[cacheKey] = (mapped, Date())
             return mapped
         } catch {
+            DebugPrint(mode: .bettingOdds, "❌ [ODDS] Error fetching odds: \(error)")
             return [:]
         }
     }
@@ -261,8 +282,11 @@ final class BettingOddsService {
         ]
         
         guard let url = components?.url else {
+            DebugPrint(mode: .bettingOdds, "❌ [ODDS API] Failed to build URL")
             throw BettingOddsError.invalidURL
         }
+        
+        DebugPrint(mode: .bettingOdds, "🌐 [ODDS API] Requesting: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -271,31 +295,60 @@ final class BettingOddsService {
         let (data, response) = try await session.data(for: request)
         
         if let httpResponse = response as? HTTPURLResponse {
+            DebugPrint(mode: .bettingOdds, "📡 [ODDS API] Response status: \(httpResponse.statusCode)")
+            
+            if let remainingRequests = httpResponse.value(forHTTPHeaderField: "x-requests-remaining") {
+                DebugPrint(mode: .bettingOdds, "📊 [ODDS API] Requests remaining: \(remainingRequests)")
+            }
+            
             guard (200...299).contains(httpResponse.statusCode) else {
+                DebugPrint(mode: .bettingOdds, "❌ [ODDS API] HTTP error \(httpResponse.statusCode)")
                 throw BettingOddsError.httpError(httpResponse.statusCode)
             }
         }
         
-        return try JSONDecoder().decode([TheOddsGame].self, from: data)
+        let decodedGames = try JSONDecoder().decode([TheOddsGame].self, from: data)
+        DebugPrint(mode: .bettingOdds, "✅ [ODDS API] Successfully decoded \(decodedGames.count) games")
+        
+        return decodedGames
     }
     
     private func extractGameOdds(for scheduleGame: ScheduleGame, from games: [TheOddsGame]) -> GameBettingOdds? {
         // Find matching The Odds API game
+        DebugPrint(mode: .bettingOdds, "🔎 [MATCH] Looking for: home='\(scheduleGame.homeTeam)' away='\(scheduleGame.awayTeam)'")
+        
         guard let oddsGame = games.first(where: { game in
-            teamsMatch(scheduleGame.homeTeam, game.homeTeam) && teamsMatch(scheduleGame.awayTeam, game.awayTeam)
+            let homeMatch = teamsMatch(scheduleGame.homeTeam, game.homeTeam)
+            let awayMatch = teamsMatch(scheduleGame.awayTeam, game.awayTeam)
+            
+            if homeMatch && awayMatch {
+                DebugPrint(mode: .bettingOdds, "✅ [MATCH] Found match: '\(game.awayTeam)' @ '\(game.homeTeam)'")
+            }
+            
+            return homeMatch && awayMatch
         }) else {
+            DebugPrint(mode: .bettingOdds, "❌ [MATCH] No match found in API results")
             return nil
         }
+        
+        DebugPrint(mode: .bettingOdds, "📊 [EXTRACT] Game has \(oddsGame.bookmakers.count) bookmakers")
         
         // 🔥 NEW: Extract odds from ALL available books
         var allBookOdds: [BookOdds] = []
         
         for bookmaker in oddsGame.bookmakers {
-            guard let book = Sportsbook.from(apiKey: bookmaker.key) else { continue }
+            DebugPrint(mode: .bettingOdds, "📚 [BOOK] Processing bookmaker: \(bookmaker.title)")
+            
+            guard let book = Sportsbook.from(apiKey: bookmaker.key) else { 
+                DebugPrint(mode: .bettingOdds, "⚠️ [BOOK] Unknown bookmaker key: \(bookmaker.key)")
+                continue 
+            }
             
             let h2hMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "h2h" })
             let totalsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "totals" })
             let spreadsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "spreads" })
+            
+            DebugPrint(mode: .bettingOdds, "📊 [BOOK] Markets - h2h: \(h2hMarket != nil), totals: \(totalsMarket != nil), spreads: \(spreadsMarket != nil)")
             
             // Extract moneyline favorite
             let favoriteML = extractFavoriteMoneylineNumeric(
@@ -306,8 +359,15 @@ final class BettingOddsService {
                 market: h2hMarket
             )
             
+            if let fav = favoriteML {
+                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Favorite ML: \(fav.teamCode) \(fav.display)")
+            }
+            
             // Extract total
             let total = totalsMarket?.outcomes.first?.point
+            if let t = total {
+                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Total: \(t)")
+            }
             
             // Extract spread
             let spreadInfo = extractSpreadInfo(
@@ -317,6 +377,10 @@ final class BettingOddsService {
                 awayName: oddsGame.awayTeam,
                 market: spreadsMarket
             )
+            
+            if let spread = spreadInfo {
+                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Spread: \(spread.teamCode) \(spread.points)")
+            }
             
             let bookOdds = BookOdds(
                 book: book,
@@ -331,25 +395,41 @@ final class BettingOddsService {
             allBookOdds.append(bookOdds)
         }
         
+        DebugPrint(mode: .bettingOdds, "📚 [BOOKS] Collected odds from \(allBookOdds.count) bookmakers")
+        
         // 🔥 Determine which book to display based on user preference
         let displayBook: BookOdds?
         let selectedSportsbook: Sportsbook?
         
         if preferredSportsbook == .bestLine {
+            DebugPrint(mode: .bettingOdds, "🎯 [SELECTION] Using best line logic")
             // Find the best moneyline (least negative = most favorable)
             displayBook = allBookOdds
                 .filter { $0.favoriteMoneylineOdds != nil }
                 .max { ($0.favoriteMoneylineOdds ?? -9999) < ($1.favoriteMoneylineOdds ?? -9999) }
             selectedSportsbook = displayBook?.book
+            
+            if let selected = selectedSportsbook {
+                DebugPrint(mode: .bettingOdds, "✅ [SELECTION] Best line from: \(selected.displayName)")
+            }
         } else {
+            DebugPrint(mode: .bettingOdds, "🎯 [SELECTION] Using preferred book: \(preferredSportsbook.displayName)")
             // Use the user's preferred book
             displayBook = allBookOdds.first { $0.book == preferredSportsbook }
             selectedSportsbook = preferredSportsbook
+            
+            if displayBook == nil {
+                DebugPrint(mode: .bettingOdds, "⚠️ [SELECTION] Preferred book not found, will use fallback")
+            }
         }
         
         // Fallback to any available book if preferred not found
         let finalBook = displayBook ?? allBookOdds.first
         let finalSportsbook = selectedSportsbook ?? finalBook?.book
+        
+        if let book = finalSportsbook {
+            DebugPrint(mode: .bettingOdds, "✅ [FINAL] Using sportsbook: \(book.displayName)")
+        }
         
         // Format display values from the selected book
         let spreadDisplay: String?
@@ -371,8 +451,11 @@ final class BettingOddsService {
         
         // Avoid returning empty objects
         if finalBook?.favoriteMoneylineDisplay == nil && spreadDisplay == nil && totalDisplay == nil {
+            DebugPrint(mode: .bettingOdds, "❌ [FINAL] No usable odds data found")
             return nil
         }
+        
+        DebugPrint(mode: .bettingOdds, "✅ [FINAL] Returning odds: spread=\(spreadDisplay ?? "N/A"), total=\(totalDisplay ?? "N/A"), ML=\(finalBook?.favoriteMoneylineDisplay ?? "N/A")")
         
         return GameBettingOdds(
             gameID: scheduleGame.id,
@@ -791,24 +874,45 @@ final class BettingOddsService {
         let t1 = team1.lowercased().trimmingCharacters(in: .whitespaces)
         let t2 = team2.lowercased().trimmingCharacters(in: .whitespaces)
         
+        DebugPrint(mode: .bettingOdds, limit: 20, "🔤 [MATCH] Comparing: '\(t1)' vs '\(t2)'")
+        
         // Direct match
-        if t1 == t2 { return true }
+        if t1 == t2 { 
+            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Direct match")
+            return true 
+        }
         
         // One contains the other
-        if t1.contains(t2) || t2.contains(t1) { return true }
+        if t1.contains(t2) || t2.contains(t1) { 
+            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Contains match")
+            return true 
+        }
         
         // Check abbreviations
         let abbr1 = normalizeTeamName(team1)
         let abbr2 = normalizeTeamName(team2)
-        if abbr1.contains(abbr2) || abbr2.contains(abbr1) { return true }
+        
+        DebugPrint(mode: .bettingOdds, limit: 20, "🔤 [MATCH] Normalized: '\(abbr1)' vs '\(abbr2)'")
+        
+        if abbr1.contains(abbr2) || abbr2.contains(abbr1) { 
+            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Normalized match")
+            return true 
+        }
         
         // Special cases
         if (t1.contains("kansas") && t2.contains("chiefs")) ||
-           (t2.contains("kansas") && t1.contains("chiefs")) { return true }
+           (t2.contains("kansas") && t1.contains("chiefs")) { 
+            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Special case: Chiefs")
+            return true 
+        }
         
         if (t1.contains("buffalo") && t2.contains("bills")) ||
-           (t2.contains("buffalo") && t1.contains("bills")) { return true }
+           (t2.contains("buffalo") && t1.contains("bills")) { 
+            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Special case: Bills")
+            return true 
+        }
         
+        DebugPrint(mode: .bettingOdds, limit: 20, "❌ [MATCH] No match found")
         return false
     }
     
