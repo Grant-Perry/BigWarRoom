@@ -149,14 +149,23 @@ struct GameDetailSheetContent: View {
     
     private var gameDetailsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let venue = game.venue {
-                detailRow(icon: "building.2.fill", title: "Stadium", value: venue.displayName)
+            // 🏈 NEW: Live game situation (down, distance, possession)
+            if game.isLive, let situation = game.liveSituation {
+                liveGameSituationRow(situation: situation)
                 Divider()
             }
             
-            if let broadcasts = game.broadcasts, !broadcasts.isEmpty {
-                detailRow(icon: "tv.fill", title: "Network", value: broadcasts.joined(separator: ", "))
-                Divider()
+            // Only show venue/broadcasts for non-live games
+            if !game.isLive {
+                if let venue = game.venue {
+                    detailRow(icon: "building.2.fill", title: "Stadium", value: venue.displayName)
+                    Divider()
+                }
+                
+                if let broadcasts = game.broadcasts, !broadcasts.isEmpty {
+                    detailRow(icon: "tv.fill", title: "Network", value: broadcasts.joined(separator: ", "))
+                    Divider()
+                }
             }
             
             // Odds section
@@ -277,6 +286,155 @@ struct GameDetailSheetContent: View {
             }
             
             Spacer()
+        }
+    }
+    
+    // 🏈 NEW: Live game situation display
+    private func liveGameSituationRow(situation: LiveGameSituation) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack(spacing: 12) {
+                Image(systemName: "sportscourt.fill")
+                    .font(.title3)
+                    .foregroundStyle(.red)
+                    .frame(width: 24)
+                
+                Text("Live Game Situation")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.primary)
+                
+                Spacer()
+            }
+            
+            // Possession indicator with football icon
+            if let possession = situation.possession {
+                HStack(spacing: 8) {
+                    Text("🏈")
+                        .font(.title2)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Possession")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text(possession)
+                            .font(.body)
+                            .fontWeight(.bold)
+                            .foregroundStyle(.primary)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .cornerRadius(8)
+            }
+            
+            // Down & Distance
+            if let downDist = situation.downDistanceDisplay {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Down & Distance")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        Text(downDist)
+                            .font(.title3)
+                            .fontWeight(.black)
+                            .foregroundStyle(.primary)
+                    }
+                    
+                    Spacer()
+                    
+                    // Field position
+                    if let yardLine = situation.yardLine {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Field Position")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            
+                            Text(yardLine)
+                                .font(.body)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(.primary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .cornerRadius(8)
+            }
+            
+            // Drive stats
+            if situation.drivePlayCount != nil || situation.driveYards != nil || situation.timeOfPossession != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Current Drive")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    HStack(spacing: 16) {
+                        if let plays = situation.drivePlayCount {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(plays)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                Text("Plays")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if let yards = situation.driveYards {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("\(yards)")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                Text("Yards")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        if let top = situation.timeOfPossession {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(top)
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                Text("TOP")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .cornerRadius(8)
+            }
+            
+            // Last play description
+            if let lastPlay = situation.lastPlay {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Last Play")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(lastPlay)
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .cornerRadius(8)
+            }
         }
     }
 }

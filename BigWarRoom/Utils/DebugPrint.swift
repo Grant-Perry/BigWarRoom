@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [] // [.appLoad, .bettingOdds]  // Added bettingOdds for odds debugging
+   static var activeMode: DebugMode = [.bracketTimer] // 🔥 ENABLED: Track bracket refresh timing
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -61,6 +61,7 @@ struct DebugMode: OptionSet {
     static let matchupSort        	= DebugMode(rawValue: 1 << 28)  // 268435456
     static let appLoad            	= DebugMode(rawValue: 1 << 29)  // 536870912
     static let bettingOdds        	= DebugMode(rawValue: 1 << 30)  // 1073741824
+    static let bracketTimer       	= DebugMode(rawValue: 1 << 31)  // 2147483648
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -97,7 +98,8 @@ struct DebugMode: OptionSet {
         .liveScores,
         .matchupSort,
         .appLoad,
-        .bettingOdds
+        .bettingOdds,
+        .bracketTimer
     ]
 }
 

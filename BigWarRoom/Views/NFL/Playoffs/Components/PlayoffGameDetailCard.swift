@@ -16,6 +16,10 @@ struct PlayoffGameDetailCard: View {
    let scoreOffset: CGFloat
    
    var body: some View {
+      // 🔥 NEW: Log when card renders
+      let _ = DebugPrint(mode: .bracketTimer, "🎨 [MODAL RENDER] Game: \(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation), Status: \(game.status.displayText), Away: \(game.awayTeam.score ?? 0), Home: \(game.homeTeam.score ?? 0)")
+      let _ = DebugPrint(mode: .bracketTimer, "🎨 [LIVE SITUATION] Has liveSituation: \(game.liveSituation != nil), Down/Dist: \(game.liveSituation?.downDistanceDisplay ?? "N/A")")
+      
       let awayColor = teamAssets.team(for: game.awayTeam.abbreviation)?.primaryColor ?? .blue
       let homeColor = teamAssets.team(for: game.homeTeam.abbreviation)?.primaryColor ?? .red
       let awayScore = game.awayTeam.score ?? 0
@@ -102,6 +106,16 @@ struct PlayoffGameDetailCard: View {
             .background(Capsule().fill(Color.black.opacity(0.85)))
             .padding(6)
          }
+         
+         // 🏈 FIXED: Possession indicator - positioned to RIGHT of away team logo
+         if game.isLive, 
+            let possession = game.liveSituation?.possession,
+            possession == game.awayTeam.abbreviation {
+            Text("🏈")
+               .font(.system(size: 20))
+               .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+               .offset(x: 25, y: -2)
+         }
       }
       .frame(width: 100, height: 100)
       .overlay(alignment: .trailing) {
@@ -122,7 +136,7 @@ struct PlayoffGameDetailCard: View {
    
    @ViewBuilder
    private func homeTeamSection(homeColor: Color, homeScore: Int, hasScores: Bool) -> some View {
-      ZStack(alignment: .bottomTrailing) {
+      ZStack(alignment: .bottomLeading) {
          if let logo = teamAssets.logo(for: game.homeTeam.abbreviation) {
             logo
                .resizable()
@@ -154,6 +168,16 @@ struct PlayoffGameDetailCard: View {
             .background(Capsule().fill(Color.black.opacity(0.85)))
             .padding(6)
          }
+         
+         // 🏈 FIXED: Possession indicator - positioned to LEFT of home team logo
+         if game.isLive,
+            let possession = game.liveSituation?.possession,
+            possession == game.homeTeam.abbreviation {
+            Text("🏈")
+               .font(.system(size: 20))
+               .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+               .offset(x: -25, y: -2)
+         }
       }
       .frame(width: 100, height: 100)
       .overlay(alignment: .leading) {
@@ -176,7 +200,7 @@ struct PlayoffGameDetailCard: View {
    private func gameInfoSection() -> some View {
       VStack(spacing: 3) {
          // Day name
-         if !game.smartFormattedDate.isEmpty {
+         if !game.smartFormattedDate.isEmpty, !game.isLive {
             Text(game.smartFormattedDate.uppercased())
                .font(.system(size: 12, weight: .bold))
                .foregroundColor(.white)
@@ -193,9 +217,31 @@ struct PlayoffGameDetailCard: View {
                
                if !time.isEmpty {
                   Text(time)
-                     .font(.system(size: 10, weight: .bold))
+                     .font(.system(size: 16, weight: .black))
                      .foregroundColor(.white.opacity(0.9))
                      .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+               }
+               
+               // 🏈 NEW: Down & Distance under game time (use cached if current not available)
+               if game.isLive {
+                  // Try current situation first, fallback to cached
+                  if let down = game.liveSituation?.down ?? game.lastKnownDownDistance?.down,
+                     let distance = game.liveSituation?.distance ?? game.lastKnownDownDistance?.distance,
+                     down > 0, distance > 0 {
+                     let suffix: String = {
+                        switch down {
+                        case 1: return "st"
+                        case 2: return "nd"
+                        case 3: return "rd"
+                        default: return "th"
+                        }
+                     }()
+                     
+                     Text("\(down)\(suffix) & \(distance)")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(.white.opacity(0.8))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                  }
                }
             }
          } else {
@@ -206,7 +252,7 @@ struct PlayoffGameDetailCard: View {
          }
          
          // Stadium
-         if let venue = game.venue, let venueName = venue.fullName {
+         if let venue = game.venue, let venueName = venue.fullName, !game.isLive {
             Text(venueName)
                .font(.system(size: 11, weight: .semibold))
                .foregroundColor(.white.opacity(0.9))
@@ -230,7 +276,7 @@ struct PlayoffGameDetailCard: View {
          }
          
          // Network
-         if let broadcasts = game.broadcasts, !broadcasts.isEmpty {
+         if let broadcasts = game.broadcasts, !broadcasts.isEmpty, !game.isLive {
             HStack(spacing: 4) {
                Image(systemName: "antenna.radiowaves.left.and.right")
                   .font(.system(size: 9, weight: .semibold))

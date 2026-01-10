@@ -17,6 +17,9 @@ struct NFLPlayoffBracketView: View {
     // 🔥 FIX: Observe the year manager
     @State private var yearManager = SeasonYearManager.shared
     
+    // 🔥 NEW: Add refresh timer state
+    @State private var refreshTimer: Timer?
+    
     // Dependencies
     let weekSelectionManager: WeekSelectionManager
     let appLifecycleManager: AppLifecycleManager
@@ -56,20 +59,10 @@ struct NFLPlayoffBracketView: View {
             // --- ORIENTATION SWITCHER using verticalSizeClass ---
             if verticalSizeClass == .compact {
                 // --- LANDSCAPE ---
-                if let bracket = bracketService.currentBracket {
-                    NFLLandscapeBracketView(bracket: bracket, playoffService: bracketService)
-                        .onAppear {
-                            DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] NFLLandscapeBracketView appeared")
-                        }
-                } else {
-                    ZStack {
-                        Color.black.ignoresSafeArea()
-                        loadingView
-                    }
+                NFLLandscapeBracketView(playoffService: bracketService)  // 🔥 CHANGED: Pass service directly
                     .onAppear {
-                        DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] Loading view shown - no bracket yet")
+                        DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] NFLLandscapeBracketView appeared")
                     }
-                }
             } else {
                 // --- PORTRAIT ---
                 if bracketService.isLoading && bracketService.currentBracket == nil {
@@ -113,10 +106,13 @@ struct NFLPlayoffBracketView: View {
             }
             // Fetch standings for selected season on appear
             standingsService.fetchStandings(season: selectedSeason)
+            
+            // 🔥 NEW: Start live updates if there are live games
+            startLiveUpdatesIfNeeded()
         }
         .onDisappear {
             // Stop live updates when view disappears to prevent crashes
-            bracketService.stopLiveUpdates()
+            stopLiveUpdates()
         }
     }
     
@@ -442,9 +438,72 @@ struct NFLPlayoffBracketView: View {
     private func loadBracket(forceRefresh: Bool = false) async {
         await bracketService.fetchPlayoffBracket(for: selectedSeason, forceRefresh: forceRefresh)
         
-        if let bracket = bracketService.currentBracket, bracket.hasLiveGames {
-            bracketService.startLiveUpdates(for: selectedSeason)
+        // 🔥 NEW: Check for live games after loading and start/stop timer accordingly
+        startLiveUpdatesIfNeeded()
+    }
+    
+    // 🔥 NEW: Start live updates if bracket has live games
+    private func startLiveUpdatesIfNeeded() {
+        guard let bracket = bracketService.currentBracket else { return }
+        
+        if bracket.hasLiveGames {
+            DebugPrint(mode: .nflData, "🔥 [PLAYOFF BRACKET] Live games detected - starting auto-refresh")
+            startPeriodicRefresh()
+        } else {
+            DebugPrint(mode: .nflData, "✅ [PLAYOFF BRACKET] No live games - stopping auto-refresh")
+            stopLiveUpdates()
         }
+    }
+    
+    // 🔥 NEW: Start periodic refresh (similar to Mission Control)
+    private func startPeriodicRefresh() {
+        // Stop any existing timer
+        stopLiveUpdates()
+        
+        let refreshInterval = TimeInterval(AppConstants.MatchupRefresh)
+        
+        // 🔥 NEW: Add counter for tracking
+        var refreshCount = 0
+        
+        let startTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        DebugPrint(mode: .bracketTimer, "🔄 [BRACKET TIMER START] Started at: \(startTime), Interval: \(refreshInterval)s")
+        
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak bracketService] _ in
+            Task { @MainActor in
+                guard let service = bracketService else { return }
+                
+                refreshCount += 1
+                let updateTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+                DebugPrint(mode: .bracketTimer, "🔄 [BRACKET TIMER FIRE] Updated at: \(updateTime) - Count: \(refreshCount)")
+                
+                await service.fetchPlayoffBracket(for: selectedSeason, forceRefresh: true)
+                
+                // 🔥 Check if we should continue refreshing
+                if let bracket = service.currentBracket {
+                    if bracket.hasLiveGames {
+                        DebugPrint(mode: .bracketTimer, "✅ [BRACKET TIMER] Still has live games, continuing refresh")
+                    } else {
+                        DebugPrint(mode: .bracketTimer, "🛑 [BRACKET TIMER] No more live games - stopping refresh")
+                        stopLiveUpdates()
+                    }
+                } else {
+                    DebugPrint(mode: .bracketTimer, "⚠️ [BRACKET TIMER] No bracket after refresh!")
+                }
+            }
+        }
+        
+        DebugPrint(mode: .bracketTimer, "✅ [BRACKET TIMER] Timer scheduled successfully")
+    }
+    
+    // 🔥 NEW: Stop all timers
+    private func stopLiveUpdates() {
+        if refreshTimer != nil {
+            let stopTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+            DebugPrint(mode: .bracketTimer, "🛑 [BRACKET TIMER STOP] Stopped at: \(stopTime)")
+        }
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        bracketService.stopLiveUpdates()
     }
     
     // MARK: - Loading/Error Views

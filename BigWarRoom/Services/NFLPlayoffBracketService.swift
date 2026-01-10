@@ -49,12 +49,13 @@ final class NFLPlayoffBracketService {
     // MARK: - Public Methods
     
     /// Fetch playoff bracket for a given season using ESPN Standings API
-    func fetchPlayoffBracket(for season: Int, forceRefresh: Bool = false) async {  // 🔥 FIX: Make it async!
-        DebugPrint(mode: .appLoad, "🏈 [START] Fetching playoff bracket for season \(season)")
+    func fetchPlayoffBracket(for season: Int, forceRefresh: Bool = false) async {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        DebugPrint(mode: .bracketTimer, "🏈 [BRACKET FETCH START] Season: \(season), Force: \(forceRefresh), Time: \(timestamp)")
         
         // 🔥 FIX: Prevent duplicate fetches
         if isLoading && !forceRefresh {
-            DebugPrint(mode: .appLoad, "⏸️ [SKIP] Already loading bracket for season \(season)")
+            DebugPrint(mode: .bracketTimer, "⏸️ [SKIP] Already loading bracket for season \(season)")
             return
         }
         
@@ -63,19 +64,34 @@ final class NFLPlayoffBracketService {
            let cached = cache[season],
            let timestamp = cacheTimestamps[season],
            Date().timeIntervalSince(timestamp) < cacheExpiration {
-            DebugPrint(mode: .appLoad, "✅ [CACHED] Using cached bracket for \(season)")
+            DebugPrint(mode: .bracketTimer, "✅ [CACHED] Using cached bracket for \(season)")
             currentBracket = cached
+            
+            // 🏈 NEW: Even with cached bracket, refresh live situations
+            if cached.hasLiveGames {
+                await refreshLiveSituations(for: cached)
+            }
             return
         }
         
         isLoading = true
         errorMessage = nil
         
-        DebugPrint(mode: .appLoad, "🌐 [NETWORK] Starting network fetch for season \(season)")
+        DebugPrint(mode: .bracketTimer, "🌐 [NETWORK] Starting network fetch for season \(season)")
         
         // 🔥 FIX: Actually await the fetch instead of wrapping in Task
         await fetchBracketData(for: season)
-        DebugPrint(mode: .appLoad, "✅ [COMPLETE] Bracket data fetch completed for season \(season)")
+        
+        let endTimestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        DebugPrint(mode: .bracketTimer, "✅ [BRACKET FETCH COMPLETE] Season: \(season), Time: \(endTimestamp)")
+        
+        // 🔥 NEW: Log bracket state after fetch
+        if let bracket = currentBracket {
+            let liveGamesCount = bracket.hasLiveGames ? "HAS LIVE GAMES" : "NO LIVE GAMES"
+            DebugPrint(mode: .bracketTimer, "📊 [BRACKET STATE] AFC: \(bracket.afcGames.count), NFC: \(bracket.nfcGames.count), SB: \(bracket.superBowl != nil), \(liveGamesCount)")
+        } else {
+            DebugPrint(mode: .bracketTimer, "⚠️ [BRACKET STATE] currentBracket is NIL after fetch!")
+        }
     }
     
     /// Start live updates for active playoff games
@@ -364,6 +380,7 @@ final class NFLPlayoffBracketService {
                 let quarter = "Q\(competition.status?.period ?? 1)"
                 let time = competition.status?.displayClock ?? ""
                 status = .inProgress(quarter: quarter, timeRemaining: time)
+                DebugPrint(mode: .nflData, "🔍 [LIVE GAME DETECTED] \(awayTeam) @ \(homeTeam) is live: \(quarter) \(time)")
             } else {
                 status = .scheduled
             }
@@ -378,6 +395,36 @@ final class NFLPlayoffBracketService {
                 conference = .nfc
             }
             
+            // 🏈 NEW: Fetch live situation for in-progress games
+            var liveSituation: LiveGameSituation? = nil
+            var lastKnownDownDistance: CachedDownDistance? = nil
+            
+            if case .inProgress = status, let gameID = event.id {
+                DebugPrint(mode: .bracketTimer, "🔍 [FETCHING LIVE SITUATION] For game \(gameID): \(awayTeam) @ \(homeTeam)")
+                liveSituation = await fetchLiveGameSituation(gameID: gameID)
+                
+                // Cache down/distance if we got valid data
+                if let situation = liveSituation,
+                   let down = situation.down,
+                   let distance = situation.distance,
+                   down > 0, distance > 0 {
+                    lastKnownDownDistance = CachedDownDistance(down: down, distance: distance)
+                } else {
+                    // Try to preserve from existing game if we have it
+                    if let existing = (afcGames + nfcGames).first(where: { $0.id == gameID }),
+                       let cached = existing.lastKnownDownDistance {
+                        lastKnownDownDistance = cached
+                        DebugPrint(mode: .bracketTimer, "🔄 [CACHED DOWN/DIST] Using cached: \(cached.display)")
+                    }
+                }
+                
+                if liveSituation != nil {
+                    DebugPrint(mode: .bracketTimer, "✅ [LIVE SITUATION] Successfully fetched for game \(gameID)")
+                } else {
+                    DebugPrint(mode: .bracketTimer, "⚠️ [LIVE SITUATION] Failed to fetch for game \(gameID)")
+                }
+            }
+            
             let game = PlayoffGame(
                 id: event.id ?? UUID().uuidString,
                 round: round,
@@ -387,7 +434,9 @@ final class NFLPlayoffBracketService {
                 gameDate: gameDate,
                 status: status,
                 venue: venue,
-                broadcasts: broadcasts
+                broadcasts: broadcasts,
+                liveSituation: liveSituation,
+                lastKnownDownDistance: lastKnownDownDistance
             )
             
             // Sort into proper arrays
@@ -481,7 +530,7 @@ final class NFLPlayoffBracketService {
         }
         
         if let week = event.week?.number {
-            // Postseason weeks from weekly fetch (weeks 1-5 with seasontype=3)
+            // Postseason weeks from weekly fetch (weeks 1..5 with seasontype=3)
             // Note: ESPN includes Pro Bowl as week 4, actual Super Bowl is week 5
             switch week {
             case 1: 
@@ -511,16 +560,15 @@ final class NFLPlayoffBracketService {
             // Legacy: absolute week numbers (shouldn't hit these with seasontype=3)
             switch week {
             case 19: return .wildCard
-            case 20: return .divisional
+            case 20: return .wildCard
             case 21: return .conference
             case 22: return .superBowl
             default: break
             }
             switch week {
-            case 20: return .wildCard
-            case 21: return .divisional
-            case 22: return .conference
-            case 23: return .superBowl
+            case 20: return .divisional
+            case 21: return .conference
+            case 22: return .superBowl
             default: break
             }
             switch week {
@@ -582,7 +630,9 @@ final class NFLPlayoffBracketService {
                 gameDate: gameDate,
                 status: .scheduled,
                 venue: nil,
-                broadcasts: nil
+                broadcasts: nil,
+                liveSituation: nil,
+                lastKnownDownDistance: nil
             )
             
             games.append(game)
@@ -759,7 +809,9 @@ final class NFLPlayoffBracketService {
             gameDate: date,
             status: .final,
             venue: venue,
-            broadcasts: nil
+            broadcasts: nil,
+            liveSituation: nil,
+            lastKnownDownDistance: nil
         )
     }
     
@@ -774,5 +826,218 @@ final class NFLPlayoffBracketService {
         }
         // 2nd Sunday
         return cal.date(byAdding: .day, value: 7, to: d) ?? d
+    }
+    
+    // MARK: - Live Game Situation Fetch
+    
+    /// Fetch live play-by-play situation for an in-progress game
+    private func fetchLiveGameSituation(gameID: String) async -> LiveGameSituation? {
+        let summaryURL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=\(gameID)"
+        
+        guard let url = URL(string: summaryURL) else {
+            DebugPrint(mode: .bracketTimer, "❌ Failed to build summary URL for game \(gameID)")
+            return nil
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            
+            // Extract down/distance from drives.current.plays array
+            var down: Int? = nil
+            var distance: Int? = nil
+            var yardLine: String? = nil
+            
+            if let drives = json?["drives"] as? [String: Any],
+               let currentDrive = drives["current"] as? [String: Any],
+               let plays = currentDrive["plays"] as? [[String: Any]],
+               let lastPlay = plays.last,
+               let endSituation = lastPlay["end"] as? [String: Any] {
+                
+                // Extract down, distance, and yard line from the last play's "end" object
+                down = endSituation["down"] as? Int
+                distance = endSituation["distance"] as? Int
+                
+                // Try possessionText first (e.g., "CAR 28"), fall back to yardLine
+                if let possText = endSituation["possessionText"] as? String {
+                    yardLine = possText
+                } else if let yl = endSituation["yardLine"] as? Int {
+                    yardLine = "\(yl)"
+                }
+                
+                DebugPrint(mode: .bracketTimer, "🎯 [PLAYS EXTRACTION] down: \(down?.description ?? "nil"), distance: \(distance?.description ?? "nil"), yardLine: \(yardLine ?? "nil")")
+            }
+            
+            // Extract current drive info as before
+            var possessionTeam: String? = nil
+            var drivePlayCount: Int? = nil
+            var driveYards: Int? = nil
+            var topDisplay: String? = nil
+            var lastPlay: String? = nil
+            
+            if let drives = json?["drives"] as? [String: Any],
+               let currentDrive = drives["current"] as? [String: Any] {
+                
+                // Parse possession team
+                if let team = currentDrive["team"] as? [String: Any],
+                   let abbr = team["abbreviation"] as? String {
+                    possessionTeam = normalizeTeamCode(abbr.uppercased())
+                }
+                
+                // Parse drive stats
+                drivePlayCount = currentDrive["offensivePlays"] as? Int
+                driveYards = currentDrive["yards"] as? Int
+                
+                if let timeElapsed = currentDrive["timeElapsed"] as? [String: Any] {
+                    topDisplay = timeElapsed["displayValue"] as? String
+                }
+                
+                // Parse last play description
+                if let plays = currentDrive["plays"] as? [[String: Any]],
+                   let lastPlayObj = plays.last,
+                   let text = lastPlayObj["text"] as? String {
+                    lastPlay = text
+                }
+            }
+            
+            DebugPrint(mode: .bracketTimer, "🏈 [LIVE] Game \(gameID): \(possessionTeam ?? "?") has ball, \(down ?? 0) & \(distance ?? 0) at \(yardLine ?? "?")")
+            
+            return LiveGameSituation(
+                down: down,
+                distance: distance,
+                yardLine: yardLine,
+                possession: possessionTeam,
+                lastPlay: lastPlay,
+                drivePlayCount: drivePlayCount,
+                driveYards: driveYards,
+                timeOfPossession: topDisplay
+            )
+            
+        } catch {
+            DebugPrint(mode: .bracketTimer, "❌ Failed to fetch live situation for game \(gameID): \(error)")
+            return nil
+        }
+    }
+    
+    // 🏈 NEW: Refresh live situations for existing bracket without rebuilding
+    private func refreshLiveSituations(for bracket: PlayoffBracket) async {
+        DebugPrint(mode: .bracketTimer, "🔄 [REFRESH LIVE SITUATIONS] Updating play-by-play data")
+        
+        var updatedAFCGames: [PlayoffGame] = []
+        var updatedNFCGames: [PlayoffGame] = []
+        var updatedSuperBowl: PlayoffGame? = bracket.superBowl
+        
+        // Update AFC games
+        for game in bracket.afcGames {
+            if game.isLive {
+                let situation = await fetchLiveGameSituation(gameID: game.id)
+                
+                // Cache down/distance if we got valid data, otherwise preserve existing
+                var downDist = game.lastKnownDownDistance
+                if let sit = situation,
+                   let down = sit.down,
+                   let distance = sit.distance,
+                   down > 0, distance > 0 {
+                    downDist = CachedDownDistance(down: down, distance: distance)
+                    DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(game.id): \(downDist!.display)")
+                }
+                
+                let updated = PlayoffGame(
+                    id: game.id,
+                    round: game.round,
+                    conference: game.conference,
+                    homeTeam: game.homeTeam,
+                    awayTeam: game.awayTeam,
+                    gameDate: game.gameDate,
+                    status: game.status,
+                    venue: game.venue,
+                    broadcasts: game.broadcasts,
+                    liveSituation: situation,
+                    lastKnownDownDistance: downDist
+                )
+                updatedAFCGames.append(updated)
+            } else {
+                updatedAFCGames.append(game)
+            }
+        }
+        
+        // Update NFC games
+        for game in bracket.nfcGames {
+            if game.isLive {
+                let situation = await fetchLiveGameSituation(gameID: game.id)
+                
+                // Cache down/distance if we got valid data, otherwise preserve existing
+                var downDist = game.lastKnownDownDistance
+                if let sit = situation,
+                   let down = sit.down,
+                   let distance = sit.distance,
+                   down > 0, distance > 0 {
+                    downDist = CachedDownDistance(down: down, distance: distance)
+                    DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(game.id): \(downDist!.display)")
+                }
+                
+                let updated = PlayoffGame(
+                    id: game.id,
+                    round: game.round,
+                    conference: game.conference,
+                    homeTeam: game.homeTeam,
+                    awayTeam: game.awayTeam,
+                    gameDate: game.gameDate,
+                    status: game.status,
+                    venue: game.venue,
+                    broadcasts: game.broadcasts,
+                    liveSituation: situation,
+                    lastKnownDownDistance: downDist
+                )
+                updatedNFCGames.append(updated)
+            } else {
+                updatedNFCGames.append(game)
+            }
+        }
+        
+        // Update Super Bowl if live
+        if let sb = bracket.superBowl, sb.isLive {
+            let situation = await fetchLiveGameSituation(gameID: sb.id)
+            
+            // Cache down/distance if we got valid data, otherwise preserve existing
+            var downDist = sb.lastKnownDownDistance
+            if let sit = situation,
+               let down = sit.down,
+               let distance = sit.distance,
+               down > 0, distance > 0 {
+                downDist = CachedDownDistance(down: down, distance: distance)
+                DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(sb.id): \(downDist!.display)")
+            }
+            
+            updatedSuperBowl = PlayoffGame(
+                id: sb.id,
+                round: sb.round,
+                conference: sb.conference,
+                homeTeam: sb.homeTeam,
+                awayTeam: sb.awayTeam,
+                gameDate: sb.gameDate,
+                status: sb.status,
+                venue: sb.venue,
+                broadcasts: sb.broadcasts,
+                liveSituation: situation,
+                lastKnownDownDistance: downDist
+            )
+        }
+        
+        // Create updated bracket
+        let updatedBracket = PlayoffBracket(
+            season: bracket.season,
+            afcGames: updatedAFCGames,
+            nfcGames: updatedNFCGames,
+            superBowl: updatedSuperBowl,
+            afcSeed1: bracket.afcSeed1,
+            nfcSeed1: bracket.nfcSeed1
+        )
+        
+        // Update cache and current bracket
+        cache[bracket.season] = updatedBracket
+        currentBracket = updatedBracket
+        
+        DebugPrint(mode: .bracketTimer, "✅ [REFRESH LIVE SITUATIONS] Updated play-by-play data")
     }
 }

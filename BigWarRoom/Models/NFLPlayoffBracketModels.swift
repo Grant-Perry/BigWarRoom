@@ -47,6 +47,56 @@ enum PlayoffRound: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Live Game Situation
+
+/// Cached down and distance info
+struct CachedDownDistance: Codable, Equatable {
+    let down: Int
+    let distance: Int
+    
+    /// Display string for down & distance (e.g., "3rd & 7")
+    var display: String {
+        let suffix: String
+        switch down {
+        case 1: suffix = "st"
+        case 2: suffix = "nd"
+        case 3: suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(down)\(suffix) & \(distance)"
+    }
+}
+
+/// Current play-by-play situation for live games
+struct LiveGameSituation: Codable, Equatable {
+    let down: Int?                  // Current down (1-4)
+    let distance: Int?              // Yards to go for first down
+    let yardLine: String?           // Field position (e.g., "OPP 25", "OWN 40")
+    let possession: String?         // Team abbreviation that has the ball
+    let lastPlay: String?           // Description of last play
+    let drivePlayCount: Int?        // Number of plays in current drive
+    let driveYards: Int?            // Yards gained in current drive
+    let timeOfPossession: String?   // Time of possession for current drive (e.g., "3:45")
+    
+    /// Display string for down & distance (e.g., "3rd & 7")
+    var downDistanceDisplay: String? {
+        guard let down = down, let distance = distance else { return nil }
+        let suffix: String
+        switch down {
+        case 1: suffix = "st"
+        case 2: suffix = "nd"
+        case 3: suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(down)\(suffix) & \(distance)"
+    }
+    
+    /// Display string for field position with team context
+    var fieldPositionDisplay: String? {
+        yardLine
+    }
+}
+
 // MARK: - Playoff Game Models
 
 /// Represents a single playoff game
@@ -62,6 +112,8 @@ struct PlayoffGame: Identifiable, Codable, Equatable {
     let status: GameStatus
     let venue: Venue?
     let broadcasts: [String]?  // Network names: ["CBS", "Paramount+"]
+    let liveSituation: LiveGameSituation?  // 🏈 NEW: Live play-by-play data
+    let lastKnownDownDistance: CachedDownDistance?  // 🏈 NEW: Cached down/distance
     
     var formattedDate: String {
         let formatter = DateFormatter()

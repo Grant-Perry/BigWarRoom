@@ -8,11 +8,23 @@ import SwiftUI
 struct NFLLandscapeBracketView: View {
    @Environment(TeamAssetManager.self) private var teamAssets
    @Environment(NFLStandingsService.self) private var standingsService
-   let bracket: PlayoffBracket
-   let playoffService: NFLPlayoffBracketService?
+   let playoffService: NFLPlayoffBracketService
+
+   // 🔥 NEW: Computed property to get current bracket
+   private var bracket: PlayoffBracket? {
+      let bracket = playoffService.currentBracket
+      
+      // 🔥 NEW: Log when bracket property is accessed
+      if let b = bracket {
+         let liveCount = b.afcGames.filter { $0.isLive }.count + b.nfcGames.filter { $0.isLive }.count
+         DebugPrint(mode: .bracketTimer, "🔍 [LANDSCAPE VIEW] Bracket accessed - Live games: \(liveCount)")
+      }
+      
+      return bracket
+   }
 
    @State private var yearManager = SeasonYearManager.shared
-   @State private var selectedGame: PlayoffGame?
+   @State private var selectedGameID: String?
    @State private var showingGameDetail = false
    @State private var showingBookPicker = false
    @AppStorage("selectedSportsbook") private var selectedBook: String = Sportsbook.fanduel.rawValue
@@ -61,76 +73,99 @@ struct NFLLandscapeBracketView: View {
 
    var body: some View {
       GeometryReader { geo in
-         let availableWidth = geo.size.width
-         let availableHeight = geo.size.height
-         let widthScale = (availableWidth - 40) / idealTotalWidth
-         let heightScale = (availableHeight - 180) / (totalContentHeight + headerHeight + 50)
-         let finalScale = min(widthScale, heightScale, 1.0)
-         let headerFontSize: CGFloat = availableWidth < 700 ? 24 : 32
-         let topPadding: CGFloat = availableWidth < 700 ? 20 : 45
-         let bottomPadding: CGFloat = availableWidth < 700 ? 10 : 20
-         
-         // Determine if we should apply the 1.1 scale boost based on screen size
-         // iPhone Pro Max/Plus in landscape ~930pts, standard iPhones ~850pts
-         let isLargeScreen = availableWidth >= 900
-         let contentScale = isLargeScreen ? 1.1 : 1.0
-
-         ZStack {
-            Image("BG3")
-               .resizable()
-               .aspectRatio(contentMode: .fill)
-               .opacity(0.25)
-               .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-               yearPickerMenu(headerFontSize: headerFontSize, topPadding: topPadding, bottomPadding: bottomPadding)
-
-               HStack(alignment: .top, spacing: 0) {
-                  conferenceSide(conference: .afc, isReversed: false)
-                  superBowlColumn
-                  conferenceSide(conference: .nfc, isReversed: true)
-               }
-               .onPreferenceChange(AFCChampConnectionKey.self) { point in
-                  afcChampPoint = point
-               }
-               .onPreferenceChange(NFCChampConnectionKey.self) { point in
-                  nfcChampPoint = point
-               }
-               .onPreferenceChange(AFCSBConnectionKey.self) { point in
-                  afcSBPoint = point
-               }
-               .onPreferenceChange(NFCSBConnectionKey.self) { point in
-                  nfcSBPoint = point
-               }
-               .background(
-                  GeometryReader { geo in
-                     ZStack {
-                        // Draw smart connectors using the geometry
-                        if let start = afcChampPoint, let end = afcSBPoint {
-                           SmartBracketConnector(startPoint: start, endPoint: end, isReversed: false)
-                        }
-                        if let start = nfcChampPoint, let end = nfcSBPoint {
-                           SmartBracketConnector(startPoint: start, endPoint: end, isReversed: true)
-                        }
-                     }
-                     .coordinateSpace(name: "bracket")
-                  }
-               )
-               .scaleEffect(contentScale)
-               .scaleEffect(finalScale)
-               .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+         if let bracket = bracket {
+            bracketContent(bracket: bracket, geo: geo)
+         } else {
+            loadingView
          }
+      }
+   }
+   
+   @ViewBuilder
+   private func bracketContent(bracket: PlayoffBracket, geo: GeometryProxy) -> some View {
+      let availableWidth = geo.size.width
+      let availableHeight = geo.size.height
+      let widthScale = (availableWidth - 40) / idealTotalWidth
+      let heightScale = (availableHeight - 180) / (totalContentHeight + headerHeight + 50)
+      let finalScale = min(widthScale, heightScale, 1.0)
+      let headerFontSize: CGFloat = availableWidth < 700 ? 24 : 32
+      let topPadding: CGFloat = availableWidth < 700 ? 20 : 45
+      let bottomPadding: CGFloat = availableWidth < 700 ? 10 : 20
+      
+      // Determine if we should apply the 1.1 scale boost based on screen size
+      // iPhone Pro Max/Plus in landscape ~930pts, standard iPhones ~850pts
+      let isLargeScreen = availableWidth >= 900
+      let contentScale = isLargeScreen ? 1.1 : 1.0
+
+      ZStack {
+         Image("BG3")
+            .resizable()
+            .aspectRatio(contentMode: .fill)
+            .opacity(0.25)
+            .ignoresSafeArea()
+
+         VStack(spacing: 0) {
+            yearPickerMenu(headerFontSize: headerFontSize, topPadding: topPadding, bottomPadding: bottomPadding)
+
+            HStack(alignment: .top, spacing: 0) {
+               conferenceSide(conference: .afc, isReversed: false, bracket: bracket)
+               superBowlColumn(bracket: bracket)
+               conferenceSide(conference: .nfc, isReversed: true, bracket: bracket)
+            }
+            .onPreferenceChange(AFCChampConnectionKey.self) { point in
+               afcChampPoint = point
+            }
+            .onPreferenceChange(NFCChampConnectionKey.self) { point in
+               nfcChampPoint = point
+            }
+            .onPreferenceChange(AFCSBConnectionKey.self) { point in
+               afcSBPoint = point
+            }
+            .onPreferenceChange(NFCSBConnectionKey.self) { point in
+               nfcSBPoint = point
+            }
+            .background(
+               GeometryReader { geo in
+                  ZStack {
+                     // Draw smart connectors using the geometry
+                     if let start = afcChampPoint, let end = afcSBPoint {
+                        SmartBracketConnector(startPoint: start, endPoint: end, isReversed: false)
+                     }
+                     if let start = nfcChampPoint, let end = nfcSBPoint {
+                        SmartBracketConnector(startPoint: start, endPoint: end, isReversed: true)
+                     }
+                  }
+                  .coordinateSpace(name: "bracket")
+               }
+            )
+            .scaleEffect(contentScale)
+            .scaleEffect(finalScale)
+            .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)
+         }
+         .frame(maxWidth: .infinity, maxHeight: .infinity)
          
          // Game detail modal overlay
-         if showingGameDetail, let game = selectedGame {
+         if showingGameDetail, let gameID = selectedGameID, let game = findGame(by: gameID, in: bracket) {
             gameDetailOverlay(game: game)
          }
          
          // Book picker modal overlay
-         if showingBookPicker, let game = selectedGame {
+         if showingBookPicker, let gameID = selectedGameID, let game = findGame(by: gameID, in: bracket) {
             bookPickerOverlay(game: game)
+         }
+      }
+   }
+   
+   @ViewBuilder
+   private var loadingView: some View {
+      ZStack {
+         Color.black.ignoresSafeArea()
+         VStack(spacing: 16) {
+            ProgressView()
+               .scaleEffect(1.5)
+               .tint(.white)
+            Text("Loading bracket...")
+               .foregroundColor(.white)
          }
       }
    }
@@ -169,7 +204,7 @@ struct NFLLandscapeBracketView: View {
    }
    
    @ViewBuilder
-   private func conferenceSide(conference: PlayoffGame.Conference, isReversed: Bool) -> some View {
+   private func conferenceSide(conference: PlayoffGame.Conference, isReversed: Bool, bracket: PlayoffBracket) -> some View {
       let actualCurrentSeasonYear = NFLWeekCalculator.getCurrentSeasonYear()
       let isCurrentSeason = (bracket.season == actualCurrentSeasonYear)
       
@@ -201,7 +236,7 @@ struct NFLLandscapeBracketView: View {
       )
    }
    
-   private var superBowlColumn: some View {
+   private func superBowlColumn(bracket: PlayoffBracket) -> some View {
       PlayoffSuperBowlColumnView(
          bracket: bracket,
          cellWidth: cellWidth,
@@ -223,57 +258,95 @@ struct NFLLandscapeBracketView: View {
             .ignoresSafeArea()
             .onTapGesture {
                showingGameDetail = false
-               selectedGame = nil
+               selectedGameID = nil
             }
          
          VStack(spacing: 0) {
-            // Header
+            // Header with timer - SUPER COMPACT
             HStack {
                Text(game.round.displayName)
-                  .font(.title2)
+                  .font(.headline)
                   .fontWeight(.bold)
                   .foregroundStyle(.white)
                
                Spacer()
                
+               // 🏈 NEW: Refresh countdown timer (only for live games)
+               if game.isLive {
+                  RefreshCountdownTimerView()
+               }
+               
+               Spacer()
+               
                Button {
                   showingGameDetail = false
-                  selectedGame = nil
+                  selectedGameID = nil
                } label: {
                   Image(systemName: "xmark.circle.fill")
-                     .font(.title2)
+                     .font(.title3)
                      .foregroundStyle(.white.opacity(0.7))
                }
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .frame(height: 36)
             .background(Color(.systemGray6))
             
-            // Matchup Card
-            let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-            let odds = playoffService?.gameOdds[gameID]
-            let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
-            let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
-            
-            PlayoffGameDetailCard(
-               game: game,
-               displayOdds: displayOdds,
-               scoreSize: scoreSize,
-               scoreOffset: scoreOffset
-            )
-            .padding()
-            
-            // Odds bar (only if game not completed)
-            if !game.isCompleted, odds != nil {
-               PlayoffOddsBar(
+            // 🏈 NEW: Live game situation (if game is live)
+            if game.isLive, let situation = game.liveSituation {
+               ScrollView {
+                  VStack(spacing: 10) {
+                     // Matchup Card
+                     let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                     let odds = playoffService.gameOdds[gameID]
+                     let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
+                     let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
+                     
+                     PlayoffGameDetailCard(
+                        game: game,
+                        displayOdds: displayOdds,
+                        scoreSize: scoreSize,
+                        scoreOffset: scoreOffset
+                     )
+                     .padding(.horizontal, 16)
+                     .padding(.top, 4)
+                     
+                     // Live situation card
+                     liveGameSituationView(situation: situation)
+                        .padding(.horizontal, 16)
+                  }
+               }
+            } else {
+               // Matchup Card (non-live games)
+               let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+               let odds = playoffService.gameOdds[gameID]
+               let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
+               let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
+               
+               PlayoffGameDetailCard(
+                  game: game,
                   displayOdds: displayOdds,
-                  currentSportsbook: currentSportsbook,
-                  onBookPickerTap: { showingBookPicker = true }
+                  scoreSize: scoreSize,
+                  scoreOffset: scoreOffset
                )
-               .padding(.horizontal)
-               .padding(.bottom, 16)
+               .padding(.horizontal, 16)
+               .padding(.top, 8)
+               .padding(.bottom, 12)
+               
+               // Odds bar (only if game not completed)
+               if !game.isCompleted, odds != nil {
+                  PlayoffOddsBar(
+                     displayOdds: displayOdds,
+                     currentSportsbook: currentSportsbook,
+                     onBookPickerTap: { showingBookPicker = true }
+                  )
+                  .padding(.horizontal, 16)
+                  .padding(.bottom, 12)
+               }
             }
          }
-         .frame(width: 500)
+         .frame(width: 480)
+         .scaleEffect(0.95)
          .fixedSize(horizontal: false, vertical: true)
          .background(Color(.systemBackground))
          .cornerRadius(20)
@@ -282,6 +355,127 @@ struct NFLLandscapeBracketView: View {
       }
       .transition(.opacity)
       .animation(.easeInOut(duration: 0.2), value: showingGameDetail)
+   }
+   
+   // 🏈 NEW: Live game situation display
+   @ViewBuilder
+   private func liveGameSituationView(situation: LiveGameSituation) -> some View {
+      VStack(alignment: .leading, spacing: 12) {
+         // Header
+         HStack(spacing: 12) {
+            Image(systemName: "sportscourt.fill")
+               .font(.title3)
+               .foregroundStyle(.red)
+               .frame(width: 24)
+            
+            Text("Live Game Situation")
+               .font(.subheadline)
+               .fontWeight(.semibold)
+               .foregroundStyle(.primary)
+            
+            Spacer()
+         }
+         
+         // 🔥 NEW: Last Play (left) and Current Drive (right) in same row
+         HStack(alignment: .top, spacing: 12) {
+            // Last Play
+            if let lastPlay = situation.lastPlay {
+               VStack(alignment: .leading, spacing: 6) {
+                  Text("Last Play")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+                  
+                  Text(lastPlay)
+                     .font(.caption)
+                     .foregroundStyle(.primary)
+                     .fixedSize(horizontal: false, vertical: true)
+                     .lineLimit(3)
+               }
+               .padding(.horizontal, 12)
+               .padding(.vertical, 8)
+               .frame(maxWidth: .infinity, alignment: .leading)
+               .background(Color(.tertiarySystemGroupedBackground))
+               .cornerRadius(8)
+            }
+            
+            // Current Drive Stats
+            if situation.drivePlayCount != nil || situation.driveYards != nil || situation.timeOfPossession != nil {
+               VStack(alignment: .leading, spacing: 6) {
+                  Text("Current Drive")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+                  
+                  HStack(spacing: 12) {
+                     if let yards = situation.driveYards {
+                        VStack(alignment: .leading, spacing: 2) {
+                           Text("\(yards)")
+                              .font(.title3)
+                              .fontWeight(.bold)
+                           Text("Yards")
+                              .font(.caption2)
+                              .foregroundStyle(.secondary)
+                        }
+                     }
+                     
+                     if let top = situation.timeOfPossession {
+                        VStack(alignment: .leading, spacing: 2) {
+                           Text(top)
+                              .font(.title3)
+                              .fontWeight(.bold)
+                           Text("TOP")
+                              .font(.caption2)
+                              .foregroundStyle(.secondary)
+                        }
+                     }
+                  }
+               }
+               .padding(.horizontal, 12)
+               .padding(.vertical, 8)
+               .frame(maxWidth: .infinity, alignment: .leading)
+               .background(Color(.tertiarySystemGroupedBackground))
+               .cornerRadius(8)
+            }
+         }
+         
+         // Down & Distance with Field Position
+         if let downDist = situation.downDistanceDisplay {
+            HStack(spacing: 8) {
+               VStack(alignment: .leading, spacing: 2) {
+                  Text("Down & Distance")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+                  
+                  Text(downDist)
+                     .font(.title3)
+                     .fontWeight(.black)
+                     .foregroundStyle(.primary)
+               }
+               
+               Spacer()
+               
+               // Field position
+               if let yardLine = situation.yardLine {
+                  VStack(alignment: .trailing, spacing: 2) {
+                     Text("Field Position")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     
+                     Text(yardLine)
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
+                  }
+               }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .cornerRadius(8)
+         }
+      }
+      .padding()
+      .background(Color(.secondarySystemGroupedBackground))
+      .cornerRadius(12)
    }
    
    @ViewBuilder
@@ -294,7 +488,7 @@ struct NFLLandscapeBracketView: View {
             }
          
          let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-         if let odds = playoffService?.gameOdds[gameID] {
+         if let odds = playoffService.gameOdds[gameID] {
             BookPickerSheet(
                odds: odds,
                selectedBook: $selectedBook,
@@ -310,8 +504,24 @@ struct NFLLandscapeBracketView: View {
    // MARK: - Helpers
    
    private func handleGameTap(_ game: PlayoffGame) {
-      selectedGame = game
+      selectedGameID = game.id
       showingGameDetail = true
+   }
+   
+   // 🔥 NEW: Find current game by ID in provided bracket
+   private func findGame(by id: String, in bracket: PlayoffBracket) -> PlayoffGame? {
+      // Search all games in current bracket
+      let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
+      let game = allGames.first { $0.id == id }
+      
+      // 🔥 NEW: Log game lookup
+      if let g = game {
+         DebugPrint(mode: .bracketTimer, "🔍 [GAME LOOKUP] Found game \(id): \(g.awayTeam.abbreviation)@\(g.homeTeam.abbreviation), Status: \(g.status.displayText), Away: \(g.awayTeam.score ?? 0), Home: \(g.homeTeam.score ?? 0)")
+      } else {
+         DebugPrint(mode: .bracketTimer, "⚠️ [GAME LOOKUP] Could not find game \(id) in bracket!")
+      }
+      
+      return game
    }
    
    private func getDisplayOdds(from odds: GameBettingOdds?, book: Sportsbook) -> GameBettingOdds? {

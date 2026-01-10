@@ -99,7 +99,9 @@ struct PlayoffRoundView: View {
             gameDate: Date(),
             status: .final,
             venue: PlayoffGame.Venue(fullName: "Arrowhead Stadium", city: "Kansas City", state: "MO"),
-            broadcasts: ["CBS", "Paramount+"]
+            broadcasts: ["CBS", "Paramount+"],
+            liveSituation: nil,
+            lastKnownDownDistance: nil
         ),
         PlayoffGame(
             id: "2",
@@ -110,7 +112,9 @@ struct PlayoffRoundView: View {
             gameDate: Date().addingTimeInterval(7200),
             status: .scheduled,
             venue: PlayoffGame.Venue(fullName: "Highmark Stadium", city: "Buffalo", state: "NY"),
-            broadcasts: ["NBC", "Peacock"]
+            broadcasts: ["NBC", "Peacock"],
+            liveSituation: nil,
+            lastKnownDownDistance: nil
         )
     ]
     
