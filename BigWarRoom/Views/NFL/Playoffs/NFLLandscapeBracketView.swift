@@ -16,6 +16,12 @@ struct NFLLandscapeBracketView: View {
    @State private var showingGameDetail = false
    @State private var showingBookPicker = false
    @AppStorage("selectedSportsbook") private var selectedBook: String = Sportsbook.fanduel.rawValue
+   
+   // Smart connector points
+   @State private var afcChampPoint: ConnectionPoint?
+   @State private var nfcChampPoint: ConnectionPoint?
+   @State private var afcSBPoint: ConnectionPoint?
+   @State private var nfcSBPoint: ConnectionPoint?
 
    private let cellWidth: CGFloat = 95
    private let cellHeight: CGFloat = 40
@@ -67,7 +73,7 @@ struct NFLLandscapeBracketView: View {
          // Determine if we should apply the 1.1 scale boost based on screen size
          // iPhone Pro Max/Plus in landscape ~930pts, standard iPhones ~850pts
          let isLargeScreen = availableWidth >= 900
-         let contentScale = isLargeScreen ? 1.2 : 1.0
+         let contentScale = isLargeScreen ? 1.1 : 1.0
 
          ZStack {
             Image("BG3")
@@ -84,6 +90,32 @@ struct NFLLandscapeBracketView: View {
                   superBowlColumn
                   conferenceSide(conference: .nfc, isReversed: true)
                }
+               .onPreferenceChange(AFCChampConnectionKey.self) { point in
+                  afcChampPoint = point
+               }
+               .onPreferenceChange(NFCChampConnectionKey.self) { point in
+                  nfcChampPoint = point
+               }
+               .onPreferenceChange(AFCSBConnectionKey.self) { point in
+                  afcSBPoint = point
+               }
+               .onPreferenceChange(NFCSBConnectionKey.self) { point in
+                  nfcSBPoint = point
+               }
+               .background(
+                  GeometryReader { geo in
+                     ZStack {
+                        // Draw smart connectors using the geometry
+                        if let start = afcChampPoint, let end = afcSBPoint {
+                           SmartBracketConnector(startPoint: start, endPoint: end, isReversed: false)
+                        }
+                        if let start = nfcChampPoint, let end = nfcSBPoint {
+                           SmartBracketConnector(startPoint: start, endPoint: end, isReversed: true)
+                        }
+                     }
+                     .coordinateSpace(name: "bracket")
+                  }
+               )
                .scaleEffect(contentScale)
                .scaleEffect(finalScale)
                .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)

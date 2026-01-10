@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [.appLoad, .bettingOdds]  // Added bettingOdds for odds debugging
+   static var activeMode: DebugMode = [] // [.appLoad, .bettingOdds]  // Added bettingOdds for odds debugging
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {

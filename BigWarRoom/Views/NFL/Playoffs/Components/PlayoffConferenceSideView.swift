@@ -202,8 +202,8 @@ struct PlayoffConferenceSideView: View {
          BracketHeader(text: "")
          Div_Champ_Connector(
             isReversed: isReversed,
-            src1: divGame1 != nil ? yDiv1Center : nil,
-            src2: divGame2 != nil ? yDiv2Center : nil,
+            src1: (divGame1 != nil || isCurrentSeason) ? yDiv1Center : nil,
+            src2: (divGame2 != nil || isCurrentSeason) ? yDiv2Center : nil,
             dst_top: yChampTop,
             dst_bot: yChampBot
          )
@@ -250,17 +250,21 @@ struct PlayoffConferenceSideView: View {
          if conference == .afc {
             Champ_SB_Connector(
                isReversed: false,
-               src: champGame != nil ? yChampCenter + headerHeight : nil,
-               dst: yChampCenter + headerHeight - 23
+               src: (champGame != nil || isCurrentSeason) ? yChampCenter + headerHeight : nil,
+               dst: yChampCenter + headerHeight - 33,
+               startOffset: 8
             )
+            .frame(width: connectorWidth + 16)
          } else {
             Champ_SB_Connector(
                isReversed: false,
-               src: champGame != nil ? yChampCenter + headerHeight : nil,
-               dst: yChampCenter + headerHeight - 23
+               src: (champGame != nil || isCurrentSeason) ? yChampCenter + headerHeight : nil,
+               dst: yChampCenter + headerHeight - 45,
+               startOffset: 8
             )
+            .frame(width: connectorWidth + 16)
+            .offset(x: -6, y: 45)
             .scaleEffect(x: -1, y: 1)
-            .offset(y: 45)
          }
       }
       .frame(width: connectorWidth)
