@@ -63,6 +63,11 @@ struct NFLLandscapeBracketView: View {
          let headerFontSize: CGFloat = availableWidth < 700 ? 24 : 32
          let topPadding: CGFloat = availableWidth < 700 ? 20 : 45
          let bottomPadding: CGFloat = availableWidth < 700 ? 10 : 20
+         
+         // Determine if we should apply the 1.1 scale boost based on screen size
+         // iPhone Pro Max/Plus in landscape ~930pts, standard iPhones ~850pts
+         let isLargeScreen = availableWidth >= 900
+         let contentScale = isLargeScreen ? 1.2 : 1.0
 
          ZStack {
             Image("BG3")
@@ -79,7 +84,7 @@ struct NFLLandscapeBracketView: View {
                   superBowlColumn
                   conferenceSide(conference: .nfc, isReversed: true)
                }
-               .scaleEffect(1.1)
+               .scaleEffect(contentScale)
                .scaleEffect(finalScale)
                .frame(width: idealTotalWidth * finalScale, height: (totalContentHeight + headerHeight + 50) * finalScale)
             }
