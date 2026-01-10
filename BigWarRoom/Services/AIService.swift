@@ -147,23 +147,6 @@ final class AIService {
     }
 }
 
-private struct OpenAIChatResponse: Codable {
-    struct Choice: Codable {
-        struct Message: Codable {
-            let role: String
-            let content: String
-        }
-        let index: Int
-        let message: Message
-        let finish_reason: String?
-    }
-    let id: String
-    let object: String
-    let created: Int
-    let model: String
-    let choices: [Choice]
-}
-
 // MARK: -> AI Errors
 enum AIError: Error, LocalizedError {
     case invalidResponse

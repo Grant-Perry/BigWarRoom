@@ -675,106 +675,9 @@ final class NFLPlayoffBracketService {
             DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   \(gameID): spread=\(gameOdds.spreadDisplay ?? "N/A"), total=\(gameOdds.totalDisplay ?? "N/A"), book=\(gameOdds.sportsbook ?? "N/A")")
         }
     }
-}
-
-// MARK: - ESPN Standings V2 Response Model
-
-private struct ESPNStandingsV2Response: Decodable {
-    let children: [Child]?
     
-    struct Child: Decodable {
-        let standings: Standings?
-    }
+    // MARK: - Weekly Postseason Fetch
     
-    struct Standings: Decodable {
-        let entries: [Entry]?
-    }
-    
-    struct Entry: Decodable {
-        let team: Team
-        let stats: [Stat]?
-    }
-    
-    struct Team: Decodable {
-        let abbreviation: String
-    }
-    
-    struct Stat: Decodable {
-        let name: String?
-        let type: String?
-        let value: Double?
-        let displayValue: String?
-    }
-}
-
-// MARK: - ESPN Scoreboard Response Model
-
-private struct ESPNScoreboardResponse: Decodable {
-    let events: [Event]?
-    
-    struct Event: Decodable {
-        let id: String?
-        let name: String?
-        let date: String?
-        let week: Week?
-        let competitions: [Competition]?
-        let venue: Venue?
-        let broadcasts: [Broadcast]?
-    }
-    
-    struct Week: Decodable {
-        let number: Int?
-    }
-    
-    struct Competition: Decodable {
-        let competitors: [Competitor]?
-        let status: Status?
-        let venue: Venue?
-        let broadcasts: [Broadcast]?
-    }
-    
-    struct Note: Decodable {
-        let headline: String?
-    }
-    
-    struct Competitor: Decodable {
-        let homeAway: String?
-        let team: Team
-        let score: String?
-    }
-    
-    struct Team: Decodable {
-        let abbreviation: String
-    }
-    
-    struct Status: Decodable {
-        let type: StatusType?
-        let period: Int?
-        let displayClock: String?
-    }
-    
-    struct StatusType: Decodable {
-        let state: String?
-        let completed: Bool?
-    }
-    
-    struct Venue: Decodable {
-        let fullName: String?
-        let address: VenueAddress?
-        
-        struct VenueAddress: Decodable {
-            let city: String?
-            let state: String?
-        }
-    }
-    
-    struct Broadcast: Decodable {
-        let market: String?
-        let names: [String]?
-    }
-}
-
-// MARK: - Weekly postseason fetch (weeks 1..5 to include Super Bowl after Pro Bowl)
     private func fetchWeeklyPlayoffEvents(for season: Int) async throws -> [ESPNScoreboardResponse.Event] {
         var all: [ESPNScoreboardResponse.Event] = []
         for wk in 1...5 {
@@ -791,8 +694,9 @@ private struct ESPNScoreboardResponse: Decodable {
         }
         return all
     }
-
-// MARK: - Detect whether SB event is generic/missing scores
+    
+    // MARK: - Super Bowl Detection & Fallback
+    
     private func isGenericSuperBowl(_ game: PlayoffGame) -> Bool {
         let home = game.homeTeam.abbreviation.uppercased()
         let away = game.awayTeam.abbreviation.uppercased()
@@ -801,8 +705,7 @@ private struct ESPNScoreboardResponse: Decodable {
         let missingScores = (game.homeTeam.score == nil && game.awayTeam.score == nil)
         return isGenericHome || isGenericAway || missingScores
     }
-
-// MARK: - Historical SB fallback 2012–2024 (season year)
+    
     private func fallbackSuperBowl(for season: Int) -> PlayoffGame? {
         let results: [Int: (winner: String, loser: String, wScore: Int, lScore: Int, venue: String, city: String, state: String)] = [
             2012: ("BAL","SF",34,31, "Mercedes-Benz Superdome", "New Orleans", "LA"),
@@ -859,8 +762,7 @@ private struct ESPNScoreboardResponse: Decodable {
             broadcasts: nil
         )
     }
-
-// MARK: - Compute SB date (2nd Sunday of February)
+    
     private func computeSuperBowlDate(for playoffYear: Int) -> Date {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(abbreviation: "UTC") ?? .current
@@ -873,3 +775,4 @@ private struct ESPNScoreboardResponse: Decodable {
         // 2nd Sunday
         return cal.date(byAdding: .day, value: 7, to: d) ?? d
     }
+}

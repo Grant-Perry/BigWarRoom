@@ -2,207 +2,124 @@
 //  NFLStandingsService.swift
 //  BigWarRoom
 //
-//  Real NFL team standings and records service using ESPN API
+//  Service for fetching and managing NFL team standings and records from ESPN API
 //
 
 import Foundation
 import SwiftUI
 import Observation
 
-// MARK: -> Playoff Status Enum
-enum PlayoffStatus: String, Codable {
-    case eliminated = "eliminated"
-    case alive = "alive"
-    case bubble = "bubble"
-    case clinched = "clinched"
-    case unknown = "unknown"
-    
-    var displayText: String {
-        switch self {
-        case .eliminated: return "ELIMINATED"
-        case .alive: return "IN CONTENTION"
-        case .bubble: return "ON THE BUBBLE"
-        case .clinched: return "CLINCHED"
-        case .unknown: return ""
-        }
-    }
-    
-    var color: Color {
-        switch self {
-        case .eliminated: return .gray
-        case .alive: return .green
-        case .bubble: return .orange
-        case .clinched: return .blue
-        case .unknown: return .clear
-        }
-    }
-}
-
-// MARK: -> ESPN NFL Team Record API Response Models
-struct NFLTeamRecordResponse: Codable {
-    let team: NFLTeamWithRecord
-}
-
-struct NFLTeamWithRecord: Codable {
-    let id: String
-    let abbreviation: String
-    let displayName: String
-    let name: String
-    let record: NFLTeamRecordData
-}
-
-struct NFLTeamRecordData: Codable {
-    let items: [NFLRecordItem]
-}
-
-struct NFLRecordItem: Codable {
-    let type: String
-    let summary: String
-    let stats: [NFLRecordStat]
-}
-
-struct NFLRecordStat: Codable {
-    let name: String
-    let value: Double
-}
-
-// MARK: -> ESPN Standings API Response (for playoff status)
-struct ESPNStandingsResponse: Codable {
-    let standings: [ESPNStandingsGroup]
-}
-
-struct ESPNStandingsGroup: Codable {
-    let teams: [ESPNStandingsTeamEntry]
-}
-
-struct ESPNStandingsTeamEntry: Codable {
-    let team: ESPNStandingsTeamInfo
-    let eliminated: Bool?           // 🔥 FIXED: At team entry level, not team info level
-    let clinched: Bool?             // 🔥 FIXED: At team entry level
-    let seed: Int?                  // 🔥 FIXED: At team entry level
-}
-
-struct ESPNStandingsTeamInfo: Codable {
-    let id: String
-    let abbreviation: String
-    let displayName: String
-}
-
-// MARK: -> Processed Team Record
-struct NFLTeamRecord {
-    let teamCode: String
-    let teamName: String
-    let wins: Int
-    let losses: Int
-    let ties: Int
-    let playoffStatus: PlayoffStatus
-    
-    /// Record display string (e.g., "10-4", "7-7-1")
-    var displayRecord: String {
-        if ties > 0 {
-            return "\(wins)-\(losses)-\(ties)"
-        } else {
-            return "\(wins)-\(losses)"
-        }
-    }
-    
-    /// Winning percentage
-    var winningPercentage: Double {
-        let totalGames = wins + losses + ties
-        guard totalGames > 0 else { return 0.0 }
-        return Double(wins) / Double(totalGames)
-    }
-}
-
-// MARK: -> NFL Standings Service
 @Observable
 @MainActor
 final class NFLStandingsService {
     
-    // 🔥 PHASE 2 TEMPORARY: Bridge pattern - allow both .shared AND dependency injection
+    // MARK: - Shared Instance (Bridge Pattern)
+    
+    /// Temporary bridge pattern - allows both .shared AND dependency injection
+    /// TODO: Phase out .shared in favor of pure dependency injection
     private static var _shared: NFLStandingsService?
     
     static var shared: NFLStandingsService {
         if let existing = _shared {
             return existing
         }
-        // Create temporary shared instance
         let instance = NFLStandingsService()
         _shared = instance
         return instance
     }
     
-    // 🔥 PHASE 2: Allow setting the shared instance for proper DI
+    /// Set the shared instance for dependency injection
     static func setSharedInstance(_ instance: NFLStandingsService) {
         _shared = instance
     }
     
-    // MARK: - Observable Properties (No @Published needed with @Observable)
+    // MARK: - Observable Properties
+    
     var teamRecords: [String: NFLTeamRecord] = [:]
     var isLoading = false
     var errorMessage: String?
     
     @ObservationIgnored private var fetchTask: Task<Void, Never>?
     @ObservationIgnored private var cacheTimestamp: Date?
-    @ObservationIgnored private let cacheExpiration: TimeInterval = 3600 // 1 hour - standings don't change as often
+    @ObservationIgnored private let cacheExpiration: TimeInterval = 3600 // 1 hour
     
-    // Team ID mapping for ESPN API
+    // MARK: - ESPN Team ID Mapping
+    
+    /// ESPN API Team ID Mapping
+    ///
+    /// ESPN's API uses numeric team IDs in their endpoints (e.g., `/teams/22` for Arizona).
+    /// This map translates our standard NFL team abbreviations to ESPN's internal team IDs.
+    ///
+    /// **Why hardcoded?**
+    /// - ESPN team IDs are stable and have not changed in 20+ years
+    /// - No ESPN API endpoint exists to dynamically look up "ARI" → "22"
+    /// - Avoids unnecessary API calls on every team record fetch
+    /// - Performance: instant local lookup vs. network request
+    ///
+    /// **Maintenance:**
+    /// - Only needs updating if NFL adds a new franchise (last: HOU in 2002)
+    /// - Or if ESPN completely redesigns their ID system (extremely unlikely)
+    ///
+    /// **Source:**
+    /// IDs derived from ESPN's public API structure:
+    /// `https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{ID}`
+    ///
+    /// **Note:**
+    /// Both "WSH" and "WAS" map to ID "28" to handle Washington's naming variations
+    /// across different data sources (Commanders branding transition).
     @ObservationIgnored private let teamIdMap: [String: String] = [
-        "ARI": "22", "ATL": "1", "BAL": "33", "BUF": "2", "CAR": "29", "CHI": "3",
-        "CIN": "4", "CLE": "5", "DAL": "6", "DEN": "7", "DET": "8", "GB": "9",
-        "HOU": "34", "IND": "11", "JAX": "30", "KC": "12", "LV": "13", "LAC": "24",
-        "LAR": "14", "MIA": "15", "MIN": "16", "NE": "17", "NO": "18", "NYG": "19",
-        "NYJ": "20", "PHI": "21", "PIT": "23", "SF": "25", "SEA": "26", "TB": "27",
-        "TEN": "10", "WSH": "28", "WAS": "28" // Handle both Washington codes
+        "ARI": "22",  // Arizona Cardinals
+        "ATL": "1",   // Atlanta Falcons
+        "BAL": "33",  // Baltimore Ravens
+        "BUF": "2",   // Buffalo Bills
+        "CAR": "29",  // Carolina Panthers
+        "CHI": "3",   // Chicago Bears
+        "CIN": "4",   // Cincinnati Bengals
+        "CLE": "5",   // Cleveland Browns
+        "DAL": "6",   // Dallas Cowboys
+        "DEN": "7",   // Denver Broncos
+        "DET": "8",   // Detroit Lions
+        "GB": "9",    // Green Bay Packers
+        "HOU": "34",  // Houston Texans
+        "IND": "11",  // Indianapolis Colts
+        "JAX": "30",  // Jacksonville Jaguars
+        "KC": "12",   // Kansas City Chiefs
+        "LV": "13",   // Las Vegas Raiders
+        "LAC": "24",  // Los Angeles Chargers
+        "LAR": "14",  // Los Angeles Rams
+        "MIA": "15",  // Miami Dolphins
+        "MIN": "16",  // Minnesota Vikings
+        "NE": "17",   // New England Patriots
+        "NO": "18",   // New Orleans Saints
+        "NYG": "19",  // New York Giants
+        "NYJ": "20",  // New York Jets
+        "PHI": "21",  // Philadelphia Eagles
+        "PIT": "23",  // Pittsburgh Steelers
+        "SF": "25",   // San Francisco 49ers
+        "SEA": "26",  // Seattle Seahawks
+        "TB": "27",   // Tampa Bay Buccaneers
+        "TEN": "10",  // Tennessee Titans
+        "WSH": "28",  // Washington Commanders (primary code)
+        "WAS": "28"   // Washington Commanders (legacy code for compatibility)
     ]
-    
-    // MARK: - ESPN Standings (Playoff clincher / seed / eliminated)
-    //
-    // We use ESPN's standings endpoint to avoid trying to re-implement NFL elimination math.
-    // This brings our Schedule tab badges (CLINCH / HUNT / BUBBLE / OUT) back in line with
-    // the source-of-truth flags (clincher + playoffSeed).
-    private struct ESPNStandingsV2Response: Decodable {
-        let children: [Child]?
-        
-        struct Child: Decodable {
-            let standings: Standings?
-        }
-        
-        struct Standings: Decodable {
-            let entries: [Entry]?
-        }
-        
-        struct Entry: Decodable {
-            let team: Team
-            let stats: [Stat]?
-        }
-        
-        struct Team: Decodable {
-            let abbreviation: String
-        }
-        
-        struct Stat: Decodable {
-            let name: String?
-            let type: String?
-            let value: Double?
-            let displayValue: String?
-        }
-    }
     
     // MARK: - Initialization
     
-    // 🔥 PHASE 2.5: Make init public for dependency injection
     init() {
-        // Auto-fetch on init
         fetchStandings()
     }
     
-    /// Fetch real NFL standings from ESPN APIs (records + calculated playoff status)
+    // MARK: - Public Methods
+    
+    /// Fetch NFL standings from ESPN API
+    ///
+    /// - Parameters:
+    ///   - forceRefresh: If true, bypasses cache and fetches fresh data
+    ///   - season: Optional season year (defaults to current season from SeasonYearManager)
     func fetchStandings(forceRefresh: Bool = false, season: Int? = nil) {
-        // Use provided season or default to SeasonYearManager's selected year
         let targetSeason = season ?? (Int(SeasonYearManager.shared.selectedYear) ?? NFLWeekCalculator.getCurrentSeasonYear())
         
-        // Check cache first (now season-aware)
+        // Check cache
         if !forceRefresh,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheExpiration,
@@ -211,7 +128,6 @@ final class NFLStandingsService {
             return
         }
         
-        // Cancel any existing fetch task
         fetchTask?.cancel()
         
         fetchTask = Task { [weak self] in
@@ -224,15 +140,17 @@ final class NFLStandingsService {
             
             DebugPrint(mode: .espnAPI, "🏈 Fetching NFL team records from ESPN API for season \(targetSeason)...")
             
-            // Prefer ESPN standings flags (clincher/eliminated + playoff seed) for playoff status.
-            // Fallback to our calculation only if the standings endpoint fails.
             let espnStatusMap = await self.fetchPlayoffStatusMapFromESPNStandings(season: targetSeason)
             
-            // Fetch individual team records
             await withTaskGroup(of: (String, NFLTeamRecord?).self) { group in
                 for (teamCode, teamId) in self.teamIdMap {
                     group.addTask {
-                        await self.fetchSingleTeamRecord(teamCode: teamCode, teamId: teamId, playoffStatusMap: espnStatusMap, season: targetSeason)
+                        await self.fetchSingleTeamRecord(
+                            teamCode: teamCode,
+                            teamId: teamId,
+                            playoffStatusMap: espnStatusMap,
+                            season: targetSeason
+                        )
                     }
                 }
                 
@@ -247,10 +165,9 @@ final class NFLStandingsService {
                 await MainActor.run {
                     self.teamRecords = newTeamRecords
                     
-                    // 🔥 DEBUG: Log all team codes we have
                     DebugPrint(mode: .contention, "🏈 Team records loaded for \(targetSeason): \(Array(newTeamRecords.keys).sorted().joined(separator: ", "))")
                     
-                    // 🔥 FIX: Ensure WSH and WAS are synced before calculating statuses
+                    // Sync Washington codes
                     if let wasRecord = newTeamRecords["WAS"], newTeamRecords["WSH"] == nil {
                         newTeamRecords["WSH"] = wasRecord
                         DebugPrint(mode: .contention, "🔄 Synced WAS -> WSH")
@@ -259,7 +176,7 @@ final class NFLStandingsService {
                         DebugPrint(mode: .contention, "🔄 Synced WSH -> WAS")
                     }
                     
-                    // If ESPN standings didn't provide statuses, compute a fallback.
+                    // Fallback to local calculation if ESPN standings failed
                     if espnStatusMap.isEmpty {
                         DebugPrint(mode: .espnAPI, "🏈 ESPN standings status map empty; falling back to local playoff-status calculation")
                         let playoffStatuses = self.calculatePlayoffStatuses()
@@ -278,7 +195,6 @@ final class NFLStandingsService {
                     }
                     
                     self.teamRecords = newTeamRecords
-                    
                     self.isLoading = false
                     self.cacheTimestamp = Date()
                     
@@ -292,8 +208,41 @@ final class NFLStandingsService {
         }
     }
     
-    /// Fetch playoff statuses from ESPN standings (`clincher` + `playoffSeed`).
-    /// Returns an empty map if anything fails (callers should fallback).
+    /// Get team record for display (e.g., "10-4")
+    func getTeamRecord(for teamCode: String) -> String {
+        let normalizedCode = normalizeTeamCode(teamCode)
+        let record = teamRecords[normalizedCode]?.displayRecord ?? "0-0"
+        DebugPrint(mode: .contention, "🔍 getTeamRecord: '\(teamCode)' -> normalized to '\(normalizedCode)' -> record: '\(record)'")
+        return record
+    }
+    
+    /// Get full team record object
+    func getFullTeamRecord(for teamCode: String) -> NFLTeamRecord? {
+        let normalizedCode = normalizeTeamCode(teamCode)
+        return teamRecords[normalizedCode]
+    }
+    
+    /// Get playoff status for a team
+    func getPlayoffStatus(for teamCode: String) -> PlayoffStatus {
+        let normalizedCode = normalizeTeamCode(teamCode)
+        let status = teamRecords[normalizedCode]?.playoffStatus ?? .unknown
+        DebugPrint(mode: .contention, "🔍 getPlayoffStatus: '\(teamCode)' -> normalized to '\(normalizedCode)' -> status: '\(status.displayText)'")
+        return status
+    }
+    
+    /// Check if team is eliminated from playoff contention
+    func isTeamEliminated(for teamCode: String) -> Bool {
+        return getPlayoffStatus(for: teamCode) == .eliminated
+    }
+    
+    /// Force refresh standings with optional season parameter
+    func refreshStandings(season: Int? = nil) {
+        fetchStandings(forceRefresh: true, season: season)
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Fetch playoff statuses from ESPN standings API
     private func fetchPlayoffStatusMapFromESPNStandings(season: Int) async -> [String: PlayoffStatus] {
         guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/standings?season=\(season)") else {
             return [:]
@@ -315,7 +264,7 @@ final class NFLStandingsService {
                     let clincher = entry.stats?.first(where: { ($0.name ?? $0.type) == "clincher" })?.displayValue?.lowercased()
                     let seedValue = entry.stats?.first(where: { ($0.name ?? $0.type) == "playoffSeed" })?.value
                     
-                    // ESPN: clincher 'e' => eliminated, 'x/y/z' => clinched (various clinch types)
+                    // ESPN clincher codes: 'e' = eliminated, 'x'/'y'/'z' = various clinch types
                     if clincher == "e" {
                         statusMap[normalizedCode] = .eliminated
                         continue
@@ -332,7 +281,7 @@ final class NFLStandingsService {
                 }
             }
             
-            // Keep both Washington codes in-sync
+            // Sync Washington codes
             if let wsh = statusMap["WSH"] {
                 statusMap["WAS"] = wsh
             } else if let was = statusMap["WAS"] {
@@ -347,130 +296,13 @@ final class NFLStandingsService {
         }
     }
     
-    /// 🔥 FIXED: Calculate playoff statuses using proper NFL math with CORRECT records
-    private func fetchPlayoffStatuses() async -> [String: PlayoffStatus] {
-        // ESPN API doesn't expose playoff status, so we calculate it ourselves
-        // This will be called AFTER records are fetched
-        return [:]
-    }
-    
-    /// 🔥 FIXED: Calculate playoff status using proper conference-based elimination logic
-    private func calculatePlayoffStatuses() -> [String: PlayoffStatus] {
-        var statusMap: [String: PlayoffStatus] = [:]
-        
-        DebugPrint(mode: .espnAPI, "🏈 Starting playoff calculation for \(teamRecords.count) teams")
-        
-        // Separate teams by conference
-        var afcTeams: [(code: String, record: NFLTeamRecord)] = []
-        var nfcTeams: [(code: String, record: NFLTeamRecord)] = []
-        
-        for (code, record) in teamRecords {
-            if let team = NFLTeam.team(for: code) {
-                if team.conference == .afc {
-                    afcTeams.append((code, record))
-                } else {
-                    nfcTeams.append((code, record))
-                }
-            } else {
-                DebugPrint(mode: .espnAPI, "🏈 WARNING: No NFLTeam found for code '\(code)'")
-            }
-        }
-        
-        DebugPrint(mode: .espnAPI, "🏈 Split into AFC: \(afcTeams.count) teams, NFC: \(nfcTeams.count) teams")
-        
-        // Calculate status for each conference
-        let afcStatuses = calculateConferencePlayoffStatuses(teams: afcTeams, conference: "AFC")
-        let nfcStatuses = calculateConferencePlayoffStatuses(teams: nfcTeams, conference: "NFC")
-        
-        DebugPrint(mode: .espnAPI, "🏈 AFC returned \(afcStatuses.count) statuses")
-        DebugPrint(mode: .espnAPI, "🏈 NFC returned \(nfcStatuses.count) statuses")
-        
-        // Merge results
-        statusMap.merge(afcStatuses) { $1 }
-        statusMap.merge(nfcStatuses) { $1 }
-        
-        return statusMap
-    }
-    
-    /// 🔥 FIXED: Proper playoff elimination calculation per conference
-    private func calculateConferencePlayoffStatuses(teams: [(code: String, record: NFLTeamRecord)], conference: String) -> [String: PlayoffStatus] {
-        var statusMap: [String: PlayoffStatus] = [:]
-        
-        // Sort teams by wins (descending), then by win percentage
-        let sortedTeams = teams.sorted { first, second in
-            if first.record.wins != second.record.wins {
-                return first.record.wins > second.record.wins
-            }
-            return first.record.winningPercentage > second.record.winningPercentage
-        }
-        
-        // Calculate max possible wins for each team
-        var teamsWithMaxWins: [(code: String, record: NFLTeamRecord, maxWins: Int, currentSeed: Int)] = []
-        for (index, team) in sortedTeams.enumerated() {
-            let gamesPlayed = team.record.wins + team.record.losses + team.record.ties
-            let remainingGames = 17 - gamesPlayed
-            let maxPossibleWins = team.record.wins + remainingGames
-            teamsWithMaxWins.append((team.code, team.record, maxPossibleWins, index + 1))
-        }
-        
-        // 7th place team's current wins (last playoff spot)
-        let seventhPlaceWins = sortedTeams.count >= 7 ? sortedTeams[6].record.wins : 0
-        
-        DebugPrint(mode: .contention, "🏈 \(conference) Conference Analysis:")
-        DebugPrint(mode: .contention, "   7th seed has \(seventhPlaceWins) wins")
-        DebugPrint(mode: .contention, "   Top 7: \(sortedTeams.prefix(7).map { "\($0.code) \($0.record.wins)W" }.joined(separator: ", "))")
-        
-        // Classify each team
-        for teamData in teamsWithMaxWins {
-            let seed = teamData.currentSeed
-            let currentWins = teamData.record.wins
-            let maxWins = teamData.maxWins
-            let gamesPlayed = teamData.record.wins + teamData.record.losses + teamData.record.ties
-            let remainingGames = 17 - gamesPlayed
-            let winsNeeded = seventhPlaceWins - currentWins
-            
-            // ELIMINATED: Can't mathematically reach 7th place
-            // 🔥 FIX: Changed <= to < - teams that can TIE are not eliminated
-            if maxWins < seventhPlaceWins {
-                statusMap[teamData.code] = .eliminated
-                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (max \(maxWins)W < \(seventhPlaceWins)W)")
-            }
-            // ELIMINATED: Too far back with too few games left
-            // If you're 3+ wins behind 7th place with 2 or fewer games left, you're done
-            else if currentWins < (seventhPlaceWins - 2) && remainingGames <= 2 {
-                statusMap[teamData.code] = .eliminated
-                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (too far back: \(currentWins)W vs \(seventhPlaceWins)W, only \(remainingGames) left)")
-            }
-            // ELIMINATED: Outside playoffs and need 2+ wins with only 2 games left (very unlikely)
-            // 🔥 FIX: Changed >= to > - teams that CAN win out are not eliminated
-            else if seed > 7 && winsNeeded > remainingGames {
-                statusMap[teamData.code] = .eliminated
-                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (need \(winsNeeded)W in \(remainingGames) games, seed #\(seed))")
-            }
-            // Currently in playoff spots (1-7)
-            else if seed <= 7 {
-                // CLINCHED: Top 2 seeds with commanding lead (4+ wins ahead of 7th)
-                if seed <= 2 && currentWins >= (seventhPlaceWins + 4) {
-                    statusMap[teamData.code] = .clinched
-                    DebugPrint(mode: .contention, "   🎉 \(teamData.code): CLINCHED #\(seed) (\(currentWins)W, +\(currentWins - seventhPlaceWins) ahead)")
-                } else {
-                    statusMap[teamData.code] = .alive
-                    DebugPrint(mode: .contention, "   ⚡️ \(teamData.code): IN HUNT #\(seed) (\(currentWins)W)")
-                }
-            }
-            // BUBBLE: Outside playoffs but still mathematically alive
-            else {
-                statusMap[teamData.code] = .bubble
-                DebugPrint(mode: .contention, "   ⚠️  \(teamData.code): BUBBLE #\(seed) (\(currentWins)W, max \(maxWins)W, need +\(winsNeeded))")
-            }
-        }
-        
-        return statusMap
-    }
-    
-    /// Fetch single team record (now includes playoff status and season parameter)
-    private func fetchSingleTeamRecord(teamCode: String, teamId: String, playoffStatusMap: [String: PlayoffStatus], season: Int) async -> (String, NFLTeamRecord?) {
-        // 🔥 FIXED: Use passed season instead of hardcoded current year
+    /// Fetch single team record from ESPN API
+    private func fetchSingleTeamRecord(
+        teamCode: String,
+        teamId: String,
+        playoffStatusMap: [String: PlayoffStatus],
+        season: Int
+    ) async -> (String, NFLTeamRecord?) {
         guard let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/\(teamId)?season=\(season)&seasontype=2") else {
             return (teamCode, nil)
         }
@@ -478,7 +310,7 @@ final class NFLStandingsService {
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             
-            // 🔥 DEBUG: Log CHI's full record structure
+            // Debug logging for specific teams
             if teamCode == "CHI" {
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                    let team = json["team"] as? [String: Any],
@@ -511,9 +343,12 @@ final class NFLStandingsService {
         }
     }
     
-    /// Process ESPN team record API response (now uses playoff status from map)
-    private func processTeamRecord(_ response: NFLTeamRecordResponse, teamCode: String, playoffStatusMap: [String: PlayoffStatus]) -> NFLTeamRecord? {
-        // Find the "total" record type
+    /// Process ESPN team record API response
+    private func processTeamRecord(
+        _ response: NFLTeamRecordResponse,
+        teamCode: String,
+        playoffStatusMap: [String: PlayoffStatus]
+    ) -> NFLTeamRecord? {
         guard let totalRecord = response.team.record.items.first(where: { $0.type == "total" }) else {
             DebugPrint(mode: .espnAPI, "🏈 No total record found for \(teamCode)")
             return nil
@@ -523,7 +358,6 @@ final class NFLStandingsService {
         var losses = 0
         var ties = 0
         
-        // Extract wins, losses, ties from stats
         for stat in totalRecord.stats {
             switch stat.name.lowercased() {
             case "wins":
@@ -537,7 +371,6 @@ final class NFLStandingsService {
             }
         }
         
-        // 🔥 FIXED: Use playoff status from ESPN, fallback to unknown
         let playoffStatus = playoffStatusMap[teamCode] ?? .unknown
         
         return NFLTeamRecord(
@@ -550,50 +383,115 @@ final class NFLStandingsService {
         )
     }
     
-    /// Get team record for display
-    func getTeamRecord(for teamCode: String) -> String {
-        let normalizedCode = normalizeTeamCode(teamCode)
-        let record = teamRecords[normalizedCode]?.displayRecord ?? "0-0"
-        DebugPrint(mode: .contention, "🔍 getTeamRecord: '\(teamCode)' -> normalized to '\(normalizedCode)' -> record: '\(record)'")
-        return record
+    /// Calculate playoff statuses using local math (fallback if ESPN fails)
+    private func calculatePlayoffStatuses() -> [String: PlayoffStatus] {
+        var statusMap: [String: PlayoffStatus] = [:]
+        
+        DebugPrint(mode: .espnAPI, "🏈 Starting playoff calculation for \(teamRecords.count) teams")
+        
+        var afcTeams: [(code: String, record: NFLTeamRecord)] = []
+        var nfcTeams: [(code: String, record: NFLTeamRecord)] = []
+        
+        for (code, record) in teamRecords {
+            if let team = NFLTeam.team(for: code) {
+                if team.conference == .afc {
+                    afcTeams.append((code, record))
+                } else {
+                    nfcTeams.append((code, record))
+                }
+            } else {
+                DebugPrint(mode: .espnAPI, "🏈 WARNING: No NFLTeam found for code '\(code)'")
+            }
+        }
+        
+        DebugPrint(mode: .espnAPI, "🏈 Split into AFC: \(afcTeams.count) teams, NFC: \(nfcTeams.count) teams")
+        
+        let afcStatuses = calculateConferencePlayoffStatuses(teams: afcTeams, conference: "AFC")
+        let nfcStatuses = calculateConferencePlayoffStatuses(teams: nfcTeams, conference: "NFC")
+        
+        DebugPrint(mode: .espnAPI, "🏈 AFC returned \(afcStatuses.count) statuses")
+        DebugPrint(mode: .espnAPI, "🏈 NFC returned \(nfcStatuses.count) statuses")
+        
+        statusMap.merge(afcStatuses) { $1 }
+        statusMap.merge(nfcStatuses) { $1 }
+        
+        return statusMap
     }
     
-    /// Get full team record object
-    func getFullTeamRecord(for teamCode: String) -> NFLTeamRecord? {
-        let normalizedCode = normalizeTeamCode(teamCode)
-        return teamRecords[normalizedCode]
+    /// Calculate playoff elimination per conference
+    private func calculateConferencePlayoffStatuses(
+        teams: [(code: String, record: NFLTeamRecord)],
+        conference: String
+    ) -> [String: PlayoffStatus] {
+        var statusMap: [String: PlayoffStatus] = [:]
+        
+        let sortedTeams = teams.sorted { first, second in
+            if first.record.wins != second.record.wins {
+                return first.record.wins > second.record.wins
+            }
+            return first.record.winningPercentage > second.record.winningPercentage
+        }
+        
+        var teamsWithMaxWins: [(code: String, record: NFLTeamRecord, maxWins: Int, currentSeed: Int)] = []
+        for (index, team) in sortedTeams.enumerated() {
+            let gamesPlayed = team.record.wins + team.record.losses + team.record.ties
+            let remainingGames = 17 - gamesPlayed
+            let maxPossibleWins = team.record.wins + remainingGames
+            teamsWithMaxWins.append((team.code, team.record, maxPossibleWins, index + 1))
+        }
+        
+        let seventhPlaceWins = sortedTeams.count >= 7 ? sortedTeams[6].record.wins : 0
+        
+        DebugPrint(mode: .contention, "🏈 \(conference) Conference Analysis:")
+        DebugPrint(mode: .contention, "   7th seed has \(seventhPlaceWins) wins")
+        DebugPrint(mode: .contention, "   Top 7: \(sortedTeams.prefix(7).map { "\($0.code) \($0.record.wins)W" }.joined(separator: ", "))")
+        
+        for teamData in teamsWithMaxWins {
+            let seed = teamData.currentSeed
+            let currentWins = teamData.record.wins
+            let maxWins = teamData.maxWins
+            let gamesPlayed = teamData.record.wins + teamData.record.losses + teamData.record.ties
+            let remainingGames = 17 - gamesPlayed
+            let winsNeeded = seventhPlaceWins - currentWins
+            
+            if maxWins < seventhPlaceWins {
+                statusMap[teamData.code] = .eliminated
+                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (max \(maxWins)W < \(seventhPlaceWins)W)")
+            } else if currentWins < (seventhPlaceWins - 2) && remainingGames <= 2 {
+                statusMap[teamData.code] = .eliminated
+                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (too far back: \(currentWins)W vs \(seventhPlaceWins)W, only \(remainingGames) left)")
+            } else if seed > 7 && winsNeeded > remainingGames {
+                statusMap[teamData.code] = .eliminated
+                DebugPrint(mode: .contention, "   💀 \(teamData.code): ELIMINATED (need \(winsNeeded)W in \(remainingGames) games, seed #\(seed))")
+            } else if seed <= 7 {
+                if seed <= 2 && currentWins >= (seventhPlaceWins + 4) {
+                    statusMap[teamData.code] = .clinched
+                    DebugPrint(mode: .contention, "   🎉 \(teamData.code): CLINCHED #\(seed) (\(currentWins)W, +\(currentWins - seventhPlaceWins) ahead)")
+                } else {
+                    statusMap[teamData.code] = .alive
+                    DebugPrint(mode: .contention, "   ⚡️ \(teamData.code): IN HUNT #\(seed) (\(currentWins)W)")
+                }
+            } else {
+                statusMap[teamData.code] = .bubble
+                DebugPrint(mode: .contention, "   ⚠️  \(teamData.code): BUBBLE #\(seed) (\(currentWins)W, max \(maxWins)W, need +\(winsNeeded))")
+            }
+        }
+        
+        return statusMap
     }
     
-    /// 🔥 NEW: Get playoff status for a team
-    func getPlayoffStatus(for teamCode: String) -> PlayoffStatus {
-        let normalizedCode = normalizeTeamCode(teamCode)
-        let status = teamRecords[normalizedCode]?.playoffStatus ?? .unknown
-        DebugPrint(mode: .contention, "🔍 getPlayoffStatus: '\(teamCode)' -> normalized to '\(normalizedCode)' -> status: '\(status.displayText)'")
-        return status
-    }
-    
-    /// 🔥 NEW: Check if team is eliminated
-    func isTeamEliminated(for teamCode: String) -> Bool {
-        return getPlayoffStatus(for: teamCode) == .eliminated
-    }
-    
-    /// Normalize team codes for consistency (handle Washington/etc.)
+    /// Normalize team codes for consistency
     private func normalizeTeamCode(_ code: String) -> String {
         switch code.uppercased() {
         case "WSH":
-            return "WSH" // ESPN uses WSH, keep it consistent
+            return "WSH"
         case "WAS":
-            return "WSH" // Convert WAS to WSH for consistency
+            return "WSH"
         case "JAC":
-            return "JAX" // Some sources use JAC, we use JAX
+            return "JAX"
         default:
             return code.uppercased()
         }
-    }
-    
-    /// Force refresh standings with optional season parameter
-    func refreshStandings(season: Int? = nil) {
-        fetchStandings(forceRefresh: true, season: season)
     }
     
     // MARK: - Cleanup

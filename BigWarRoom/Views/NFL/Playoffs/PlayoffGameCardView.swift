@@ -18,7 +18,11 @@ struct PlayoffGameCardView: View {
         Button(action: onTap) {
             HStack(spacing: 8) {
                 // Away Team (Left)
-                teamCard(team: game.awayTeam, isWinning: isTeamWinning(game.awayTeam))
+                PlayoffTeamCard(
+                    team: game.awayTeam,
+                    isWinning: isTeamWinning(game.awayTeam),
+                    isGameCompleted: game.isCompleted
+                )
                 
                 // VS Divider
                 Text("vs")
@@ -27,7 +31,11 @@ struct PlayoffGameCardView: View {
                     .frame(width: 30)
                 
                 // Home Team (Right)
-                teamCard(team: game.homeTeam, isWinning: isTeamWinning(game.homeTeam))
+                PlayoffTeamCard(
+                    team: game.homeTeam,
+                    isWinning: isTeamWinning(game.homeTeam),
+                    isGameCompleted: game.isCompleted
+                )
             }
             .padding(12)
             .background(cardBackground)
@@ -41,59 +49,9 @@ struct PlayoffGameCardView: View {
         .buttonStyle(.plain)
     }
     
-    // MARK: - Team Card
-    
-    @ViewBuilder
-    private func teamCard(team: PlayoffTeam, isWinning: Bool) -> some View {
-        VStack(spacing: 8) {
-            // Team Logo with Seed Badge
-            ZStack(alignment: .topLeading) {
-                // Team Logo Background
-                Circle()
-                    .fill(teamLogoBackground(team.abbreviation))
-                    .frame(width: 60, height: 60)
-                    .overlay(
-                        Text(team.abbreviation)
-                            .font(.system(size: 16, weight: .black))
-                            .foregroundStyle(.white)
-                    )
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-                
-                // Seed Badge (Top Left Corner)
-                if let seed = team.seed {
-                    Text("\(seed)")
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(
-                            Circle()
-                                .fill(seedColor(for: seed))
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                        )
-                        .offset(x: -2, y: -2)
-                }
-            }
-            
-            // Team Name
-            Text(team.abbreviation)
-                .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(isWinning ? .primary : .secondary)
-            
-            // Score (if available)
-            if let score = team.score {
-                Text("\(score)")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(isWinning ? .green : .secondary)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(isWinning && game.isCompleted ? winningBackground : Color.clear)
-        .cornerRadius(8)
-    }
-    
     // MARK: - Helper Methods
     
+    /// Determines if the given team is currently winning
     private func isTeamWinning(_ team: PlayoffTeam) -> Bool {
         guard let teamScore = team.score else { return false }
         
@@ -107,37 +65,10 @@ struct PlayoffGameCardView: View {
         return teamScore > opponentScore
     }
     
-    private func seedColor(for seed: Int) -> Color {
-        switch seed {
-        case 1:
-            return Color(red: 1.0, green: 0.84, blue: 0.0)  // Gold
-        case 2:
-            return Color(red: 0.75, green: 0.75, blue: 0.75)  // Silver
-        case 3:
-            return Color(red: 0.8, green: 0.5, blue: 0.2)  // Bronze
-        default:
-            return .blue
-        }
-    }
-    
-    private func teamLogoBackground(_ abbreviation: String) -> Color {
-        // Get actual team color
-        if let team = NFLTeam.team(for: abbreviation) {
-            return team.primaryColor
-        }
-        
-        // Fallback
-        let hash = abbreviation.hashValue
-        let hue = Double(abs(hash) % 360) / 360.0
-        return Color(hue: hue, saturation: 0.6, brightness: 0.7)
-    }
+    // MARK: - Computed Properties
     
     private var cardBackground: Color {
         colorScheme == .dark ? Color(.systemGray6) : .white
-    }
-    
-    private var winningBackground: Color {
-        Color.green.opacity(0.1)
     }
     
     private var shadowColor: Color {
@@ -155,4 +86,3 @@ struct PlayoffGameCardView: View {
         showFantasyHighlight ? 2 : 1
     }
 }
-
