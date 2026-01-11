@@ -273,7 +273,7 @@ struct NFLLandscapeBracketView: View {
             let screenWidth = geo.size.width
             // iPhone Pro Max in landscape ~930pts, standard iPhones ~850pts
             let isProMax = screenWidth >= 900
-            let modalScale = isProMax ? 0.9 : 0.8
+            let modalScale = isProMax ? 0.85 : 0.7
             
             VStack(spacing: 0) {
                // Header with timer - SUPER COMPACT
