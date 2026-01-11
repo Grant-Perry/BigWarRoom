@@ -273,8 +273,8 @@ struct NFLLandscapeBracketView: View {
             let screenWidth = geo.size.width
             // iPhone Pro Max in landscape ~930pts, standard iPhones ~850pts
             let isProMax = screenWidth >= 900
-            let modalScale = isProMax ? 0.85 : 0.7
-            
+            let modalScale = isProMax ? 0.85 : 0.75
+
             VStack(spacing: 0) {
                // Header with timer - SUPER COMPACT
                HStack {
@@ -316,6 +316,15 @@ struct NFLLandscapeBracketView: View {
                         let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
                         let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
                         
+                        // DEBUG: Log odds availability
+                        let _ = {
+                           DebugPrint(mode: .bettingOdds, "🎰 [MODAL ODDS] Game: \(gameID), Has odds: \(odds != nil), DisplayOdds: \(displayOdds != nil)")
+                           if odds == nil {
+                              DebugPrint(mode: .bettingOdds, "⚠️ [MODAL] No odds in gameOdds dict for \(gameID)")
+                              DebugPrint(mode: .bettingOdds, "🔍 [MODAL] Available odds keys: \(playoffService.gameOdds.keys.sorted().joined(separator: ", "))")
+                           }
+                        }()
+                        
                         PlayoffGameDetailCard(
                            game: game,
                            displayOdds: displayOdds,
@@ -329,8 +338,8 @@ struct NFLLandscapeBracketView: View {
                         liveGameSituationView(situation: situation, game: game)
                            .padding(.horizontal, 16)
                         
-                        // Odds bar for live games too
-                        if let odds = odds {
+                        // Odds bar for live games
+                        if displayOdds != nil {
                            PlayoffOddsBar(
                               displayOdds: displayOdds,
                               currentSportsbook: currentSportsbook,
@@ -573,11 +582,11 @@ struct NFLLandscapeBracketView: View {
                showLastPlayDetail = false
             }
          
-         VStack(spacing: 0) {
-            // Header
+         VStack(spacing: 8) {
+            // Compact header
             HStack {
                Text("Last Play")
-                  .font(.headline)
+                  .font(.caption)
                   .fontWeight(.bold)
                   .foregroundStyle(.white)
                
@@ -587,31 +596,26 @@ struct NFLLandscapeBracketView: View {
                   showLastPlayDetail = false
                } label: {
                   Image(systemName: "xmark.circle.fill")
-                     .font(.title3)
+                     .font(.caption)
                      .foregroundStyle(.white.opacity(0.7))
                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .frame(height: 36)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
             .background(Color(.systemGray6))
             
-            // Full play text
-            ScrollView {
-               Text(lastPlayText)
-                  .font(.body)
-                  .foregroundStyle(.primary)
-                  .padding()
-                  .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: 300)
+            // Compact play text
+            Text(lastPlayText)
+               .font(.caption2)
+               .foregroundStyle(.primary)
+               .padding(12)
+               .frame(maxWidth: .infinity, alignment: .leading)
          }
-         .frame(width: 400)
+         .frame(width: 280)
          .fixedSize(horizontal: false, vertical: true)
          .background(Color(.systemBackground))
-         .cornerRadius(20)
-         .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
-         .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
+         .cornerRadius(12)
+         .shadow(color: .black.opacity(0.5), radius: 20, x: 0, y: 5)
       }
       .transition(.opacity)
       .animation(.easeInOut(duration: 0.2), value: showLastPlayDetail)
