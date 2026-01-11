@@ -16,6 +16,7 @@ struct NFLScheduleView: View {
     @Environment(NFLGameDataService.self) private var nflGameDataService
     @Environment(NFLWeekService.self) private var nflWeekService
     @Environment(ESPNCredentialsManager.self) private var espnCredentials
+    @Environment(BettingOddsService.self) private var bettingOddsService
     @State private var showingWeekPicker = false
     @State private var showingTeamMatchups = false
     @State private var selectedGame: ScheduleGame?
@@ -114,7 +115,8 @@ struct NFLScheduleView: View {
                         
                         viewModel = NFLScheduleViewModel(
                             gameDataService: nflGameDataService,
-                            weekService: nflWeekService
+                            weekService: nflWeekService,
+                            bettingOddsService: bettingOddsService
                         )
                         
                         // 🔥 CREATE UnifiedLeagueManager with proper credentials
@@ -260,7 +262,8 @@ struct NFLScheduleView: View {
         
         playoffBracketService = NFLPlayoffBracketService(
             weekSelectionManager: weekSelectionManager,
-            appLifecycleManager: AppLifecycleManager.shared
+            appLifecycleManager: AppLifecycleManager.shared,
+            bettingOddsService: bettingOddsService
         )
     }
     

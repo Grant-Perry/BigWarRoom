@@ -29,7 +29,7 @@ struct MoreTabView: View {
         ),
         MenuItem(
             icon: "gearshape.fill",
-            iconColor: .gray,
+            iconColor: .gpPink,
             title: "Settings",
             subtitle: "App configuration and setup",
             destination: .settings

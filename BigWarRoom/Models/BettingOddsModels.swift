@@ -220,7 +220,7 @@ struct TheOddsOutcome: Codable {
 // MARK: - Processed Game Betting Odds (Spreads / Totals / Moneyline)
 
 /// Individual book's odds for a game
-struct BookOdds: Hashable {
+struct BookOdds: Hashable, Codable {
     let book: Sportsbook
     let favoriteTeamCode: String?
     let favoriteMoneylineOdds: Int?      // Raw numeric value for comparison
@@ -234,7 +234,7 @@ struct BookOdds: Hashable {
 }
 
 /// Processed game betting odds for display in the NFL Schedule.
-struct GameBettingOdds: Hashable {
+struct GameBettingOdds: Hashable, Codable {
     let gameID: String
     let homeTeamCode: String
     let awayTeamCode: String

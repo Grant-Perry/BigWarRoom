@@ -2,7 +2,7 @@
 //  BettingOddsService.swift
 //  BigWarRoom
 //
-//  Service to fetch player betting odds from The Odds API
+//  Orchestrates betting odds fetching, caching, and extraction
 //
 
 import Foundation
@@ -18,42 +18,29 @@ extension UserDefaults {
 @MainActor
 final class BettingOddsService {
     
-    static let shared = BettingOddsService()
+    // MARK: - Dependencies
     
-    // Cache to avoid excessive API calls
-    private var oddsCache: [String: (PlayerBettingOdds?, Date)] = [:]
-    private let cacheExpiration: TimeInterval = 3600 // 1 hour
+    private let bettingOddsAPIClient = BettingOddsAPIClient()
+    private let bettingOddsExtractor = BettingOddsExtractor()
+    private let bettingOddsCacheManager = BettingOddsCacheManager()
     
-    // Cache for game odds (spreads/totals)
-    private var gameOddsCache: [String: ([String: GameBettingOdds], Date)] = [:]
-    private let gameOddsCacheExpiration: TimeInterval = 600 // 10 minutes
+    // MARK: - User Preferences
     
-    // 🔥 NEW: User's preferred sportsbook (defaults to best line)
     var preferredSportsbook: Sportsbook {
         get {
             if let raw = UserDefaults.standard.string(forKey: UserDefaults.preferredSportsbookKey),
                let book = Sportsbook(rawValue: raw) {
                 return book
             }
-            return .bestLine // Default to best available
+            return .bestLine
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: UserDefaults.preferredSportsbookKey)
         }
     }
     
-    // API Configuration
-    private var apiKey: String {
-        guard let key = Secrets.theOddsAPIKey else {
-            return ""
-        }
-        return key
-    }
+    // MARK: - Loading State
     
-    private let baseURL = "https://api.the-odds-api.com/v4"
-    private let session = URLSession.shared
-    
-    // Loading state
     var isLoading = false
     var errorMessage: String?
     
@@ -61,30 +48,28 @@ final class BettingOddsService {
     
     // MARK: - Public API
     
-    /// Fetch betting odds for a player for current week
-    /// - Parameters:
-    ///   - player: Sleeper player to get odds for
-    ///   - week: NFL week number
-    ///   - year: Season year (defaults to current)
-    /// - Returns: Player betting odds or nil if unavailable
+    /// Force refresh game odds cache
+    func refreshGameOddsCache() {
+        bettingOddsCacheManager.clearGameOddsCache()
+    }
+    
+    /// Fetch betting odds for a player
     func fetchPlayerOdds(
         for player: SleeperPlayer,
         week: Int,
         year: Int? = nil
     ) async -> PlayerBettingOdds? {
         
-        guard !apiKey.isEmpty else {
+        guard !bettingOddsAPIClient.apiKey.isEmpty else {
             errorMessage = "API key not configured"
             return nil
         }
         
-        let cacheKey = "\(player.playerID)_\(week)_\(year)"
+        let cacheKey = "\(player.playerID)_\(week)_\(year ?? AppConstants.currentSeasonYearInt)"
         
-        // Check cache first
-        if let (cachedOdds, timestamp) = oddsCache[cacheKey],
-           Date().timeIntervalSince(timestamp) < cacheExpiration,
-           let odds = cachedOdds {
-            return odds
+        // Check cache
+        if let cached = bettingOddsCacheManager.getCachedPlayerOdds(cacheKey: cacheKey) {
+            return cached
         }
         
         guard let team = player.team else {
@@ -97,36 +82,24 @@ final class BettingOddsService {
         defer { isLoading = false }
         
         do {
-            // Fetch odds for all NFL games this week
-            let actualYear = year ?? AppConstants.currentSeasonYearInt
-            let games = try await fetchNFLGamesOdds(week: week, year: actualYear)
+            let games = try await bettingOddsAPIClient.fetchAllNFLGames()
             
-            // Find the game for this player's team
-            guard let game = findGame(for: team, in: games) else {
-                let errorMsg = "No game found for \(team). Games may not be posted yet (games start Nov 2-3) or team name mismatch."
-                errorMessage = errorMsg
+            guard let game = bettingOddsExtractor.findGame(for: team, in: games) else {
+                errorMessage = "No game found for \(team). Games may not be posted yet or team name mismatch."
                 return nil
             }
             
-            // Extract player props from the game
-            let playerOdds = extractPlayerOdds(
+            let playerOdds = bettingOddsExtractor.extractPlayerOdds(
                 for: player,
                 team: team,
                 from: game,
                 week: week
             )
             
-            // Cache the result (even if nil - prevents repeated API calls)
-            if let odds = playerOdds {
-                oddsCache[cacheKey] = (odds, Date())
-            } else {
-                // Cache nil result with shorter expiration to retry later
-                oddsCache[cacheKey] = (nil, Date().addingTimeInterval(-300)) // Expires in 5 min for retry
-            }
+            bettingOddsCacheManager.cachePlayerOdds(playerOdds, cacheKey: cacheKey)
             
             if playerOdds == nil {
-                let errorMsg = "Player props not available. The Odds API free tier only includes game moneylines (h2h). Player props require a paid plan ($99+/month)."
-                errorMessage = errorMsg
+                errorMessage = "Player props not available. The Odds API free tier only includes game moneylines (h2h). Player props require a paid plan ($99+/month)."
             }
             
             return playerOdds
@@ -137,15 +110,14 @@ final class BettingOddsService {
         }
     }
     
-    /// Fetch game odds (spread + total) for a set of Schedule games.
-    /// Returns a dictionary keyed by `ScheduleGame.id` (e.g. "BUF@NE").
+    /// Fetch game odds for schedule games
     func fetchGameOdds(
         for scheduleGames: [ScheduleGame],
         week: Int,
         year: Int? = nil
     ) async -> [String: GameBettingOdds] {
         
-        guard !apiKey.isEmpty else {
+        guard !bettingOddsAPIClient.apiKey.isEmpty else {
             DebugPrint(mode: .bettingOdds, "❌ [ODDS] API key is empty - cannot fetch odds")
             return [:]
         }
@@ -154,30 +126,71 @@ final class BettingOddsService {
         let cacheKey = "schedule_games_\(week)_\(actualYear)"
         
         DebugPrint(mode: .bettingOdds, "🎰 [ODDS] Fetching game odds for \(scheduleGames.count) games, week \(week), year \(actualYear)")
-        for game in scheduleGames {
-            DebugPrint(mode: .bettingOdds, "🎰 [ODDS]   - Game: \(game.id) (\(game.awayTeam) @ \(game.homeTeam))")
+        
+        // Check persistent cache
+        let intervalMinutes = UserDefaults.standard.double(forKey: "OddsRefreshInterval")
+        let finalIntervalMinutes = intervalMinutes > 0 ? intervalMinutes : 15.0
+        let expirationInterval = finalIntervalMinutes * 60.0
+        
+        DebugPrint(mode: .bracketTimer, "⏱️ [ODDS CACHE CHECK] User interval: \(Int(finalIntervalMinutes)) minutes (\(Int(expirationInterval))s)")
+        
+        let cacheStatus = bettingOddsCacheManager.isGameOddsCacheValid()
+        
+        if cacheStatus.isValid {
+            if let timeSince = cacheStatus.timeSinceLastFetch,
+               let lastFetch = cacheStatus.lastFetchDate {
+                DebugPrint(mode: .bracketTimer, "📊 [ODDS CACHE CHECK] Last fetch: \(Int(timeSince))s ago (at \(Self.formatDate(lastFetch)))")
+                DebugPrint(mode: .bracketTimer, "📊 [ODDS CACHE CHECK] Expires in: \(Int(expirationInterval - timeSince))s")
+                
+                // Try in-memory cache first
+                if let cached = bettingOddsCacheManager.getCachedGameOdds(cacheKey: cacheKey) {
+                    let minutesAgo = Int(timeSince / 60)
+                    DebugPrint(mode: .bracketTimer, "✅ [ODDS CACHE HIT - MEMORY] Using in-memory cached odds - \(cached.count) games, \(minutesAgo) min old, \(Int(finalIntervalMinutes - Double(minutesAgo))) min until refresh")
+                    return cached
+                }
+                
+                // Try persistent file cache
+                if let persisted = bettingOddsCacheManager.loadPersistedGameOdds(cacheKey: cacheKey) {
+                    let minutesAgo = Int(timeSince / 60)
+                    DebugPrint(mode: .bracketTimer, "✅ [ODDS CACHE HIT - DISK] Using persisted odds from file - \(persisted.count) games, \(minutesAgo) min old, \(Int(finalIntervalMinutes - Double(minutesAgo))) min until refresh")
+                    
+                    // Populate in-memory cache
+                    if let lastFetch = cacheStatus.lastFetchDate {
+                        bettingOddsCacheManager.cacheGameOdds(persisted, cacheKey: cacheKey, timestamp: lastFetch)
+                    }
+                    
+                    return persisted
+                } else {
+                    DebugPrint(mode: .bracketTimer, "⚠️ [ODDS CACHE PARTIAL] Timestamp valid but no persisted data - will fetch fresh")
+                }
+            }
+        } else {
+            if let timeSince = cacheStatus.timeSinceLastFetch {
+                let minutesOverdue = Int((timeSince - expirationInterval) / 60)
+                DebugPrint(mode: .bracketTimer, "⏰ [ODDS CACHE EXPIRED] Cache is \(minutesOverdue) min overdue - fetching fresh odds")
+            } else {
+                DebugPrint(mode: .bracketTimer, "🆕 [ODDS CACHE MISS] No previous fetch found - fetching fresh odds")
+            }
         }
         
-        if let (cached, timestamp) = gameOddsCache[cacheKey],
-           Date().timeIntervalSince(timestamp) < gameOddsCacheExpiration {
-            DebugPrint(mode: .bettingOdds, "✅ [ODDS] Using cached odds (\(cached.count) games)")
-            return cached
-        }
+        // Fetch fresh data
+        DebugPrint(mode: .bracketTimer, "🌐 [ODDS API CALL] Fetching fresh odds from The Odds API...")
         
         do {
-            let games = try await fetchNFLGamesMarkets(markets: ["h2h", "spreads", "totals"])
+            let games = try await bettingOddsAPIClient.fetchNFLGamesWithMarkets(["h2h", "spreads", "totals"])
             
             DebugPrint(mode: .bettingOdds, "📥 [ODDS] The Odds API returned \(games.count) total games")
-            for (index, game) in games.enumerated() {
-                DebugPrint(mode: .bettingOdds, "📥 [ODDS]   Game \(index + 1): \(game.awayTeam) @ \(game.homeTeam) (commence: \(game.commenceTime ?? "N/A"))")
-            }
             
             var mapped: [String: GameBettingOdds] = [:]
             
             for scheduleGame in scheduleGames {
                 DebugPrint(mode: .bettingOdds, "🔍 [ODDS] Searching for odds: \(scheduleGame.awayTeam) @ \(scheduleGame.homeTeam)")
                 
-                if let odds = extractGameOdds(for: scheduleGame, from: games) {
+                if let odds = bettingOddsExtractor.extractGameOdds(
+                    for: scheduleGame,
+                    from: games,
+                    preferredSportsbook: preferredSportsbook
+                ) {
                     mapped[scheduleGame.id] = odds
                     DebugPrint(mode: .bettingOdds, "✅ [ODDS] Found odds for \(scheduleGame.id): spread=\(odds.spreadDisplay ?? "N/A"), total=\(odds.totalDisplay ?? "N/A"), ML=\(odds.favoriteMoneylineOdds ?? "N/A")")
                 } else {
@@ -187,805 +200,29 @@ final class BettingOddsService {
             
             DebugPrint(mode: .bettingOdds, "✅ [ODDS] Mapped \(mapped.count) out of \(scheduleGames.count) games with odds")
             
-            gameOddsCache[cacheKey] = (mapped, Date())
+            // Update caches
+            let now = Date()
+            bettingOddsCacheManager.updateGameOddsFetchTimestamp()
+            bettingOddsCacheManager.persistGameOdds(mapped, cacheKey: cacheKey)
+            bettingOddsCacheManager.cacheGameOdds(mapped, cacheKey: cacheKey, timestamp: now)
+            
+            let nextRefreshTime = now.addingTimeInterval(expirationInterval)
+            DebugPrint(mode: .bracketTimer, "💾 [ODDS CACHE UPDATED] Saved timestamp + file: \(Self.formatDate(now))")
+            DebugPrint(mode: .bracketTimer, "⏰ [ODDS CACHE UPDATED] Next refresh at: \(Self.formatDate(nextRefreshTime)) (\(Int(finalIntervalMinutes)) min from now)")
+            
             return mapped
         } catch {
             DebugPrint(mode: .bettingOdds, "❌ [ODDS] Error fetching odds: \(error)")
+            DebugPrint(mode: .bracketTimer, "❌ [ODDS API ERROR] Failed to fetch fresh odds: \(error.localizedDescription)")
             return [:]
         }
     }
     
-    // MARK: - Private Implementation
+    // MARK: - Helpers
     
-    /// Fetch all NFL games with odds for a given week
-    private func fetchNFLGamesOdds(week: Int, year: Int) async throws -> [TheOddsGame] {
-        
-        // The Odds API v4 doesn't support "player_props" as a market filter
-        // Go directly to fetching all markets - player props may not be available in free tier
-        return try await fetchNFLGamesOddsFallback()
-    }
-    
-    /// Fallback method - fetch without player_props filter
-    private func fetchNFLGamesOddsFallback() async throws -> [TheOddsGame] {
-        var components = URLComponents(string: "\(baseURL)/sports/americanfootball_nfl/odds")
-        components?.queryItems = [
-            URLQueryItem(name: "apiKey", value: apiKey),
-            URLQueryItem(name: "regions", value: "us"),
-            URLQueryItem(name: "oddsFormat", value: "american")
-            // Remove player_props - fetch all markets and filter client-side
-        ]
-        
-        guard let url = components?.url else {
-            throw BettingOddsError.invalidURL
-        }
-        
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        let (data, response) = try await session.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            guard (200...299).contains(httpResponse.statusCode) else {
-                throw BettingOddsError.httpError(httpResponse.statusCode)
-            }
-        }
-        
-        let games = try JSONDecoder().decode([TheOddsGame].self, from: data)
-        
-        // Debug: Print all available market keys to understand what's available
-        var allMarketKeys = Set<String>()
-        var sampleOutcomes: [String] = []
-        
-        for game in games.prefix(3) {
-            for bookmaker in game.bookmakers.prefix(2) {
-                for market in bookmaker.markets {
-                    allMarketKeys.insert(market.key)
-                    if market.outcomes.count > 0 && sampleOutcomes.count < 10 {
-                        sampleOutcomes.append("\(market.key): \(market.outcomes[0].name)")
-                    }
-                }
-            }
-        }
-        
-        for key in Array(allMarketKeys).sorted() {
-        }
-        if !sampleOutcomes.isEmpty {
-            for outcome in sampleOutcomes.prefix(5) {
-            }
-        }
-        
-        // ⚠️ CRITICAL: Check if player props are available
-        let hasPlayerProps = allMarketKeys.contains { key in
-            key.lowercased().contains("player") ||
-            key.lowercased().contains("touchdown") ||
-            key.lowercased().contains("yards") ||
-            key.lowercased().contains("reception")
-        }
-        
-        if !hasPlayerProps {
-        }
-        
-        // Return all games - we'll filter for player props when extracting for specific player
-        return games
-    }
-    
-    /// Fetch NFL games with specific markets (e.g. h2h/spreads/totals).
-    private func fetchNFLGamesMarkets(markets: [String]) async throws -> [TheOddsGame] {
-        var components = URLComponents(string: "\(baseURL)/sports/americanfootball_nfl/odds")
-        components?.queryItems = [
-            URLQueryItem(name: "apiKey", value: apiKey),
-            URLQueryItem(name: "regions", value: "us"),
-            URLQueryItem(name: "oddsFormat", value: "american"),
-            URLQueryItem(name: "markets", value: markets.joined(separator: ","))
-        ]
-        
-        guard let url = components?.url else {
-            DebugPrint(mode: .bettingOdds, "❌ [ODDS API] Failed to build URL")
-            throw BettingOddsError.invalidURL
-        }
-        
-        DebugPrint(mode: .bettingOdds, "🌐 [ODDS API] Requesting: \(url.absoluteString)")
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        
-        let (data, response) = try await session.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse {
-            DebugPrint(mode: .bettingOdds, "📡 [ODDS API] Response status: \(httpResponse.statusCode)")
-            
-            if let remainingRequests = httpResponse.value(forHTTPHeaderField: "x-requests-remaining") {
-                DebugPrint(mode: .bettingOdds, "📊 [ODDS API] Requests remaining: \(remainingRequests)")
-            }
-            
-            guard (200...299).contains(httpResponse.statusCode) else {
-                DebugPrint(mode: .bettingOdds, "❌ [ODDS API] HTTP error \(httpResponse.statusCode)")
-                throw BettingOddsError.httpError(httpResponse.statusCode)
-            }
-        }
-        
-        let decodedGames = try JSONDecoder().decode([TheOddsGame].self, from: data)
-        DebugPrint(mode: .bettingOdds, "✅ [ODDS API] Successfully decoded \(decodedGames.count) games")
-        
-        return decodedGames
-    }
-    
-    private func extractGameOdds(for scheduleGame: ScheduleGame, from games: [TheOddsGame]) -> GameBettingOdds? {
-        // Find matching The Odds API game
-        DebugPrint(mode: .bettingOdds, "🔎 [MATCH] Looking for: home='\(scheduleGame.homeTeam)' away='\(scheduleGame.awayTeam)'")
-        
-        guard let oddsGame = games.first(where: { game in
-            let homeMatch = teamsMatch(scheduleGame.homeTeam, game.homeTeam)
-            let awayMatch = teamsMatch(scheduleGame.awayTeam, game.awayTeam)
-            
-            if homeMatch && awayMatch {
-                DebugPrint(mode: .bettingOdds, "✅ [MATCH] Found match: '\(game.awayTeam)' @ '\(game.homeTeam)'")
-            }
-            
-            return homeMatch && awayMatch
-        }) else {
-            DebugPrint(mode: .bettingOdds, "❌ [MATCH] No match found in API results")
-            return nil
-        }
-        
-        DebugPrint(mode: .bettingOdds, "📊 [EXTRACT] Game has \(oddsGame.bookmakers.count) bookmakers")
-        
-        // 🔥 NEW: Extract odds from ALL available books
-        var allBookOdds: [BookOdds] = []
-        
-        for bookmaker in oddsGame.bookmakers {
-            DebugPrint(mode: .bettingOdds, "📚 [BOOK] Processing bookmaker: \(bookmaker.title)")
-            
-            guard let book = Sportsbook.from(apiKey: bookmaker.key) else { 
-                DebugPrint(mode: .bettingOdds, "⚠️ [BOOK] Unknown bookmaker key: \(bookmaker.key)")
-                continue 
-            }
-            
-            let h2hMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "h2h" })
-            let totalsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "totals" })
-            let spreadsMarket = bookmaker.markets.first(where: { $0.key.lowercased() == "spreads" })
-            
-            DebugPrint(mode: .bettingOdds, "📊 [BOOK] Markets - h2h: \(h2hMarket != nil), totals: \(totalsMarket != nil), spreads: \(spreadsMarket != nil)")
-            
-            // Extract BOTH moneylines (favorite and underdog)
-            let bothML = extractBothMoneylines(
-                homeCode: scheduleGame.homeTeam,
-                awayCode: scheduleGame.awayTeam,
-                homeName: oddsGame.homeTeam,
-                awayName: oddsGame.awayTeam,
-                market: h2hMarket
-            )
-            
-            if let ml = bothML {
-                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Favorite ML: \(ml.favorite.teamCode) \(ml.favorite.display), Underdog ML: \(ml.underdog.teamCode) \(ml.underdog.display)")
-            }
-            
-            // Extract total
-            let total = totalsMarket?.outcomes.first?.point
-            if let t = total {
-                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Total: \(t)")
-            }
-            
-            // Extract spread
-            let spreadInfo = extractSpreadInfo(
-                homeCode: scheduleGame.homeTeam,
-                awayCode: scheduleGame.awayTeam,
-                homeName: oddsGame.homeTeam,
-                awayName: oddsGame.awayTeam,
-                market: spreadsMarket
-            )
-            
-            if let spread = spreadInfo {
-                DebugPrint(mode: .bettingOdds, "📊 [BOOK] Spread: \(spread.teamCode) \(spread.points)")
-            }
-            
-            let bookOdds = BookOdds(
-                book: book,
-                favoriteTeamCode: bothML?.favorite.teamCode,
-                favoriteMoneylineOdds: bothML?.favorite.odds,
-                favoriteMoneylineDisplay: bothML?.favorite.display,
-                underdogTeamCode: bothML?.underdog.teamCode,
-                underdogMoneylineOdds: bothML?.underdog.odds,
-                underdogMoneylineDisplay: bothML?.underdog.display,
-                totalPoints: total,
-                spreadPoints: spreadInfo?.points,
-                spreadTeamCode: spreadInfo?.teamCode
-            )
-            
-            allBookOdds.append(bookOdds)
-        }
-        
-        DebugPrint(mode: .bettingOdds, "📚 [BOOKS] Collected odds from \(allBookOdds.count) bookmakers")
-        
-        // 🔥 Determine which book to display based on user preference
-        let displayBook: BookOdds?
-        let selectedSportsbook: Sportsbook?
-        
-        if preferredSportsbook == .bestLine {
-            DebugPrint(mode: .bettingOdds, "🎯 [SELECTION] Using best line logic")
-            // Find the best moneyline (least negative = most favorable)
-            displayBook = allBookOdds
-                .filter { $0.favoriteMoneylineOdds != nil }
-                .max { ($0.favoriteMoneylineOdds ?? -9999) < ($1.favoriteMoneylineOdds ?? -9999) }
-            selectedSportsbook = displayBook?.book
-            
-            if let selected = selectedSportsbook {
-                DebugPrint(mode: .bettingOdds, "✅ [SELECTION] Best line from: \(selected.displayName)")
-            }
-        } else {
-            DebugPrint(mode: .bettingOdds, "🎯 [SELECTION] Using preferred book: \(preferredSportsbook.displayName)")
-            // Use the user's preferred book
-            displayBook = allBookOdds.first { $0.book == preferredSportsbook }
-            selectedSportsbook = preferredSportsbook
-            
-            if displayBook == nil {
-                DebugPrint(mode: .bettingOdds, "⚠️ [SELECTION] Preferred book not found, will use fallback")
-            }
-        }
-        
-        // Fallback to any available book if preferred not found
-        let finalBook = displayBook ?? allBookOdds.first
-        let finalSportsbook = selectedSportsbook ?? finalBook?.book
-        
-        if let book = finalSportsbook {
-            DebugPrint(mode: .bettingOdds, "✅ [FINAL] Using sportsbook: \(book.displayName)")
-        }
-        
-        // Format display values from the selected book
-        let spreadDisplay: String?
-        if let spread = finalBook?.spreadPoints, let teamCode = finalBook?.spreadTeamCode {
-            spreadDisplay = "\(teamCode) \(formatPoint(spread))"
-        } else {
-            spreadDisplay = nil
-        }
-        
-        let totalDisplay: String?
-        let totalPoints: String?
-        if let total = finalBook?.totalPoints {
-            totalDisplay = "O/U \(formatPoint(total))"
-            totalPoints = formatPoint(total)
-        } else {
-            totalDisplay = nil
-            totalPoints = nil
-        }
-        
-        // Avoid returning empty objects
-        if finalBook?.favoriteMoneylineDisplay == nil && spreadDisplay == nil && totalDisplay == nil {
-            DebugPrint(mode: .bettingOdds, "❌ [FINAL] No usable odds data found")
-            return nil
-        }
-        
-        DebugPrint(mode: .bettingOdds, "✅ [FINAL] Returning odds: spread=\(spreadDisplay ?? "N/A"), total=\(totalDisplay ?? "N/A"), ML=\(finalBook?.favoriteMoneylineDisplay ?? "N/A")")
-        
-        return GameBettingOdds(
-            gameID: scheduleGame.id,
-            homeTeamCode: scheduleGame.homeTeam,
-            awayTeamCode: scheduleGame.awayTeam,
-            spreadDisplay: spreadDisplay,
-            totalDisplay: totalDisplay,
-            favoriteMoneylineTeamCode: finalBook?.favoriteTeamCode,
-            favoriteMoneylineOdds: finalBook?.favoriteMoneylineDisplay,
-            underdogMoneylineTeamCode: finalBook?.underdogTeamCode,
-            underdogMoneylineOdds: finalBook?.underdogMoneylineDisplay,
-            totalPoints: totalPoints,
-            moneylineDisplay: nil, // We don't need the full ML display anymore
-            sportsbook: finalSportsbook?.displayName,
-            sportsbookEnum: finalSportsbook,
-            lastUpdated: Date(),
-            allBookOdds: allBookOdds
-        )
-    }
-    
-    // 🔥 NEW: Extract numeric moneyline for comparison
-    private func extractFavoriteMoneylineNumeric(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> (teamCode: String, odds: Int, display: String)? {
-        guard let market = market else { return nil }
-        
-        func outcome(forTeamName name: String) -> TheOddsOutcome? {
-            return market.outcomes.first(where: { teamsMatch($0.name, name) })
-        }
-        
-        guard let homeOutcome = outcome(forTeamName: homeName),
-              let awayOutcome = outcome(forTeamName: awayName) else {
-            return nil
-        }
-        
-        let homePrice = Int(homeOutcome.price)
-        let awayPrice = Int(awayOutcome.price)
-        
-        // Favorite is the more negative price
-        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
-        let teamCode = homeIsFav ? homeCode : awayCode
-        let price = homeIsFav ? homePrice : awayPrice
-        let display = price > 0 ? "+\(price)" : "\(price)"
-        
-        return (teamCode, price, display)
-    }
-    
-    // 🔥 NEW: Extract BOTH moneylines (favorite AND underdog)
-    private func extractBothMoneylines(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> (favorite: (teamCode: String, odds: Int, display: String), underdog: (teamCode: String, odds: Int, display: String))? {
-        guard let market = market else { 
-            DebugPrint(mode: .bettingOdds, "⚠️ [ML EXTRACT] No h2h market provided")
-            return nil 
-        }
-        
-        func outcome(forTeamName name: String) -> TheOddsOutcome? {
-            return market.outcomes.first(where: { teamsMatch($0.name, name) })
-        }
-        
-        guard let homeOutcome = outcome(forTeamName: homeName),
-              let awayOutcome = outcome(forTeamName: awayName) else {
-            DebugPrint(mode: .bettingOdds, "⚠️ [ML EXTRACT] Could not find both team outcomes")
-            return nil
-        }
-        
-        let homePrice = Int(homeOutcome.price)
-        let awayPrice = Int(awayOutcome.price)
-        
-        DebugPrint(mode: .bettingOdds, "🎲 [ML EXTRACT] RAW PRICES - Home(\(homeCode)): \(homePrice), Away(\(awayCode)): \(awayPrice)")
-        
-        // Favorite is the more negative price (or less positive)
-        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
-        
-        let favTeamCode = homeIsFav ? homeCode : awayCode
-        let favPrice = homeIsFav ? homePrice : awayPrice
-        let favDisplay = favPrice > 0 ? "+\(favPrice)" : "\(favPrice)"
-        
-        let dogTeamCode = homeIsFav ? awayCode : homeCode
-        let dogPrice = homeIsFav ? awayPrice : homePrice
-        let dogDisplay = dogPrice > 0 ? "+\(dogPrice)" : "\(dogPrice)"
-        
-        DebugPrint(mode: .bettingOdds, "🎲 [ML EXTRACT] DETERMINED - Fav: \(favTeamCode) \(favPrice), Dog: \(dogTeamCode) \(dogPrice)")
-        
-        return (
-            favorite: (favTeamCode, favPrice, favDisplay),
-            underdog: (dogTeamCode, dogPrice, dogDisplay)
-        )
-    }
-    
-    // 🔥 NEW: Extract spread info (points and team)
-    private func extractSpreadInfo(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> (teamCode: String, points: Double)? {
-        guard let market = market else { return nil }
-        
-        func point(forTeamName name: String) -> Double? {
-            return market.outcomes.first(where: { teamsMatch($0.name, name) })?.point
-        }
-        
-        guard let homePoint = point(forTeamName: homeName),
-              let awayPoint = point(forTeamName: awayName) else {
-            return nil
-        }
-        
-        // Favorite is the team with negative points
-        if homePoint < awayPoint {
-            return (homeCode, homePoint)
-        } else {
-            return (awayCode, awayPoint)
-        }
-    }
-    
-    private func formatSpread(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> String? {
-        guard let market = market else { return nil }
-        
-        func point(forTeamName name: String) -> Double? {
-            let outcome = market.outcomes.first(where: { o in
-                teamsMatch(o.name, name)
-            })
-            return outcome?.point
-        }
-        
-        guard let homePoint = point(forTeamName: homeName),
-              let awayPoint = point(forTeamName: awayName) else {
-            return nil
-        }
-        
-        // Favorite is the team with negative points
-        if homePoint < awayPoint {
-            return "\(homeCode) \(formatPoint(homePoint))"
-        } else {
-            return "\(awayCode) \(formatPoint(awayPoint))"
-        }
-    }
-    
-    private func formatTotalDisplay(market: TheOddsMarket?) -> String? {
-        guard let market = market else { return nil }
-        // Totals outcomes are usually "Over" and "Under" with the same point
-        if let point = market.outcomes.first?.point {
-            return "O/U \(formatPoint(point))"
-        }
-        return nil
-    }
-    
-    private func extractTotalPoints(market: TheOddsMarket?) -> String? {
-        guard let market = market else { return nil }
-        if let point = market.outcomes.first?.point {
-            return formatPoint(point)
-        }
-        return nil
-    }
-    
-    private func formatMoneyline(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> String? {
-        guard let market = market else { return nil }
-        
-        func price(forTeamName name: String) -> String? {
-            guard let outcome = market.outcomes.first(where: { teamsMatch($0.name, name) }) else { return nil }
-            let price = Int(outcome.price)
-            return price > 0 ? "+\(price)" : "\(price)"
-        }
-        
-        guard let home = price(forTeamName: homeName),
-              let away = price(forTeamName: awayName) else {
-            return nil
-        }
-        
-        return "ML: \(awayCode) \(away) / \(homeCode) \(home)"
-    }
-    
-    private func extractFavoriteMoneyline(
-        homeCode: String,
-        awayCode: String,
-        homeName: String,
-        awayName: String,
-        market: TheOddsMarket?
-    ) -> (teamCode: String, odds: String)? {
-        guard let market = market else { return nil }
-        
-        func outcome(forTeamName name: String) -> TheOddsOutcome? {
-            return market.outcomes.first(where: { teamsMatch($0.name, name) })
-        }
-        
-        guard let homeOutcome = outcome(forTeamName: homeName),
-              let awayOutcome = outcome(forTeamName: awayName) else {
-            return nil
-        }
-        
-        let homePrice = Int(homeOutcome.price)
-        let awayPrice = Int(awayOutcome.price)
-        
-        // Favorite is the more negative price; if both positive, pick lower (more favored).
-        let homeIsFav = (homePrice < 0 && awayPrice >= 0) || (homePrice < awayPrice)
-        let teamCode = homeIsFav ? homeCode : awayCode
-        let price = homeIsFav ? homePrice : awayPrice
-        let oddsString = price > 0 ? "+\(price)" : "\(price)"
-        
-        return (teamCode, oddsString)
-    }
-    
-    private func formatPoint(_ value: Double) -> String {
-        // Drop trailing .0, keep .5, etc.
-        let rounded = (value * 10).rounded() / 10
-        if rounded.truncatingRemainder(dividingBy: 1) == 0 {
-            return String(Int(rounded))
-        }
-        return String(format: "%.1f", rounded)
-    }
-    
-    /// Find game for a specific team
-    private func findGame(for team: String, in games: [TheOddsGame]) -> TheOddsGame? {
-        let normalizedTeam = normalizeTeamName(team)
-        
-        let foundGame = games.first { game in
-            teamsMatch(team, game.homeTeam) || teamsMatch(team, game.awayTeam)
-        }
-        
-        if let game = foundGame {
-        } else {
-        }
-        
-        return foundGame
-    }
-    
-    /// Extract player-specific odds from a game
-    private func extractPlayerOdds(
-        for player: SleeperPlayer,
-        team: String,
-        from game: TheOddsGame,
-        week: Int
-    ) -> PlayerBettingOdds? {
-        
-        let playerName = player.fullName
-        
-        var anytimeTD: PropOdds?
-        var rushingYards: PropOdds?
-        var receivingYards: PropOdds?
-        var passingYards: PropOdds?
-        var passingTDs: PropOdds?
-        var receptions: PropOdds?
-        
-        // Search through all bookmakers and markets for player-specific props
-        
-        var foundMarkets = Set<String>()
-        
-        for bookmaker in game.bookmakers {
-            for market in bookmaker.markets {
-                
-                // Search outcomes for this player (case-insensitive)
-                for outcome in market.outcomes {
-                    let outcomeName = outcome.name.lowercased()
-                    let playerFullNameLower = playerName.lowercased()
-                    let playerFirstLower = (player.firstName ?? "").lowercased()
-                    let playerLastLower = (player.lastName ?? "").lowercased()
-                    
-                    // Check if outcome matches player name
-                    let matchesPlayer = outcomeName.contains(playerFullNameLower) ||
-                                       (!playerFirstLower.isEmpty && !playerLastLower.isEmpty && 
-                                        outcomeName.contains(playerFirstLower) && outcomeName.contains(playerLastLower)) ||
-                                       (!playerLastLower.isEmpty && outcomeName.contains(playerLastLower))
-                    
-                    if matchesPlayer {
-                        foundMarkets.insert(market.key)
-                        
-                        // Determine market type and extract odds
-                        switch market.key.lowercased() {
-                        case let key where key.contains("touchdown") || key.contains("td"):
-                            if anytimeTD == nil {
-                                anytimeTD = PropOdds(
-                                    id: "\(player.playerID)_anytime_td",
-                                    marketType: .anytimeTD,
-                                    playerName: playerName,
-                                    overUnder: nil,
-                                    yesOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    noOdds: nil, // Would need opposite outcome
-                                    overOdds: nil,
-                                    underOdds: nil,
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        case let key where key.contains("rushing") && key.contains("yard"):
-                            if rushingYards == nil {
-                                rushingYards = PropOdds(
-                                    id: "\(player.playerID)_rushing_yds",
-                                    marketType: .rushingYards,
-                                    playerName: playerName,
-                                    overUnder: outcome.point.map { String($0) },
-                                    yesOdds: nil,
-                                    noOdds: nil,
-                                    overOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    underOdds: nil, // Would need opposite outcome
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        case let key where key.contains("receiving") && key.contains("yard"):
-                            if receivingYards == nil {
-                                receivingYards = PropOdds(
-                                    id: "\(player.playerID)_receiving_yds",
-                                    marketType: .receivingYards,
-                                    playerName: playerName,
-                                    overUnder: outcome.point.map { String($0) },
-                                    yesOdds: nil,
-                                    noOdds: nil,
-                                    overOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    underOdds: nil,
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        case let key where key.contains("passing") && key.contains("yard"):
-                            if passingYards == nil {
-                                passingYards = PropOdds(
-                                    id: "\(player.playerID)_passing_yds",
-                                    marketType: .passingYards,
-                                    playerName: playerName,
-                                    overUnder: outcome.point.map { String($0) },
-                                    yesOdds: nil,
-                                    noOdds: nil,
-                                    overOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    underOdds: nil,
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        case let key where key.contains("passing") && (key.contains("td") || key.contains("touchdown")):
-                            if passingTDs == nil {
-                                passingTDs = PropOdds(
-                                    id: "\(player.playerID)_passing_tds",
-                                    marketType: .passingTDs,
-                                    playerName: playerName,
-                                    overUnder: outcome.point.map { String($0) },
-                                    yesOdds: nil,
-                                    noOdds: nil,
-                                    overOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    underOdds: nil,
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        case let key where key.contains("reception"):
-                            if receptions == nil {
-                                receptions = PropOdds(
-                                    id: "\(player.playerID)_receptions",
-                                    marketType: .receptions,
-                                    playerName: playerName,
-                                    overUnder: outcome.point.map { String($0) },
-                                    yesOdds: nil,
-                                    noOdds: nil,
-                                    overOdds: outcome.price > 0 ? Int(outcome.price) : nil,
-                                    underOdds: nil,
-                                    sportsbook: bookmaker.title
-                                )
-                            }
-                            
-                        default:
-                            break
-                        }
-                    }
-                }
-            }
-        }
-        
-        
-        // Only return if we found at least one prop
-        guard anytimeTD != nil || rushingYards != nil || receivingYards != nil || 
-              passingYards != nil || passingTDs != nil || receptions != nil else {
-            return nil
-        }
-        
-        return PlayerBettingOdds(
-            id: "\(player.playerID)_\(week)",
-            playerID: player.playerID,
-            playerName: playerName,
-            team: team,
-            week: week,
-            lastUpdated: Date(),
-            anytimeTD: anytimeTD,
-            rushingYards: rushingYards,
-            receivingYards: receivingYards,
-            passingYards: passingYards,
-            passingTDs: passingTDs,
-            receptions: receptions
-        )
-    }
-    
-    /// Normalize team name for matching (e.g., "KC" -> matches "Kansas City Chiefs")
-    private func normalizeTeamName(_ teamName: String) -> String {
-        let upperTeam = teamName.uppercased()
-        let lowerTeam = teamName.lowercased()
-        
-        // Full team name mappings (how The Odds API formats them)
-        let fullTeamNames: [String: [String]] = [
-            "KC": ["kansas city", "kansas city chiefs", "chiefs"],
-            "BUF": ["buffalo", "buffalo bills", "bills"],
-            "MIA": ["miami", "miami dolphins", "dolphins"],
-            "NE": ["new england", "new england patriots", "patriots"],
-            "NYJ": ["new york jets", "jets"],
-            "BAL": ["baltimore", "baltimore ravens", "ravens"],
-            "CIN": ["cincinnati", "cincinnati bengals", "bengals"],
-            "CLE": ["cleveland", "cleveland browns", "browns"],
-            "PIT": ["pittsburgh", "pittsburgh steelers", "steelers"],
-            "HOU": ["houston", "houston texans", "texans"],
-            "IND": ["indianapolis", "indianapolis colts", "colts"],
-            "JAX": ["jacksonville", "jacksonville jaguars", "jaguars"],
-            "TEN": ["tennessee", "tennessee titans", "titans"],
-            "DEN": ["denver", "denver broncos", "broncos"],
-            "LV": ["las vegas", "las vegas raiders", "raiders", "oakland raiders"],
-            "LAC": ["los angeles chargers", "chargers", "la chargers"],
-            "DAL": ["dallas", "dallas cowboys", "cowboys"],
-            "NYG": ["new york giants", "giants"],
-            "PHI": ["philadelphia", "philadelphia eagles", "eagles"],
-            "WSH": ["washington", "washington commanders", "commanders"],
-            "CHI": ["chicago", "chicago bears", "bears"],
-            "DET": ["detroit", "detroit lions", "lions"],
-            "GB": ["green bay", "green bay packers", "packers"],
-            "MIN": ["minnesota", "minnesota vikings", "vikings"],
-            "ATL": ["atlanta", "atlanta falcons", "falcons"],
-            "CAR": ["carolina", "carolina panthers", "panthers"],
-            "NO": ["new orleans", "new orleans saints", "saints"],
-            "TB": ["tampa bay", "tampa bay buccaneers", "buccaneers"],
-            "ARI": ["arizona", "arizona cardinals", "cardinals"],
-            "LAR": ["los angeles rams", "rams", "la rams"],
-            "SF": ["san francisco", "san francisco 49ers", "49ers"],
-            "SEA": ["seattle", "seattle seahawks", "seahawks"]
-        ]
-        
-        // If input is an abbreviation, return search variants
-        if let variants = fullTeamNames[upperTeam] {
-            // Return the most likely match candidate
-            return variants.first ?? lowerTeam
-        }
-        
-        // If input is already a full name, return lowercase for matching
-        return lowerTeam
-    }
-    
-    /// Check if two team names match (handles various formats)
-    private func teamsMatch(_ team1: String, _ team2: String) -> Bool {
-        let t1 = team1.lowercased().trimmingCharacters(in: .whitespaces)
-        let t2 = team2.lowercased().trimmingCharacters(in: .whitespaces)
-        
-        DebugPrint(mode: .bettingOdds, limit: 20, "🔤 [MATCH] Comparing: '\(t1)' vs '\(t2)'")
-        
-        // Direct match
-        if t1 == t2 { 
-            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Direct match")
-            return true 
-        }
-        
-        // One contains the other
-        if t1.contains(t2) || t2.contains(t1) { 
-            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Contains match")
-            return true 
-        }
-        
-        // Check abbreviations
-        let abbr1 = normalizeTeamName(team1)
-        let abbr2 = normalizeTeamName(team2)
-        
-        DebugPrint(mode: .bettingOdds, limit: 20, "🔤 [MATCH] Normalized: '\(abbr1)' vs '\(abbr2)'")
-        
-        if abbr1.contains(abbr2) || abbr2.contains(abbr1) { 
-            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Normalized match")
-            return true 
-        }
-        
-        // Special cases
-        if (t1.contains("kansas") && t2.contains("chiefs")) ||
-           (t2.contains("kansas") && t1.contains("chiefs")) { 
-            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Special case: Chiefs")
-            return true 
-        }
-        
-        if (t1.contains("buffalo") && t2.contains("bills")) ||
-           (t2.contains("buffalo") && t1.contains("bills")) { 
-            DebugPrint(mode: .bettingOdds, limit: 20, "✅ [MATCH] Special case: Bills")
-            return true 
-        }
-        
-        DebugPrint(mode: .bettingOdds, limit: 20, "❌ [MATCH] No match found")
-        return false
-    }
-    
-    /// Get date range for an NFL week
-    private func getWeekDateRange(week: Int, year: Int) -> (Date, Date) {
-        // Simplified: NFL weeks generally start on Thursday
-        // This is a rough calculation - could be improved
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.year = year
-        components.month = 9 // NFL season typically starts in September
-        components.day = (week - 1) * 7 + 1 // Rough estimate
-        
-        guard let weekStart = calendar.date(from: components) else {
-            // Fallback to current date range
-            let now = Date()
-            return (now, calendar.date(byAdding: .day, value: 7, to: now) ?? now)
-        }
-        
-        let weekEnd = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-        
-        return (weekStart, weekEnd)
+    private static func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
     }
 }

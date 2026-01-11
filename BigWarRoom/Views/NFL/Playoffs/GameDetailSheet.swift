@@ -348,17 +348,29 @@ struct GameDetailSheetContent: View {
                     
                     Spacer()
                     
-                    // Field position
+                    // 🔥 ENHANCED: Field position with team logo
                     if let yardLine = situation.yardLine {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text("Field Position")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                             
-                            Text(yardLine)
-                                .font(.body)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(.primary)
+                            // Parse team code from yard line (e.g., "CHI 35" -> "CHI")
+                            HStack(spacing: 4) {
+                                if let teamCode = extractTeamCode(from: yardLine),
+                                   let logo = teamAssets.logo(for: teamCode) {
+                                    logo
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 20, height: 20)
+                                        .clipShape(Circle())
+                                }
+                                
+                                Text(yardLine)
+                                    .font(.body)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.primary)
+                            }
                         }
                     }
                 }
@@ -436,5 +448,13 @@ struct GameDetailSheetContent: View {
                 .cornerRadius(8)
             }
         }
+    }
+    
+    // 🔥 NEW: Helper to extract team code from yard line string
+    private func extractTeamCode(from yardLine: String) -> String? {
+        // Format is typically "CHI 35" or "GB 20"
+        let components = yardLine.split(separator: " ")
+        guard components.count >= 1 else { return nil }
+        return String(components[0])
     }
 }

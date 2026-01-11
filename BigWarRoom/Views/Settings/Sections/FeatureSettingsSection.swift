@@ -12,9 +12,11 @@ struct FeatureSettingsSection: View {
    @Binding var lineupThreshold: Double
    @Binding var winProbabilitySD: Double
    @Binding var preferredSportsbook: String
+   @Binding var oddsRefreshInterval: Double // 🔥 NEW: Odds refresh interval in minutes
    
    let onThresholdReset: () -> Void
    let onThresholdChange: (Double) -> Void
+   let onOddsRefresh: () -> Void // 🔥 NEW: Odds refresh callback
    
    private var winProbabilityDescription: String {
       let sd = winProbabilitySD
@@ -37,7 +39,7 @@ struct FeatureSettingsSection: View {
             }
          } label: {
             HStack {
-               Text("Features")
+               Text("Features / Odds") // 🔥 CHANGED: Was "Features"
                   .font(.headline)
                   .foregroundColor(.white)
                
@@ -181,6 +183,79 @@ struct FeatureSettingsSection: View {
             }
             .padding(.vertical, 8)
             
+            // 🔥 NEW: Odds Refresh Interval
+            VStack(alignment: .leading, spacing: 12) {
+               HStack {
+                  Image(systemName: "clock.arrow.circlepath")
+                     .foregroundColor(.cyan)
+                     .frame(width: 24)
+                  
+                  VStack(alignment: .leading, spacing: 2) {
+                     Text("Odds Refresh Interval")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                     
+                     Text("Update betting odds every \(Int(oddsRefreshInterval)) minutes")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                  }
+                  
+                  Spacer()
+                  
+                  Button(action: {
+                     oddsRefreshInterval = 15.0
+                  }) {
+                     Text("Reset")
+                        .font(.caption)
+                        .foregroundColor(.gpBlue)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.gpBlue.opacity(0.1))
+                        .cornerRadius(6)
+                  }
+                  .opacity(oddsRefreshInterval == 15.0 ? 0.5 : 1.0)
+                  .disabled(oddsRefreshInterval == 15.0)
+               }
+               
+               VStack(spacing: 8) {
+                  HStack {
+                     Slider(value: $oddsRefreshInterval, in: 10...60, step: 5)
+                        .tint(.cyan)
+                     
+                     Text("\(Int(oddsRefreshInterval))")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 28)
+                        .background(
+                           RoundedRectangle(cornerRadius: 6)
+                              .fill(Color.cyan)
+                        )
+                  }
+                  
+                  HStack {
+                     Text("10")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                     Text("Frequent")
+                        .font(.caption2)
+                        .foregroundColor(.gpGreen)
+                     Spacer()
+                     Text("15")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                     Spacer()
+                     Text("Infrequent")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                     Text("60")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                  }
+               }
+               .padding(.horizontal, 28)
+            }
+            .padding(.vertical, 8)
+            
             // Sportsbook Preference
             VStack(alignment: .leading, spacing: 12) {
                HStack {
@@ -197,6 +272,23 @@ struct FeatureSettingsSection: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                   }
+                  
+                  Spacer()
+                  
+                  // 🔥 NEW: Refresh button
+                  Button(action: onOddsRefresh) {
+                     HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                           .font(.caption)
+                        Text("Refresh")
+                           .font(.caption)
+                     }
+                     .foregroundColor(.gpBlue)
+                     .padding(.horizontal, 8)
+                     .padding(.vertical, 4)
+                     .background(Color.gpBlue.opacity(0.1))
+                     .cornerRadius(6)
+                  }
                }
                
                LazyVGrid(columns: [
@@ -210,14 +302,9 @@ struct FeatureSettingsSection: View {
                         preferredSportsbook = book.rawValue
                      } label: {
                         VStack(spacing: 4) {
-                           Text(book.abbreviation)
-                              .font(.system(size: 12, weight: .black, design: .rounded))
-                              .foregroundColor(book.textColor)
+                           // 🔥 CHANGED: Use SportsbookBadge instead of manual rendering
+                           SportsbookBadge(book: book, size: 12)
                               .frame(width: 40, height: 24)
-                              .background(
-                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(book.primaryColor)
-                              )
                               .overlay(
                                  RoundedRectangle(cornerRadius: 4)
                                     .stroke(preferredSportsbook == book.rawValue ? Color.white : Color.clear, lineWidth: 2)

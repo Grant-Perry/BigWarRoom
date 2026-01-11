@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TeamRostersView: View {
     @Environment(TeamAssetManager.self) private var teamAssets
+    @Environment(NFLStandingsService.self) private var standingsService
     @State private var viewModel = TeamRostersViewModel()
     @State private var nflGameService = NFLGameDataService.shared
     @State private var weekManager = WeekSelectionManager.shared
@@ -397,7 +398,7 @@ struct MiniScheduleCard: View {
     let onTeamTap: (String) -> Void
     
     @Environment(TeamAssetManager.self) private var teamAssets
-    @State private var standingsService = NFLStandingsService.shared
+    @Environment(NFLStandingsService.self) private var standingsService
     
     var body: some View {
         if isByeWeek {

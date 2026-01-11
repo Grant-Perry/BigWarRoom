@@ -45,7 +45,7 @@ final class NFLScheduleViewModel {
     init(
         gameDataService: NFLGameDataService,
         weekService: NFLWeekService,
-        bettingOddsService: BettingOddsService = .shared
+        bettingOddsService: BettingOddsService
     ) {
         self.gameDataService = gameDataService
         self.weekService = weekService

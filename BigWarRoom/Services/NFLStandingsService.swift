@@ -13,26 +13,6 @@ import Observation
 @MainActor
 final class NFLStandingsService {
     
-    // MARK: - Shared Instance (Bridge Pattern)
-    
-    /// Temporary bridge pattern - allows both .shared AND dependency injection
-    /// TODO: Phase out .shared in favor of pure dependency injection
-    private static var _shared: NFLStandingsService?
-    
-    static var shared: NFLStandingsService {
-        if let existing = _shared {
-            return existing
-        }
-        let instance = NFLStandingsService()
-        _shared = instance
-        return instance
-    }
-    
-    /// Set the shared instance for dependency injection
-    static func setSharedInstance(_ instance: NFLStandingsService) {
-        _shared = instance
-    }
-    
     // MARK: - Observable Properties
     
     var teamRecords: [String: NFLTeamRecord] = [:]

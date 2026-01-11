@@ -11,6 +11,7 @@ struct AppSettingsView: View {
    @State private var viewModel: SettingsViewModel
    @Environment(NFLWeekService.self) private var nflWeekService
    @Environment(WeekSelectionManager.self) private var weekSelectionManager
+   @Environment(BettingOddsService.self) private var bettingOddsService // 🔥 NEW: For odds refresh
    
    // MARK: - @AppStorage Properties
    @AppStorage("UseRedesignedPlayerCards") private var useRedesignedCards = false
@@ -19,6 +20,7 @@ struct AppSettingsView: View {
    @AppStorage("PreferredSportsbook") private var preferredSportsbookRaw: String = Sportsbook.bestLine.rawValue
    @AppStorage("MatchupRefresh") private var matchupRefresh: Int = 15
    @AppStorage("WinProbabilitySD") private var winProbabilitySD: Double = 40.0
+   @AppStorage("OddsRefreshInterval") private var oddsRefreshInterval: Double = 15.0 // 🔥 NEW: Minutes between odds refreshes
    
    // MARK: - Section State
    @State private var isGeneralExpanded = true
@@ -64,15 +66,19 @@ struct AppSettingsView: View {
                lineupThreshold: $viewModel.lineupOptimizationThreshold,
                winProbabilitySD: $winProbabilitySD,
                preferredSportsbook: $preferredSportsbookRaw,
+               oddsRefreshInterval: $oddsRefreshInterval, // 🔥 NEW: Pass odds refresh interval
                onThresholdReset: viewModel.resetLineupOptimizationThreshold,
-               onThresholdChange: viewModel.updateLineupOptimizationThreshold
+               onThresholdChange: viewModel.updateLineupOptimizationThreshold,
+               onOddsRefresh: {
+                  bettingOddsService.refreshGameOddsCache()
+               }
             )
             
             NFLSettingsSection(
                isExpanded: $isNFLSettingsExpanded,
                showWeekPicker: $showWeekPicker,
-               currentWeek: viewModel.currentNFLWeek,
-               currentYear: viewModel.selectedYear,
+               currentWeek: weekSelectionManager.selectedWeek, // 🔥 FIXED: Read from WeekSelectionManager
+               currentYear: SeasonYearManager.shared.selectedYear, // 🔥 FIXED: Read from SeasonYearManager
                onRefresh: { await nflWeekService.refresh() }
             )
             

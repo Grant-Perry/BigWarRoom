@@ -155,7 +155,6 @@ final class AppContainer {
         GameStatusService.setSharedInstance(gameStatusService)
         
         self.nflStandingsService = NFLStandingsService()
-        NFLStandingsService.setSharedInstance(nflStandingsService)
         
         // MARK: - Stats Services
         self.playerStatsCache = PlayerStatsCache()

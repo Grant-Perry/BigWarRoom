@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct BettingOddsTestView: View {
-    @State private var bettingService = BettingOddsService.shared
+    @Environment(BettingOddsService.self) private var bettingService
     @State private var playerDirectory = PlayerDirectoryStore.shared
     @State private var testPlayer: SleeperPlayer?
     @State private var odds: PlayerBettingOdds?
@@ -517,4 +517,3 @@ struct BettingOddsTestView: View {
 #Preview {
     BettingOddsTestView()
 }
-

@@ -39,7 +39,7 @@ final class NFLPlayoffBracketService {
     init(
         weekSelectionManager: WeekSelectionManager,
         appLifecycleManager: AppLifecycleManager,
-        bettingOddsService: BettingOddsService = .shared
+        bettingOddsService: BettingOddsService
     ) {
         self.weekSelectionManager = weekSelectionManager
         self.appLifecycleManager = appLifecycleManager
