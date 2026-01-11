@@ -83,191 +83,102 @@ struct PlayoffConferenceSideView: View {
       }
       
       return HStack(alignment: .top, spacing: 0) {
-         wildCardColumn(seeds: seeds, wcGame1: wcGame1, wcGame2: wcGame2, wcGame3: wcGame3)
-         wildCardConnectorColumn(wcGame1: wcGame1, wcGame2: wcGame2, wcGame3: wcGame3)
-         divisionalColumn(seed1: seed1, divGame1: divGame1, divGame2: divGame2)
-         divisionalConnectorColumn(divGame1: divGame1, divGame2: divGame2)
-         championshipColumn(champGame: champGame, divGame1: divGame1)
-         championshipConnectorColumn(champGame: champGame)
+         WildCardColumnView(
+            conference: conference,
+            seeds: seeds,
+            wcGame1: wcGame1,
+            wcGame2: wcGame2,
+            wcGame3: wcGame3,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            cellWidth: cellWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yWC1: yWC1,
+            yWC2: yWC2,
+            yWC3: yWC3,
+            matchupSpacing: matchupSpacing,
+            onGameTap: onGameTap
+         )
+         
+         WildCardConnectorColumnView(
+            wcGame1: wcGame1,
+            wcGame2: wcGame2,
+            wcGame3: wcGame3,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            connectorWidth: connectorWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yWC1: yWC1,
+            yWC2: yWC2,
+            yWC3: yWC3,
+            yDiv1Top: yDiv1Top,
+            yDiv2Top: yDiv2Top,
+            yDiv2Bot: yDiv2Bot
+         )
+         
+         DivisionalColumnView(
+            seed1: seed1,
+            divGame1: divGame1,
+            divGame2: divGame2,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            cellWidth: cellWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yDiv1Top: yDiv1Top,
+            yDiv1Bot: yDiv1Bot,
+            yDiv1Center: yDiv1Center,
+            yDiv2Top: yDiv2Top,
+            yDiv2Bot: yDiv2Bot,
+            yDiv2Center: yDiv2Center,
+            matchupSpacing: matchupSpacing,
+            onGameTap: onGameTap
+         )
+         
+         DivisionalConnectorColumnView(
+            divGame1: divGame1,
+            divGame2: divGame2,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            connectorWidth: connectorWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yDiv1Center: yDiv1Center,
+            yDiv2Center: yDiv2Center,
+            yChampTop: yChampTop,
+            yChampBot: yChampBot
+         )
+         
+         ChampionshipColumnView(
+            conference: conference,
+            champGame: champGame,
+            divGame1: divGame1,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            cellWidth: cellWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yChampTop: yChampTop,
+            yChampBot: yChampBot,
+            yChampCenter: yChampCenter,
+            matchupSpacing: matchupSpacing,
+            onGameTap: onGameTap
+         )
+         
+         ChampionshipConnectorColumnView(
+            conference: conference,
+            champGame: champGame,
+            isReversed: isReversed,
+            isCurrentSeason: isCurrentSeason,
+            connectorWidth: connectorWidth,
+            headerHeight: headerHeight,
+            totalContentHeight: totalContentHeight,
+            yChampCenter: yChampCenter
+         )
       }
       .environment(\.layoutDirection, isReversed ? .rightToLeft : .leftToRight)
-   }
-   
-   // MARK: - Column Views
-   
-   @ViewBuilder
-   private func wildCardColumn(seeds: [Int: PlayoffTeam], wcGame1: PlayoffGame?, wcGame2: PlayoffGame?, wcGame3: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: cellWidth, height: totalContentHeight)
-         
-         // Conference logo
-         if let confLogo = teamAssets.logo(for: (conference == .afc ? "AFC" : "NFC")) {
-            confLogo
-               .resizable()
-               .aspectRatio(contentMode: .fit)
-               .frame(width: 56, height: 56)
-               .offset(x: conference == .afc ? 120 : 120, y: -headerHeight - 22)
-         } else {
-            Text(conference == .afc ? "AFC" : "NFC")
-               .font(.custom("BebasNeue-Regular", size: 30))
-               .foregroundColor(.white)
-               .frame(height: headerHeight, alignment: .top)
-               .offset(x: conference == .afc ? 125 : 125, y: -headerHeight - 4)
-         }
-
-         BracketHeader(text: "WILD CARD")
-
-         // Wild Card games
-         if let game = wcGame1 {
-            PlayoffMatchupView(game: game, isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC1 + headerHeight)
-         } else if isCurrentSeason {
-            PlayoffMatchupView(topTeam: seeds[5], bottomTeam: seeds[4], isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC1 + headerHeight)
-         }
-
-         if let game = wcGame2 {
-            PlayoffMatchupView(game: game, isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC2 + headerHeight)
-         } else if isCurrentSeason {
-            PlayoffMatchupView(topTeam: seeds[6], bottomTeam: seeds[3], isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC2 + headerHeight)
-         }
-
-         if let game = wcGame3 {
-            PlayoffMatchupView(game: game, isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC3 + headerHeight)
-         } else if isCurrentSeason {
-            PlayoffMatchupView(topTeam: seeds[7], bottomTeam: seeds[2], isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yWC3 + headerHeight)
-         }
-      }
-      .frame(width: cellWidth)
-   }
-   
-   @ViewBuilder
-   private func wildCardConnectorColumn(wcGame1: PlayoffGame?, wcGame2: PlayoffGame?, wcGame3: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: connectorWidth, height: totalContentHeight)
-         BracketHeader(text: "")
-         WC_Div_Connector(
-            isReversed: isReversed,
-            src1: (wcGame1 != nil || isCurrentSeason) ? yWC1 : nil,
-            src2: (wcGame2 != nil || isCurrentSeason) ? yWC2 : nil,
-            src3: (wcGame3 != nil || isCurrentSeason) ? yWC3 : nil,
-            dst1: yDiv1Top,
-            dst2_top: yDiv2Top,
-            dst2_bot: yDiv2Bot
-         )
-         .offset(y: headerHeight)
-      }
-      .frame(width: connectorWidth)
-   }
-   
-   @ViewBuilder
-   private func divisionalColumn(seed1: PlayoffTeam?, divGame1: PlayoffGame?, divGame2: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: cellWidth, height: totalContentHeight)
-         BracketHeader(text: "DIVISIONAL")
-         
-         // Divisional Game 1
-         if let game = divGame1 {
-            PlayoffMatchupView(game: game, isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yDiv1Center + headerHeight)
-         } else if isCurrentSeason {
-            BracketTeamCell(team: nil, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yDiv1Top + headerHeight)
-            BracketTeamCell(team: seed1, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yDiv1Bot + headerHeight)
-         }
-
-         // Divisional Game 2
-         if let game = divGame2 {
-            PlayoffMatchupView(game: game, isReversed: isReversed, matchupSpacing: matchupSpacing, onTap: onGameTap)
-               .position(x: cellWidth/2, y: yDiv2Center + headerHeight)
-         } else if isCurrentSeason {
-            BracketTeamCell(team: nil, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yDiv2Top + headerHeight)
-            BracketTeamCell(team: nil, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yDiv2Bot + headerHeight)
-         }
-      }
-      .frame(width: cellWidth)
-   }
-   
-   @ViewBuilder
-   private func divisionalConnectorColumn(divGame1: PlayoffGame?, divGame2: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: connectorWidth, height: totalContentHeight)
-         BracketHeader(text: "")
-         Div_Champ_Connector(
-            isReversed: isReversed,
-            src1: (divGame1 != nil || isCurrentSeason) ? yDiv1Center : nil,
-            src2: (divGame2 != nil || isCurrentSeason) ? yDiv2Center : nil,
-            dst_top: yChampTop,
-            dst_bot: yChampBot
-         )
-         .offset(y: headerHeight)
-         .scaleEffect(x: isReversed ? -1 : 1, y: 1)
-      }
-      .frame(width: connectorWidth)
-   }
-   
-   @ViewBuilder
-   private func championshipColumn(champGame: PlayoffGame?, divGame1: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: cellWidth, height: totalContentHeight)
-         BracketHeader(text: conference == .afc ? "AFC CHAMP" : "NFC CHAMP")
-
-         if let game = champGame {
-            PlayoffChampionshipMatchupView(
-               game: game,
-               topDivGame: divGame1,
-               isReversed: isReversed,
-               yChampTop: yChampTop,
-               yChampBot: yChampBot,
-               headerHeight: headerHeight,
-               cellWidth: cellWidth,
-               matchupSpacing: matchupSpacing,
-               onTap: onGameTap
-            )
-         } else if isCurrentSeason {
-            BracketTeamCell(team: nil, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yChampTop + headerHeight)
-            BracketTeamCell(team: nil, game: nil, isReversed: isReversed)
-               .position(x: cellWidth/2, y: yChampBot + headerHeight)
-         }
-      }
-      .frame(width: cellWidth)
-   }
-   
-   @ViewBuilder
-   private func championshipConnectorColumn(champGame: PlayoffGame?) -> some View {
-      ZStack(alignment: .top) {
-         Color.clear.frame(width: connectorWidth, height: totalContentHeight)
-         BracketHeader(text: "")
-         
-         if conference == .afc {
-            Champ_SB_Connector(
-               isReversed: false,
-               src: (champGame != nil || isCurrentSeason) ? yChampCenter + headerHeight : nil,
-               dst: yChampCenter + headerHeight - 33,
-               startOffset: 8
-            )
-            .frame(width: connectorWidth + 16)
-         } else {
-            Champ_SB_Connector(
-               isReversed: false,
-               src: (champGame != nil || isCurrentSeason) ? yChampCenter + headerHeight : nil,
-               dst: yChampCenter + headerHeight - 45,
-               startOffset: 8
-            )
-            .frame(width: connectorWidth + 16)
-            .offset(x: -6, y: 45)
-            .scaleEffect(x: -1, y: 1)
-         }
-      }
-      .frame(width: connectorWidth)
    }
    
    // MARK: - Helper Functions

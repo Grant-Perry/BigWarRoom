@@ -331,7 +331,6 @@ struct NFLLandscapeBracketView: View {
                            scoreSize: scoreSize,
                            scoreOffset: scoreOffset
                         )
-                        .padding(.horizontal, 16)
                         .padding(.top, 4)
                         
                         // Live situation card
@@ -363,7 +362,9 @@ struct NFLLandscapeBracketView: View {
                      scoreSize: scoreSize,
                      scoreOffset: scoreOffset
                   )
-                  .padding(.horizontal, 16)
+				  .scaleEffect(1.1) // just bump up the playoff card a bit
+                  .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
+                  .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
                   .padding(.top, 8)
                   .padding(.bottom, 12)
                   
@@ -382,10 +383,10 @@ struct NFLLandscapeBracketView: View {
             .frame(width: 480)
             .scaleEffect(modalScale)
             .fixedSize(horizontal: false, vertical: true)
-            .background(Color(.systemBackground))
+            .background(game.isLive ? Color(.systemBackground) : Color.clear)
             .cornerRadius(20)
-            .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
-            .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
+            .shadow(color: game.isLive ? .white.opacity(0.3) : .clear, radius: 30, x: 0, y: 0)
+            .shadow(color: game.isLive ? .black.opacity(0.5) : .clear, radius: 40, x: 0, y: 10)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
       }

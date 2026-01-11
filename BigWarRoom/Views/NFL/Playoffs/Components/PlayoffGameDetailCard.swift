@@ -41,7 +41,9 @@ struct PlayoffGameDetailCard: View {
          // Home team logo (right side) with score overlay
          homeTeamSection(homeColor: homeColor, homeScore: homeScore, hasScores: hasScores)
       }
+      .padding(.horizontal, 20)
       .frame(height: 100)
+      .frame(maxWidth: .infinity)
       .background(
          Rectangle()
             .fill(
