@@ -19,6 +19,7 @@ struct PlayoffGameDetailCard: View {
       // 🔥 NEW: Log when card renders
       let _ = DebugPrint(mode: .bracketTimer, "🎨 [MODAL RENDER] Game: \(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation), Status: \(game.status.displayText), Away: \(game.awayTeam.score ?? 0), Home: \(game.homeTeam.score ?? 0)")
       let _ = DebugPrint(mode: .bracketTimer, "🎨 [LIVE SITUATION] Has liveSituation: \(game.liveSituation != nil), Down/Dist: \(game.liveSituation?.downDistanceDisplay ?? "N/A")")
+      let _ = DebugPrint(mode: .bracketTimer, "🏈 [POSSESSION DEBUG] Possession: \(game.liveSituation?.possession ?? "NIL"), Away: \(game.awayTeam.abbreviation), Home: \(game.homeTeam.abbreviation), isLive: \(game.isLive)")
       
       let awayColor = teamAssets.team(for: game.awayTeam.abbreviation)?.primaryColor ?? .blue
       let homeColor = teamAssets.team(for: game.homeTeam.abbreviation)?.primaryColor ?? .red
@@ -67,6 +68,26 @@ struct PlayoffGameDetailCard: View {
                lineWidth: 2
             )
       )
+      .overlay {
+         // 🏈 FOOTBALL OVERLAY - completely independent positioning
+         if game.isLive, let possession = game.liveSituation?.possession, hasScores {
+            GeometryReader { geo in
+               if possession == game.awayTeam.abbreviation {
+                  // Away team has possession - put football under left score
+                  Text("🏈")
+                     .font(.system(size: 20))
+                     .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                     .position(x: 130 + scoreOffset, y: 87)
+               } else if possession == game.homeTeam.abbreviation {
+                  // Home team has possession - put football under right score
+                  Text("🏈")
+                     .font(.system(size: 20))
+                     .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                     .position(x: geo.size.width - 130 - scoreOffset, y: 87)
+               }
+            }
+         }
+      }
       .clipShape(Rectangle())
       .cornerRadius(12)
       .shadow(color: .black.opacity(0.3), radius: 8)
@@ -74,61 +95,56 @@ struct PlayoffGameDetailCard: View {
    
    @ViewBuilder
    private func awayTeamSection(awayColor: Color, awayScore: Int, hasScores: Bool) -> some View {
-      ZStack(alignment: .bottomTrailing) {
+      ZStack {
+         // Logo - no clipping, just scaled
          if let logo = teamAssets.logo(for: game.awayTeam.abbreviation) {
             logo
                .resizable()
                .aspectRatio(contentMode: .fill)
-               .scaleEffect(1.5)
-               .frame(width: 90, height: 90)
-               .clipped()
+               .frame(width: 110, height: 110)
          }
          
-         // Seed badge with moneyline
-         if let seed = game.awayTeam.seed {
-            let isAwayFavorite = displayOdds?.favoriteMoneylineTeamCode == game.awayTeam.abbreviation
-            let isAwayUnderdog = displayOdds?.underdogMoneylineTeamCode == game.awayTeam.abbreviation
-            let moneyline = isAwayFavorite ? displayOdds?.favoriteMoneylineOdds : (isAwayUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
-            
-            HStack(spacing: 4) {
-               Text("#\(seed)")
-                  .font(.system(size: 12, weight: .black))
-                  .foregroundStyle(.white)
-               
-               if let ml = moneyline, !game.isCompleted {
-                  Text(ml)
-                     .font(.system(size: 10, weight: .black))
-                     .foregroundStyle(isAwayFavorite ? .green : .orange)
+         // Seed badge with moneyline - at bottom
+         VStack {
+            Spacer()
+            HStack {
+               Spacer()
+               if let seed = game.awayTeam.seed {
+                  let isAwayFavorite = displayOdds?.favoriteMoneylineTeamCode == game.awayTeam.abbreviation
+                  let isAwayUnderdog = displayOdds?.underdogMoneylineTeamCode == game.awayTeam.abbreviation
+                  let moneyline = isAwayFavorite ? displayOdds?.favoriteMoneylineOdds : (isAwayUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
+                  
+                  HStack(spacing: 4) {
+                     Text("#\(seed)")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(.white)
+                     
+                     if let ml = moneyline, !game.isCompleted {
+                        Text(ml)
+                           .font(.system(size: 10, weight: .black))
+                           .foregroundStyle(isAwayFavorite ? .green : .orange)
+                     }
+                  }
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Capsule().fill(Color.black.opacity(0.85)))
+                  .padding(6)
                }
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.black.opacity(0.85)))
-            .padding(6)
-         }
-         
-         // 🏈 FIXED: Possession indicator - positioned to RIGHT of away team logo
-         if game.isLive, 
-            let possession = game.liveSituation?.possession,
-            possession == game.awayTeam.abbreviation {
-            Text("🏈")
-               .font(.system(size: 20))
-               .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-               .offset(x: 25, y: -2)
          }
       }
       .frame(width: 100, height: 100)
       .overlay(alignment: .trailing) {
          if hasScores {
             Text("\(awayScore)")
-               .font(.bebas(size: scoreSize))
-               .bold()
-               .kerning(-2)
-               .foregroundColor(.white.opacity(0.3))
+               .font(.bebas(size: scoreSize * 1.3))
+               .kerning(-3)
+               .foregroundColor(.white.opacity(0.35))
                .lineLimit(1)
                .minimumScaleFactor(0.1)
                .allowsTightening(true)
                .fixedSize(horizontal: true, vertical: false)
+               .shadow(color: .black.opacity(0.5), radius: 2, x: 1, y: 1)
                .offset(x: 60 + scoreOffset)
          }
       }
@@ -136,61 +152,56 @@ struct PlayoffGameDetailCard: View {
    
    @ViewBuilder
    private func homeTeamSection(homeColor: Color, homeScore: Int, hasScores: Bool) -> some View {
-      ZStack(alignment: .bottomLeading) {
+      ZStack {
+         // Logo - no clipping, just scaled
          if let logo = teamAssets.logo(for: game.homeTeam.abbreviation) {
             logo
                .resizable()
                .aspectRatio(contentMode: .fill)
-               .scaleEffect(1.5)
-               .frame(width: 90, height: 90)
-               .clipped()
+               .frame(width: 110, height: 110)
          }
          
-         // Seed badge with moneyline
-         if let seed = game.homeTeam.seed {
-            let isHomeFavorite = displayOdds?.favoriteMoneylineTeamCode == game.homeTeam.abbreviation
-            let isHomeUnderdog = displayOdds?.underdogMoneylineTeamCode == game.homeTeam.abbreviation
-            let moneyline = isHomeFavorite ? displayOdds?.favoriteMoneylineOdds : (isHomeUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
-            
-            HStack(spacing: 4) {
-               Text("#\(seed)")
-                  .font(.system(size: 12, weight: .black))
-                  .foregroundStyle(.white)
-               
-               if let ml = moneyline, !game.isCompleted {
-                  Text(ml)
-                     .font(.system(size: 10, weight: .black))
-                     .foregroundStyle(isHomeFavorite ? .green : .orange)
+         // Seed badge with moneyline - at bottom
+         VStack {
+            Spacer()
+            HStack {
+               if let seed = game.homeTeam.seed {
+                  let isHomeFavorite = displayOdds?.favoriteMoneylineTeamCode == game.homeTeam.abbreviation
+                  let isHomeUnderdog = displayOdds?.underdogMoneylineTeamCode == game.homeTeam.abbreviation
+                  let moneyline = isHomeFavorite ? displayOdds?.favoriteMoneylineOdds : (isHomeUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
+                  
+                  HStack(spacing: 4) {
+                     Text("#\(seed)")
+                        .font(.system(size: 12, weight: .black))
+                        .foregroundStyle(.white)
+                     
+                     if let ml = moneyline, !game.isCompleted {
+                        Text(ml)
+                           .font(.system(size: 10, weight: .black))
+                           .foregroundStyle(isHomeFavorite ? .green : .orange)
+                     }
+                  }
+                  .padding(.horizontal, 6)
+                  .padding(.vertical, 2)
+                  .background(Capsule().fill(Color.black.opacity(0.85)))
+                  .padding(6)
                }
+               Spacer()
             }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(Capsule().fill(Color.black.opacity(0.85)))
-            .padding(6)
-         }
-         
-         // 🏈 FIXED: Possession indicator - positioned to LEFT of home team logo
-         if game.isLive,
-            let possession = game.liveSituation?.possession,
-            possession == game.homeTeam.abbreviation {
-            Text("🏈")
-               .font(.system(size: 20))
-               .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-               .offset(x: -25, y: -2)
          }
       }
       .frame(width: 100, height: 100)
       .overlay(alignment: .leading) {
          if hasScores {
             Text("\(homeScore)")
-               .font(.bebas(size: scoreSize))
-               .kerning(-2)
-               .bold()
-               .foregroundColor(.white.opacity(0.3))
+               .font(.bebas(size: scoreSize * 1.3))
+               .kerning(-3)
+               .foregroundColor(.white.opacity(0.35))
                .lineLimit(1)
                .minimumScaleFactor(0.1)
                .allowsTightening(true)
                .fixedSize(horizontal: true, vertical: false)
+               .shadow(color: .black.opacity(0.5), radius: 2, x: -1, y: 1)
                .offset(x: -60 + (scoreOffset * -1))
          }
       }

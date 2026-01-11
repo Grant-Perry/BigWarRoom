@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [.bettingOdds] // 🔥 ENABLED: Track bracket refresh timing
+   static var activeMode: DebugMode = [.bracketTimer] // [.bracketTimer] // 🔥 ENABLED: Track bracket refresh timing] // [.bettingOdds] // 🔥 ENABLED: Track bracket refresh timing
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
