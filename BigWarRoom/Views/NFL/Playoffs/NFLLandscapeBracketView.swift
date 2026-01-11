@@ -27,6 +27,8 @@ struct NFLLandscapeBracketView: View {
    @State private var selectedGameID: String?
    @State private var showingGameDetail = false
    @State private var showingBookPicker = false
+   @State private var showLastPlayDetail = false
+   @State private var lastPlayText: String = ""
    @AppStorage("selectedSportsbook") private var selectedBook: String = Sportsbook.fanduel.rawValue
    
    // Smart connector points
@@ -77,6 +79,12 @@ struct NFLLandscapeBracketView: View {
             bracketContent(bracket: bracket, geo: geo)
          } else {
             loadingView
+         }
+      }
+      .overlay {
+         // Last Play detail popup
+         if showLastPlayDetail {
+            lastPlayDetailOverlay
          }
       }
    }
@@ -261,97 +269,116 @@ struct NFLLandscapeBracketView: View {
                selectedGameID = nil
             }
          
-         VStack(spacing: 0) {
-            // Header with timer - SUPER COMPACT
-            HStack {
-               Text(game.round.displayName)
-                  .font(.headline)
-                  .fontWeight(.bold)
-                  .foregroundStyle(.white)
-               
-               Spacer()
-               
-               // 🏈 NEW: Refresh countdown timer (only for live games)
-               if game.isLive {
-                  RefreshCountdownTimerView()
-               }
-               
-               Spacer()
-               
-               Button {
-                  showingGameDetail = false
-                  selectedGameID = nil
-               } label: {
-                  Image(systemName: "xmark.circle.fill")
-                     .font(.title3)
-                     .foregroundStyle(.white.opacity(0.7))
-               }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .frame(height: 36)
-            .background(Color(.systemGray6))
+         GeometryReader { geo in
+            let screenWidth = geo.size.width
+            // iPhone Pro Max in landscape ~930pts, standard iPhones ~850pts
+            let isProMax = screenWidth >= 900
+            let modalScale = isProMax ? 0.9 : 0.8
             
-            // 🏈 NEW: Live game situation (if game is live)
-            if game.isLive, let situation = game.liveSituation {
-               ScrollView {
-                  VStack(spacing: 10) {
-                     // Matchup Card
-                     let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-                     let odds = playoffService.gameOdds[gameID]
-                     let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
-                     let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
-                     
-                     PlayoffGameDetailCard(
-                        game: game,
-                        displayOdds: displayOdds,
-                        scoreSize: scoreSize,
-                        scoreOffset: scoreOffset
-                     )
-                     .padding(.horizontal, 16)
-                     .padding(.top, 4)
-                     
-                     // Live situation card
-                     liveGameSituationView(situation: situation)
-                        .padding(.horizontal, 16)
+            VStack(spacing: 0) {
+               // Header with timer - SUPER COMPACT
+               HStack {
+                  Text(game.round.displayName)
+                     .font(.headline)
+                     .fontWeight(.bold)
+                     .foregroundStyle(.white)
+                  
+                  Spacer()
+                  
+                  // 🏈 NEW: Refresh countdown timer (only for live games)
+                  if game.isLive {
+                     RefreshCountdownTimerView()
+                  }
+                  
+                  Spacer()
+                  
+                  Button {
+                     showingGameDetail = false
+                     selectedGameID = nil
+                  } label: {
+                     Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.7))
                   }
                }
-            } else {
-               // Matchup Card (non-live games)
-               let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-               let odds = playoffService.gameOdds[gameID]
-               let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
-               let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
-               
-               PlayoffGameDetailCard(
-                  game: game,
-                  displayOdds: displayOdds,
-                  scoreSize: scoreSize,
-                  scoreOffset: scoreOffset
-               )
                .padding(.horizontal, 16)
-               .padding(.top, 8)
-               .padding(.bottom, 12)
+               .padding(.vertical, 6)
+               .frame(height: 36)
+               .background(Color(.systemGray6))
                
-               // Odds bar (only if game not completed)
-               if !game.isCompleted, odds != nil {
-                  PlayoffOddsBar(
+               // 🏈 NEW: Live game situation (if game is live)
+               if game.isLive, let situation = game.liveSituation {
+                  ScrollView {
+                     VStack(spacing: 10) {
+                        // Matchup Card
+                        let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                        let odds = playoffService.gameOdds[gameID]
+                        let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
+                        let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
+                        
+                        PlayoffGameDetailCard(
+                           game: game,
+                           displayOdds: displayOdds,
+                           scoreSize: scoreSize,
+                           scoreOffset: scoreOffset
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                        
+                        // Live situation card
+                        liveGameSituationView(situation: situation, game: game)
+                           .padding(.horizontal, 16)
+                        
+                        // Odds bar for live games too
+                        if let odds = odds {
+                           PlayoffOddsBar(
+                              displayOdds: displayOdds,
+                              currentSportsbook: currentSportsbook,
+                              onBookPickerTap: { showingBookPicker = true }
+                           )
+                           .padding(.horizontal, 16)
+                           .padding(.bottom, 10)
+                        }
+                     }
+                  }
+               } else {
+                  // Matchup Card (non-live games)
+                  let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+                  let odds = playoffService.gameOdds[gameID]
+                  let currentSportsbook = Sportsbook(rawValue: selectedBook) ?? .fanduel
+                  let displayOdds = getDisplayOdds(from: odds, book: currentSportsbook)
+                  
+                  PlayoffGameDetailCard(
+                     game: game,
                      displayOdds: displayOdds,
-                     currentSportsbook: currentSportsbook,
-                     onBookPickerTap: { showingBookPicker = true }
+                     scoreSize: scoreSize,
+                     scoreOffset: scoreOffset
                   )
                   .padding(.horizontal, 16)
+                  .padding(.top, 8)
                   .padding(.bottom, 12)
+                  
+                  // Odds bar (only if game not completed)
+                  if !game.isCompleted, odds != nil {
+                     PlayoffOddsBar(
+                        displayOdds: displayOdds,
+                        currentSportsbook: currentSportsbook,
+                        onBookPickerTap: { showingBookPicker = true }
+                     )
+                     .padding(.horizontal, 16)
+                     .padding(.bottom, 12)
+                  }
                }
             }
+            .frame(width: 480)
+            .scaleEffect(modalScale)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(Color(.systemBackground))
+            .cornerRadius(20)
+            .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
+            .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
-         .frame(width: 480)
-         .scaleEffect(0.95)
-         .fixedSize(horizontal: false, vertical: true)
-         .background(Color(.systemBackground))
-         .cornerRadius(20)
-         .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
-         .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
       }
       .transition(.opacity)
       .animation(.easeInOut(duration: 0.2), value: showingGameDetail)
@@ -359,7 +386,7 @@ struct NFLLandscapeBracketView: View {
    
    // 🏈 NEW: Live game situation display
    @ViewBuilder
-   private func liveGameSituationView(situation: LiveGameSituation) -> some View {
+   private func liveGameSituationView(situation: LiveGameSituation, game: PlayoffGame) -> some View {
       VStack(alignment: .leading, spacing: 12) {
          // Header
          HStack(spacing: 12) {
@@ -378,24 +405,32 @@ struct NFLLandscapeBracketView: View {
          
          // 🔥 NEW: Last Play (left) and Current Drive (right) in same row
          HStack(alignment: .top, spacing: 12) {
-            // Last Play
+            // Last Play - tappable for full text
             if let lastPlay = situation.lastPlay {
-               VStack(alignment: .leading, spacing: 6) {
-                  Text("Last Play")
-                     .font(.caption)
-                     .foregroundStyle(.secondary)
-                  
-                  Text(lastPlay)
-                     .font(.caption)
-                     .foregroundStyle(.primary)
-                     .fixedSize(horizontal: false, vertical: true)
-                     .lineLimit(3)
+               Button {
+                  showLastPlayDetail = true
+                  lastPlayText = lastPlay
+               } label: {
+                  VStack(alignment: .leading, spacing: 6) {
+                     Text("Last Play")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     
+                     Text(lastPlay)
+                        .font(.caption2)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                  }
+                  .padding(.horizontal, 12)
+                  .padding(.vertical, 8)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .background(Color(.tertiarySystemGroupedBackground))
+                  .cornerRadius(8)
+                  .contentShape(Rectangle())
                }
-               .padding(.horizontal, 12)
-               .padding(.vertical, 8)
-               .frame(maxWidth: .infinity, alignment: .leading)
-               .background(Color(.tertiarySystemGroupedBackground))
-               .cornerRadius(8)
+               .buttonStyle(.plain)
             }
             
             // Current Drive Stats
@@ -437,18 +472,46 @@ struct NFLLandscapeBracketView: View {
             }
          }
          
-         // Down & Distance with Field Position
-         if let downDist = situation.downDistanceDisplay {
+         // Down & Distance with Field Position - ONLY show if down/distance are valid
+         if let down = situation.down,
+            let distance = situation.distance,
+            down > 0, down <= 4, distance >= 0 {
             HStack(spacing: 8) {
                VStack(alignment: .leading, spacing: 2) {
                   Text("Down & Distance")
                      .font(.caption)
                      .foregroundStyle(.secondary)
                   
-                  Text(downDist)
-                     .font(.title3)
-                     .fontWeight(.black)
-                     .foregroundStyle(.primary)
+                  let suffix: String = {
+                     switch down {
+                     case 1: return "st"
+                     case 2: return "nd"
+                     case 3: return "rd"
+                     default: return "th"
+                     }
+                  }()
+                  
+                  // Extract quarter and time from game status
+                  let clockInfo: String = {
+                     if case .inProgress(let quarter, let time) = game.status {
+                        return "\(quarter) \(time)"
+                     }
+                     return ""
+                  }()
+                  
+                  HStack(spacing: 10) {
+                     Text("\(down)\(suffix) & \(distance)")
+                        .font(.title3)
+                        .fontWeight(.black)
+                        .foregroundStyle(.primary)
+                     
+                     if !clockInfo.isEmpty {
+                        Text("(\(clockInfo))")
+                           .font(.callout)
+                           .fontWeight(.semibold)
+                           .foregroundStyle(.secondary)
+                     }
+                  }
                }
                
                Spacer()
@@ -499,6 +562,59 @@ struct NFLLandscapeBracketView: View {
       }
       .transition(.opacity)
       .animation(.easeInOut(duration: 0.2), value: showingBookPicker)
+   }
+   
+   @ViewBuilder
+   private var lastPlayDetailOverlay: some View {
+      ZStack {
+         Color.black.opacity(0.75)
+            .ignoresSafeArea()
+            .onTapGesture {
+               showLastPlayDetail = false
+            }
+         
+         VStack(spacing: 0) {
+            // Header
+            HStack {
+               Text("Last Play")
+                  .font(.headline)
+                  .fontWeight(.bold)
+                  .foregroundStyle(.white)
+               
+               Spacer()
+               
+               Button {
+                  showLastPlayDetail = false
+               } label: {
+                  Image(systemName: "xmark.circle.fill")
+                     .font(.title3)
+                     .foregroundStyle(.white.opacity(0.7))
+               }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .frame(height: 36)
+            .background(Color(.systemGray6))
+            
+            // Full play text
+            ScrollView {
+               Text(lastPlayText)
+                  .font(.body)
+                  .foregroundStyle(.primary)
+                  .padding()
+                  .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 300)
+         }
+         .frame(width: 400)
+         .fixedSize(horizontal: false, vertical: true)
+         .background(Color(.systemBackground))
+         .cornerRadius(20)
+         .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
+         .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
+      }
+      .transition(.opacity)
+      .animation(.easeInOut(duration: 0.2), value: showLastPlayDetail)
    }
    
    // MARK: - Helpers
