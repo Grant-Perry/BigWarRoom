@@ -17,6 +17,7 @@ struct BracketTeamCell: View {
 
    var body: some View {
       let winner = isWinner()
+      let isLoser = isLoser()
       
       ZStack {
          // Treat "TBD" teams as nil (empty)
@@ -92,6 +93,7 @@ struct BracketTeamCell: View {
          }
       }
       .frame(width: 95, height: 40)
+      .opacity(isLoser ? 0.4 : 1.0)
       .environment(\.layoutDirection, .leftToRight)
    }
 
@@ -169,6 +171,25 @@ struct BracketTeamCell: View {
       }
       
       return didWin
+   }
+   
+   /// Determine if this team lost the game
+   private func isLoser() -> Bool {
+      guard let game = game,
+            game.isCompleted,
+            let team = team else {
+         return false
+      }
+      
+      // If there's a winner and this team isn't the winner, they lost
+      guard let myScore = team.score,
+            let homeScore = game.homeTeam.score,
+            let awayScore = game.awayTeam.score else {
+         return false
+      }
+      
+      let winningScore = max(homeScore, awayScore)
+      return myScore < winningScore && winningScore > 0
    }
    
    /// Normalize team codes for consistent comparison

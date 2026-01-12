@@ -205,9 +205,6 @@ struct NFLPlayoffBracketView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.top, 24)  // 🔥 Add padding to separate from week picker
                 
-                // Add this new view right below the header
-                topSeedsView(bracket: bracket)
-                
                 // Side-by-side conferences
                 HStack(alignment: .top, spacing: 30) {
                     // AFC Bracket
@@ -266,6 +263,7 @@ struct NFLPlayoffBracketView: View {
                 // 5 vs 4 matchup with bracket line
                 if let seed5 = seeds[5], let seed4 = seeds[4] {
                     let game = findGame(team1: seed5, team2: seed4, in: games)
+                    let winner = determineWinner(game: game)
                     
                     VStack(spacing: 0) {
                         // Game day info at TOP
@@ -280,8 +278,8 @@ struct NFLPlayoffBracketView: View {
                                 .frame(width: 20, height: 120)
                             
                             VStack(spacing: 20) {
-                                teamCard(team: seed5, seed: 5)
-                                teamCard(team: seed4, seed: 4)
+                                teamCard(team: seed5, seed: 5, game: game, isWinner: winner == seed5.abbreviation)
+                                teamCard(team: seed4, seed: 4, game: game, isWinner: winner == seed4.abbreviation)
                             }
                         }
                     }
@@ -292,6 +290,7 @@ struct NFLPlayoffBracketView: View {
                 // 6 vs 3 matchup with bracket line
                 if let seed6 = seeds[6], let seed3 = seeds[3] {
                     let game = findGame(team1: seed6, team2: seed3, in: games)
+                    let winner = determineWinner(game: game)
                     
                     VStack(spacing: 0) {
                         // Game day info at TOP
@@ -306,8 +305,8 @@ struct NFLPlayoffBracketView: View {
                                 .frame(width: 20, height: 120)
                             
                             VStack(spacing: 20) {
-                                teamCard(team: seed6, seed: 6)
-                                teamCard(team: seed3, seed: 3)
+                                teamCard(team: seed6, seed: 6, game: game, isWinner: winner == seed6.abbreviation)
+                                teamCard(team: seed3, seed: 3, game: game, isWinner: winner == seed3.abbreviation)
                             }
                         }
                     }
@@ -318,6 +317,7 @@ struct NFLPlayoffBracketView: View {
                 // 7 vs 2 matchup with bracket line
                 if let seed7 = seeds[7], let seed2 = seeds[2] {
                     let game = findGame(team1: seed7, team2: seed2, in: games)
+                    let winner = determineWinner(game: game)
                     
                     VStack(spacing: 0) {
                         // Game day info at TOP
@@ -332,8 +332,8 @@ struct NFLPlayoffBracketView: View {
                                 .frame(width: 20, height: 120)
                             
                             VStack(spacing: 20) {
-                                teamCard(team: seed7, seed: 7)
-                                teamCard(team: seed2, seed: 2)
+                                teamCard(team: seed7, seed: 7, game: game, isWinner: winner == seed7.abbreviation)
+                                teamCard(team: seed2, seed: 2, game: game, isWinner: winner == seed2.abbreviation)
                             }
                         }
                     }
@@ -387,27 +387,46 @@ struct NFLPlayoffBracketView: View {
     // MARK: - Team Card (ESPN Style with Centered Watermark Seed)
     
     @ViewBuilder
-    private func teamCard(team: PlayoffTeam, seed: Int) -> some View {
+    private func teamCard(team: PlayoffTeam, seed: Int, game: PlayoffGame? = nil, isWinner: Bool = false) -> some View {
+        // Determine if this team lost
+        let isLoser = game?.isCompleted == true && !isWinner && determineWinner(game: game) != nil
+        
         // Team card with centered watermark seed - EXACT size, NO padding
         ZStack {
             // Card background
             RoundedRectangle(cornerRadius: 8)
                 .fill(teamColor(for: team.abbreviation))
             
-            // Watermark seed number (centered with x offset)
-            SeedNumberView(seed: seed)
-                .offset(x: -15)
+            // Watermark - show score if game is completed, otherwise seed
+            if let game = game, game.isCompleted, let score = team.score {
+                // Show score as watermark for completed games
+                Text("\(score)")
+                    .font(.system(size: 50, weight: .black))
+                    .foregroundColor(.white.opacity(0.25))
+                    .offset(x: -15)
+            } else {
+                // Show seed as watermark for scheduled/live games
+                SeedNumberView(seed: seed)
+                    .offset(x: -15)
+            }
             
             // Content layer
             HStack(spacing: 0) {
-                // Team name
-                Text(team.displayName.uppercased())
-                    .font(.system(size: 11, weight: .black))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 10)
+                VStack(alignment: .leading, spacing: 2) {
+                    // Team name
+                    Text(team.displayName.uppercased())
+                        .font(.system(size: 11, weight: .black))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.6)
+                    
+                    // Seed number (always shown under team name)
+                    Text("#\(seed)")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 10)
                 
                 // Team logo
                 if let logoImage = teamAssets.logo(for: team.abbreviation) {
@@ -416,7 +435,6 @@ struct NFLPlayoffBracketView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: logoSize, height: logoSize)
-
                         .padding(.trailing, 6)
                 } else {
                     // Fallback
@@ -432,15 +450,18 @@ struct NFLPlayoffBracketView: View {
         .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.3), .clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
+                    isWinner ? 
+                        AnyShapeStyle(Color.gpGreen) : 
+                        AnyShapeStyle(LinearGradient(
+                            colors: [.white.opacity(0.3), .clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )),
+                    lineWidth: isWinner ? 3 : 1
                 )
         )
         .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+        .opacity(isLoser ? 0.4 : 1.0)
     }
     
     // MARK: - Helper Views
@@ -481,13 +502,13 @@ struct NFLPlayoffBracketView: View {
         
         let games = conference == .afc ? bracket.afcGames : bracket.nfcGames
         
-        // Extract all teams with their seeds
-        for game in games {
-            if let homeSeed = game.homeTeam.seed {
-                seeds[homeSeed] = game.homeTeam
-            }
+        // Extract all teams with their seeds - prioritize teams from later rounds (they have updated scores)
+        for game in games.reversed() {
             if let awaySeed = game.awayTeam.seed {
                 seeds[awaySeed] = game.awayTeam
+            }
+            if let homeSeed = game.homeTeam.seed {
+                seeds[homeSeed] = game.homeTeam
             }
         }
         
@@ -499,6 +520,19 @@ struct NFLPlayoffBracketView: View {
             (game.homeTeam.abbreviation == team1.abbreviation && game.awayTeam.abbreviation == team2.abbreviation) ||
             (game.homeTeam.abbreviation == team2.abbreviation && game.awayTeam.abbreviation == team1.abbreviation)
         }
+    }
+    
+    /// Determine the winner of a completed game
+    private func determineWinner(game: PlayoffGame?) -> String? {
+        guard let game = game, game.isCompleted else { return nil }
+        guard let homeScore = game.homeTeam.score, let awayScore = game.awayTeam.score else { return nil }
+        
+        if homeScore > awayScore {
+            return game.homeTeam.abbreviation
+        } else if awayScore > homeScore {
+            return game.awayTeam.abbreviation
+        }
+        return nil
     }
     
     private func loadBracket(forceRefresh: Bool = false) async {
@@ -640,79 +674,6 @@ struct NFLPlayoffBracketView: View {
                 .padding(.horizontal)
         }
         .padding()
-    }
-    
-    // MARK: - Top Seeds View
-    
-    @ViewBuilder
-    private func topSeedsView(bracket: PlayoffBracket) -> some View {
-        if let afcSeed1 = bracket.afcSeed1, let nfcSeed1 = bracket.nfcSeed1 {
-            VStack(spacing: 5) {
-                Text("TOP SEEDS")
-                    .font(.custom("BebasNeue-Regular", size: 20))
-                    .foregroundColor(.white)
-                
-                HStack(spacing: 20) {
-                    topSeedCard(team: afcSeed1, seed: 1)
-                    topSeedCard(team: nfcSeed1, seed: 1)
-                }
-            }
-            .padding(.vertical, 10)
-        }
-    }
-    
-    @ViewBuilder
-    private func topSeedCard(team: PlayoffTeam, seed: Int) -> some View {
-        ZStack {
-            // Card background
-            RoundedRectangle(cornerRadius: 8)
-                .fill(teamColor(for: team.abbreviation))
-            
-            // Watermark seed number
-            SeedNumberView(seed: seed)
-                .offset(x: -15)
-
-            HStack(spacing: 0) {
-                // Team Name (forced two lines)
-                Text(team.displayName.uppercased().replacingOccurrences(of: " ", with: "\n"))
-                    .font(.system(size: 11, weight: .black))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 10)
-                
-                // Team logo
-                if let logoImage = teamAssets.logo(for: team.abbreviation) {
-                    let logoSize: CGFloat = 90.0
-                    logoImage
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: logoSize, height: logoSize)
-                        .padding(.trailing, 6)
-                } else {
-                    // Fallback
-                    Text(team.abbreviation)
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundColor(.white)
-                        .frame(width: 50, height: 50)
-                }
-            }
-        }
-        .frame(width: 180, height: 50)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(
-                    LinearGradient(
-                        colors: [.white.opacity(0.3), .clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
     }
     
     // MARK: - Landscape Placeholder
