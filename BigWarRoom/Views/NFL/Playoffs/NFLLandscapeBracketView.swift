@@ -400,7 +400,7 @@ struct NFLLandscapeBracketView: View {
       VStack(alignment: .leading, spacing: 12) {
          // Header
          HStack(spacing: 12) {
-            Image(systemName: "sportscourt.fill")
+            Image(systemName: "football.circle")
                .font(.title3)
                .foregroundStyle(.red)
                .frame(width: 24)
@@ -533,10 +533,22 @@ struct NFLLandscapeBracketView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                      
-                     Text(yardLine)
-                        .font(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.primary)
+                     // Parse team code from yard line (e.g., "BUF 33" -> "BUF")
+                     HStack(spacing: 4) {
+                        if let teamCode = extractTeamCode(from: yardLine),
+                           let logo = teamAssets.logo(for: teamCode) {
+                           logo
+                              .resizable()
+                              .aspectRatio(contentMode: .fit)
+                              .frame(width: 20, height: 20)
+                              .clipShape(Circle())
+                        }
+                        
+                        Text(yardLine)
+                           .font(.body)
+                           .fontWeight(.semibold)
+                           .foregroundStyle(.primary)
+                     }
                   }
                }
             }
@@ -627,6 +639,14 @@ struct NFLLandscapeBracketView: View {
    private func handleGameTap(_ game: PlayoffGame) {
       selectedGameID = game.id
       showingGameDetail = true
+   }
+   
+   // 🔥 NEW: Helper to extract team code from yard line string
+   private func extractTeamCode(from yardLine: String) -> String? {
+      // Format is typically "BUF 33" or "JAX 20"
+      let components = yardLine.split(separator: " ")
+      guard components.count >= 1 else { return nil }
+      return String(components[0])
    }
    
    // 🔥 NEW: Find current game by ID in provided bracket

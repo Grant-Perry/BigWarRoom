@@ -391,8 +391,22 @@ final class NFLPlayoffBracketService {
                 conference = .none
             } else if homeNFLTeam?.conference == .afc && awayNFLTeam?.conference == .afc {
                 conference = .afc
-            } else {
+            } else if homeNFLTeam?.conference == .nfc && awayNFLTeam?.conference == .nfc {
                 conference = .nfc
+            } else {
+                // Mixed conference or missing team data - shouldn't happen in playoffs except Super Bowl
+                DebugPrint(mode: .nflData, "⚠️ Mixed conference game detected: \(awayTeam) @ \(homeTeam) in round \(round.rawValue)")
+                DebugPrint(mode: .nflData, "   Home: \(homeTeam) = \(homeNFLTeam?.conference.rawValue ?? "UNKNOWN")")
+                DebugPrint(mode: .nflData, "   Away: \(awayTeam) = \(awayNFLTeam?.conference.rawValue ?? "UNKNOWN")")
+                
+                // Default to the home team's conference if available, otherwise away team's conference
+                if let homeConf = homeNFLTeam?.conference {
+                    conference = homeConf == .afc ? .afc : .nfc
+                } else if let awayConf = awayNFLTeam?.conference {
+                    conference = awayConf == .afc ? .afc : .nfc
+                } else {
+                    conference = .none
+                }
             }
             
             // 🏈 NEW: Fetch live situation for in-progress games

@@ -101,6 +101,7 @@ struct SportsbookBadge: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(height: size * 1.5) // Slightly larger for logo visibility
                 .clipShape(RoundedRectangle(cornerRadius: 3))
+                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
         } else {
             // Fallback to text badge if image doesn't exist
             Text(book.abbreviation)

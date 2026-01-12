@@ -294,7 +294,7 @@ struct GameDetailSheetContent: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header
             HStack(spacing: 12) {
-                Image(systemName: "sportscourt.fill")
+                Image(systemName: "football.circle")
                     .font(.title3)
                     .foregroundStyle(.red)
                     .frame(width: 24)

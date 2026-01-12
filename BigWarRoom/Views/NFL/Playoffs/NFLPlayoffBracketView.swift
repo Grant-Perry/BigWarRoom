@@ -21,6 +21,9 @@ struct NFLPlayoffBracketView: View {
     // 🔥 NEW: Add refresh timer state
     @State private var refreshTimer: Timer?
     
+    // 🔥 NEW: Track device orientation for iPad
+    @State private var isLandscape: Bool = false
+    
     // Dependencies
     let weekSelectionManager: WeekSelectionManager
     let appLifecycleManager: AppLifecycleManager
@@ -44,7 +47,7 @@ struct NFLPlayoffBracketView: View {
     var body: some View {
         ZStack {
             // Only apply the BG3 for the portrait view
-            if verticalSizeClass != .compact {
+            if !shouldShowLandscape {
                 Image("BG3")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -52,11 +55,12 @@ struct NFLPlayoffBracketView: View {
                     .ignoresSafeArea()
             }
             
-            // --- ORIENTATION SWITCHER using verticalSizeClass ---
-            if verticalSizeClass == .compact {
+            // --- ORIENTATION SWITCHER ---
+            if shouldShowLandscape {
                 // --- LANDSCAPE ---
                 if let service = bracketService {
                     NFLLandscapeBracketView(playoffService: service)
+                        .scaleEffect(UIDevice.current.userInterfaceIdiom == .pad ? 1.3 : 1.0)
                         .onAppear {
                             DebugPrint(mode: .appLoad, "🎨 [LANDSCAPE] NFLLandscapeBracketView appeared")
                         }
@@ -116,10 +120,65 @@ struct NFLPlayoffBracketView: View {
             
             // 🔥 NEW: Start live updates if there are live games
             startLiveUpdatesIfNeeded()
+            
+            // 🔥 NEW: Setup orientation monitoring for iPad
+            setupOrientationMonitoring()
         }
         .onDisappear {
             // Stop live updates when view disappears to prevent crashes
             stopLiveUpdates()
+            
+            // 🔥 NEW: Remove orientation observer
+            NotificationCenter.default.removeObserver(self, name: UIDevice.orientationDidChangeNotification, object: nil)
+        }
+    }
+    
+    // MARK: - Orientation Detection
+    
+    /// Determines if landscape view should be shown
+    /// - iPhone: Uses verticalSizeClass (works perfectly)
+    /// - iPad: Uses tracked orientation state
+    private var shouldShowLandscape: Bool {
+        let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+        
+        if isIPad {
+            // iPad: Use our tracked orientation state
+            return isLandscape
+        } else {
+            // iPhone: Use size class (existing perfect behavior)
+            return verticalSizeClass == .compact
+        }
+    }
+    
+    /// Setup orientation change monitoring for iPad
+    private func setupOrientationMonitoring() {
+        // Initial orientation check
+        updateOrientation()
+        
+        // Listen for orientation changes
+        NotificationCenter.default.addObserver(
+            forName: UIDevice.orientationDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            updateOrientation()
+        }
+    }
+    
+    /// Update the landscape state based on device orientation
+    private func updateOrientation() {
+        let orientation = UIDevice.current.orientation
+        
+        switch orientation {
+        case .landscapeLeft, .landscapeRight:
+            isLandscape = true
+            DebugPrint(mode: .appLoad, "🔄 [ORIENTATION] Switched to LANDSCAPE")
+        case .portrait, .portraitUpsideDown:
+            isLandscape = false
+            DebugPrint(mode: .appLoad, "🔄 [ORIENTATION] Switched to PORTRAIT")
+        default:
+            // Keep current state for .unknown or .faceUp/.faceDown
+            DebugPrint(mode: .appLoad, "🔄 [ORIENTATION] Unknown orientation, keeping current state")
         }
     }
     
