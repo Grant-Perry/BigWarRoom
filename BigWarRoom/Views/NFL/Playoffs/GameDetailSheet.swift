@@ -332,53 +332,22 @@ struct GameDetailSheetContent: View {
                 .cornerRadius(8)
             }
             
-            // Down & Distance
-            if let downDist = situation.downDistanceDisplay {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Down & Distance")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        Text(downDist)
-                            .font(.title3)
-                            .fontWeight(.black)
-                            .foregroundStyle(.primary)
-                    }
-                    
-                    Spacer()
-                    
-                    // 🔥 ENHANCED: Field position with team logo
-                    if let yardLine = situation.yardLine {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text("Field Position")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            
-                            // Parse team code from yard line (e.g., "CHI 35" -> "CHI")
-                            HStack(spacing: 4) {
-                                if let teamCode = extractTeamCode(from: yardLine),
-                                   let logo = teamAssets.logo(for: teamCode) {
-                                    logo
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 20, height: 20)
-                                        .clipShape(Circle())
-                                }
-                                
-                                Text(yardLine)
-                                    .font(.body)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.primary)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(.tertiarySystemGroupedBackground))
-                .cornerRadius(8)
+            // HARDCODED TEST - ALWAYS SHOW
+            VStack(alignment: .leading, spacing: 8) {
+                Text("🔥 HARDCODED TEST")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                
+                FieldPositionView(
+                    yardLine: "HOU 39",
+                    awayTeam: "HOU",
+                    homeTeam: "PIT"
+                )
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.red.opacity(0.2))
+            .cornerRadius(8)
             
             // Drive stats
             if situation.drivePlayCount != nil || situation.driveYards != nil || situation.timeOfPossession != nil {

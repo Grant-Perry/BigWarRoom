@@ -57,14 +57,12 @@ struct BracketTeamCell: View {
             // 🔥 UPDATED: Watermark - show COLORED SCORE for any game with scores (active or completed), SEED otherwise
             if let game = game, let score = team.score, score > 0 {
                // Show score as watermark for active/completed games
-               // Unified styling: always white, preserve previous transparency per status
-               let scoreColor: Color = game.isCompleted
-                  ? Color.white.opacity(0.2)
-                  : Color.white.opacity(0.4)
-               
+               // Winning teams get 0.45 opacity, losing teams get 0.2 opacity
+               let scoreOpacity: Double = winner ? 0.45 : (game.isCompleted ? 0.2 : 0.4)
+
                Text("\(score)")
                   .font(.system(size: 36, weight: .black))
-                  .foregroundColor(scoreColor)
+                  .foregroundColor(.white.opacity(scoreOpacity))
                   .frame(maxWidth: .infinity, alignment: .trailing)
                   .padding(.horizontal, 4)
             } else if let seed = team.seed, seed > 0 {

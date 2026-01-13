@@ -387,6 +387,7 @@ struct NFLLandscapeBracketView: View {
             .cornerRadius(20)
             .shadow(color: game.isLive ? .white.opacity(0.3) : .clear, radius: 30, x: 0, y: 0)
             .shadow(color: game.isLive ? .black.opacity(0.5) : .clear, radius: 40, x: 0, y: 10)
+            .scaleEffect(0.9)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
       }
@@ -556,6 +557,15 @@ struct NFLLandscapeBracketView: View {
             .padding(.vertical, 8)
             .background(Color(.tertiarySystemGroupedBackground))
             .cornerRadius(8)
+            
+            if let yardLine = situation.yardLine {
+               FieldPositionView(
+                  yardLine: yardLine,
+                  awayTeam: game.awayTeam.abbreviation,
+                  homeTeam: game.homeTeam.abbreviation
+               )
+               .padding(.top, 4)
+            }
          }
       }
       .padding()
