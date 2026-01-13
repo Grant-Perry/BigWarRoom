@@ -106,7 +106,7 @@ struct WeekPickerView: View {
                     pickerFooter
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 450) // Increased height for year picker
+                .frame(height: 550) // 🔥 Increased height to show all weeks including playoffs
                 .background(
                     RoundedRectangle(cornerRadius: 24)
                         .fill(
@@ -337,25 +337,167 @@ struct WeekPickerView: View {
     // MARK: - Week Grid (Fixed: Left-to-Right Layout + All Weeks Fit)
     private var weekGrid: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8),
-                    GridItem(.flexible(), spacing: 8)
-                ],
-                spacing: 12
-            ) {
-                ForEach(1...maxWeeks, id: \.self) { week in
-                    weekButton(for: week)
+            VStack(spacing: 16) {
+                // Regular season weeks (1-18)
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ],
+                    spacing: 8
+                ) {
+                    ForEach(1...18, id: \.self) { week in
+                        weekButton(for: week)
+                    }
                 }
+                
+                // 🔥 NEW: Playoff weeks section with purple styling
+                VStack(spacing: 10) {
+                    // Section header
+                    HStack {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(.purple)
+                        
+                        Text("PLAYOFF WEEKS")
+                            .font(.system(size: 11, weight: .black))
+                            .foregroundColor(.purple)
+                            .kerning(1.0)
+                        
+                        Spacer()
+                    }
+                    .padding(.horizontal, 4)
+                    
+                    // Playoff weeks grid (19-23)
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8),
+                            GridItem(.flexible(), spacing: 8)
+                        ],
+                        spacing: 8
+                    ) {
+                        ForEach(19...23, id: \.self) { week in
+                            playoffWeekButton(for: week)
+                        }
+                    }
+                }
+                .padding(.top, 4)
             }
             .padding(.horizontal, 24)
         }
-        .frame(height: 180)
+        .frame(height: 320)  // 🔥 Increased to show all weeks
         .padding(.vertical, 8)
+    }
+    
+    // 🔥 NEW: Playoff week button with purple styling
+    private func playoffWeekButton(for week: Int) -> some View {
+        let isSelected = week == weekManager.selectedWeek
+        let isCurrent = week == weekManager.currentNFLWeek
+        
+        return Button(action: {
+            selectWeek(week)
+        }) {
+            VStack(spacing: 2) {
+                // Week number - smaller, non-rounded
+                Text("\(week)")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(isSelected ? .white : .purple)
+                
+                // Playoff round abbreviation
+                Text(playoffRoundAbbr(for: week))
+                    .font(.system(size: 7, weight: .bold))
+                    .foregroundColor(isSelected ? .white.opacity(0.8) : .purple.opacity(0.7))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                
+                // 🔥 NEW: Week start date for playoffs too
+                Text(weekStartDate(for: week))
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundColor(isSelected ? .white.opacity(0.6) : .purple.opacity(0.5))
+                    .lineLimit(1)
+                
+                // Status indicator
+                if isCurrent {
+                    Circle()
+                        .fill(Color.purple)
+                        .frame(width: 3, height: 3)
+                } else {
+                    Circle()
+                        .fill(Color.clear)
+                        .frame(width: 3, height: 3)
+                }
+            }
+            .frame(width: 50, height: 50)  // 🔥 Slightly taller to fit date
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(playoffButtonBackground(isSelected: isSelected, isCurrent: isCurrent))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(playoffButtonBorder(isSelected: isSelected, isCurrent: isCurrent), lineWidth: 1.5)
+                    )
+                    .shadow(
+                        color: isSelected ? Color.purple.opacity(0.6) : .clear,
+                        radius: isSelected ? 6 : 0,
+                        x: 0,
+                        y: isSelected ? 3 : 0
+                    )
+            )
+            .scaleEffect(isSelected ? 1.05 : 1.0)
+            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
+        }
+    }
+    
+    // 🔥 NEW: Playoff round abbreviations
+    private func playoffRoundAbbr(for week: Int) -> String {
+        switch week {
+        case 19: return "WC"
+        case 20: return "DIV"
+        case 21: return "CONF"
+        case 22: return "PRO"
+        case 23: return "SB"
+        default: return "PO"
+        }
+    }
+    
+    // 🔥 NEW: Playoff button background gradient
+    private func playoffButtonBackground(isSelected: Bool, isCurrent: Bool) -> some ShapeStyle {
+        if isSelected {
+            return LinearGradient(
+                colors: [.purple, .purple.opacity(0.7)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if isCurrent {
+            return LinearGradient(
+                colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.2)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else {
+            return LinearGradient(
+                colors: [Color.purple.opacity(0.15), Color.purple.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    // 🔥 NEW: Playoff button border color
+    private func playoffButtonBorder(isSelected: Bool, isCurrent: Bool) -> Color {
+        if isSelected {
+            return .white.opacity(0.8)
+        } else if isCurrent {
+            return .purple.opacity(0.8)
+        } else {
+            return .purple.opacity(0.4)
+        }
     }
     
     private func weekButton(for week: Int) -> some View {
@@ -368,36 +510,27 @@ struct WeekPickerView: View {
         return Button(action: {
             selectWeek(week)
         }) {
-            VStack(spacing: 4) {
-                // Week number
+            VStack(spacing: 2) {
+                // Week number - smaller, non-rounded font
                 Text("\(week)")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(isSelected ? .black : .white)
                 
-                // Week label with date
-                VStack(spacing: 1) {
-                    Text(weekLabel(for: week))
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundColor(isSelected ? .black.opacity(0.7) : .gray)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    
-                    // Week start date
-                    Text(weekStartDate(for: week))
-                        .font(.system(size: 6, weight: .medium))
-                        .foregroundColor(isSelected ? .black.opacity(0.5) : .gray.opacity(0.8))
-                        .lineLimit(1)
-                }
+                // Week start date
+                Text(weekStartDate(for: week))
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundColor(isSelected ? .black.opacity(0.6) : .gray.opacity(0.7))
+                    .lineLimit(1)
                 
                 // Status indicator
                 statusIndicator(for: week, isSelected: isSelected)
             }
-            .frame(width: 50, height: 50)
+            .frame(width: 50, height: 46)
             .background(
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 8)
                     .fill(backgroundGradient(for: week, isSelected: isSelected))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: 8)
                             .stroke(borderColor(for: week, isSelected: isSelected), lineWidth: 1.5)
                     )
                     .shadow(
@@ -515,10 +648,8 @@ struct WeekPickerView: View {
             }
         } else if week == weekManager.currentNFLWeek {
             return "CURRENT"
-        } else if week < weekManager.currentNFLWeek {
-            return "PAST"
         } else {
-            return "FUTURE"
+            return ""  // 🔥 REMOVED: No more PAST/FUTURE labels
         }
     }
     

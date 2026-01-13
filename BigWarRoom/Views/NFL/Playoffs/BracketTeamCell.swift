@@ -61,21 +61,23 @@ struct BracketTeamCell: View {
                let scoreOpacity: Double = winner ? 0.45 : (game.isCompleted ? 0.2 : 0.4)
 
                Text("\(score)")
-                  .font(.system(size: 36, weight: .black))
+                  .font(.system(size: 24, weight: .black))
                   .foregroundColor(.white.opacity(scoreOpacity))
+                  .fixedSize()
                   .frame(maxWidth: .infinity, alignment: .trailing)
                   .padding(.horizontal, 4)
             } else if let seed = team.seed, seed > 0 {
                // Show seed as watermark for scheduled games (no scores yet)
                HStack(alignment: .top, spacing: 0) {
                   Text("#")
-                     .font(.system(size: 18, weight: .black))
+                     .font(.system(size: 12, weight: .black))
                      .foregroundColor(.white.opacity(0.25))
                      .offset(y: -1)
                   Text("\(seed)")
-                     .font(.system(size: 36, weight: .black))
+                     .font(.system(size: 24, weight: .black))
                      .foregroundColor(.white.opacity(0.3))
                }
+               .fixedSize()
                .frame(maxWidth: .infinity, alignment: .trailing)
                .padding(.horizontal, 4)
             }
@@ -91,7 +93,7 @@ struct BracketTeamCell: View {
          }
       }
       .frame(width: 95, height: 40)
-      .opacity(isLoser ? 0.4 : 1.0)
+      .opacity(isLoser ? 0.8 : 1.0) // loser opacity for landscape bracket view
       .environment(\.layoutDirection, .leftToRight)
    }
 

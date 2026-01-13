@@ -84,7 +84,7 @@ struct PlayoffBracketTeamCard: View {
                 )
         )
         .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
-        .opacity(isLoser ? 0.4 : 1.0)
+        .opacity(isLoser ? 0.8 : 1.0)
     }
     
     private func teamColor(for teamCode: String) -> Color {
