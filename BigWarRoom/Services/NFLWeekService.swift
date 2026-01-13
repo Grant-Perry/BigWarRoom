@@ -84,8 +84,27 @@ final class NFLWeekService {
             
             DebugPrint(mode: .weekCheck, "📅 NFLWeekService.fetchCurrentNFLWeek: API returned week \(nflState.displayWeek), season \(nflState.leagueSeason), type \(nflState.seasonType)")
             
+            // 🏈 CRITICAL FIX: Convert playoff weeks to our internal week system
+            // ESPN/Sleeper playoff weeks: 1=WC, 2=DIV, 3=CONF, 4=PRO BOWL, 5=SUPER BOWL
+            // Our internal weeks: 19=WC, 20=DIV, 21=CONF, 22=PRO BOWL, 23=SUPER BOWL
+            let mappedWeek: Int
+            if nflState.seasonType == "post" {
+                // Playoff week mapping:
+                // Playoff Week 1 (Wild Card) → Week 19
+                // Playoff Week 2 (Divisional) → Week 20
+                // Playoff Week 3 (Conference Championship) → Week 21
+                // Playoff Week 4 (Pro Bowl) → Week 22
+                // Playoff Week 5 (Super Bowl) → Week 23
+                mappedWeek = 18 + nflState.displayWeek
+                DebugPrint(mode: .weekCheck, "🏈 NFLWeekService: PLAYOFF DETECTED - Converting playoff week \(nflState.displayWeek) to internal week \(mappedWeek)")
+            } else {
+                // Regular season - use displayWeek directly
+                mappedWeek = nflState.displayWeek
+                DebugPrint(mode: .weekCheck, "📅 NFLWeekService: Regular season week \(mappedWeek)")
+            }
+            
             // Update properties - @Observable will automatically notify observers
-            currentWeek = nflState.displayWeek
+            currentWeek = mappedWeek
             currentYear = nflState.leagueSeason
             seasonType = nflState.seasonType
             lastUpdated = Date()

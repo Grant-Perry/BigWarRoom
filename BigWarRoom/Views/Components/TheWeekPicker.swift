@@ -119,12 +119,13 @@ struct TheWeekPicker: View {
                     .foregroundColor(labelColor)
                 
                 // Week number with year underneath, trailing aligned
-                // For playoffs, show the week number still but smaller
+                // For playoffs, show the playoff round instead of week number
                 VStack(alignment: .trailing, spacing: 0) {
                     if weekManager.selectedWeek >= 19 {
-                        // For playoffs, we might not want to show the week number at all
-                        // or show it very subtly
-                        EmptyView()
+                        // Show playoff round name - same size as "Playoffs" label
+                        Text(playoffRoundName(for: weekManager.selectedWeek))
+                            .font(.system(size: labelFontSize, weight: labelFontWeight, design: .rounded))
+                            .foregroundColor(weekNumberColor)
                     } else {
                         Text("\(weekManager.selectedWeek)")
                             .font(.system(size: weekNumberFontSize, weight: weekNumberFontWeight, design: .rounded))
@@ -176,6 +177,26 @@ struct TheWeekPicker: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Get the playoff round name for a given week
+    private func playoffRoundName(for week: Int) -> String {
+        switch week {
+        case 19:
+            return "WC" // Wild Card
+        case 20:
+            return "DIV" // Divisional
+        case 21:
+            return "CONF" // Conference Championships
+        case 22:
+            return "PRO" // Pro Bowl
+        case 23:
+            return "SB" // Super Bowl
+        default:
+            return "PO" // Generic Playoffs
+        }
     }
 }
 

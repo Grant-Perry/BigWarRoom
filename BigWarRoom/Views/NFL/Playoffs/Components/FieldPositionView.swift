@@ -26,9 +26,21 @@ struct FieldPositionView: View {
             // Field visualization
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    // Field background
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color(red: 0.2, green: 0.5, blue: 0.2))  // Dark green
+                    // Left/right endzones per quarter swap - BEHIND everything
+                    HStack(spacing: 0) {
+                        endzoneView(for: leftTeam, isActive: ballIsInThisEndzone(leftTeam))
+                            .frame(width: 34)
+                        
+                        Spacer()
+                        
+                        endzoneView(for: rightTeam, isActive: ballIsInThisEndzone(rightTeam))
+                            .frame(width: 34)
+                    }
+                    
+                    // Field background - sits ON TOP of endzones
+                    RoundedRectangle(cornerRadius: 0)
+                        .fill(Color(red: 0.2, green: 0.5, blue: 0.2))
+                        .padding(.horizontal, 34)
                         .overlay {
                             // Yard line markers
                             HStack(spacing: 0) {
@@ -42,19 +54,8 @@ struct FieldPositionView: View {
                                     }
                                 }
                             }
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 34)
                         }
-                    
-                    // Left/right endzones per quarter swap!
-                    HStack(spacing: 0) {
-                        endzoneView(for: leftTeam, isActive: ballIsInThisEndzone(leftTeam))
-                            .frame(width: 30)
-                        
-                        Spacer()
-                        
-                        endzoneView(for: rightTeam, isActive: ballIsInThisEndzone(rightTeam))
-                            .frame(width: 30)
-                    }
                     
                     // 50 yard line marker
                     Rectangle()
@@ -62,28 +63,39 @@ struct FieldPositionView: View {
                         .frame(width: 2)
                         .offset(x: calculateFieldPosition(for: "50", in: geometry.size.width))
                     
-                    // Yard line numbers ON the field
-                    HStack(spacing: 0) {
-                        ForEach([10, 20, 30, 40], id: \.self) { yard in
+                    // Yard line numbers ON the field - centered on vertical lines
+                    ZStack {
+                        // Left side: 10, 20, 30, 40
+                        ForEach(Array([10, 20, 30, 40].enumerated()), id: \.offset) { index, yard in
                             Text("\(yard)")
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.5))
-                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(.white.opacity(0.3))
+                                .position(
+                                    x: calculateFieldPosition(for: String(yard), in: geometry.size.width),
+                                    y: 25
+                                )
                         }
                         
+                        // 50 yard line
                         Text("50")
                             .font(.system(size: 16, weight: .black))
-                            .foregroundStyle(.yellow.opacity(0.8))
-                            .frame(maxWidth: .infinity)
+                            .foregroundStyle(.yellow.opacity(0.45))
+                            .position(
+                                x: calculateFieldPosition(for: "50", in: geometry.size.width),
+                                y: 25
+                            )
                         
-                        ForEach([40, 30, 20, 10], id: \.self) { yard in
+                        // Right side: 40, 30, 20, 10
+                        ForEach(Array([40, 30, 20, 10].enumerated()), id: \.offset) { index, yard in
                             Text("\(yard)")
                                 .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.5))
-                                .frame(maxWidth: .infinity)
+                                .foregroundStyle(.white.opacity(0.3))
+                                .position(
+                                    x: calculateFieldPosition(for: String(100 - yard), in: geometry.size.width),
+                                    y: 25
+                                )
                         }
                     }
-                    .padding(.horizontal, 30)
                     
                     // Football position - only show if we have a valid position
                     if parseFieldYards() != nil {
@@ -94,13 +106,21 @@ struct FieldPositionView: View {
             }
             .frame(height: 50)
         }
-        .frame(height: 70)  // Total height including markers
+        .frame(height: 70)
     }
     
     private func endzoneView(for team: String, isActive: Bool = false) -> some View {
         ZStack {
             if let teamObj = NFLTeam.team(for: team) {
-                teamObj.primaryColor.opacity(0.8)
+                // Gradient fade: left endzone fades left-to-right, right endzone fades right-to-left
+                let isLeftEndzone = (team == leftTeam)
+                LinearGradient(
+                    colors: isLeftEndzone 
+                        ? [teamObj.primaryColor.opacity(0.8), .clear]
+                        : [.clear, teamObj.primaryColor.opacity(0.8)],
+                    startPoint: isLeftEndzone ? .leading : .trailing,
+                    endPoint: isLeftEndzone ? .trailing : .leading
+                )
             } else {
                 Color.blue.opacity(0.8)
             }
@@ -108,14 +128,14 @@ struct FieldPositionView: View {
                 logo
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 20, height: 20)
                     .opacity(0.7)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.gpGreen, lineWidth: isActive ? 2 : 0)
+                .stroke(isActive ? Color.gpGreen : Color.secondary, lineWidth: isActive ? 3 : 1)
+                .padding(2)
         )
     }
     
@@ -127,15 +147,22 @@ struct FieldPositionView: View {
                     .font(.system(size: 20))
                     .shadow(color: .white.opacity(0.6), radius: 8, x: 0, y: 0)
                     .shadow(color: .white.opacity(0.4), radius: 12, x: 0, y: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.5))
+				  // I'm gonna comment out the chevron for now
+				  // the ball should point in the direction of the play
+//                Image(systemName: "chevron.right")
+//                    .font(.system(size: 24, weight: .bold))
+//                    .foregroundStyle(.white.opacity(0.35))
+//					.offset(x: -7) // push it closer to the ball
+
             } else {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.5))
+//                Image(systemName: "chevron.left")
+//                    .font(.system(size: 12, weight: .bold))
+//                    .foregroundStyle(.white.opacity(0.5))
+//					.offset(x: -3)
                 Text("🏈")
                     .font(.system(size: 20))
+					.scaleEffect(x: -1)
+
                     .shadow(color: .white.opacity(0.6), radius: 8, x: 0, y: 0)
                     .shadow(color: .white.opacity(0.4), radius: 12, x: 0, y: 0)
             }
@@ -148,10 +175,10 @@ struct FieldPositionView: View {
         return possession == leftTeam
     }
     
-    /// Determine if the ball is currently in this team's endzone area (per quarter)
+    /// Determine if this team has possession (highlights their endzone)
     private func ballIsInThisEndzone(_ team: String) -> Bool {
-        guard let fieldTeam = parseFieldTeam() else { return false }
-        return fieldTeam == team
+        guard let possession = possession else { return false }
+        return possession == team
     }
     
     /// Calculate football's horizontal position (per quarter orientation)
@@ -181,10 +208,99 @@ struct FieldPositionView: View {
     
     /// Calculate pixel position based on yard line (per quarter orientation)
     private func calculateFieldPosition(for yardLineString: String, in totalWidth: CGFloat) -> CGFloat {
-        guard let yards = Int(yardLineString) else { return 30 }
-        let endzoneWidth: CGFloat = 30
+        guard let yards = Int(yardLineString) else { return 34 }
+        let endzoneWidth: CGFloat = 34
         let playableWidth = totalWidth - (endzoneWidth * 2)
         let percentage = CGFloat(yards) / 100.0
         return endzoneWidth + (playableWidth * percentage)
+    }
+}
+
+// MARK: - Preview
+
+#Preview("Field Position Tests") {
+    ScrollView {
+        VStack(spacing: 24) {
+
+            // Test 1: Q1 - HOU attacking (ball at HOU 35)
+            testCase(
+                title: "",
+                expected: "",
+                yardLine: "PIT 37",
+                awayTeam: "HOU",
+                homeTeam: "PIT",
+                possession: "HOU",
+                quarter: 3
+            )
+            
+
+        }
+        .padding()
+    }
+    .background(Color.black)
+    .environment(TeamAssetManager())
+}
+
+#Preview("Quick Visual Test") {
+    VStack(spacing: 20) {
+        Text("QUARTERS 1-4: Same Position")
+            .font(.caption)
+            .foregroundStyle(.white)
+        
+        ForEach(1...4, id: \.self) { quarter in
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Q\(quarter): HOU ball at HOU 30")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                
+                FieldPositionView(
+                    yardLine: "HOU 30",
+                    awayTeam: "HOU",
+                    homeTeam: "PIT",
+                    possession: "HOU",
+                    quarter: quarter
+                )
+            }
+        }
+    }
+    .padding()
+    .background(Color.black)
+    .environment(TeamAssetManager())
+}
+
+// MARK: - Helper
+
+@ViewBuilder
+private func testCase(
+    title: String,
+    expected: String,
+    yardLine: String,
+    awayTeam: String,
+    homeTeam: String,
+    possession: String?,
+    quarter: Int
+) -> some View {
+    VStack(alignment: .leading, spacing: 8) {
+        if !title.isEmpty {
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+        }
+        
+        if !expected.isEmpty {
+            Text(expected)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .italic()
+        }
+        
+        FieldPositionView(
+            yardLine: yardLine,
+            awayTeam: awayTeam,
+            homeTeam: homeTeam,
+            possession: possession,
+            quarter: quarter
+        )
     }
 }

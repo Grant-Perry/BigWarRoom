@@ -36,7 +36,7 @@ struct WeekPickerView: View {
     @State private var showYearPicker = false
     
     /// NFL season has 18 weeks (17 regular + 1 playoff)
-    private let maxWeeks = 18
+    private let maxWeeks = 23  // 🔥 UPDATED: 18 regular + 5 playoff weeks (WC, DIV, CONF, PRO, SB)
     
     /// Year range for picker: 2015 through (current NFL season year + 1)
     private var yearRange: [String] {
@@ -504,7 +504,15 @@ struct WeekPickerView: View {
     
     private func weekLabel(for week: Int) -> String {
         if week > 18 {
-            return "PLAYOFFS"
+            // Show playoff round names
+            switch week {
+            case 19: return "WILD CARD"
+            case 20: return "DIVISIONAL"
+            case 21: return "CONF CHAMP"
+            case 22: return "PRO BOWL"
+            case 23: return "SUPER BOWL"
+            default: return "PLAYOFFS"
+            }
         } else if week == weekManager.currentNFLWeek {
             return "CURRENT"
         } else if week < weekManager.currentNFLWeek {

@@ -739,3 +739,323 @@ struct NFLLandscapeBracketView: View {
       )
    }
 }
+
+// MARK: - Preview
+
+#Preview("Wild Card Live Game Popup") {
+   // Mock live game data
+   let mockLiveGame = PlayoffGame(
+      id: "mock-wc-1",
+      round: .wildCard,
+      conference: .afc,
+      homeTeam: PlayoffTeam(
+         abbreviation: "PIT",
+         name: "Pittsburgh Steelers",
+         seed: 4,
+         score: 3,
+         logoURL: nil
+      ),
+      awayTeam: PlayoffTeam(
+         abbreviation: "HOU",
+         name: "Houston Texans",
+         seed: 5,
+         score: 0,
+         logoURL: nil
+      ),
+      gameDate: Date(),
+      status: .inProgress(quarter: "Q1", timeRemaining: "5:58"),
+      venue: PlayoffGame.Venue(
+         fullName: "Acrisure Stadium",
+         city: "Pittsburgh",
+         state: "PA"
+      ),
+      broadcasts: ["ABC", "ESPN+"],
+      liveSituation: LiveGameSituation(
+         down: 2,
+         distance: 6,
+         yardLine: "HOU 30",
+         possession: "HOU",
+         lastPlay: "(Shotgun) C.Stroud pass short middle to N.Collins to HST 30 for 4 yards (J.Porter).",
+         drivePlayCount: nil,
+         driveYards: 4,
+         timeOfPossession: "0:04"
+      ),
+      lastKnownDownDistance: nil
+   )
+   
+   // Mock odds
+   let mockOdds = GameBettingOdds(
+      gameID: "HOU@PIT",
+      homeTeamCode: "PIT",
+      awayTeamCode: "HOU",
+      spreadDisplay: "PIT -1.5",
+      totalDisplay: "O/U 36.5",
+      favoriteMoneylineTeamCode: "PIT",
+      favoriteMoneylineOdds: "-113",
+      underdogMoneylineTeamCode: "HOU",
+      underdogMoneylineOdds: "-113",
+      totalPoints: "36.5",
+      moneylineDisplay: "HOU -113 / PIT -113",
+      sportsbook: "FanDuel",
+      sportsbookEnum: .fanduel,
+      lastUpdated: Date(),
+      allBookOdds: nil
+   )
+   
+   ZStack {
+      Color.black.ignoresSafeArea()
+      
+      // Dimmed bracket background
+      Image("BG3")
+         .resizable()
+         .aspectRatio(contentMode: .fill)
+         .opacity(0.15)
+         .ignoresSafeArea()
+      
+      // Show the popup directly
+      VStack(spacing: 0) {
+         // Header
+         HStack {
+            Text("Wild Card")
+               .font(.headline)
+               .fontWeight(.bold)
+               .foregroundStyle(.white)
+            
+            Spacer()
+            
+            RefreshCountdownTimerView()
+            
+            Spacer()
+            
+            Button {
+               // Close button (doesn't do anything in preview)
+            } label: {
+               Image(systemName: "xmark.circle.fill")
+                  .font(.title3)
+                  .foregroundStyle(.white.opacity(0.7))
+            }
+         }
+         .padding(.horizontal, 16)
+         .padding(.vertical, 6)
+         .frame(height: 36)
+         .background(Color(.systemGray6))
+         
+         // Live game content
+         ScrollView {
+            VStack(spacing: 10) {
+               // Matchup Card
+               PlayoffGameDetailCard(
+                  game: mockLiveGame,
+                  displayOdds: mockOdds,
+                  scoreSize: 80,
+                  scoreOffset: 24
+               )
+               .padding(.top, 4)
+               
+               // Live situation card
+               liveGameSituationViewPreview(
+                  situation: mockLiveGame.liveSituation!,
+                  game: mockLiveGame
+               )
+               .padding(.horizontal, 16)
+               
+               // Odds bar
+               PlayoffOddsBar(
+                  displayOdds: mockOdds,
+                  currentSportsbook: .fanduel,
+                  onBookPickerTap: { }
+               )
+               .padding(.horizontal, 16)
+               .padding(.bottom, 10)
+            }
+         }
+      }
+      .frame(width: 480)
+      .scaleEffect(0.75)
+      .fixedSize(horizontal: false, vertical: true)
+      .background(Color(.systemBackground))
+      .cornerRadius(20)
+      .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
+      .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
+      .scaleEffect(0.85)
+   }
+   .environment(TeamAssetManager())
+   .preferredColorScheme(.dark)
+
+}
+
+// MARK: - Preview Helper
+
+@ViewBuilder
+private func liveGameSituationViewPreview(situation: LiveGameSituation, game: PlayoffGame) -> some View {
+   VStack(alignment: .leading, spacing: 12) {
+      // Header
+      HStack(spacing: 12) {
+         Image(systemName: "football.circle")
+            .font(.title3)
+            .foregroundStyle(.red)
+            .frame(width: 24)
+         
+         Text("Live Game Situation")
+            .font(.subheadline)
+            .fontWeight(.semibold)
+            .foregroundStyle(.primary)
+         
+         Spacer()
+      }
+      
+      // Last Play and Current Drive in same row
+      HStack(alignment: .top, spacing: 12) {
+         // Last Play
+         if let lastPlay = situation.lastPlay {
+            VStack(alignment: .leading, spacing: 6) {
+               Text("Last Play")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+               
+               Text(lastPlay)
+                  .font(.caption2)
+                  .foregroundStyle(.primary)
+                  .fixedSize(horizontal: false, vertical: true)
+                  .lineLimit(3)
+                  .multilineTextAlignment(.leading)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(8)
+         }
+         
+         // Current Drive Stats
+         if situation.drivePlayCount != nil || situation.driveYards != nil || situation.timeOfPossession != nil {
+            VStack(alignment: .leading, spacing: 6) {
+               Text("Current Drive")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+               
+               HStack(spacing: 12) {
+                  if let yards = situation.driveYards {
+                     VStack(alignment: .leading, spacing: 2) {
+                        Text("\(yards)")
+                           .font(.title3)
+                           .fontWeight(.bold)
+                        Text("Yards")
+                           .font(.caption2)
+                           .foregroundStyle(.secondary)
+                     }
+                  }
+                  
+                  if let top = situation.timeOfPossession {
+                     VStack(alignment: .leading, spacing: 2) {
+                        Text(top)
+                           .font(.title3)
+                           .fontWeight(.bold)
+                        Text("TOP")
+                           .font(.caption2)
+                           .foregroundStyle(.secondary)
+                     }
+                  }
+               }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.black.opacity(0.3))
+            .cornerRadius(8)
+         }
+      }
+      
+      // Down & Distance with Field Position
+      if let down = situation.down,
+         let distance = situation.distance,
+         down > 0, down <= 4, distance >= 0 {
+         
+         let currentQuarter: Int = {
+            if case .inProgress(let quarterStr, _) = game.status {
+               let q = quarterStr
+                  .replacingOccurrences(of: "Q", with: "")
+                  .replacingOccurrences(of: "ST", with: "")
+                  .replacingOccurrences(of: "ND", with: "")
+                  .replacingOccurrences(of: "RD", with: "")
+                  .replacingOccurrences(of: "TH", with: "")
+                  .trimmingCharacters(in: .whitespacesAndNewlines)
+               if let intQ = Int(q.prefix(1)), intQ >= 1, intQ <= 4 { return intQ }
+            }
+            return 1
+         }()
+         
+         HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+               Text("Down & Distance")
+                  .font(.caption)
+                  .foregroundStyle(.secondary)
+               
+               let suffix: String = {
+                  switch down {
+                  case 1: return "st"
+                  case 2: return "nd"
+                  case 3: return "rd"
+                  default: return "th"
+                  }
+               }()
+               
+               let clockInfo: String = {
+                  if case .inProgress(let quarter, let time) = game.status {
+                     return "\(quarter) \(time)"
+                  }
+                  return ""
+               }()
+               
+               HStack(spacing: 10) {
+                  Text("\(down)\(suffix) & \(distance)")
+                     .font(.title3)
+                     .fontWeight(.black)
+                     .foregroundStyle(.primary)
+                  
+                  if !clockInfo.isEmpty {
+                     Text("(\(clockInfo))")
+                        .font(.callout)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                  }
+               }
+            }
+            
+            Spacer()
+            
+            // Field position
+            if let yardLine = situation.yardLine {
+               VStack(alignment: .trailing, spacing: 2) {
+                  Text("Field Position")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+                  
+                  Text(yardLine)
+                     .font(.body)
+                     .fontWeight(.semibold)
+                     .foregroundStyle(.primary)
+               }
+            }
+         }
+         .padding(.horizontal, 12)
+         .padding(.vertical, 8)
+         .background(Color.black.opacity(0.3))
+         .cornerRadius(8)
+         
+         if let yardLine = situation.yardLine {
+            FieldPositionView(
+               yardLine: yardLine,
+               awayTeam: game.awayTeam.abbreviation,
+               homeTeam: game.homeTeam.abbreviation,
+               possession: situation.possession,
+               quarter: currentQuarter
+            )
+            .padding(.top, 4)
+         }
+      }
+   }
+   .padding()
+   .background(Color.black.opacity(0.5))
+   .cornerRadius(12)
+}
