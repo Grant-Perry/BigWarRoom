@@ -11,61 +11,19 @@ import SwiftUI
 /// **WeekPickerView**
 /// 
 /// A sleek week selector that appears when the user taps the "WEEK X" stat card.
-/// Features:
-/// - Left-to-right week arrangement (1,2,3,4,5...)
-/// - All 18 weeks fit with proper scrolling
-/// - Week dates under PAST/CURRENT/FUTURE labels
-/// - Current week highlighting
-/// - NFL season awareness (1-18 weeks)
-/// - Smooth animations and haptic feedback
-/// - Playoff week indicators
-/// - **USES WeekSelectionManager AS SSOT**
+/// Refactored for single responsibility - this view only orchestrates layout and state.
 struct WeekPickerView: View {
     @Binding var isPresented: Bool
     
-    // 🔥 PHASE 2.5: Accept dependencies instead of using .shared
-    // 🔥 FIX: Use @Bindable to properly observe changes to these @Observable objects
-    // Must be `var` for @Bindable to work
     @Bindable var weekManager: WeekSelectionManager
     @Bindable var yearManager: SeasonYearManager
     
-    // 🏈 Callback for playoff navigation
     var onPlayoffsSelected: (() -> Void)?
     
     @State private var animateIn = false
     @State private var showYearPicker = false
+    @State private var weekPickerViewModel: WeekPickerViewModel
     
-    /// NFL season has 18 weeks (17 regular + 1 playoff)
-    private let maxWeeks = 23  // 🔥 UPDATED: 18 regular + 5 playoff weeks (WC, DIV, CONF, PRO, SB)
-    
-    /// Year range for picker: 2015 through (current NFL season year + 1)
-    private var yearRange: [String] {
-        let currentNFLYear = NFLWeekCalculator.getCurrentSeasonYear()
-        let maxYear = currentNFLYear + 1
-        return (2012...maxYear).map { String($0) }.reversed()
-    }
-    
-    /// NFL season start date - calculated from SeasonYearManager (SOT)
-    private var seasonStartDate: Date {
-        let calendar = Calendar.current
-        let selectedYear = Int(yearManager.selectedYear) ?? 2025
-        
-        // Known season start dates
-        if selectedYear == 2025 {
-            return calendar.date(from: DateComponents(year: 2025, month: 9, day: 4))!
-        } else if selectedYear == 2024 {
-            return calendar.date(from: DateComponents(year: 2024, month: 9, day: 5))!
-        } else {
-            // Fallback: find first Thursday of September
-            var startDate = calendar.date(from: DateComponents(year: selectedYear, month: 9, day: 1))!
-            while calendar.component(.weekday, from: startDate) != 5 { // Thursday = 5
-                startDate = calendar.date(byAdding: .day, value: 1, to: startDate)!
-            }
-            return startDate
-        }
-    }
-    
-    // 🔥 PHASE 2.5: Dependency injection initializer
     init(
         weekManager: WeekSelectionManager,
         yearManager: SeasonYearManager,
@@ -76,12 +34,18 @@ struct WeekPickerView: View {
         self.yearManager = yearManager
         self._isPresented = isPresented
         self.onPlayoffsSelected = onPlayoffsSelected
+        
+        // Initialize ViewModel
+        self._weekPickerViewModel = State(initialValue: WeekPickerViewModel(
+            weekManager: weekManager,
+            yearManager: yearManager
+        ))
     }
 
     var body: some View {
         ZStack {
             // Background blur
-            Color.black.opacity(0.7)
+            Color.black.opacity(0.3)
                 .ignoresSafeArea()
                 .onTapGesture {
                     if showYearPicker {
@@ -91,48 +55,32 @@ struct WeekPickerView: View {
                     }
                 }
             
-            // 🔥 FIX: Add proper vertical centering for sheet presentation
+            // Main content
             VStack {
                 Spacer()
                 
                 VStack(spacing: 0) {
-                    // Header with year picker
-                    pickerHeader
+                    WeekPickerHeader(
+                        weekPickerViewModel: weekPickerViewModel,
+                        showYearPicker: $showYearPicker,
+                        onDismiss: dismissPicker
+                    )
                     
-                    // Week grid
-                    weekGrid
+                    WeekPickerGrid(
+                        weekPickerViewModel: weekPickerViewModel,
+                        onWeekSelect: selectWeek
+                    )
                     
-                    // Footer actions
-                    pickerFooter
+                    WeekPickerFooter(
+                        weekPickerViewModel: weekPickerViewModel,
+                        onCurrentSelect: selectCurrentWeek,
+                        onPlayoffsSelect: selectPlayoffs,
+                        onConfirm: confirmSelection
+                    )
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 550) // 🔥 Increased height to show all weeks including playoffs
-                .background(
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.black.opacity(0.95),
-                                    Color.gray.opacity(0.1),
-                                    Color.black.opacity(0.95)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6), .gpGreen.opacity(0.6)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 2
-                                )
-                        )
-                        .shadow(color: .gpGreen.opacity(0.3), radius: 20, x: 0, y: 10)
-                )
+                .frame(height: 460)
+                .background(pickerBackground)
                 .padding(.horizontal, 20)
                 .scaleEffect(animateIn ? 1.0 : 0.8)
                 .opacity(animateIn ? 1.0 : 0.0)
@@ -143,7 +91,11 @@ struct WeekPickerView: View {
             
             // Year Picker Overlay
             if showYearPicker {
-                yearPickerOverlay
+                WeekPickerYearPicker(
+                    weekPickerViewModel: weekPickerViewModel,
+                    showYearPicker: $showYearPicker,
+                    onYearSelect: selectYear
+                )
             }
         }
         .onAppear {
@@ -151,610 +103,48 @@ struct WeekPickerView: View {
         }
     }
     
-    // MARK: - Header with Year Picker
-    private var pickerHeader: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("🗓️")
-                    .font(.system(size: 24))
-                
-                Text("Select Week or Season Year")
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .gpGreen.opacity(0.8)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Spacer()
-                
-                Button(action: dismissPicker) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(.gray)
-                }
-            }
-            
-            // Year Picker Button (tappable)
-            HStack(spacing: 8) {
-                Text("Season:")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.gray)
-                
-                Button(action: {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                        showYearPicker.toggle()
-                    }
-                }) {
-                    HStack(spacing: 6) {
-                        Text(yearManager.selectedYear)
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundColor(.black)
-                        
-                        Image(systemName: showYearPicker ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.black)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.white.opacity(0.6), lineWidth: 1)
-                            )
-                    )
-                }
-                
-                Spacer()
-            }
-            
-            Text("Choose a week to view matchups")
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.gray)
-            
-            Divider()
-                .background(Color.gpGreen.opacity(0.3))
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 16)
-    }
+    // MARK: - Background
     
-    // MARK: - Year Picker Overlay
-    private var yearPickerOverlay: some View {
-        VStack {
-            Spacer()
-            
-            yearPickerContent
-            
-            Spacer()
-        }
-    }
-    
-    private var yearPickerContent: some View {
-        VStack(spacing: 0) {
-            yearPickerHeader
-            
-            Divider()
-                .background(Color.gpGreen.opacity(0.3))
-            
-            yearPickerScrollList
-        }
-        .background(yearPickerBackground)
-        .padding(.horizontal, 40)
-        .padding(.bottom, 80)
-        .transition(.scale.combined(with: .opacity))
-    }
-    
-    private var yearPickerHeader: some View {
-        HStack {
-            Text("Select Season")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(.white)
-            
-            Spacer()
-            
-            Button(action: {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                    showYearPicker = false
-                }
-            }) {
-                Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(.gray)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
-    }
-    
-    private var yearPickerScrollList: some View {
-        ScrollView {
-            VStack(spacing: 8) {
-                ForEach(yearRange, id: \.self) { year in
-                    yearRowButton(for: year)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-        }
-        .frame(maxHeight: 300)
-    }
-    
-    private func yearRowButton(for year: String) -> some View {
-        let isSelected = year == yearManager.selectedYear
-        
-        return Button(action: {
-            selectYear(year)
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                showYearPicker = false
-            }
-        }) {
-            HStack {
-                Text(year)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(isSelected ? .black : .white)
-                
-                Spacer()
-                
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.black)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(isSelected ?
-                          AnyShapeStyle(LinearGradient(colors: [.gpGreen, .blue], startPoint: .leading, endPoint: .trailing)) :
-                          AnyShapeStyle(Color.gray.opacity(0.1)))
+    private var pickerBackground: some View {
+        RoundedRectangle(cornerRadius: 24)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.95),
+                        Color.gray.opacity(0.1),
+                        Color.black.opacity(0.95)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
             )
-        }
-    }
-    
-    private var yearPickerBackground: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(Color.black.opacity(0.95))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: 24)
                     .stroke(
                         LinearGradient(
-                            colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6)],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                            colors: [.gpGreen.opacity(0.6), .blue.opacity(0.6), .gpGreen.opacity(0.6)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         ),
                         lineWidth: 2
                     )
             )
-    }
-    
-    // MARK: - Week Grid (Fixed: Left-to-Right Layout + All Weeks Fit)
-    private var weekGrid: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 16) {
-                // Regular season weeks (1-18)
-                LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8)
-                    ],
-                    spacing: 8
-                ) {
-                    ForEach(1...18, id: \.self) { week in
-                        weekButton(for: week)
-                    }
-                }
-                
-                // 🔥 NEW: Playoff weeks section with purple styling
-                VStack(spacing: 10) {
-                    // Section header
-                    HStack {
-                        Image(systemName: "trophy.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.purple)
-                        
-                        Text("PLAYOFF WEEKS")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundColor(.purple)
-                            .kerning(1.0)
-                        
-                        Spacer()
-                    }
-                    .padding(.horizontal, 4)
-                    
-                    // Playoff weeks grid (19-23)
-                    LazyVGrid(
-                        columns: [
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8),
-                            GridItem(.flexible(), spacing: 8)
-                        ],
-                        spacing: 8
-                    ) {
-                        ForEach(19...23, id: \.self) { week in
-                            playoffWeekButton(for: week)
-                        }
-                    }
-                }
-                .padding(.top, 4)
-            }
-            .padding(.horizontal, 24)
-        }
-        .frame(height: 320)  // 🔥 Increased to show all weeks
-        .padding(.vertical, 8)
-    }
-    
-    // 🔥 NEW: Playoff week button with purple styling
-    private func playoffWeekButton(for week: Int) -> some View {
-        let isSelected = week == weekManager.selectedWeek
-        let isCurrent = week == weekManager.currentNFLWeek
-        
-        return Button(action: {
-            selectWeek(week)
-        }) {
-            VStack(spacing: 2) {
-                // Week number - smaller, non-rounded
-                Text("\(week)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(isSelected ? .white : .purple)
-                
-                // Playoff round abbreviation
-                Text(playoffRoundAbbr(for: week))
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .purple.opacity(0.7))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                
-                // 🔥 NEW: Week start date for playoffs too
-                Text(weekStartDate(for: week))
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(isSelected ? .white.opacity(0.6) : .purple.opacity(0.5))
-                    .lineLimit(1)
-                
-                // Status indicator
-                if isCurrent {
-                    Circle()
-                        .fill(Color.purple)
-                        .frame(width: 3, height: 3)
-                } else {
-                    Circle()
-                        .fill(Color.clear)
-                        .frame(width: 3, height: 3)
-                }
-            }
-            .frame(width: 50, height: 50)  // 🔥 Slightly taller to fit date
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(playoffButtonBackground(isSelected: isSelected, isCurrent: isCurrent))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(playoffButtonBorder(isSelected: isSelected, isCurrent: isCurrent), lineWidth: 1.5)
-                    )
-                    .shadow(
-                        color: isSelected ? Color.purple.opacity(0.6) : .clear,
-                        radius: isSelected ? 6 : 0,
-                        x: 0,
-                        y: isSelected ? 3 : 0
-                    )
-            )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
-        }
-    }
-    
-    // 🔥 NEW: Playoff round abbreviations
-    private func playoffRoundAbbr(for week: Int) -> String {
-        switch week {
-        case 19: return "WC"
-        case 20: return "DIV"
-        case 21: return "CONF"
-        case 22: return "PRO"
-        case 23: return "SB"
-        default: return "PO"
-        }
-    }
-    
-    // 🔥 NEW: Playoff button background gradient
-    private func playoffButtonBackground(isSelected: Bool, isCurrent: Bool) -> some ShapeStyle {
-        if isSelected {
-            return LinearGradient(
-                colors: [.purple, .purple.opacity(0.7)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else if isCurrent {
-            return LinearGradient(
-                colors: [Color.purple.opacity(0.3), Color.purple.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else {
-            return LinearGradient(
-                colors: [Color.purple.opacity(0.15), Color.purple.opacity(0.1)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-    
-    // 🔥 NEW: Playoff button border color
-    private func playoffButtonBorder(isSelected: Bool, isCurrent: Bool) -> Color {
-        if isSelected {
-            return .white.opacity(0.8)
-        } else if isCurrent {
-            return .purple.opacity(0.8)
-        } else {
-            return .purple.opacity(0.4)
-        }
-    }
-    
-    private func weekButton(for week: Int) -> some View {
-        let isSelected = week == weekManager.selectedWeek
-        let isCurrent = week == weekManager.currentNFLWeek
-        let isPlayoffs = week > 17
-        let isPast = week < weekManager.currentNFLWeek
-        let isFuture = week > weekManager.currentNFLWeek
-        
-        return Button(action: {
-            selectWeek(week)
-        }) {
-            VStack(spacing: 2) {
-                // Week number - smaller, non-rounded font
-                Text("\(week)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(isSelected ? .black : .white)
-                
-                // Week start date
-                Text(weekStartDate(for: week))
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(isSelected ? .black.opacity(0.6) : .gray.opacity(0.7))
-                    .lineLimit(1)
-                
-                // Status indicator
-                statusIndicator(for: week, isSelected: isSelected)
-            }
-            .frame(width: 50, height: 46)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(backgroundGradient(for: week, isSelected: isSelected))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(borderColor(for: week, isSelected: isSelected), lineWidth: 1.5)
-                    )
-                    .shadow(
-                        color: shadowColor(for: week, isSelected: isSelected),
-                        radius: isSelected ? 6 : 0,
-                        x: 0,
-                        y: isSelected ? 3 : 0
-                    )
-            )
-            .scaleEffect(isSelected ? 1.05 : 1.0)
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isSelected)
-        }
-    }
-    
-    // MARK: - Footer
-    private var pickerFooter: some View {
-        VStack(spacing: 16) {
-            Divider()
-                .background(Color.gpGreen.opacity(0.3))
-            
-            HStack(spacing: 12) {
-                // Current Week Quick Select
-                Button(action: {
-                    selectCurrentWeek()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "calendar.circle.fill")
-                            .foregroundColor(.gpGreen)
-                        Text("Current")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.gpGreen)
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.gpGreen.opacity(0.15))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.gpGreen.opacity(0.4), lineWidth: 1)
-                            )
-                    )
-                }
-                
-                // 🏈 Playoffs Button
-                Button(action: {
-                    selectPlayoffs()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "trophy.fill")
-                            .foregroundColor(.purple)
-                        Text("Playoffs")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.purple)
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(Color.purple.opacity(0.15))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(Color.purple.opacity(0.4), lineWidth: 1)
-                            )
-                    )
-                }
-                
-                Spacer()
-                
-                // Confirm Selection
-                Button(action: {
-                    confirmSelection()
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.white)
-                        Text("Week \(weekManager.selectedWeek)")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white)
-                            .fixedSize()
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.gpGreen, .blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                    )
-                }
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 20)
-    }
-    
-    // MARK: - Helper Functions
-    
-    private func weekLabel(for week: Int) -> String {
-        if week > 18 {
-            // Show playoff round names
-            switch week {
-            case 19: return "WILD CARD"
-            case 20: return "DIVISIONAL"
-            case 21: return "CONF CHAMP"
-            case 22: return "PRO BOWL"
-            case 23: return "SUPER BOWL"
-            default: return "PLAYOFFS"
-            }
-        } else if week == weekManager.currentNFLWeek {
-            return "CURRENT"
-        } else {
-            return ""  // 🔥 REMOVED: No more PAST/FUTURE labels
-        }
-    }
-    
-    /// Calculate the start date for a given NFL week
-    private func weekStartDate(for week: Int) -> String {
-        let calendar = Calendar.current
-        let weekStartDate = calendar.date(byAdding: .day, value: (week - 1) * 7, to: seasonStartDate)!
-        
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: weekStartDate)
-    }
-    
-    @ViewBuilder
-    private func statusIndicator(for week: Int, isSelected: Bool) -> some View {
-        let size: CGFloat = 3
-        
-        if week == weekManager.currentNFLWeek && !isSelected {
-            Circle()
-                .fill(Color.gpGreen)
-                .frame(width: size, height: size)
-        } else if week > 17 {
-            Circle()
-                .fill(Color.purple)
-                .frame(width: size, height: size)
-        } else {
-            Circle()
-                .fill(Color.clear)
-                .frame(width: size, height: size)
-        }
-    }
-    
-    private func backgroundGradient(for week: Int, isSelected: Bool) -> some ShapeStyle {
-        if isSelected {
-            return LinearGradient(
-                colors: [.gpGreen, .blue],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else if week == weekManager.currentNFLWeek {
-            return LinearGradient(
-                colors: [Color.gpGreen.opacity(0.2), Color.blue.opacity(0.2)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        } else {
-            return LinearGradient(
-                colors: [Color.gray.opacity(0.1), Color.gray.opacity(0.05)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
-    }
-    
-    private func borderColor(for week: Int, isSelected: Bool) -> Color {
-        if isSelected {
-            return .white.opacity(0.8)
-        } else if week == weekManager.currentNFLWeek {
-            return .gpGreen.opacity(0.6)
-        } else {
-            return .gray.opacity(0.2)
-        }
-    }
-    
-    private func shadowColor(for week: Int, isSelected: Bool) -> Color {
-        if isSelected {
-            return .gpGreen.opacity(0.6)
-        }
-        return .clear
+            .shadow(color: .gpGreen.opacity(0.3), radius: 20, x: 0, y: 10)
     }
     
     // MARK: - Actions
     
     private func selectYear(_ year: String) {
-        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: selectYear called with year: \(year)")
-        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: Current yearManager.selectedYear BEFORE: \(yearManager.selectedYear)")
+        weekPickerViewModel.selectYear(year)
         
-        // Haptic feedback for year selection
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        // 🔥 FIX: Call selectYear directly
-        yearManager.selectYear(year)
-        
-        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: Current yearManager.selectedYear AFTER: \(yearManager.selectedYear)")
-        DebugPrint(mode: .weekCheck, "🔥 WeekPickerView: AppConstants.ESPNLeagueYear: \(AppConstants.ESPNLeagueYear)")
-        
-        // 🔥 FIX: Trigger immediate data refresh by re-selecting current week with new year
-        // This ensures year changes fire immediately just like week changes
-        weekManager.selectWeek(weekManager.selectedWeek)
-        
-        // 🔥 FIX: Auto-dismiss the ENTIRE week picker after year selection
+        // Auto-dismiss after year selection
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             dismissPicker()
         }
     }
     
     private func selectWeek(_ week: Int) {
-        // Haptic feedback for selection
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            weekManager.selectWeek(week)
-        }
+        weekPickerViewModel.selectWeek(week)
         
         // Auto-dismiss after week selection
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
@@ -763,39 +153,28 @@ struct WeekPickerView: View {
     }
     
     private func selectCurrentWeek() {
-        // Haptic feedback for current week selection
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        weekPickerViewModel.selectCurrentWeek()
         
-        weekManager.resetToCurrentWeek()
-        
-        // Auto-dismiss after current week selection
+        // Auto-dismiss
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
             dismissPicker()
         }
     }
     
     private func selectPlayoffs() {
-        // Haptic feedback for playoffs selection
-        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-        impactFeedback.impactOccurred()
-        
-        // Select Week 19 to trigger playoff view in Schedule tab
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-            weekManager.selectWeek(19)
-        }
+        weekPickerViewModel.selectPlayoffs()
         
         // Dismiss picker
         dismissPicker()
         
-        // Trigger playoff navigation callback after dismiss animation
+        // Trigger playoff navigation callback
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             onPlayoffsSelected?()
         }
     }
     
     private func confirmSelection() {
-        // Haptic feedback for confirmation
+        // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
         impactFeedback.impactOccurred()
         
