@@ -111,29 +111,6 @@ private var debugPrintIterations: [String: Int] = [:]
 // MARK: - Debug Print Function
 
 /// Flexible debug print with mode filtering and iteration limiting
-///
-/// - Parameters:
-///   - mode: Debug mode(s) to filter on. Defaults to .all if not specified
-///   - limit: Maximum times this statement should print (0 = unlimited)
-///   - file: Source file (auto-captured)
-///   - line: Line number (auto-captured)
-///   - function: Function name (auto-captured)
-///   - message: Message to print (only evaluated if it will actually print)
-///
-/// Examples:
-/// ```swift
-/// // Single mode
-/// DebugPrint(mode: .globalRefresh, "Starting refresh")
-///
-/// // Multiple modes
-/// DebugPrint(mode: [.espnAPI, .sleeperAPI], "API response received")
-///
-/// // With iteration limit (only prints 5 times)
-/// DebugPrint(mode: .statsLookup, limit: 5, "Checking stats for \(playerID)")
-///
-/// // Default to .all (prints if anything is active)
-/// DebugPrint("General debug message")
-/// ```
 func DebugPrint(
     mode: DebugMode = .all,
     limit: Int = 0,

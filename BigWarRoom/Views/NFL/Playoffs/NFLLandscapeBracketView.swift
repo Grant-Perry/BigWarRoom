@@ -387,7 +387,7 @@ struct NFLLandscapeBracketView: View {
             .cornerRadius(20)
             .shadow(color: game.isLive ? .white.opacity(0.3) : .clear, radius: 30, x: 0, y: 0)
             .shadow(color: game.isLive ? .black.opacity(0.5) : .clear, radius: 40, x: 0, y: 10)
-            .scaleEffect(0.9)
+            .scaleEffect(0.85)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
       }
@@ -487,6 +487,22 @@ struct NFLLandscapeBracketView: View {
          if let down = situation.down,
             let distance = situation.distance,
             down > 0, down <= 4, distance >= 0 {
+            
+            // EXTRACT QUARTER NUMBER FROM GAME STATUS, make it available here:
+            let currentQuarter: Int = {
+                if case .inProgress(let quarterStr, _) = game.status {
+                    let q = quarterStr
+                        .replacingOccurrences(of: "Q", with: "")
+                        .replacingOccurrences(of: "ST", with: "")
+                        .replacingOccurrences(of: "ND", with: "")
+                        .replacingOccurrences(of: "RD", with: "")
+                        .replacingOccurrences(of: "TH", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let intQ = Int(q.prefix(1)), intQ >= 1, intQ <= 4 { return intQ }
+                }
+                return 1 // default to Q1 if parsing fails
+            }()
+            
             HStack(spacing: 8) {
                VStack(alignment: .leading, spacing: 2) {
                   Text("Down & Distance")
@@ -502,6 +518,22 @@ struct NFLLandscapeBracketView: View {
                      }
                   }()
                   
+                  // Extract quarter number from game.status.inProgress if possible
+                  let currentQuarter: Int = {
+                     if case .inProgress(let quarterStr, _) = game.status {
+                        // Parse "Q1", "Q2", "Q3", "Q4", "1st", etc.
+                        let q = quarterStr
+                           .replacingOccurrences(of: "Q", with: "")
+                           .replacingOccurrences(of: "ST", with: "")
+                           .replacingOccurrences(of: "ND", with: "")
+                           .replacingOccurrences(of: "RD", with: "")
+                           .replacingOccurrences(of: "TH", with: "")
+                           .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let intQ = Int(q.prefix(1)), intQ >= 1, intQ <= 4 { return intQ }
+                     }
+                     return 1 // Fallback to Q1
+                  }()
+
                   // Extract quarter and time from game status
                   let clockInfo: String = {
                      if case .inProgress(let quarter, let time) = game.status {
@@ -562,7 +594,9 @@ struct NFLLandscapeBracketView: View {
                FieldPositionView(
                   yardLine: yardLine,
                   awayTeam: game.awayTeam.abbreviation,
-                  homeTeam: game.homeTeam.abbreviation
+                  homeTeam: game.homeTeam.abbreviation,
+                  possession: situation.possession,
+                  quarter: currentQuarter
                )
                .padding(.top, 4)
             }

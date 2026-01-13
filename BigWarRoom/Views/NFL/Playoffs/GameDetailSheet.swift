@@ -341,7 +341,9 @@ struct GameDetailSheetContent: View {
                 FieldPositionView(
                     yardLine: "HOU 39",
                     awayTeam: "HOU",
-                    homeTeam: "PIT"
+                    homeTeam: "PIT",
+                    possession: "HOU",
+                    quarter: 1
                 )
             }
             .padding(.horizontal, 12)
@@ -416,14 +418,42 @@ struct GameDetailSheetContent: View {
                 .background(Color(.tertiarySystemGroupedBackground))
                 .cornerRadius(8)
             }
+            
+            // 🏈 NEW: Visual field representation
+            if let yardLine = situation.yardLine {
+                Text("🔥 DEBUG: \(yardLine)")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .padding(.vertical, 4)
+                
+                FieldPositionView(
+                    yardLine: yardLine,
+                    awayTeam: game.awayTeam.abbreviation,
+                    homeTeam: game.homeTeam.abbreviation,
+                    possession: situation.possession,
+                    quarter: currentQuarter
+                )
+                .padding(.top, 4)
+                .background(Color.red.opacity(0.2))
+            }
         }
     }
     
-    // 🔥 NEW: Helper to extract team code from yard line string
-    private func extractTeamCode(from yardLine: String) -> String? {
-        // Format is typically "CHI 35" or "GB 20"
-        let components = yardLine.split(separator: " ")
-        guard components.count >= 1 else { return nil }
-        return String(components[0])
+    /// Extract numeric quarter from game status (e.g., "Q1" -> 1, "OT" -> 4)
+    private var currentQuarter: Int {
+        guard case let .inProgress(quarter, _) = game.status else { return 1 }
+        
+        // Parse "Q1", "Q2", etc.
+        if quarter.hasPrefix("Q"), let num = Int(quarter.dropFirst()) {
+            return min(max(num, 1), 4)  // Clamp to 1-4
+        }
+        
+        // Handle overtime as Q4 orientation
+        if quarter.uppercased().contains("OT") {
+            return 4
+        }
+        
+        // Default to Q1
+        return 1
     }
 }
