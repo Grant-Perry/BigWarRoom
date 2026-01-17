@@ -269,11 +269,18 @@ struct NFLLandscapeBracketView: View {
                selectedGameID = nil
             }
          
+         // MARK: - Modal Sizing & Responsiveness
+         // GeometryReader detects device screen width to apply appropriate scaling
+         // - Live games need more space for play-by-play data: 115% (Pro Max) / 100% (Standard)
+         // - Scheduled/completed games: 115% (Pro Max) / 90% (Standard)
+         // Base modal width is 480pts before scaling is applied
          GeometryReader { geo in
             let screenWidth = geo.size.width
             // iPhone Pro Max in landscape ~930pts, standard iPhones ~850pts
             let isProMax = screenWidth >= 900
-            let modalScale = isProMax ? 0.85 : 0.75
+            
+            // Live games need more space for situation data
+			let modalScale: CGFloat = game.isLive ? (isProMax ? 0.75 : 0.65) : (isProMax ? 1.25 : 0.90)
 
             VStack(spacing: 0) {
                // Header with timer - SUPER COMPACT
@@ -282,13 +289,6 @@ struct NFLLandscapeBracketView: View {
                      .font(.headline)
                      .fontWeight(.bold)
                      .foregroundStyle(.white)
-                  
-                  Spacer()
-                  
-                  // 🏈 NEW: Refresh countdown timer (only for live games)
-                  if game.isLive {
-                     RefreshCountdownTimerView()
-                  }
                   
                   Spacer()
                   
@@ -362,7 +362,7 @@ struct NFLLandscapeBracketView: View {
                      scoreSize: scoreSize,
                      scoreOffset: scoreOffset
                   )
-				  .scaleEffect(1.1) // just bump up the playoff card a bit
+                  .scaleEffect(1.1) // just bump up the playoff card a bit
                   .shadow(color: .white.opacity(0.3), radius: 30, x: 0, y: 0)
                   .shadow(color: .black.opacity(0.5), radius: 40, x: 0, y: 10)
                   .padding(.top, 8)
@@ -387,7 +387,6 @@ struct NFLLandscapeBracketView: View {
             .cornerRadius(20)
             .shadow(color: game.isLive ? .white.opacity(0.3) : .clear, radius: 30, x: 0, y: 0)
             .shadow(color: game.isLive ? .black.opacity(0.5) : .clear, radius: 40, x: 0, y: 10)
-            .scaleEffect(0.85)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
          }
       }
@@ -473,6 +472,8 @@ struct NFLLandscapeBracketView: View {
                               .foregroundStyle(.secondary)
                         }
                      }
+                     
+                     Spacer()
                   }
                }
                .padding(.horizontal, 12)
@@ -480,6 +481,11 @@ struct NFLLandscapeBracketView: View {
                .frame(maxWidth: .infinity, alignment: .leading)
                .background(Color(.tertiarySystemGroupedBackground))
                .cornerRadius(8)
+               .overlay(alignment: .topTrailing) {
+                  RefreshCountdownTimerView()
+                     .scaleEffect(1.2)
+                     .padding(8)
+               }
             }
          }
          
@@ -487,6 +493,12 @@ struct NFLLandscapeBracketView: View {
          if let down = situation.down,
             let distance = situation.distance,
             down > 0, down <= 4, distance >= 0 {
+            
+            // Check if it's a timeout even with valid down/distance
+            let isTimeout = situation.lastPlay?.lowercased().contains("timeout") ?? false
+            let isTwoMinuteWarning = situation.lastPlay?.lowercased().contains("two-minute warning") ?? false
+            let isHalftime = (situation.lastPlay?.lowercased().contains("end quarter 2") ?? false) || 
+                            (situation.lastPlay?.lowercased().contains("end of quarter 2") ?? false)
             
             // EXTRACT QUARTER NUMBER FROM GAME STATUS, make it available here:
             let currentQuarter: Int = {
@@ -533,7 +545,7 @@ struct NFLLandscapeBracketView: View {
                      }
                      return 1 // Fallback to Q1
                   }()
-
+                  
                   // Extract quarter and time from game status
                   let clockInfo: String = {
                      if case .inProgress(let quarter, let time) = game.status {
@@ -598,6 +610,225 @@ struct NFLLandscapeBracketView: View {
                   possession: situation.possession,
                   quarter: currentQuarter
                )
+               .opacity((isTimeout || isTwoMinuteWarning || isHalftime) ? 0.6 : 1.0)
+               .overlay(
+                  Group {
+                     if isHalftime {
+                        // Halftime overlay
+                        Text("HALFTIME")
+                           .font(.caption)
+                           .fontWeight(.bold)
+                           .foregroundStyle(.black)
+                           .padding(.horizontal, 12)
+                           .padding(.vertical, 6)
+                           .background(
+                              LinearGradient(
+                                 colors: [Color.gpYellow, Color.gpYellow.opacity(0.7)],
+                                 startPoint: .leading,
+                                 endPoint: .trailing
+                              )
+                           )
+                           .cornerRadius(8)
+                     } else if isTimeout {
+                        // Commercial break overlay when timeout detected
+                        Text("Commercial Break")
+                           .font(.caption)
+                           .fontWeight(.bold)
+                           .foregroundStyle(.white)
+                           .padding(.horizontal, 12)
+                           .padding(.vertical, 6)
+                           .background(
+                              LinearGradient(
+                                 colors: [Color.gpPurple, Color.gpPurple.opacity(0.7)],
+                                 startPoint: .leading,
+                                 endPoint: .trailing
+                              )
+                           )
+                           .cornerRadius(8)
+                     } else if isTwoMinuteWarning {
+                        // Two-Minute Warning overlay
+                        Text("Two-Minute Warning")
+                           .font(.caption)
+                           .fontWeight(.bold)
+                           .foregroundStyle(.white)
+                           .padding(.horizontal, 12)
+                           .padding(.vertical, 6)
+                           .background(
+                              LinearGradient(
+                                 colors: [Color.gpBlue, Color.gpBlue.opacity(0.7)],
+                                 startPoint: .leading,
+                                 endPoint: .trailing
+                              )
+                           )
+                           .cornerRadius(8)
+                     }
+                  }
+               )
+               .padding(.top, 4)
+            }
+         } else {
+            // MARK: - Between Plays State
+            // Show field with stoppage indicator when no active down/distance
+            let currentQuarter: Int = {
+                if case .inProgress(let quarterStr, _) = game.status {
+                    let q = quarterStr
+                        .replacingOccurrences(of: "Q", with: "")
+                        .replacingOccurrences(of: "ST", with: "")
+                        .replacingOccurrences(of: "ND", with: "")
+                        .replacingOccurrences(of: "RD", with: "")
+                        .replacingOccurrences(of: "TH", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    if let intQ = Int(q.prefix(1)), intQ >= 1, intQ <= 4 { return intQ }
+                }
+                return 1
+            }()
+            
+            // Parse stoppage type from last play
+            let stoppageType: String = {
+               if let lastPlay = situation.lastPlay?.lowercased() {
+                  if lastPlay.contains("end quarter 2") || lastPlay.contains("end of quarter 2") { return "HALFTIME" }
+                  if lastPlay.contains("timeout") { return "Official Timeout" }
+                  if lastPlay.contains("touchdown") { return "Touchdown - Awaiting Kickoff" }
+                  if lastPlay.contains("field goal") { return "Field Goal - Awaiting Kickoff" }
+                  if lastPlay.contains("penalty") { return "Penalty" }
+                  if lastPlay.contains("two-minute warning") { return "Two-Minute Warning" }
+                  if lastPlay.contains("end of") { return "End of Quarter" }
+               }
+               return "Between Plays"
+            }()
+            
+            HStack(spacing: 8) {
+               VStack(alignment: .leading, spacing: 2) {
+                  Text("Game Status")
+                     .font(.caption)
+                     .foregroundStyle(.secondary)
+                  
+                  // Extract quarter and time from game status
+                  let clockInfo: String = {
+                     if case .inProgress(let quarter, let time) = game.status {
+                        return "\(quarter) \(time)"
+                     }
+                     return ""
+                  }()
+                  
+                  HStack(spacing: 10) {
+                     // Show team logo for scoring plays
+                     if let possession = situation.possession,
+                        (stoppageType.lowercased().contains("touchdown") || 
+                         stoppageType.lowercased().contains("field goal")),
+                        let logo = teamAssets.logo(for: possession) {
+                        logo
+                           .resizable()
+                           .aspectRatio(contentMode: .fit)
+                           .frame(width: 28, height: 28)
+                           .clipShape(Circle())
+                     }
+                     
+                     Text(stoppageType)
+                        .font(.title3)
+                        .fontWeight(.black)
+                        .foregroundStyle(.orange)
+                     
+                     if !clockInfo.isEmpty {
+                        Text("(\(clockInfo))")
+                           .font(.callout)
+                           .fontWeight(.semibold)
+                           .foregroundStyle(.secondary)
+                     }
+                  }
+               }
+               
+               Spacer()
+               
+               // Show last known yard line if available
+               if let yardLine = situation.yardLine {
+                  VStack(alignment: .trailing, spacing: 2) {
+                     Text("Last Position")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     
+                     HStack(spacing: 4) {
+                        if let teamCode = extractTeamCode(from: yardLine),
+                           let logo = teamAssets.logo(for: teamCode) {
+                           logo
+                              .resizable()
+                              .aspectRatio(contentMode: .fit)
+                              .frame(width: 20, height: 20)
+                              .clipShape(Circle())
+                              .opacity(0.6)
+                        }
+                        
+                        Text(yardLine)
+                           .font(.body)
+                           .fontWeight(.semibold)
+                           .foregroundStyle(.secondary)
+                     }
+                  }
+               }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.tertiarySystemGroupedBackground))
+            .cornerRadius(8)
+            
+            // Always show field during stoppages with last known position
+            if let yardLine = situation.yardLine {
+               // Get team color for scoring plays
+               let teamColor: Color = {
+                  if let possession = situation.possession,
+                     (stoppageType.lowercased().contains("touchdown") || 
+                      stoppageType.lowercased().contains("field goal")),
+                     let team = teamAssets.team(for: possession) {
+                     return team.primaryColor
+                  }
+                  return .orange
+               }()
+               
+               FieldPositionView(
+                  yardLine: yardLine,
+                  awayTeam: game.awayTeam.abbreviation,
+                  homeTeam: game.homeTeam.abbreviation,
+                  possession: situation.possession,
+                  quarter: currentQuarter
+               )
+               .opacity(0.6)
+               .overlay(
+                  // Stoppage overlay on field
+                  HStack(spacing: 8) {
+                     // Show team logo for scoring plays
+                     if let possession = situation.possession,
+                        (stoppageType.lowercased().contains("touchdown") || 
+                         stoppageType.lowercased().contains("field goal")),
+                        let logo = teamAssets.logo(for: possession) {
+                        logo
+                           .resizable()
+                           .aspectRatio(contentMode: .fit)
+                           .frame(width: 24, height: 24)
+                           .clipShape(Circle())
+                     }
+                     
+                     Text(stoppageType == "Official Timeout" ? "Commercial Break" : stoppageType)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.black)
+                  }
+                  .padding(.horizontal, 12)
+                  .padding(.vertical, 6)
+                  .background(
+                     LinearGradient(
+                        colors: stoppageType == "HALFTIME" ?
+                           [Color.gpYellow, Color.gpYellow.opacity(0.7)] :
+                           stoppageType == "Official Timeout" ? 
+                           [Color.gpOrange, Color.gpOrange.opacity(0.7)] :
+                           stoppageType == "Two-Minute Warning" ?
+                           [Color.gpPink, Color.gpPink.opacity(0.7)] :
+                           [teamColor, teamColor.opacity(0.7)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                     )
+                  )
+                  .cornerRadius(8)
+               )
                .padding(.top, 4)
             }
          }
@@ -659,6 +890,7 @@ struct NFLLandscapeBracketView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
+            .frame(height: 36)
             .background(Color(.systemGray6))
             
             // Compact play text
@@ -753,14 +985,16 @@ struct NFLLandscapeBracketView: View {
          name: "Pittsburgh Steelers",
          seed: 4,
          score: 3,
-         logoURL: nil
+         logoURL: nil,
+         timeoutsRemaining: 2
       ),
       awayTeam: PlayoffTeam(
          abbreviation: "HOU",
          name: "Houston Texans",
          seed: 5,
          score: 0,
-         logoURL: nil
+         logoURL: nil,
+         timeoutsRemaining: 3
       ),
       gameDate: Date(),
       status: .inProgress(quarter: "Q1", timeRemaining: "5:58"),
@@ -933,7 +1167,7 @@ private func liveGameSituationViewPreview(situation: LiveGameSituation, game: Pl
                Text("Current Drive")
                   .font(.caption)
                   .foregroundStyle(.secondary)
-               
+                  
                HStack(spacing: 12) {
                   if let yards = situation.driveYards {
                      VStack(alignment: .leading, spacing: 2) {
@@ -956,6 +1190,8 @@ private func liveGameSituationViewPreview(situation: LiveGameSituation, game: Pl
                            .foregroundStyle(.secondary)
                      }
                   }
+                  
+                  Spacer()
                }
             }
             .padding(.horizontal, 12)

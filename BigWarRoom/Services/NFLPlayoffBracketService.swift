@@ -218,7 +218,8 @@ final class NFLPlayoffBracketService {
                     name: nflTeam.fullName,
                     seed: seed,
                     score: nil,
-                    logoURL: nil
+                    logoURL: nil,
+                    timeoutsRemaining: nil
                 )
                 
                 if nflTeam.conference == .afc {
@@ -300,7 +301,8 @@ final class NFLPlayoffBracketService {
                 name: homeNFLTeam?.fullName ?? homeTeam,
                 seed: homeSeed,
                 score: homeScore,
-                logoURL: nil
+                logoURL: nil,
+                timeoutsRemaining: nil
             )
             
             let awayPlayoffTeam = PlayoffTeam(
@@ -308,7 +310,8 @@ final class NFLPlayoffBracketService {
                 name: awayNFLTeam?.fullName ?? awayTeam,
                 seed: awaySeed,
                 score: awayScore,
-                logoURL: nil
+                logoURL: nil,
+                timeoutsRemaining: nil
             )
             
             // Parse game date
@@ -805,8 +808,8 @@ final class NFLPlayoffBracketService {
         let playoffYear = season + 1
         let date = computeSuperBowlDate(for: playoffYear)
         
-        let home = PlayoffTeam(abbreviation: nfcAbbr, name: nfcName, seed: nil, score: nfcScore, logoURL: nil)
-        let away = PlayoffTeam(abbreviation: afcAbbr, name: afcName, seed: nil, score: afcScore, logoURL: nil)
+        let home = PlayoffTeam(abbreviation: nfcAbbr, name: nfcName, seed: nil, score: nfcScore, logoURL: nil, timeoutsRemaining: nil)
+        let away = PlayoffTeam(abbreviation: afcAbbr, name: afcName, seed: nil, score: afcScore, logoURL: nil, timeoutsRemaining: nil)
         
         let venue = PlayoffGame.Venue(
             fullName: r.venue,

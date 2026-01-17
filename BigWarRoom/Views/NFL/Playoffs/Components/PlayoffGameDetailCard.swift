@@ -110,28 +110,35 @@ struct PlayoffGameDetailCard: View {
          VStack {
             Spacer()
             HStack {
-               Spacer()
-               if let seed = game.awayTeam.seed {
-                  let isAwayFavorite = displayOdds?.favoriteMoneylineTeamCode == game.awayTeam.abbreviation
-                  let isAwayUnderdog = displayOdds?.underdogMoneylineTeamCode == game.awayTeam.abbreviation
-                  let moneyline = isAwayFavorite ? displayOdds?.favoriteMoneylineOdds : (isAwayUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
-                  
-                  HStack(spacing: 4) {
-                     Text("#\(seed)")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundStyle(.white)
-                     
-                     if let ml = moneyline, !game.isCompleted {
-                        Text(ml)
-                           .font(.system(size: 10, weight: .black))
-                           .foregroundStyle(isAwayFavorite ? .green : .orange)
-                     }
+               VStack(spacing: 4) {
+                  // Timeout indicators
+                  if game.isLive {
+                     TimeoutIndicatorView(timeoutsRemaining: game.awayTeam.timeoutsRemaining ?? 3)
                   }
-                  .padding(.horizontal, 6)
-                  .padding(.vertical, 2)
-                  .background(Capsule().fill(Color.black.opacity(0.85)))
-                  .padding(6)
+                  
+                  // Seed badge with moneyline
+                  if let seed = game.awayTeam.seed {
+                     let isAwayFavorite = displayOdds?.favoriteMoneylineTeamCode == game.awayTeam.abbreviation
+                     let isAwayUnderdog = displayOdds?.underdogMoneylineTeamCode == game.awayTeam.abbreviation
+                     let moneyline = isAwayFavorite ? displayOdds?.favoriteMoneylineOdds : (isAwayUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
+                     
+                     HStack(spacing: 4) {
+                        Text("#\(seed)")
+                           .font(.system(size: 12, weight: .black))
+                           .foregroundStyle(.white)
+                        
+                        if let ml = moneyline, !game.isCompleted {
+                           Text(ml)
+                              .font(.system(size: 10, weight: .black))
+                              .foregroundStyle(isAwayFavorite ? .green : .orange)
+                        }
+                     }
+                     .padding(.horizontal, 6)
+                     .padding(.vertical, 2)
+                     .background(Capsule().fill(Color.black.opacity(0.85)))
+                  }
                }
+               .padding(6)
             }
          }
       }
@@ -167,27 +174,35 @@ struct PlayoffGameDetailCard: View {
          VStack {
             Spacer()
             HStack {
-               if let seed = game.homeTeam.seed {
-                  let isHomeFavorite = displayOdds?.favoriteMoneylineTeamCode == game.homeTeam.abbreviation
-                  let isHomeUnderdog = displayOdds?.underdogMoneylineTeamCode == game.homeTeam.abbreviation
-                  let moneyline = isHomeFavorite ? displayOdds?.favoriteMoneylineOdds : (isHomeUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
-                  
-                  HStack(spacing: 4) {
-                     Text("#\(seed)")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundStyle(.white)
-                     
-                     if let ml = moneyline, !game.isCompleted {
-                        Text(ml)
-                           .font(.system(size: 10, weight: .black))
-                           .foregroundStyle(isHomeFavorite ? .green : .orange)
-                     }
+               VStack(spacing: 4) {
+                  // Timeout indicators
+                  if game.isLive {
+                     TimeoutIndicatorView(timeoutsRemaining: game.homeTeam.timeoutsRemaining ?? 3)
                   }
-                  .padding(.horizontal, 6)
-                  .padding(.vertical, 2)
-                  .background(Capsule().fill(Color.black.opacity(0.85)))
-                  .padding(6)
+                  
+                  // Seed badge with moneyline
+                  if let seed = game.homeTeam.seed {
+                     let isHomeFavorite = displayOdds?.favoriteMoneylineTeamCode == game.homeTeam.abbreviation
+                     let isHomeUnderdog = displayOdds?.underdogMoneylineTeamCode == game.homeTeam.abbreviation
+                     let moneyline = isHomeFavorite ? displayOdds?.favoriteMoneylineOdds : (isHomeUnderdog ? displayOdds?.underdogMoneylineOdds : nil)
+                     
+                     HStack(spacing: 4) {
+                        Text("#\(seed)")
+                           .font(.system(size: 12, weight: .black))
+                           .foregroundStyle(.white)
+                        
+                        if let ml = moneyline, !game.isCompleted {
+                           Text(ml)
+                              .font(.system(size: 10, weight: .black))
+                              .foregroundStyle(isHomeFavorite ? .green : .orange)
+                        }
+                     }
+                     .padding(.horizontal, 6)
+                     .padding(.vertical, 2)
+                     .background(Capsule().fill(Color.black.opacity(0.85)))
+                  }
                }
+               .padding(6)
                Spacer()
             }
          }
@@ -305,5 +320,26 @@ struct PlayoffGameDetailCard: View {
       }
       .frame(maxWidth: .infinity)
       .padding(.vertical, 8)
+   }
+}
+
+// MARK: - Timeout Indicator View
+
+/// Shows 3 circles representing timeouts remaining (filled = available, empty = used)
+struct TimeoutIndicatorView: View {
+   let timeoutsRemaining: Int
+   
+   var body: some View {
+      HStack(spacing: 3) {
+         ForEach(0..<3, id: \.self) { index in
+            Circle()
+               .fill(index < timeoutsRemaining ? Color.yellow : Color.clear)
+               .frame(width: 10, height: 10)
+               .overlay(
+                  Circle()
+                     .stroke(Color.secondary, lineWidth: 1)
+               )
+         }
+      }
    }
 }

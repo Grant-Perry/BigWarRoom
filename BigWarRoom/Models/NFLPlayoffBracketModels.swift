@@ -245,6 +245,7 @@ struct PlayoffTeam: Codable, Equatable {
     let seed: Int?
     let score: Int?
     let logoURL: String?
+    let timeoutsRemaining: Int?  // 🏈 NEW: Timeouts remaining (0-3)
     
     var displayName: String {
         name

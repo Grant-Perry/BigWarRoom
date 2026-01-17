@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = .nflData // [.bracketTimer] // 🔥 ENABLED: Track bracket refresh timing] // [.bettingOdds] // 🔥 ENABLED: Track bracket refresh timing
+   static var activeMode: DebugMode = [.bettingOdds, .bracketTimer]
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -67,40 +67,12 @@ struct DebugMode: OptionSet {
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
     static let allData: DebugMode 	= [.statsLookup, .caching, .dataSync]
     static let liveRefresh: DebugMode = [.globalRefresh, .liveUpdates, .leagueProvider, .liveScores]
-    static let all: DebugMode 		= [
-        .globalRefresh,
-        .espnAPI,
-        .sleeperAPI,
-        .matchupLoading,
-        .recordCalculation,
-        .statsLookup,
-        .navigation,
-        .caching,
-        .leagueProvider,
-        .viewModelLifecycle,
-        .dataSync,
-        .nflData,
-        .opponentIntel,
-        .liveUpdates,
-        .oprk,
-        .lineupRX,
-		.liveUpdate2,
-        .waivers,
-        .weekCheck,
-        .lifecycle,
-        .general,
-        .scoring,
-        .fantasy,
-        .playerIDMapping,
-        .draft,
-        .contention,
-        .winProb,
-        .liveScores,
-        .matchupSort,
-        .appLoad,
-        .bettingOdds,
-        .bracketTimer
-    ]
+    static let all: DebugMode 		= [.globalRefresh, .espnAPI,
+        .sleeperAPI,.matchupLoading, .recordCalculation, .statsLookup, .navigation,
+        .caching, .leagueProvider, .viewModelLifecycle, .dataSync, .nflData,
+		.opponentIntel, .liveUpdates, .oprk, .lineupRX, .liveUpdate2, .waivers,
+        .weekCheck, .lifecycle, .general, .scoring, .fantasy, .playerIDMapping, .draft,
+		 .contention, .winProb, .liveScores, .matchupSort, .appLoad, .bettingOdds, .bracketTimer]
 }
 
 // MARK: - Iteration Tracking

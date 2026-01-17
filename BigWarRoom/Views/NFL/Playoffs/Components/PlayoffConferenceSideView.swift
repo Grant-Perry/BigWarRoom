@@ -193,7 +193,8 @@ struct PlayoffConferenceSideView: View {
                name: game.awayTeam.name,
                seed: awaySeed,
                score: game.awayTeam.score,
-               logoURL: game.awayTeam.logoURL
+               logoURL: game.awayTeam.logoURL,
+               timeoutsRemaining: game.awayTeam.timeoutsRemaining
             )
          }
          if let homeSeed = game.homeTeam.seed {
@@ -202,7 +203,8 @@ struct PlayoffConferenceSideView: View {
                name: game.homeTeam.name,
                seed: homeSeed,
                score: game.homeTeam.score,
-               logoURL: game.homeTeam.logoURL
+               logoURL: game.homeTeam.logoURL,
+               timeoutsRemaining: game.homeTeam.timeoutsRemaining
             )
          }
       }
@@ -212,7 +214,8 @@ struct PlayoffConferenceSideView: View {
             name: s1.name,
             seed: s1.seed,
             score: s1.score,
-            logoURL: s1.logoURL
+            logoURL: s1.logoURL,
+            timeoutsRemaining: s1.timeoutsRemaining
          )
       }
       return seeds
