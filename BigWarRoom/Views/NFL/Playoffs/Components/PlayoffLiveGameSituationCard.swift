@@ -32,6 +32,20 @@ struct PlayoffLiveGameSituationCard: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .onAppear {
+            DebugPrint(mode: .fieldPosition, "📋 [LIVE SITUATION CARD] onAppear - situation.yardLine='\(situation.yardLine ?? "NIL")'")
+            DebugPrint(mode: .fieldPosition, "   shouldShowDownDistance = \(shouldShowDownDistance)")
+            
+            if shouldShowDownDistance {
+                if situation.yardLine != nil {
+                    DebugPrint(mode: .fieldPosition, "   ✅ yardLine exists - will call fieldPositionView")
+                } else {
+                    DebugPrint(mode: .fieldPosition, "   ❌ yardLine is NIL - field position will NOT render")
+                }
+            } else {
+                DebugPrint(mode: .fieldPosition, "   ⚠️ shouldShowDownDistance=false - showing betweenPlaysState instead")
+            }
+        }
     }
     
     private var headerRow: some View {
@@ -217,6 +231,8 @@ struct PlayoffLiveGameSituationCard: View {
     
     @ViewBuilder
     private func fieldPositionView(yardLine: String) -> some View {
+        let _ = DebugPrint(mode: .fieldPosition, "🏟️ [FIELD POS VIEW HELPER] Creating FieldPositionView with yardLine='\(yardLine)', awayTeam=\(game.awayTeam.abbreviation), homeTeam=\(game.homeTeam.abbreviation), possession=\(situation.possession ?? "nil"), quarter=\(currentQuarter)")
+        
         FieldPositionView(
             yardLine: yardLine,
             awayTeam: game.awayTeam.abbreviation,
@@ -253,6 +269,8 @@ struct PlayoffLiveGameSituationCard: View {
                         .font(.title3)
                         .fontWeight(.black)
                         .foregroundStyle(.orange)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
                     
                     if !clockInfo.isEmpty {
                         Text("(\(clockInfo))")
@@ -444,8 +462,8 @@ struct PlayoffLiveGameSituationCard: View {
             if lastPlay.contains("end quarter 1") || lastPlay.contains("end of quarter 1") { return "End of Quarter 1" }
             if lastPlay.contains("end quarter 3") || lastPlay.contains("end of quarter 3") { return "End of Quarter 3" }
             if lastPlay.contains("timeout") { return "Official Timeout" }
-            if lastPlay.contains("touchdown") { return "Touchdown - Awaiting Kickoff" }
-            if lastPlay.contains("field goal") { return "Field Goal - Awaiting Kickoff" }
+            if lastPlay.contains("touchdown") { return "TD - Awaiting Kickoff" }  // 🔥 SHORTENED
+            if lastPlay.contains("field goal") { return "FG - Awaiting Kickoff" }  // 🔥 SHORTENED
             if lastPlay.contains("penalty") { return "Penalty" }
             if lastPlay.contains("two-minute warning") { return "Two-Minute Warning" }
             if lastPlay.contains("end of") { return "End of Quarter" }

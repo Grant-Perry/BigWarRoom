@@ -41,6 +41,9 @@ struct FantasyMatchupDetailView: View {
     
     // 🔥 NEW: Force view update when hub refreshes
     @State private var observedUpdateTime: Date = Date.distantPast
+    
+    // 🔥 NEW: Central navigation state
+    @State private var selectedPlayerForNavigation: SleeperPlayer? = nil
 
     // MARK: - Initializers
 
@@ -65,21 +68,11 @@ struct FantasyMatchupDetailView: View {
     // MARK: - Body
 
     var body: some View {
-        // FIX: Only add background when NOT embedded in LeagueMatchupsTabView
         Group {
             if isEmbeddedInTabView {
-                // Embedded in LeagueMatchupsTabView - no background, content only
                 contentView
-                    .navigationDestination(for: SleeperPlayer.self) { player in
-                        PlayerStatsCardView(
-                            player: player,
-                            team: NFLTeam.team(for: player.team ?? "")
-                        )
-                    }
             } else {
-                // Standalone - add background
                 ZStack {
-                    // Background
                     ZStack {
                         Color.black
                         Image("BG7")
@@ -89,19 +82,19 @@ struct FantasyMatchupDetailView: View {
                     }
                     .ignoresSafeArea(.all)
                     
-                    // Content
                     contentView
                 }
                 .navigationBarHidden(true)
                 .navigationBarBackButtonHidden(true)
                 .preferredColorScheme(.dark)
-                .navigationDestination(for: SleeperPlayer.self) { player in
-                    PlayerStatsCardView(
-                        player: player,
-                        team: NFLTeam.team(for: player.team ?? "")
-                    )
-                }
             }
+        }
+        // 🔥 MOVED: Navigation destination at the ROOT level (outside lazy containers)
+        .navigationDestination(item: $selectedPlayerForNavigation) { player in
+            PlayerStatsCardView(
+                player: player,
+                team: NFLTeam.team(for: player.team ?? "")
+            )
         }
         .onChange(of: sortingMethodRaw) { oldValue, newValue in
             DebugPrint(mode: .matchupSort, "🎯 SORT METHOD CHANGED: \(oldValue) → \(newValue)")
@@ -196,7 +189,6 @@ struct FantasyMatchupDetailView: View {
     }
 
     private var rosterScrollView: some View {
-        // 🔥 FIX: Create a @Binding-compatible wrapper for sortingMethod
         let sortingBinding = Binding<MatchupSortingMethod>(
             get: { self.sortingMethod },
             set: { self.sortingMethodRaw = $0.rawValue }
@@ -213,7 +205,11 @@ struct FantasyMatchupDetailView: View {
                         selectedPosition: $selectedPosition,
                         showActiveOnly: $showActiveOnly,
                         showYetToPlayOnly: $showYetToPlayOnly,
-                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime
+                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime,
+                        onPlayerTap: { player in
+                            // 🔥 NEW: Handle navigation at root level
+                            selectedPlayerForNavigation = player
+                        }
                     )
                     
                     FantasyMatchupBenchSectionFiltered(
@@ -224,7 +220,11 @@ struct FantasyMatchupDetailView: View {
                         selectedPosition: $selectedPosition,
                         showActiveOnly: $showActiveOnly,
                         showYetToPlayOnly: $showYetToPlayOnly,
-                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime
+                        hubUpdateTime: matchupsHubViewModel.lastUpdateTime,
+                        onPlayerTap: { player in
+                            // 🔥 NEW: Handle navigation at root level
+                            selectedPlayerForNavigation = player
+                        }
                     )
                 }
             }
@@ -256,7 +256,11 @@ struct FantasyMatchupDetailView: View {
                             teamIndex: 1,
                             isBench: false,
                             allLivePlayersViewModel: livePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: { sleeperPlayer in
+                                // 🔥 NEW: Handle navigation at root level
+                                selectedPlayerForNavigation = sleeperPlayer
+                            }
                         )
                         .padding(.horizontal, 8)
                     }
@@ -280,7 +284,11 @@ struct FantasyMatchupDetailView: View {
                             teamIndex: 0,
                             isBench: false,
                             allLivePlayersViewModel: livePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: { sleeperPlayer in
+                                // 🔥 NEW: Handle navigation at root level
+                                selectedPlayerForNavigation = sleeperPlayer
+                            }
                         )
                         .padding(.horizontal, 8)
                     }

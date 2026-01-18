@@ -20,17 +20,15 @@ struct FantasyPlayerCard: View {
     let matchup: FantasyMatchup?
     let teamIndex: Int?
     let isBench: Bool
-    // 🔥 PURE DI: Accept AllLivePlayersViewModel as parameter
     let allLivePlayersViewModel: AllLivePlayersViewModel
     let nflWeekService: NFLWeekService
+    let onPlayerTap: ((SleeperPlayer) -> Void)? // 🔥 NEW: Navigation callback
     
     @State private var viewModel: FantasyPlayerViewModel?
     @State private var watchService = PlayerWatchService.shared
     
     @State private var showingScoreBreakdown = false
-    @State private var selectedPlayerForNavigation: SleeperPlayer? = nil // 🔥 NEW: Navigation trigger
     
-    // 🔥 PURE DI: Add allLivePlayersViewModel parameter
     init(
         player: FantasyPlayer,
         fantasyViewModel: FantasyViewModel,
@@ -38,7 +36,8 @@ struct FantasyPlayerCard: View {
         teamIndex: Int?,
         isBench: Bool,
         allLivePlayersViewModel: AllLivePlayersViewModel,
-        nflWeekService: NFLWeekService
+        nflWeekService: NFLWeekService,
+        onPlayerTap: ((SleeperPlayer) -> Void)? = nil // 🔥 NEW: Optional navigation callback
     ) {
         self.player = player
         self.fantasyViewModel = fantasyViewModel
@@ -47,6 +46,7 @@ struct FantasyPlayerCard: View {
         self.isBench = isBench
         self.allLivePlayersViewModel = allLivePlayersViewModel
         self.nflWeekService = nflWeekService
+        self.onPlayerTap = onPlayerTap
     }
 
     var body: some View {
@@ -116,13 +116,6 @@ struct FantasyPlayerCard: View {
                     color: vm.isPlayerLive(player) ? .gpGreen.opacity(0.5) : player.isOnBye(gameDataService: vm.nflGameDataService) ? .gpPink.opacity(0.5) : .clear,
                     radius: (vm.isPlayerLive(player) || player.isOnBye(gameDataService: vm.nflGameDataService)) ? 10 : 0
                 )
-                // 🔥 NEW: Navigation via state change
-                .navigationDestination(item: $selectedPlayerForNavigation) { sleeperPlayer in
-                    PlayerStatsCardView(
-                        player: sleeperPlayer,
-                        team: NFLTeam.team(for: sleeperPlayer.team ?? "")
-                    )
-                }
             } else {
                 ProgressView()
                     .frame(height: 125)
@@ -161,9 +154,9 @@ struct FantasyPlayerCard: View {
             fantasyViewModel: fantasyViewModel,
             sleeperPlayer: vm.getSleeperPlayerData(for: player),
             onPlayerImageTap: {
-                // 🔥 NEW: Trigger navigation via state
+                // 🔥 CHANGED: Fire callback instead of setting state
                 if let sleeperPlayer = vm.getSleeperPlayerData(for: player) {
-                    selectedPlayerForNavigation = sleeperPlayer
+                    onPlayerTap?(sleeperPlayer)
                 }
             }
         )

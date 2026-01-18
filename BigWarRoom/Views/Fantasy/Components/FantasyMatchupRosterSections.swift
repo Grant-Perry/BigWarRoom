@@ -757,6 +757,7 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
     @Binding var showActiveOnly: Bool
     @Binding var showYetToPlayOnly: Bool
     let hubUpdateTime: Date
+    let onPlayerTap: (SleeperPlayer) -> Void // 🔥 NEW: Navigation callback
     
     @State private var cachedHomeRoster: [FantasyPlayer] = []
     @State private var cachedAwayRoster: [FantasyPlayer] = []
@@ -783,7 +784,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             teamIndex: 0,
                             isBench: false,
                             allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: onPlayerTap 
                         )
                     }
                     
@@ -808,7 +810,8 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                             teamIndex: 1,
                             isBench: false,
                             allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: onPlayerTap 
                         )
                     }
                     
@@ -922,9 +925,6 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
             isBench ? !player.isStarter : player.isStarter
         }
         
-        // 🔥 DEBUG: Log initial player count
-        DebugPrint(mode: .matchupSort, "🔍 FILTER START: Team=\(team.name), Bench=\(isBench), Count=\(filteredPlayers.count), sortMethod=\(sortMethod.displayName)")
-        
         if selectedPosition != .all {
             filteredPlayers = filteredPlayers.filter { player in
                 let playerPosition = player.position.uppercased()
@@ -936,23 +936,18 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 
                 return playerPosition == filterPosition
             }
-            DebugPrint(mode: .matchupSort, "🔍 AFTER POSITION FILTER: Count=\(filteredPlayers.count)")
         }
         
         if showActiveOnly {
-            // 🔥 FIX: Use same logic as Live Players - check each player via service
             filteredPlayers = filteredPlayers.filter { player in
                 guard let playerTeam = player.team else { return false }
                 
-                // 🔥 Use NFLGameDataService which handles team normalization internally
                 if let gameInfo = nflGameDataService.getGameInfo(for: playerTeam) {
                     return gameInfo.isLive
                 } else {
                     return false
                 }
             }
-            
-            DebugPrint(mode: .matchupSort, "🔍 AFTER ACTIVE ONLY FILTER: Count=\(filteredPlayers.count)")
         }
         
         if showYetToPlayOnly {
@@ -962,14 +957,9 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                     currentPoints: player.currentPoints
                 )
             }
-            DebugPrint(mode: .matchupSort, "🔍 AFTER YET TO PLAY FILTER: Count=\(filteredPlayers.count)")
         }
         
-        DebugPrint(mode: .matchupSort, "🔍 SORTING: method=\(sortMethod.displayName), direction=\(highToLow ? "High→Low" : "Low→High")")
-        
         filteredPlayers = filteredPlayers.sorted { player1, player2 in
-            DebugPrint(mode: .matchupSort, limit: 3, "   🔄 Comparing: \(player1.fullName) vs \(player2.fullName) using \(sortMethod.displayName)")
-            
             switch sortMethod {
             case .position:
                 let order1 = positionSortOrder(player1.position)
@@ -999,36 +989,24 @@ struct FantasyMatchupActiveRosterSectionFiltered: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                // 🔥 FIX: Sort by lastActivityTime first (most recent activity first)
                 let time1 = player1.lastActivityTime ?? Date.distantPast
                 let time2 = player2.lastActivityTime ?? Date.distantPast
-                
-                DebugPrint(mode: .matchupSort, limit: 5, "   🕐 Comparing \(player1.fullName) (\(time1 == Date.distantPast ? "NO TIME" : "\(time1)")) vs \(player2.fullName) (\(time2 == Date.distantPast ? "NO TIME" : "\(time2)"))")
                 
                 if time1 != time2 {
                     return time1 > time2
                 }
                 
-                // Fallback: Live players next
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
                 if live1 != live2 {
-                    DebugPrint(mode: .matchupSort, limit: 5, "   🔴 Live status: \(player1.fullName)=\(live1) vs \(player2.fullName)=\(live2)")
                     return live1
                 }
                 
-                // Then by score
                 let p1 = player1.currentPoints ?? 0.0
                 let p2 = player2.currentPoints ?? 0.0
-                DebugPrint(mode: .matchupSort, limit: 5, "   📊 Score: \(player1.fullName)=\(p1) vs \(player2.fullName)=\(p2)")
                 return p1 > p2
             }
-        }
-        
-        DebugPrint(mode: .matchupSort, "✅ SORTING COMPLETE: Final count=\(filteredPlayers.count)")
-        if filteredPlayers.count > 0 {
-            DebugPrint(mode: .matchupSort, "   First 3 players: \(filteredPlayers.prefix(3).map { $0.fullName }.joined(separator: ", "))")
         }
         
         return filteredPlayers
@@ -1065,6 +1043,7 @@ struct FantasyMatchupBenchSectionFiltered: View {
     @Binding var showActiveOnly: Bool
     @Binding var showYetToPlayOnly: Bool
     let hubUpdateTime: Date
+    let onPlayerTap: (SleeperPlayer) -> Void 
     
     @State private var cachedHomeBench: [FantasyPlayer] = []
     @State private var cachedAwayBench: [FantasyPlayer] = []
@@ -1096,7 +1075,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             teamIndex: 0,
                             isBench: true,
                             allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: onPlayerTap 
                         )
                     }
                     
@@ -1118,7 +1098,8 @@ struct FantasyMatchupBenchSectionFiltered: View {
                             teamIndex: 1,
                             isBench: true,
                             allLivePlayersViewModel: allLivePlayersViewModel,
-                            nflWeekService: nflWeekService
+                            nflWeekService: nflWeekService,
+                            onPlayerTap: onPlayerTap 
                         )
                     }
                     
@@ -1269,7 +1250,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
             filteredPlayers = filteredPlayers.filter { player in
                 guard let playerTeam = player.team else { return false }
                 
-                // 🔥 Use NFLGameDataService which handles team normalization internally
                 if let gameInfo = nflGameDataService.getGameInfo(for: playerTeam) {
                     return gameInfo.isLive
                 } else {
@@ -1317,7 +1297,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                 return highToLow ? team1 > team2 : team1 < team2
                 
             case .recentActivity:
-                // 🔥 FIX: Sort by lastActivityTime first (most recent activity first)
                 let time1 = player1.lastActivityTime ?? Date.distantPast
                 let time2 = player2.lastActivityTime ?? Date.distantPast
                 
@@ -1325,7 +1304,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                     return time1 > time2
                 }
                 
-                // Fallback: Live players next
                 let live1 = player1.isLive(gameDataService: nflGameDataService)
                 let live2 = player2.isLive(gameDataService: nflGameDataService)
                 
@@ -1333,7 +1311,6 @@ struct FantasyMatchupBenchSectionFiltered: View {
                     return live1
                 }
                 
-                // Then by score
                 let p1 = player1.currentPoints ?? 0.0
                 let p2 = player2.currentPoints ?? 0.0
                 return p1 > p2

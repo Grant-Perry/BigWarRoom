@@ -277,9 +277,8 @@ struct ScheduleByeTeamCell: View {
                     
                     // 🔥 NEW: Show elimination skull badge
                     if standingsService.isTeamEliminated(for: team.id) {
-                        Image(systemName: "skull.fill")
+                        Text("💀")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
                             .background(
                                 Circle()
                                     .fill(Color.black)

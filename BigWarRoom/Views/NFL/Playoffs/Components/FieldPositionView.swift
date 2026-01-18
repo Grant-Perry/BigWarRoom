@@ -107,6 +107,18 @@ struct FieldPositionView: View {
             .frame(height: 50)
         }
         .frame(height: 70)
+        .onAppear {
+            DebugPrint(mode: .fieldPosition, "🖼️ [FIELD POS VIEW] onAppear - yardLine='\(yardLine)', awayTeam=\(awayTeam), homeTeam=\(homeTeam), possession=\(possession ?? "nil"), quarter=\(quarter)")
+            
+            if let yards = parseFieldYards() {
+                DebugPrint(mode: .fieldPosition, "   ✅ parseFieldYards() = \(yards) - football WILL show")
+            } else {
+                DebugPrint(mode: .fieldPosition, "   ❌ parseFieldYards() = NIL - football will NOT show!")
+                DebugPrint(mode: .fieldPosition, "   yardLine string analysis: '\(yardLine)'")
+                let components = yardLine.split(separator: " ")
+                DebugPrint(mode: .fieldPosition, "   split by space: [\(components.map { "'\($0)'" }.joined(separator: ", "))]")
+            }
+        }
     }
     
     private func endzoneView(for team: String, isActive: Bool = false) -> some View {
@@ -196,8 +208,15 @@ struct FieldPositionView: View {
     /// Parse field position from yardLine string into (team, yards)
     private func parseFieldYards() -> Int? {
         let components = yardLine.split(separator: " ")
-        if yardLine.trimmingCharacters(in: .whitespaces) == "50" { return 50 }
-        guard components.count == 2, let yards = Int(components[1]) else { return nil }
+        
+        if yardLine.trimmingCharacters(in: .whitespaces) == "50" { 
+            return 50 
+        }
+        
+        guard components.count == 2, let yards = Int(components[1]) else { 
+            return nil 
+        }
+        
         return yards
     }
     

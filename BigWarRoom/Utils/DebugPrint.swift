@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [.bettingOdds, .bracketTimer]
+   static var activeMode: DebugMode = [.fieldPosition] // [.bettingOdds, .bracketTimer]
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {
@@ -62,6 +62,7 @@ struct DebugMode: OptionSet {
     static let appLoad            	= DebugMode(rawValue: 1 << 29)  // 536870912
     static let bettingOdds        	= DebugMode(rawValue: 1 << 30)  // 1073741824
     static let bracketTimer       	= DebugMode(rawValue: 1 << 31)  // 2147483648
+    static let fieldPosition      	= DebugMode(rawValue: 1 << 32)  // 4294967296
 
     // Convenience combinations
     static let allAPIs: DebugMode 	= [.espnAPI, .sleeperAPI]
@@ -72,7 +73,7 @@ struct DebugMode: OptionSet {
         .caching, .leagueProvider, .viewModelLifecycle, .dataSync, .nflData,
 		.opponentIntel, .liveUpdates, .oprk, .lineupRX, .liveUpdate2, .waivers,
         .weekCheck, .lifecycle, .general, .scoring, .fantasy, .playerIDMapping, .draft,
-		 .contention, .winProb, .liveScores, .matchupSort, .appLoad, .bettingOdds, .bracketTimer]
+		 .contention, .winProb, .liveScores, .matchupSort, .appLoad, .bettingOdds, .bracketTimer, .fieldPosition]
 }
 
 // MARK: - Iteration Tracking

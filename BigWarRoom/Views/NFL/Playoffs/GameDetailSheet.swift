@@ -421,6 +421,8 @@ struct GameDetailSheetContent: View {
             
             // 🏈 NEW: Visual field representation
             if let yardLine = situation.yardLine {
+                let _ = DebugPrint(mode: .fieldPosition, "🏟️ [GAME DETAIL SHEET] Rendering FieldPositionView with yardLine='\(yardLine)', awayTeam=\(game.awayTeam.abbreviation), homeTeam=\(game.homeTeam.abbreviation), possession=\(situation.possession ?? "nil"), quarter=\(currentQuarter)")
+                
                 Text("🔥 DEBUG: \(yardLine)")
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -435,6 +437,9 @@ struct GameDetailSheetContent: View {
                 )
                 .padding(.top, 4)
                 .background(Color.red.opacity(0.2))
+            } else {
+                let _ = DebugPrint(mode: .fieldPosition, "❌ [GAME DETAIL SHEET] situation.yardLine is NIL - field position will NOT render")
+                EmptyView()
             }
         }
     }

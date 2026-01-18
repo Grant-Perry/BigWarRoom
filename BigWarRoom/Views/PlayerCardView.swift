@@ -58,9 +58,27 @@ struct PlayerCardView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // Additional details + stats preview - use component
+                    // Additional details
                     if showDetails {
-                        PlayerCardStatsPreviewRowView(player: player)
+                        HStack(spacing: 8) {
+                            if let number = player.number {
+                                Text("#\(number)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            if let age = player.age {
+                                Text("Age \(age)")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            if let height = player.height, let weight = player.weight {
+                                Text("\(height), \(weight) lbs")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                 }
                 

@@ -1038,45 +1038,6 @@ final class NFLPlayoffBracketService {
                         }
                     }
                 }
-                
-                // 🔥 NEW: Try to get down/distance from drives.current.end (when drive is complete/scored)
-                if let endSituation = currentDrive["end"] as? [String: Any] {
-                    DebugPrint(mode: .fieldPosition, "   🔍 Checking drives.current.end")
-                    DebugPrint(mode: .fieldPosition, "      end keys: \(Array(endSituation.keys).sorted().joined(separator: ", "))")
-                    
-                    down = endSituation["down"] as? Int
-                    distance = endSituation["distance"] as? Int
-                    
-                    DebugPrint(mode: .fieldPosition, "      ✅ Extracted from end: down=\(down?.description ?? "nil"), distance=\(distance?.description ?? "nil")")
-                }
-                
-                // 🔥 NEW: Try to get down/distance from last play in current drive
-                if let plays = currentDrive["plays"] as? [[String: Any]], !plays.isEmpty {
-                    DebugPrint(mode: .fieldPosition, "   🔍 Checking drives.current.plays (total: \(plays.count))")
-                    
-                    if let lastPlay = plays.last {
-                        DebugPrint(mode: .fieldPosition, "      lastPlay keys: \(Array(lastPlay.keys).sorted().joined(separator: ", "))")
-                        
-                        if let playEndSituation = lastPlay["end"] as? [String: Any] {
-                            DebugPrint(mode: .fieldPosition, "      Found lastPlay.end")
-                            DebugPrint(mode: .fieldPosition, "      end keys: \(Array(playEndSituation.keys).sorted().joined(separator: ", "))")
-                            
-                            // Extract down/distance if we don't have them yet
-                            if down == nil {
-                                down = playEndSituation["down"] as? Int
-                                DebugPrint(mode: .fieldPosition, "         Extracted down = \(down?.description ?? "nil")")
-                            }
-                            if distance == nil {
-                                distance = playEndSituation["distance"] as? Int
-                                DebugPrint(mode: .fieldPosition, "         Extracted distance = \(distance?.description ?? "nil")")
-                            }
-                        } else {
-                            DebugPrint(mode: .fieldPosition, "      ❌ No 'end' in last play")
-                        }
-                    }
-                } else {
-                    DebugPrint(mode: .fieldPosition, "   ❌ No plays array or empty")
-                }
 
                 DebugPrint(mode: .fieldPosition, "   📊 [FINAL EXTRACTION] down=\(down?.description ?? "nil"), distance=\(distance?.description ?? "nil"), yardLine='\(yardLine ?? "nil")'")
                 
