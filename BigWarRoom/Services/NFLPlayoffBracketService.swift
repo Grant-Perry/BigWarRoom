@@ -1026,15 +1026,22 @@ final class NFLPlayoffBracketService {
                             if yl == 50 {
                                 yardLine = "50"
                                 DebugPrint(mode: .fieldPosition, "      ✅ 50 yard line")
+                            } else if yl > 50 {
+                                // Ball is past midfield (on opponent's side)
+                                // Convert: 65 → 35 yard line (100-65=35)
+                                let normalizedYards = 100 - yl
+                                yardLine = "\(normalizedYards)"
+                                DebugPrint(mode: .fieldPosition, "      ✅ Converted absolute \(yl) to \(normalizedYards) yard line (opponent territory)")
                             } else {
-                                // Build format like "HOU 47" (team has ball at their 47)
+                                // Ball is on possession team's own side (0-49)
                                 yardLine = "\(teamCode) \(yl)"
-                                DebugPrint(mode: .fieldPosition, "      ✅ Constructed field position from yardLine: '\(yardLine!)'")
+                                DebugPrint(mode: .fieldPosition, "      ✅ Constructed field position: '\(yardLine!)'")
                             }
                         } else {
-                            // Fallback: just use the number
-                            yardLine = "\(yl)"
-                            DebugPrint(mode: .fieldPosition, "      ⚠️ Found yardLine but no team - using raw number: \(yl)")
+                            // Fallback: normalize the number if > 50
+                            let normalizedYL = yl > 50 ? (100 - yl) : yl
+                            yardLine = "\(normalizedYL)"
+                            DebugPrint(mode: .fieldPosition, "      ⚠️ No team found - using normalized number: \(normalizedYL)")
                         }
                     }
                 }
@@ -1060,6 +1067,43 @@ final class NFLPlayoffBracketService {
                         if let playEndSituation = lastPlay["end"] as? [String: Any] {
                             DebugPrint(mode: .fieldPosition, "      Found lastPlay.end")
                             DebugPrint(mode: .fieldPosition, "      end keys: \(Array(playEndSituation.keys).sorted().joined(separator: ", "))")
+                            
+                            // 🔍 DEBUG: Let's see ALL the data in playEndSituation
+                            for (key, value) in playEndSituation {
+                                DebugPrint(mode: .fieldPosition, "         🔍 end[\(key)] = \(value)")
+                            }
+                            
+                            // 🏈 CRITICAL: Extract CURRENT field position from last play's end
+                            // First check if possessionText has the formatted position
+                            if let possText = playEndSituation["possessionText"] as? String {
+                                yardLine = possText
+                                DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS from possessionText] '\(possText)'")
+                            } else if let endYardLine = playEndSituation["yardLine"] as? Int {
+                                DebugPrint(mode: .fieldPosition, "      🎯 [LAST PLAY END YARDLINE] Raw value: \(endYardLine)")
+                                
+                                if let team = currentDrive["team"] as? [String: Any],
+                                   let abbr = team["abbreviation"] as? String {
+                                    let teamCode = normalizeTeamCode(abbr.uppercased())
+                                    
+                                    if endYardLine == 50 {
+                                        yardLine = "50"
+                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] 50 yard line")
+                                    } else if endYardLine > 50 {
+                                        let normalizedYards = 100 - endYardLine
+                                        yardLine = "\(normalizedYards)"
+                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] Converted \(endYardLine) → \(normalizedYards) yard line (opponent territory)")
+                                    } else {
+                                        yardLine = "\(teamCode) \(endYardLine)"
+                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] '\(yardLine!)'")
+                                    }
+                                } else {
+                                    let normalizedYL = endYardLine > 50 ? (100 - endYardLine) : endYardLine
+                                    yardLine = "\(normalizedYL)"
+                                    DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] Normalized: \(normalizedYL)")
+                                }
+                            } else {
+                                DebugPrint(mode: .fieldPosition, "      ⚠️ No yardLine in lastPlay.end")
+                            }
                             
                             // Extract down/distance if we don't have them yet
                             if down == nil {
