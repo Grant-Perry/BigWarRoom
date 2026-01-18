@@ -975,63 +975,6 @@ final class NFLPlayoffBracketService {
                 }
             }
             
-            // Also check current drive for timeout plays
-            if let drives = json?["drives"] as? [String: Any],
-               let currentDrive = drives["current"] as? [String: Any],
-               let plays = currentDrive["plays"] as? [[String: Any]] {
-                
-                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Current drive: \(plays.count) plays")
-                
-                for (playIndex, play) in plays.enumerated() {
-                    if let playType = play["type"] as? [String: Any],
-                       let typeID = playType["id"] as? String {
-                        
-                        DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Current Play \(playIndex): typeID=\(typeID)")
-                        
-                        if typeID == "21" {
-                            DebugPrint(mode: .bracketTimer, "🎯 [TIMEOUT FOUND] Current drive Play \(playIndex) is a timeout!")
-                            
-                            if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
-                                for participant in teamParticipants {
-                                    if let isTimeout = participant["timeout"] as? Bool,
-                                       isTimeout {
-                                        
-                                        var teamID: String? = nil
-                                        
-                                        // Parse team ID from $ref URL
-                                        if let teamRef = participant["team"] as? [String: Any],
-                                           let ref = teamRef["$ref"] as? String {
-                                            if let url = URL(string: ref) {
-                                                let pathComponents = url.pathComponents
-                                                if let teamsIndex = pathComponents.firstIndex(of: "teams"),
-                                                   teamsIndex + 1 < pathComponents.count {
-                                                    teamID = pathComponents[teamsIndex + 1]
-                                                }
-                                            }
-                                        }
-                                        
-                                        // Fallback: try direct ID field
-                                        if teamID == nil {
-                                            teamID = participant["id"] as? String
-                                        }
-                                        
-                                        if let tid = teamID {
-                                            if tid == homeTeamID {
-                                                homeTimeouts -= 1
-                                                DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Home team timeout used, remaining: \(homeTimeouts)")
-                                            } else if tid == awayTeamID {
-                                                awayTimeouts -= 1
-                                                DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Away team timeout used, remaining: \(awayTimeouts)")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
             // Ensure timeouts don't go below 0
             homeTimeouts = max(0, homeTimeouts)
             awayTimeouts = max(0, awayTimeouts)
@@ -1044,9 +987,7 @@ final class NFLPlayoffBracketService {
 
             if let drives = json?["drives"] as? [String: Any],
                let currentDrive = drives["current"] as? [String: Any],
-               let plays = currentDrive["plays"] as? [[String: Any]],
-               let lastPlay = plays.last,
-               let endSituation = lastPlay["end"] as? [String: Any] {
+               let endSituation = currentDrive["end"] as? [String: Any] {
 
                 down = endSituation["down"] as? Int
                 distance = endSituation["distance"] as? Int
