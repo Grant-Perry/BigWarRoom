@@ -931,35 +931,30 @@ final class NFLPlayoffBracketService {
                                 if typeID == "21" {
                                     DebugPrint(mode: .bracketTimer, "🎯 [TIMEOUT FOUND] Drive \(driveIndex) Play \(playIndex) is a timeout!")
                                     
-                                    // Dump the entire play object to see structure
                                     if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
-                                        DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] teamParticipants count: \(teamParticipants.count)")
-                                        
-                                        for (tpIndex, participant) in teamParticipants.enumerated() {
-                                            DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Participant \(tpIndex): \(participant.keys.joined(separator: ", "))")
-                                            if let hasTimeout = participant["timeout"] as? Bool {
-                                                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Participant \(tpIndex) timeout flag: \(hasTimeout)")
-                                            }
-                                        }
-                                        
-                                        // Find which team called the timeout
                                         for participant in teamParticipants {
                                             if let isTimeout = participant["timeout"] as? Bool,
                                                isTimeout {
                                                 
                                                 // Try to extract team ID from the nested structure
                                                 var teamID: String? = nil
+                                                
+                                                // Parse team ID from $ref URL
                                                 if let teamRef = participant["team"] as? [String: Any],
                                                    let ref = teamRef["$ref"] as? String {
-                                                    // Extract team ID from reference URL
-                                                    // e.g., "http://...teams/26?..." -> "26"
-                                                    DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Team $ref: \(ref)")
-                                                    teamID = participant["id"] as? String
-                                                } else {
-                                                    teamID = participant["id"] as? String
+                                                    if let url = URL(string: ref) {
+                                                        let pathComponents = url.pathComponents
+                                                        if let teamsIndex = pathComponents.firstIndex(of: "teams"),
+                                                           teamsIndex + 1 < pathComponents.count {
+                                                            teamID = pathComponents[teamsIndex + 1]
+                                                        }
+                                                    }
                                                 }
                                                 
-                                                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Extracted teamID: \(teamID ?? "NIL")")
+                                                // Fallback: try direct ID field
+                                                if teamID == nil {
+                                                    teamID = participant["id"] as? String
+                                                }
                                                 
                                                 if let tid = teamID {
                                                     if tid == homeTeamID {
@@ -968,8 +963,6 @@ final class NFLPlayoffBracketService {
                                                     } else if tid == awayTeamID {
                                                         awayTimeouts -= 1
                                                         DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Away team timeout used, remaining: \(awayTimeouts)")
-                                                    } else {
-                                                        DebugPrint(mode: .bracketTimer, "⚠️ [TIMEOUT DEBUG] Team ID '\(tid)' doesn't match home '\(homeTeamID ?? "NIL")' or away '\(awayTeamID ?? "NIL")'")
                                                     }
                                                 }
                                             }
@@ -1004,10 +997,21 @@ final class NFLPlayoffBracketService {
                                        isTimeout {
                                         
                                         var teamID: String? = nil
+                                        
+                                        // Parse team ID from $ref URL
                                         if let teamRef = participant["team"] as? [String: Any],
                                            let ref = teamRef["$ref"] as? String {
-                                            teamID = participant["id"] as? String
-                                        } else {
+                                            if let url = URL(string: ref) {
+                                                let pathComponents = url.pathComponents
+                                                if let teamsIndex = pathComponents.firstIndex(of: "teams"),
+                                                   teamsIndex + 1 < pathComponents.count {
+                                                    teamID = pathComponents[teamsIndex + 1]
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Fallback: try direct ID field
+                                        if teamID == nil {
                                             teamID = participant["id"] as? String
                                         }
                                         
