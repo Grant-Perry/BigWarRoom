@@ -499,6 +499,10 @@ struct NFLLandscapeBracketView: View {
             let isTwoMinuteWarning = situation.lastPlay?.lowercased().contains("two-minute warning") ?? false
             let isHalftime = (situation.lastPlay?.lowercased().contains("end quarter 2") ?? false) || 
                             (situation.lastPlay?.lowercased().contains("end of quarter 2") ?? false)
+            let isEndOfQuarter1 = (situation.lastPlay?.lowercased().contains("end quarter 1") ?? false) || 
+                                 (situation.lastPlay?.lowercased().contains("end of quarter 1") ?? false)
+            let isEndOfQuarter3 = (situation.lastPlay?.lowercased().contains("end quarter 3") ?? false) || 
+                                 (situation.lastPlay?.lowercased().contains("end of quarter 3") ?? false)
             
             // EXTRACT QUARTER NUMBER FROM GAME STATUS, make it available here:
             let currentQuarter: Int = {
@@ -623,7 +627,39 @@ struct NFLLandscapeBracketView: View {
                            .padding(.vertical, 6)
                            .background(
                               LinearGradient(
-                                 colors: [Color.gpYellow, Color.gpYellow.opacity(0.7)],
+                                 colors: [Color.gpYellow.opacity(0.85), Color.gpYellow.opacity(0.6)],
+                                 startPoint: .leading,
+                                 endPoint: .trailing
+                              )
+                           )
+                           .cornerRadius(8)
+                     } else if isEndOfQuarter1 {
+                        // End of Quarter 1 overlay
+                        Text("End of Quarter 1")
+                           .font(.caption)
+                           .fontWeight(.bold)
+                           .foregroundStyle(.white)
+                           .padding(.horizontal, 12)
+                           .padding(.vertical, 6)
+                           .background(
+                              LinearGradient(
+                                 colors: [Color.gpBlue.opacity(0.85), Color.gpBlue.opacity(0.6)],
+                                 startPoint: .leading,
+                                 endPoint: .trailing
+                              )
+                           )
+                           .cornerRadius(8)
+                     } else if isEndOfQuarter3 {
+                        // End of Quarter 3 overlay
+                        Text("End of Quarter 3")
+                           .font(.caption)
+                           .fontWeight(.bold)
+                           .foregroundStyle(.white)
+                           .padding(.horizontal, 12)
+                           .padding(.vertical, 6)
+                           .background(
+                              LinearGradient(
+                                 colors: [Color.gpGreen.opacity(0.85), Color.gpGreen.opacity(0.6)],
                                  startPoint: .leading,
                                  endPoint: .trailing
                               )
@@ -639,7 +675,7 @@ struct NFLLandscapeBracketView: View {
                            .padding(.vertical, 6)
                            .background(
                               LinearGradient(
-                                 colors: [Color.gpPurple, Color.gpPurple.opacity(0.7)],
+                                 colors: [Color.gpOrange.opacity(0.85), Color.gpOrange.opacity(0.6)],
                                  startPoint: .leading,
                                  endPoint: .trailing
                               )
@@ -655,7 +691,7 @@ struct NFLLandscapeBracketView: View {
                            .padding(.vertical, 6)
                            .background(
                               LinearGradient(
-                                 colors: [Color.gpBlue, Color.gpBlue.opacity(0.7)],
+                                 colors: [Color.gpBlue.opacity(0.85), Color.gpBlue.opacity(0.6)],
                                  startPoint: .leading,
                                  endPoint: .trailing
                               )
@@ -687,6 +723,8 @@ struct NFLLandscapeBracketView: View {
             let stoppageType: String = {
                if let lastPlay = situation.lastPlay?.lowercased() {
                   if lastPlay.contains("end quarter 2") || lastPlay.contains("end of quarter 2") { return "HALFTIME" }
+                  if lastPlay.contains("end quarter 1") || lastPlay.contains("end of quarter 1") { return "End of Quarter 1" }
+                  if lastPlay.contains("end quarter 3") || lastPlay.contains("end of quarter 3") { return "End of Quarter 3" }
                   if lastPlay.contains("timeout") { return "Official Timeout" }
                   if lastPlay.contains("touchdown") { return "Touchdown - Awaiting Kickoff" }
                   if lastPlay.contains("field goal") { return "Field Goal - Awaiting Kickoff" }
@@ -810,19 +848,19 @@ struct NFLLandscapeBracketView: View {
                      Text(stoppageType == "Official Timeout" ? "Commercial Break" : stoppageType)
                         .font(.caption)
                         .fontWeight(.bold)
-                        .foregroundStyle(.black)
+                        .foregroundStyle(.white)
                   }
                   .padding(.horizontal, 12)
                   .padding(.vertical, 6)
                   .background(
                      LinearGradient(
                         colors: stoppageType == "HALFTIME" ?
-                           [Color.gpYellow, Color.gpYellow.opacity(0.7)] :
+                           [Color.gpYellow.opacity(0.85), Color.gpYellow.opacity(0.6)] :
                            stoppageType == "Official Timeout" ? 
-                           [Color.gpOrange, Color.gpOrange.opacity(0.7)] :
+                           [Color.gpOrange.opacity(0.85), Color.gpOrange.opacity(0.6)] :
                            stoppageType == "Two-Minute Warning" ?
-                           [Color.gpPink, Color.gpPink.opacity(0.7)] :
-                           [teamColor, teamColor.opacity(0.7)],
+                           [Color.gpPink.opacity(0.85), Color.gpPink.opacity(0.6)] :
+                           [teamColor.opacity(0.85), teamColor.opacity(0.6)],
                         startPoint: .leading,
                         endPoint: .trailing
                      )
@@ -1012,7 +1050,9 @@ struct NFLLandscapeBracketView: View {
          lastPlay: "(Shotgun) C.Stroud pass short middle to N.Collins to HST 30 for 4 yards (J.Porter).",
          drivePlayCount: nil,
          driveYards: 4,
-         timeOfPossession: "0:04"
+         timeOfPossession: "0:04",
+         homeTimeouts: 2,
+         awayTimeouts: 3
       ),
       lastKnownDownDistance: nil
    )

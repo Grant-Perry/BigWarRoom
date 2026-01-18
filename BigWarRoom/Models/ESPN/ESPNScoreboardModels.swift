@@ -41,6 +41,7 @@ struct ESPNScoreboardResponse: Decodable {
         let homeAway: String?
         let team: Team
         let score: String?
+        let timeouts: Int?  // 🏈 NEW: Timeouts remaining (0-3)
     }
     
     struct Team: Decodable {

@@ -273,8 +273,13 @@ final class NFLPlayoffBracketService {
             let homeScore = Int(homeComp?.score ?? "0")
             let awayScore = Int(awayComp?.score ?? "0")
             
+            // 🏈 NEW: Get timeouts remaining
+            let homeTimeouts = homeComp?.timeouts
+            let awayTimeouts = awayComp?.timeouts
+            
             // 🔥 DEBUG: Log team info and scores
             DebugPrint(mode: .nflData, "🔍   Teams: \(awayTeam) @ \(homeTeam), Score: \(awayScore ?? 0)-\(homeScore ?? 0)")
+            DebugPrint(mode: .nflData, "⏱️   Timeouts: Home \(homeTimeouts ?? -1), Away \(awayTimeouts ?? -1)")
             
             // Determine round from week/date
             guard let round = determinePlayoffRound(from: event, season: season) else {
@@ -295,14 +300,14 @@ final class NFLPlayoffBracketService {
                 DebugPrint(mode: .nflData, "⚠️ Missing seed for game: \(awayTeam) (seed \(awaySeed ?? -1)) @ \(homeTeam) (seed \(homeSeed ?? -1))")
             }
             
-            // Create playoff teams with scores
+            // Create playoff teams with scores and timeouts
             let homePlayoffTeam = PlayoffTeam(
                 abbreviation: homeTeam,
                 name: homeNFLTeam?.fullName ?? homeTeam,
                 seed: homeSeed,
                 score: homeScore,
                 logoURL: nil,
-                timeoutsRemaining: nil
+                timeoutsRemaining: homeTimeouts
             )
             
             let awayPlayoffTeam = PlayoffTeam(
@@ -311,7 +316,7 @@ final class NFLPlayoffBracketService {
                 seed: awaySeed,
                 score: awayScore,
                 logoURL: nil,
-                timeoutsRemaining: nil
+                timeoutsRemaining: awayTimeouts
             )
             
             // Parse game date
@@ -412,7 +417,6 @@ final class NFLPlayoffBracketService {
                 }
             }
             
-            // 🏈 NEW: Fetch live situation for in-progress games
             var liveSituation: LiveGameSituation? = nil
             var lastKnownDownDistance: CachedDownDistance? = nil
             
@@ -420,14 +424,12 @@ final class NFLPlayoffBracketService {
                 DebugPrint(mode: .bracketTimer, "🔍 [FETCHING LIVE SITUATION] For game \(gameID): \(awayTeam) @ \(homeTeam)")
                 liveSituation = await fetchLiveGameSituation(gameID: gameID)
                 
-                // Cache down/distance if we got valid data
                 if let situation = liveSituation,
                    let down = situation.down,
                    let distance = situation.distance,
                    down > 0, distance > 0 {
                     lastKnownDownDistance = CachedDownDistance(down: down, distance: distance)
                 } else {
-                    // Try to preserve from existing game if we have it
                     if let existing = (afcGames + nfcGames).first(where: { $0.id == gameID }),
                        let cached = existing.lastKnownDownDistance {
                         lastKnownDownDistance = cached
@@ -442,12 +444,35 @@ final class NFLPlayoffBracketService {
                 }
             }
             
+            let finalHomeTimeouts = liveSituation?.homeTimeouts ?? homeTimeouts
+            let finalAwayTimeouts = liveSituation?.awayTimeouts ?? awayTimeouts
+            
+            let homePlayoffTeamWithTimeouts = PlayoffTeam(
+                abbreviation: homePlayoffTeam.abbreviation,
+                name: homePlayoffTeam.name,
+                seed: homePlayoffTeam.seed,
+                score: homePlayoffTeam.score,
+                logoURL: homePlayoffTeam.logoURL,
+                timeoutsRemaining: finalHomeTimeouts
+            )
+            
+            let awayPlayoffTeamWithTimeouts = PlayoffTeam(
+                abbreviation: awayPlayoffTeam.abbreviation,
+                name: awayPlayoffTeam.name,
+                seed: awayPlayoffTeam.seed,
+                score: awayPlayoffTeam.score,
+                logoURL: awayPlayoffTeam.logoURL,
+                timeoutsRemaining: finalAwayTimeouts
+            )
+            
+            DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT FINAL] \(awayTeam)@\(homeTeam): Home=\(finalHomeTimeouts?.description ?? "nil"), Away=\(finalAwayTimeouts?.description ?? "nil")")
+            
             let game = PlayoffGame(
                 id: event.id ?? UUID().uuidString,
                 round: round,
                 conference: conference,
-                homeTeam: homePlayoffTeam,
-                awayTeam: awayPlayoffTeam,
+                homeTeam: homePlayoffTeamWithTimeouts,
+                awayTeam: awayPlayoffTeamWithTimeouts,
                 gameDate: gameDate,
                 status: status,
                 venue: venue,
@@ -850,75 +875,217 @@ final class NFLPlayoffBracketService {
     /// Fetch live play-by-play situation for an in-progress game
     private func fetchLiveGameSituation(gameID: String) async -> LiveGameSituation? {
         let summaryURL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=\(gameID)"
-        
+
         guard let url = URL(string: summaryURL) else {
             DebugPrint(mode: .bracketTimer, "❌ Failed to build summary URL for game \(gameID)")
             return nil
         }
-        
+
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
             let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+            // 🏈 NEW: Calculate timeouts by counting timeout plays
+            var homeTimeouts: Int = 3  // Start with 3 timeouts per team
+            var awayTimeouts: Int = 3
+
+            // Get team IDs first
+            var homeTeamID: String? = nil
+            var awayTeamID: String? = nil
+
+            if let header = json?["header"] as? [String: Any],
+               let competitions = header["competitions"] as? [[String: Any]],
+               let competition = competitions.first,
+               let competitors = competition["competitors"] as? [[String: Any]] {
+
+                for competitor in competitors {
+                    if let homeAway = competitor["homeAway"] as? String,
+                       let teamInfo = competitor["team"] as? [String: Any],
+                       let teamID = teamInfo["id"] as? String {
+                        if homeAway == "home" {
+                            homeTeamID = teamID
+                        } else {
+                            awayTeamID = teamID
+                        }
+                    }
+                }
+            }
+
+            // Count timeout plays from drives
+            if let drives = json?["drives"] as? [String: Any],
+               let previous = drives["previous"] as? [[String: Any]] {
+                
+                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Found \(previous.count) previous drives to check")
+                
+                for (driveIndex, drive) in previous.enumerated() {
+                    if let plays = drive["plays"] as? [[String: Any]] {
+                        DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Drive \(driveIndex): \(plays.count) plays")
+                        
+                        for (playIndex, play) in plays.enumerated() {
+                            // Check if this is a timeout play (type 21)
+                            if let playType = play["type"] as? [String: Any],
+                               let typeID = playType["id"] as? String {
+                                
+                                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Drive \(driveIndex) Play \(playIndex): typeID=\(typeID)")
+                                
+                                if typeID == "21" {
+                                    DebugPrint(mode: .bracketTimer, "🎯 [TIMEOUT FOUND] Drive \(driveIndex) Play \(playIndex) is a timeout!")
+                                    
+                                    // Dump the entire play object to see structure
+                                    if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
+                                        DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] teamParticipants count: \(teamParticipants.count)")
+                                        
+                                        for (tpIndex, participant) in teamParticipants.enumerated() {
+                                            DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Participant \(tpIndex): \(participant.keys.joined(separator: ", "))")
+                                            if let hasTimeout = participant["timeout"] as? Bool {
+                                                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Participant \(tpIndex) timeout flag: \(hasTimeout)")
+                                            }
+                                        }
+                                        
+                                        // Find which team called the timeout
+                                        for participant in teamParticipants {
+                                            if let isTimeout = participant["timeout"] as? Bool,
+                                               isTimeout {
+                                                
+                                                // Try to extract team ID from the nested structure
+                                                var teamID: String? = nil
+                                                if let teamRef = participant["team"] as? [String: Any],
+                                                   let ref = teamRef["$ref"] as? String {
+                                                    // Extract team ID from reference URL
+                                                    // e.g., "http://...teams/26?..." -> "26"
+                                                    DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Team $ref: \(ref)")
+                                                    teamID = participant["id"] as? String
+                                                } else {
+                                                    teamID = participant["id"] as? String
+                                                }
+                                                
+                                                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG]   Extracted teamID: \(teamID ?? "NIL")")
+                                                
+                                                if let tid = teamID {
+                                                    if tid == homeTeamID {
+                                                        homeTimeouts -= 1
+                                                        DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Home team timeout used, remaining: \(homeTimeouts)")
+                                                    } else if tid == awayTeamID {
+                                                        awayTimeouts -= 1
+                                                        DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Away team timeout used, remaining: \(awayTimeouts)")
+                                                    } else {
+                                                        DebugPrint(mode: .bracketTimer, "⚠️ [TIMEOUT DEBUG] Team ID '\(tid)' doesn't match home '\(homeTeamID ?? "NIL")' or away '\(awayTeamID ?? "NIL")'")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             
-            // Extract down/distance from drives.current.plays array
+            // Also check current drive for timeout plays
+            if let drives = json?["drives"] as? [String: Any],
+               let currentDrive = drives["current"] as? [String: Any],
+               let plays = currentDrive["plays"] as? [[String: Any]] {
+                
+                DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Current drive: \(plays.count) plays")
+                
+                for (playIndex, play) in plays.enumerated() {
+                    if let playType = play["type"] as? [String: Any],
+                       let typeID = playType["id"] as? String {
+                        
+                        DebugPrint(mode: .bracketTimer, "🔍 [TIMEOUT DEBUG] Current Play \(playIndex): typeID=\(typeID)")
+                        
+                        if typeID == "21" {
+                            DebugPrint(mode: .bracketTimer, "🎯 [TIMEOUT FOUND] Current drive Play \(playIndex) is a timeout!")
+                            
+                            if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
+                                for participant in teamParticipants {
+                                    if let isTimeout = participant["timeout"] as? Bool,
+                                       isTimeout {
+                                        
+                                        var teamID: String? = nil
+                                        if let teamRef = participant["team"] as? [String: Any],
+                                           let ref = teamRef["$ref"] as? String {
+                                            teamID = participant["id"] as? String
+                                        } else {
+                                            teamID = participant["id"] as? String
+                                        }
+                                        
+                                        if let tid = teamID {
+                                            if tid == homeTeamID {
+                                                homeTimeouts -= 1
+                                                DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Home team timeout used, remaining: \(homeTimeouts)")
+                                            } else if tid == awayTeamID {
+                                                awayTimeouts -= 1
+                                                DebugPrint(mode: .bracketTimer, "⏱️ [TIMEOUT DETECTED] Away team timeout used, remaining: \(awayTimeouts)")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Ensure timeouts don't go below 0
+            homeTimeouts = max(0, homeTimeouts)
+            awayTimeouts = max(0, awayTimeouts)
+
+            DebugPrint(mode: .bracketTimer, "⏱️ [LIVE SITUATION] Game \(gameID) - Home TOs: \(homeTimeouts), Away TOs: \(awayTimeouts)")
+
             var down: Int? = nil
             var distance: Int? = nil
             var yardLine: String? = nil
-            
+
             if let drives = json?["drives"] as? [String: Any],
                let currentDrive = drives["current"] as? [String: Any],
                let plays = currentDrive["plays"] as? [[String: Any]],
                let lastPlay = plays.last,
                let endSituation = lastPlay["end"] as? [String: Any] {
-                
-                // Extract down, distance, and yard line from the last play's "end" object
+
                 down = endSituation["down"] as? Int
                 distance = endSituation["distance"] as? Int
-                
-                // Try possessionText first (e.g., "CAR 28"), fall back to yardLine
+
                 if let possText = endSituation["possessionText"] as? String {
                     yardLine = possText
                 } else if let yl = endSituation["yardLine"] as? Int {
                     yardLine = "\(yl)"
                 }
-                
+
                 DebugPrint(mode: .bracketTimer, "🎯 [PLAYS EXTRACTION] down: \(down?.description ?? "nil"), distance: \(distance?.description ?? "nil"), yardLine: \(yardLine ?? "nil")")
             }
-            
-            // Extract current drive info as before
+
             var possessionTeam: String? = nil
             var drivePlayCount: Int? = nil
             var driveYards: Int? = nil
             var topDisplay: String? = nil
             var lastPlay: String? = nil
-            
+
             if let drives = json?["drives"] as? [String: Any],
                let currentDrive = drives["current"] as? [String: Any] {
-                
-                // Parse possession team
+
                 if let team = currentDrive["team"] as? [String: Any],
                    let abbr = team["abbreviation"] as? String {
                     possessionTeam = normalizeTeamCode(abbr.uppercased())
                 }
-                
-                // Parse drive stats
+
                 drivePlayCount = currentDrive["offensivePlays"] as? Int
                 driveYards = currentDrive["yards"] as? Int
-                
+
                 if let timeElapsed = currentDrive["timeElapsed"] as? [String: Any] {
                     topDisplay = timeElapsed["displayValue"] as? String
                 }
-                
-                // Parse last play description
+
                 if let plays = currentDrive["plays"] as? [[String: Any]],
                    let lastPlayObj = plays.last,
                    let text = lastPlayObj["text"] as? String {
                     lastPlay = text
                 }
             }
-            
+
             DebugPrint(mode: .bracketTimer, "🏈 [LIVE] Game \(gameID): \(possessionTeam ?? "?") has ball, \(down ?? 0) & \(distance ?? 0) at \(yardLine ?? "?")")
-            
+
             return LiveGameSituation(
                 down: down,
                 distance: distance,
@@ -927,29 +1094,28 @@ final class NFLPlayoffBracketService {
                 lastPlay: lastPlay,
                 drivePlayCount: drivePlayCount,
                 driveYards: driveYards,
-                timeOfPossession: topDisplay
+                timeOfPossession: topDisplay,
+                homeTimeouts: homeTimeouts,
+                awayTimeouts: awayTimeouts
             )
-            
+
         } catch {
             DebugPrint(mode: .bracketTimer, "❌ Failed to fetch live situation for game \(gameID): \(error)")
             return nil
         }
     }
-    
-    // 🏈 NEW: Refresh live situations for existing bracket without rebuilding
+
     private func refreshLiveSituations(for bracket: PlayoffBracket) async {
         DebugPrint(mode: .bracketTimer, "🔄 [REFRESH LIVE SITUATIONS] Updating play-by-play data")
-        
+
         var updatedAFCGames: [PlayoffGame] = []
         var updatedNFCGames: [PlayoffGame] = []
         var updatedSuperBowl: PlayoffGame? = bracket.superBowl
-        
-        // Update AFC games
+
         for game in bracket.afcGames {
             if game.isLive {
                 let situation = await fetchLiveGameSituation(gameID: game.id)
-                
-                // Cache down/distance if we got valid data, otherwise preserve existing
+
                 var downDist = game.lastKnownDownDistance
                 if let sit = situation,
                    let down = sit.down,
@@ -958,13 +1124,31 @@ final class NFLPlayoffBracketService {
                     downDist = CachedDownDistance(down: down, distance: distance)
                     DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(game.id): \(downDist!.display)")
                 }
-                
+
+                let updatedHomeTeam = PlayoffTeam(
+                    abbreviation: game.homeTeam.abbreviation,
+                    name: game.homeTeam.name,
+                    seed: game.homeTeam.seed,
+                    score: game.homeTeam.score,
+                    logoURL: game.homeTeam.logoURL,
+                    timeoutsRemaining: situation?.homeTimeouts ?? game.homeTeam.timeoutsRemaining
+                )
+
+                let updatedAwayTeam = PlayoffTeam(
+                    abbreviation: game.awayTeam.abbreviation,
+                    name: game.awayTeam.name,
+                    seed: game.awayTeam.seed,
+                    score: game.awayTeam.score,
+                    logoURL: game.awayTeam.logoURL,
+                    timeoutsRemaining: situation?.awayTimeouts ?? game.awayTeam.timeoutsRemaining
+                )
+
                 let updated = PlayoffGame(
                     id: game.id,
                     round: game.round,
                     conference: game.conference,
-                    homeTeam: game.homeTeam,
-                    awayTeam: game.awayTeam,
+                    homeTeam: updatedHomeTeam,
+                    awayTeam: updatedAwayTeam,
                     gameDate: game.gameDate,
                     status: game.status,
                     venue: game.venue,
@@ -977,13 +1161,11 @@ final class NFLPlayoffBracketService {
                 updatedAFCGames.append(game)
             }
         }
-        
-        // Update NFC games
+
         for game in bracket.nfcGames {
             if game.isLive {
                 let situation = await fetchLiveGameSituation(gameID: game.id)
-                
-                // Cache down/distance if we got valid data, otherwise preserve existing
+
                 var downDist = game.lastKnownDownDistance
                 if let sit = situation,
                    let down = sit.down,
@@ -992,13 +1174,31 @@ final class NFLPlayoffBracketService {
                     downDist = CachedDownDistance(down: down, distance: distance)
                     DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(game.id): \(downDist!.display)")
                 }
-                
+
+                let updatedHomeTeam = PlayoffTeam(
+                    abbreviation: game.homeTeam.abbreviation,
+                    name: game.homeTeam.name,
+                    seed: game.homeTeam.seed,
+                    score: game.homeTeam.score,
+                    logoURL: game.homeTeam.logoURL,
+                    timeoutsRemaining: situation?.homeTimeouts ?? game.homeTeam.timeoutsRemaining
+                )
+
+                let updatedAwayTeam = PlayoffTeam(
+                    abbreviation: game.awayTeam.abbreviation,
+                    name: game.awayTeam.name,
+                    seed: game.awayTeam.seed,
+                    score: game.awayTeam.score,
+                    logoURL: game.awayTeam.logoURL,
+                    timeoutsRemaining: situation?.awayTimeouts ?? game.awayTeam.timeoutsRemaining
+                )
+
                 let updated = PlayoffGame(
                     id: game.id,
                     round: game.round,
                     conference: game.conference,
-                    homeTeam: game.homeTeam,
-                    awayTeam: game.awayTeam,
+                    homeTeam: updatedHomeTeam,
+                    awayTeam: updatedAwayTeam,
                     gameDate: game.gameDate,
                     status: game.status,
                     venue: game.venue,
@@ -1011,12 +1211,10 @@ final class NFLPlayoffBracketService {
                 updatedNFCGames.append(game)
             }
         }
-        
-        // Update Super Bowl if live
+
         if let sb = bracket.superBowl, sb.isLive {
             let situation = await fetchLiveGameSituation(gameID: sb.id)
-            
-            // Cache down/distance if we got valid data, otherwise preserve existing
+
             var downDist = sb.lastKnownDownDistance
             if let sit = situation,
                let down = sit.down,
@@ -1025,13 +1223,31 @@ final class NFLPlayoffBracketService {
                 downDist = CachedDownDistance(down: down, distance: distance)
                 DebugPrint(mode: .bracketTimer, "🆕 [NEW DOWN/DIST] \(sb.id): \(downDist!.display)")
             }
-            
+
+            let updatedHomeTeam = PlayoffTeam(
+                abbreviation: sb.homeTeam.abbreviation,
+                name: sb.homeTeam.name,
+                seed: sb.homeTeam.seed,
+                score: sb.homeTeam.score,
+                logoURL: sb.homeTeam.logoURL,
+                timeoutsRemaining: situation?.homeTimeouts ?? sb.homeTeam.timeoutsRemaining
+            )
+
+            let updatedAwayTeam = PlayoffTeam(
+                abbreviation: sb.awayTeam.abbreviation,
+                name: sb.awayTeam.name,
+                seed: sb.awayTeam.seed,
+                score: sb.awayTeam.score,
+                logoURL: sb.awayTeam.logoURL,
+                timeoutsRemaining: situation?.awayTimeouts ?? sb.awayTeam.timeoutsRemaining
+            )
+
             updatedSuperBowl = PlayoffGame(
                 id: sb.id,
                 round: sb.round,
                 conference: sb.conference,
-                homeTeam: sb.homeTeam,
-                awayTeam: sb.awayTeam,
+                homeTeam: updatedHomeTeam,
+                awayTeam: updatedAwayTeam,
                 gameDate: sb.gameDate,
                 status: sb.status,
                 venue: sb.venue,
@@ -1040,8 +1256,7 @@ final class NFLPlayoffBracketService {
                 lastKnownDownDistance: downDist
             )
         }
-        
-        // Create updated bracket
+
         let updatedBracket = PlayoffBracket(
             season: bracket.season,
             afcGames: updatedAFCGames,
@@ -1050,11 +1265,10 @@ final class NFLPlayoffBracketService {
             afcSeed1: bracket.afcSeed1,
             nfcSeed1: bracket.nfcSeed1
         )
-        
-        // Update cache and current bracket
+
         cache[bracket.season] = updatedBracket
         currentBracket = updatedBracket
-        
+
         DebugPrint(mode: .bracketTimer, "✅ [REFRESH LIVE SITUATIONS] Updated play-by-play data")
     }
 }

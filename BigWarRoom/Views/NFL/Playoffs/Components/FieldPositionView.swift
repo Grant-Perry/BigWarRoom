@@ -145,8 +145,9 @@ struct FieldPositionView: View {
             if ballIsMovingRight {
                 Text("🏈")
                     .font(.system(size: 20))
-                    .shadow(color: .white.opacity(0.6), radius: 8, x: 0, y: 0)
-                    .shadow(color: .white.opacity(0.4), radius: 12, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.9), radius: 4, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.7), radius: 8, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.5), radius: 12, x: 0, y: 0)
 				  // I'm gonna comment out the chevron for now
 				  // the ball should point in the direction of the play
 //                Image(systemName: "chevron.right")
@@ -162,9 +163,9 @@ struct FieldPositionView: View {
                 Text("🏈")
                     .font(.system(size: 20))
 					.scaleEffect(x: -1)
-
-                    .shadow(color: .white.opacity(0.6), radius: 8, x: 0, y: 0)
-                    .shadow(color: .white.opacity(0.4), radius: 12, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.9), radius: 4, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.7), radius: 8, x: 0, y: 0)
+                    .shadow(color: .white.opacity(0.5), radius: 12, x: 0, y: 0)
             }
         }
     }

@@ -333,7 +333,7 @@ struct TimeoutIndicatorView: View {
       HStack(spacing: 3) {
          ForEach(0..<3, id: \.self) { index in
             Circle()
-               .fill(index < timeoutsRemaining ? Color.yellow : Color.clear)
+               .fill(index < timeoutsRemaining ? Color.yellow : Color.gray.opacity(0.3))
                .frame(width: 10, height: 10)
                .overlay(
                   Circle()

@@ -77,6 +77,8 @@ struct LiveGameSituation: Codable, Equatable {
     let drivePlayCount: Int?        // Number of plays in current drive
     let driveYards: Int?            // Yards gained in current drive
     let timeOfPossession: String?   // Time of possession for current drive (e.g., "3:45")
+    let homeTimeouts: Int?          // 🏈 NEW: Home team timeouts remaining
+    let awayTimeouts: Int?          // 🏈 NEW: Away team timeouts remaining
     
     /// Display string for down & distance (e.g., "3rd & 7")
     var downDistanceDisplay: String? {
@@ -361,6 +363,7 @@ struct ESPNPlayoffCompetitor: Codable {
     let team: ESPNTeamInfo
     let score: String?
     let curatedRank: ESPNCuratedRank?
+    let timeouts: Int?  // 🏈 NEW: Timeouts remaining
     
     struct ESPNCuratedRank: Codable {
         let current: Int
