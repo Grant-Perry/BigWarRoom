@@ -41,12 +41,3 @@ struct ChoppedRosterErrorView: View {
         }
     }
 }
-
-#Preview {
-    ChoppedRosterErrorView(
-        errorMessage: "Network connection failed",
-        onRetry: { }
-    )
-    .background(Color.black)
-    .preferredColorScheme(.dark)
-}

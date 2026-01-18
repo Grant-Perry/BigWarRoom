@@ -350,8 +350,8 @@ final class FantasyMatchupListViewModel {
         return fantasyViewModel.detectedAsChoppedLeague || forceChoppedMode
     }
     
-    // MARK: - Mock Data Creation
-    func createChoppedSummaryFromMatchups() -> ChoppedWeekSummary {
+    // MARK: - Chopped Summary Creation
+    func createChoppedSummaryFromMatchups() -> ChoppedWeekSummary? {
         // If this is a real Chopped league, fetch real data
         if let leagueWrapper = draftRoomViewModel?.selectedLeagueWrapper,
            leagueWrapper.source == .sleeper {
@@ -368,7 +368,7 @@ final class FantasyMatchupListViewModel {
             // In the next iteration, we'll make this async properly
         }
         
-        // Collect all teams from matchups and bye weeks (EXISTING LOGIC)
+        // Collect all teams from matchups and bye weeks
         var allTeams: [FantasyTeam] = []
         
         // Add teams from matchups
@@ -380,9 +380,9 @@ final class FantasyMatchupListViewModel {
         // Add bye week teams
         allTeams.append(contentsOf: fantasyViewModel.byeWeekTeams)
         
-        // If no teams found, create MOCK CHOPPED LEAGUE data for demo
-        if allTeams.isEmpty {
-            allTeams = createMockChoppedTeams()
+        // If no teams found, return nil instead of creating mock data
+        guard !allTeams.isEmpty else {
+            return nil
         }
         
         // Sort by current score (highest to lowest)
@@ -462,39 +462,7 @@ final class FantasyMatchupListViewModel {
             averageScore: avgScore,
             highestScore: highScore,
             lowestScore: lowScore,
-            eliminationHistory: [] // No historical data for mock/fallback
+            eliminationHistory: [] // No historical data for fallback
         )
-    }
-    
-    /// Create Mock Chopped Teams for Demo
-    private func createMockChoppedTeams() -> [FantasyTeam] {
-        let mockTeams = [
-            ("The Chopped Champions", "Gp", 142.8),
-            ("Survival Squad", "Mike", 138.2),
-            ("Last Stand United", "Sarah", 135.6),
-            ("Death Dodgers", "Chris", 131.4),
-            ("Battle Royale Bros", "Alex", 128.9),
-            ("Elimination Elites", "Jordan", 125.3),
-            ("Final Four", "Taylor", 122.7),
-            ("Danger Zone Dawgs", "Casey", 118.1),
-            ("Critical Condition", "Jamie", 114.5),
-            ("About To Be Chopped", "Riley", 98.2)
-        ]
-        
-        return mockTeams.enumerated().map { index, teamData in
-            FantasyTeam(
-                id: "mock_team_\(index)",
-                name: teamData.0,
-                ownerName: teamData.1,
-                record: TeamRecord(wins: Int.random(in: 5...12), losses: Int.random(in: 1...8), ties: 0),
-                avatar: nil,
-                currentScore: teamData.2,
-                projectedScore: teamData.2 + Double.random(in: -10...10),
-                roster: [],
-                rosterID: index + 1,
-                faabTotal: nil,  // Mock data - no FAAB
-                faabUsed: nil    // Mock data - no FAAB
-            )
-        }
     }
 }

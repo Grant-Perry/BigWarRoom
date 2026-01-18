@@ -645,8 +645,3 @@ extension SleeperPlayer: Hashable {
         return lhs.playerID == rhs.playerID
     }
 }
-
-#Preview("Team Rosters") {
-    TeamRostersView()
-        .preferredColorScheme(.dark)
-}

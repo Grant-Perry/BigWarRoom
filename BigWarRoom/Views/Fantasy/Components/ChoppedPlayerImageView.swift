@@ -37,10 +37,3 @@ struct ChoppedPlayerImageView: View {
         }
     }
 }
-
-#Preview {
-    // Cannot preview without proper ViewModel setup
-    Text("ChoppedPlayerImageView Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}

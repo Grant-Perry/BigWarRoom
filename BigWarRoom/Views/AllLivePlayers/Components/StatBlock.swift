@@ -26,11 +26,3 @@ struct StatBlock: View {
         }
     }
 }
-
-#Preview {
-    HStack {
-        StatBlock(title: "Players", value: "42", color: .gpGreen)
-        StatBlock(title: "Top Score", value: "25.6", color: .blue)
-        StatBlock(title: "Position", value: "RB", color: .orange)
-    }
-}

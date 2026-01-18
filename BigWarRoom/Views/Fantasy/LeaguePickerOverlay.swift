@@ -224,13 +224,3 @@ private struct LeagueSelectionCard: View {
         LeagueSelectionCardMatchupPreviewView(matchup: matchup, isSelected: isSelected)
     }
 }
-
-// MARK: - Preview
-#Preview {
-    // Mock data for preview
-    LeaguePickerOverlay(
-        leagues: [],
-        onLeagueSelected: { _ in },
-        onDismiss: { }
-    )
-}

@@ -62,25 +62,3 @@ struct PlayerDetailsInfoView: View {
         }
     }
 }
-
-#Preview {
-    // Create a mock player with minimal required data
-    let mockPlayerData = """
-    {
-        "player_id": "123",
-        "first_name": "Josh",
-        "last_name": "Allen",
-        "position": "QB",
-        "team": "BUF",
-        "college": "Wyoming",
-        "height": "77",
-        "weight": "237",
-        "years_exp": 6,
-        "search_rank": 15
-    }
-    """.data(using: .utf8)!
-    
-    let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
-    
-    return PlayerDetailsInfoView(player: mockPlayer)
-}

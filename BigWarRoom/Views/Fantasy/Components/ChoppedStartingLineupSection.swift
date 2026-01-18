@@ -74,10 +74,3 @@ struct ChoppedStartingLineupSection: View {
         )
     }
 }
-
-#Preview {
-    // Cannot preview without proper models setup
-    Text("ChoppedStartingLineupSection Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}

@@ -63,15 +63,3 @@ struct FantasyAnalysisView: View {
         }
     }
 }
-
-#Preview {
-    FantasyAnalysisView(
-        fantasyAnalysisData: FantasyAnalysisData(
-            searchRank: 15,
-            position: "QB",
-            tier: 1,
-            tierDescription: "Elite QB1 - Weekly starter",
-            positionAnalysis: "QB1 - Target in rounds 6-8"
-        )
-    )
-}

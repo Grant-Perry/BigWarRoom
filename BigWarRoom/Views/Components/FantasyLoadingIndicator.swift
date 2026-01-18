@@ -13,11 +13,3 @@ struct FantasyLoadingIndicator: View {
             .frame(width: 200, height: 200)
     }
 }
-
-// MARK: -> Preview
-#Preview {
-    FantasyLoadingIndicator()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-        .preferredColorScheme(.dark)
-}

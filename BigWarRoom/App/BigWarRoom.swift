@@ -370,7 +370,3 @@ struct BigWarRoom: View {
     }
 }
 
-#Preview("BigWarRoom") {
-    BigWarRoom()
-        .preferredColorScheme(.dark)
-}

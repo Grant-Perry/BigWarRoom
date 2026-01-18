@@ -77,10 +77,3 @@ struct ChoppedBenchSection: View {
         )
     }
 }
-
-#Preview {
-    // Cannot preview without proper models setup
-    Text("ChoppedBenchSection Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}

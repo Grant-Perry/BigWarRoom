@@ -159,13 +159,3 @@ struct ESPNDraftPickSelectionView: View {
         }
     }
 }
-
-#Preview {
-    ESPNDraftPickSelectionView(
-        leagueName: "Barnyard Bash",
-        maxTeams: 10,
-        selectedPick: .constant(2),
-        onConfirm: { _ in },
-        onCancel: { }
-    )
-}

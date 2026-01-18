@@ -403,8 +403,3 @@ struct FeatureCard: View {
         )
     }
 }
-
-#Preview("Features View") {
-    FeaturesView()
-        .preferredColorScheme(.dark)
-}

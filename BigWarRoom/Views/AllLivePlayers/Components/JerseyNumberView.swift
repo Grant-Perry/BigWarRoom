@@ -60,17 +60,3 @@ struct JerseyNumberView: View {
         }
     }
 }
-
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        
-        JerseyNumberView(
-            jerseyNumber: "17",
-            teamColor: .blue
-        )
-        .frame(width: 200, height: 100)
-        .background(Color.gray.opacity(0.3))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}

@@ -121,22 +121,6 @@ struct SportsbookBadge: View {
     }
 }
 
-// MARK: - Preview
-#Preview("Sportsbook Badges") {
-    VStack(spacing: 12) {
-        ForEach(Sportsbook.allCases) { book in
-            HStack {
-                SportsbookBadge(book: book)
-                Text(book.displayName)
-                    .foregroundColor(.white)
-                Spacer()
-            }
-        }
-    }
-    .padding()
-    .background(Color.black)
-}
-
 // MARK: - The Odds API Response Models
 
 /// Main response from The Odds API for NFL odds

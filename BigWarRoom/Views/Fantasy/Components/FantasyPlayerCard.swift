@@ -182,7 +182,10 @@ struct FantasyPlayerCard: View {
         )
         
         // Watch toggle button
-        buildWatchToggle()
+        FantasyPlayerCardWatchButton(
+            isWatched: isPlayerWatched,
+            onToggle: toggleWatchStatus
+        )
         
         // Game matchup section
         FantasyPlayerCardMatchupView(player: player)
@@ -193,31 +196,6 @@ struct FantasyPlayerCard: View {
             statLine: vm.formatPlayerStatBreakdown(for: player),
             teamColor: vm.teamColor
         )
-    }
-    
-    @ViewBuilder
-    private func buildWatchToggle() -> some View {
-        VStack {
-            HStack {
-                Spacer()
-                
-                Button(action: toggleWatchStatus) {
-                    Image(systemName: isPlayerWatched ? "eye.fill" : "eye")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(isPlayerWatched ? .gpYellow : .white.opacity(0.6))
-                        .frame(width: 24, height: 24)
-                        .background(
-                            Circle()
-                                .fill(Color.black.opacity(0.6))
-                                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
-                        )
-                }
-                .buttonStyle(PlainButtonStyle())
-                .padding(.top, 8)
-                .padding(.trailing, 8)
-            }
-            Spacer()
-        }
     }
     
     @ViewBuilder 

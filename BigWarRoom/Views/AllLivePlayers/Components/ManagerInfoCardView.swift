@@ -125,28 +125,3 @@ struct ManagerInfoCardView: View {
         )
     }
 }
-
-#Preview {
-    VStack(spacing: 16) {
-        ManagerInfoCardView(
-            manager: ManagerInfo(
-                name: "John Player",
-                score: 87.5,
-                scoreColor: .green
-            ),
-            style: .fullWidth,
-            countdown: 12.0,
-            onRefresh: {}
-        )
-        
-        ManagerInfoCardView(
-            manager: ManagerInfo(
-                name: "Jane Manager",
-                score: 45.2,
-                scoreColor: .red
-            ),
-            style: .compact
-        )
-    }
-    .padding()
-}

@@ -363,14 +363,3 @@ struct NewsItemCard: View {
         }
     }
 }
-
-#Preview {
-    PlayerNewsView(player: PlayerData(
-        id: "sample",
-        fullName: "Josh Allen",
-        position: "QB",
-        team: "BUF",
-        photoUrl: nil,
-        espnId: 17102
-    ))
-}

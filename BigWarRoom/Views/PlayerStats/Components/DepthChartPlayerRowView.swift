@@ -86,36 +86,4 @@ struct DepthChartPlayerRowView: View {
         default: return .gray
         }
     }
-    
-}
-
-#Preview {
-    // Create a mock player with minimal required data
-    let mockPlayerData = """
-    {
-        "player_id": "123",
-        "first_name": "Josh",
-        "last_name": "Allen",
-        "position": "QB",
-        "team": "BUF",
-        "number": 17,
-        "search_rank": 15
-    }
-    """.data(using: .utf8)!
-    
-    let mockPlayer = try! JSONDecoder().decode(SleeperPlayer.self, from: mockPlayerData)
-    
-    return NavigationView {
-        DepthChartPlayerRowView(
-            depthPlayer: DepthChartPlayer(
-                player: mockPlayer,
-                depth: 1,
-                isCurrentPlayer: true
-            ),
-            team: nil,
-            allLivePlayersViewModel: AllLivePlayersViewModel.shared,
-            onTap: nil
-        )
-        .padding()
-    }
 }

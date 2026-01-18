@@ -51,21 +51,3 @@ struct AdaptiveNotificationBadge: View {
         }
     }
 }
-
-#Preview("Adaptive Badge Examples") {
-    VStack(spacing: 20) {
-        HStack(spacing: 20) {
-            AdaptiveNotificationBadge(count: 3)
-            AdaptiveNotificationBadge(count: 16)
-            AdaptiveNotificationBadge(count: 99)
-        }
-        
-        HStack(spacing: 20) {
-            AdaptiveNotificationBadge(count: 100)
-            AdaptiveNotificationBadge(count: 142)
-            AdaptiveNotificationBadge(count: 999)
-        }
-    }
-    .padding()
-    .background(Color.black)
-}

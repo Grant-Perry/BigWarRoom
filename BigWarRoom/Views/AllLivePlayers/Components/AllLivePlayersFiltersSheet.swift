@@ -208,6 +208,3 @@ private struct FilterChip: View {
         .buttonStyle(PlainButtonStyle())
     }
 }
-
-// 🔥 PHASE 3 DI: Preview temporarily disabled - requires full dependency tree
-// TODO: Create preview mock instances or use PreviewContainer pattern

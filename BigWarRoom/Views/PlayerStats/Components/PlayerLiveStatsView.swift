@@ -207,11 +207,3 @@ struct PlayerLiveStatsView: View {
             )
     }
 }
-
-#Preview {
-    PlayerLiveStatsView(
-        playerStatsData: nil,
-        team: nil,
-        isLoading: false
-    )
-}

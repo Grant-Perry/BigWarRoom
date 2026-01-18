@@ -26,9 +26,3 @@ struct ChoppedRosterLoadingView: View {
         }
     }
 }
-
-#Preview {
-    ChoppedRosterLoadingView(ownerName: "Test Owner")
-        .background(Color.black)
-        .preferredColorScheme(.dark)
-}

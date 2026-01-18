@@ -222,26 +222,3 @@ struct PlayerNewsDetailView: View {
         return formatter.string(from: date)
     }
 }
-
-#Preview {
-    let mockNewsItem = PlayerNewsItem(
-        id: 123,
-        nowId: "test-now-id",
-        contentKey: "test-key",
-        dataSourceIdentifier: "espn",
-        type: .rotowire,
-        headline: "Josh Allen throws for 300 yards and 3 TDs in dominant performance",
-        description: "The Bills quarterback had an outstanding game against the Dolphins, completing 24 of 32 passes.",
-        story: "Josh Allen put on a clinic Sunday afternoon, completing 24 of 32 passes for 304 yards and three touchdowns in the Bills' 31-10 victory over the Miami Dolphins. The fifth-year quarterback looked sharp from the opening drive, connecting with Stefon Diggs for touchdowns of 15 and 23 yards in the first half. Allen also rushed for 39 yards on seven carries, including a crucial third-down conversion late in the fourth quarter that sealed the victory. The performance moves Allen into the top tier of MVP candidates as the Bills improve to 8-3 on the season.",
-        categorized: "performance",
-        lastModified: "2024-01-15T18:30:00Z",
-        published: "2024-01-15T18:00:00Z",
-        premium: false,
-        playerId: 17102
-    )
-    
-    return PlayerNewsDetailView(
-        newsItem: mockNewsItem,
-        playerName: "Josh Allen"
-    )
-}

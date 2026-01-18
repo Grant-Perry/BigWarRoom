@@ -36,28 +36,3 @@ struct ChoppedRosterStatCard: View {
         )
     }
 }
-
-#Preview {
-    HStack(spacing: 20) {
-        ChoppedRosterStatCard(
-            title: "STARTERS",
-            value: "9",
-            color: .green
-        )
-        
-        ChoppedRosterStatCard(
-            title: "BENCH",
-            value: "7",
-            color: .blue
-        )
-        
-        ChoppedRosterStatCard(
-            title: "TOTAL",
-            value: "16",
-            color: .white
-        )
-    }
-    .padding()
-    .background(Color.black)
-    .preferredColorScheme(.dark)
-}

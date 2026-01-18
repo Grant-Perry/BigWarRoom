@@ -141,7 +141,3 @@ struct LiveDraftPicksView: View {
         }
     }
 }
-
-#Preview {
-    LiveDraftPicksView(viewModel: DraftRoomViewModel())
-}

@@ -259,31 +259,3 @@ struct MatchupTeamFinalView: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    let mockPlayer = FantasyPlayer(
-        id: "mock1",
-        sleeperID: nil,
-        espnID: nil,
-        firstName: "Mock",
-        lastName: "Player",
-        position: "WR",
-        team: "KC",
-        jerseyNumber: "1",
-        currentPoints: 0,
-        projectedPoints: 0,
-        gameStatus: nil,
-        isStarter: true,
-        lineupSlot: "WR",
-        injuryStatus: nil  // 🔥 MODEL-BASED: Mock has no injury
-    )
-    
-    VStack(spacing: 20) {
-        MatchupTeamFinalView(player: mockPlayer)
-        MatchupTeamFinalView(player: mockPlayer, scaleEffect: 1.2)
-    }
-    .padding()
-    .background(Color.black)
-}

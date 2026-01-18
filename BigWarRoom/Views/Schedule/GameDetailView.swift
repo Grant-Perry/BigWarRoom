@@ -38,19 +38,3 @@ struct GameDetailView: View {
         .preferredColorScheme(.dark)
     }
 }
-
-#Preview("Game Detail") {
-    GameDetailView(
-        game: ScheduleGame(
-            id: "KC@BUF",
-            awayTeam: "KC",
-            homeTeam: "BUF",
-            awayScore: 21,
-            homeScore: 17,
-            gameStatus: "in",
-            gameTime: "Q3 8:42",
-            startDate: Date(),
-            isLive: true
-        )
-    )
-}

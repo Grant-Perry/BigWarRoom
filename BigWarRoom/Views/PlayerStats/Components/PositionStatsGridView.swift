@@ -30,20 +30,3 @@ struct PositionStatsGridView: View {
         }
     }
 }
-
-#Preview {
-    PositionStatsGridView(
-        statsData: PlayerStatsData(
-            playerID: "123",
-            stats: [
-                "pts_ppr": 25.6,
-                "pass_cmp": 22,
-                "pass_att": 35,
-                "pass_yd": 287,
-                "pass_td": 2
-            ],
-            position: "QB"
-        )
-    )
-    .background(Color.black)
-}

@@ -426,20 +426,3 @@ struct PlayerSearchResultCard: View {
             )
     }
 }
-
-#Preview("Player Search - Empty State") {
-    NavigationView {
-        PlayerSearchView()
-    }
-    .preferredColorScheme(.dark)
-}
-
-#Preview("Player Search - With Results") {
-    NavigationView {
-        PlayerSearchView()
-    }
-    .preferredColorScheme(.dark)
-    .onAppear {
-        // This would be handled by search in real app
-    }
-}

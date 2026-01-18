@@ -314,9 +314,3 @@ struct FeatureRow: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    OnBoardingView()
-}

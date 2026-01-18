@@ -206,18 +206,3 @@ struct IntelligenceLoadingView: View {
     //     let currentCount = baseCounts[min(loadingTextIndex, baseCounts.count - 1)]
     //     return String(currentCount)
     // }
-
-// MARK: - Preview
-
-#Preview("Intelligence Loading") {
-    ZStack {
-        Image("BG2")
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .opacity(0.4)
-            .ignoresSafeArea(.all)
-        
-        IntelligenceLoadingView()
-    }
-    .preferredColorScheme(.dark)
-}

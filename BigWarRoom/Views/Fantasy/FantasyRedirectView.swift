@@ -80,10 +80,3 @@ struct FantasyRedirectView: View {
         }
     }
 }
-
-#Preview {
-    FantasyRedirectView(
-        selectedTab: .constant(2),
-        draftRoomViewModel: DraftRoomViewModel()
-    )
-}

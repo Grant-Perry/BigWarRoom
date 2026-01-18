@@ -233,33 +233,3 @@ extension TheWeekPicker {
         )
     }
 }
-
-#Preview("The Week Picker") {
-    let nflWeekService = NFLWeekService(apiClient: SleeperAPIClient())
-    let weekManager = WeekSelectionManager(nflWeekService: nflWeekService)
-    
-    return ZStack {
-        Color.black.ignoresSafeArea()
-        
-        VStack(spacing: 20) {
-            // Default
-            TheWeekPicker(showingWeekPicker: .constant(false), weekManager: weekManager)
-            
-            // Compact
-            TheWeekPicker.compact(showingWeekPicker: .constant(false), weekManager: weekManager)
-            
-            // Blue style
-            TheWeekPicker.blueStyle(showingWeekPicker: .constant(false), weekManager: weekManager)
-            
-            // Custom
-            TheWeekPicker(
-                showingWeekPicker: .constant(false),
-                weekManager: weekManager,
-                weekNumberFontSize: 32,
-                gradientStartColor: .orange,
-                gradientEndColor: .red,
-                shadowColor: .orange
-            )
-        }
-    }
-}

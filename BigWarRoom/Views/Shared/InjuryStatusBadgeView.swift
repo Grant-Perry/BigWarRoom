@@ -47,27 +47,3 @@ struct InjuryStatusBadgeView: View {
         return colorService.injuryStatusTextColor(for: injuryStatus)
     }
 }
-
-#Preview("Questionable") {
-    InjuryStatusBadgeView(injuryStatus: "Questionable")
-        .padding()
-        .background(Color.gray)
-}
-
-#Preview("Out") {
-    InjuryStatusBadgeView(injuryStatus: "Out")
-        .padding()
-        .background(Color.gray)
-}
-
-#Preview("IR") {
-    InjuryStatusBadgeView(injuryStatus: "IR")
-        .padding()
-        .background(Color.gray)
-}
-
-#Preview("BYE") {
-    InjuryStatusBadgeView(injuryStatus: "BYE")
-        .padding()
-        .background(Color.gray)
-}

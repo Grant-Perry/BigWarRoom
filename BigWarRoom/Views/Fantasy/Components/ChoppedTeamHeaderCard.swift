@@ -125,10 +125,3 @@ struct ChoppedTeamHeaderCard: View {
         )
     }
 }
-
-#Preview {
-    // Cannot preview without proper models setup
-    Text("ChoppedTeamHeaderCard Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}

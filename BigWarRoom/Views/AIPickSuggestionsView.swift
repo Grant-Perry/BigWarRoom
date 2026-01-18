@@ -123,9 +123,3 @@ extension SortMethod {
         }
     }
 }
-
-#Preview {
-    NavigationView {
-        AIPickSuggestionsView(viewModel: DraftRoomViewModel())
-    }
-}

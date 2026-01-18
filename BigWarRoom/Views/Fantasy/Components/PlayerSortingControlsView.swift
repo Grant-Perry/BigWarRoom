@@ -86,21 +86,3 @@ struct PlayerSortingControlsView: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    @Previewable @State var sortMethod: MatchupSortingMethod = .position
-    @Previewable @State var sortHigh = false
-    
-    return VStack(spacing: 20) {
-        PlayerSortingControlsView(
-            sortingMethod: $sortMethod,
-            sortHighToLow: $sortHigh
-        )
-        
-        Text("Current: \(sortMethod.displayName) - \(sortHigh ? "Z-A" : "A-Z")")
-    }
-    .padding()
-    .background(Color.black)
-}

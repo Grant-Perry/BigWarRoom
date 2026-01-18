@@ -25,12 +25,21 @@ struct FantasyChoppedLeaderboardContainer: View {
             )
         } else {
             // Fallback to mock data for non-Sleeper leagues
-            let choppedSummary = fantasyMatchupListViewModel.createChoppedSummaryFromMatchups()
-            ChoppedLeaderboardView(
-                choppedSummary: choppedSummary,
-                leagueName: fantasyViewModel.selectedLeague?.league.name ?? "Chopped League",
-                leagueID: fantasyViewModel.selectedLeague?.league.leagueID ?? ""
-            )
+            // Chopped League Content
+            if let choppedSummary = fantasyMatchupListViewModel.createChoppedSummaryFromMatchups() {
+                ChoppedLeaderboardView(
+                    choppedSummary: choppedSummary,
+                    leagueName: fantasyViewModel.selectedLeague?.league.name ?? "Chopped League",
+                    leagueID: fantasyViewModel.selectedLeague?.league.leagueID ?? ""
+                )
+            } else {
+                // Empty state when no teams are available
+                ContentUnavailableView(
+                    "No Teams Available",
+                    systemImage: "person.3.slash",
+                    description: Text("Unable to load Chopped league data")
+                )
+            }
         }
     }
 }

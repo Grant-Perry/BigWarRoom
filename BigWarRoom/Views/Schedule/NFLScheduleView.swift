@@ -1218,8 +1218,3 @@ struct NFLScheduleView: View {
         return formatter.string(from: weekStartDate)
     }
 }
-
-#Preview("NFL Schedule") {
-    NFLScheduleView()
-        .preferredColorScheme(.dark)
-}

@@ -217,58 +217,6 @@ struct FieldPositionView: View {
     }
 }
 
-// MARK: - Preview
-
-#Preview("Field Position Tests") {
-    ScrollView {
-        VStack(spacing: 24) {
-
-            // Test 1: Q1 - HOU attacking (ball at HOU 35)
-            testCase(
-                title: "",
-                expected: "",
-                yardLine: "PIT 37",
-                awayTeam: "HOU",
-                homeTeam: "PIT",
-                possession: "HOU",
-                quarter: 3
-            )
-            
-
-        }
-        .padding()
-    }
-    .background(Color.black)
-    .environment(TeamAssetManager())
-}
-
-#Preview("Quick Visual Test") {
-    VStack(spacing: 20) {
-        Text("QUARTERS 1-4: Same Position")
-            .font(.caption)
-            .foregroundStyle(.white)
-        
-        ForEach(1...4, id: \.self) { quarter in
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Q\(quarter): HOU ball at HOU 30")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                
-                FieldPositionView(
-                    yardLine: "HOU 30",
-                    awayTeam: "HOU",
-                    homeTeam: "PIT",
-                    possession: "HOU",
-                    quarter: quarter
-                )
-            }
-        }
-    }
-    .padding()
-    .background(Color.black)
-    .environment(TeamAssetManager())
-}
-
 // MARK: - Helper
 
 @ViewBuilder

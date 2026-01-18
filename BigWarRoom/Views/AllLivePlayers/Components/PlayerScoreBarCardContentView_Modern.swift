@@ -613,21 +613,3 @@ struct PlayerScoreBarCardContentView_Modern: View {
         )]
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        
-        VStack(spacing: 12) {
-            Text("Modern Sports App Design")
-                .font(.headline)
-                .foregroundColor(.white)
-            
-            Text("Thin cards • High contrast • Glanceable data")
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.6))
-        }
-    }
-}

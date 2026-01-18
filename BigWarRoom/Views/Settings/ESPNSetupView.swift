@@ -96,9 +96,3 @@ struct ESPNSetupView: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview {
-    ESPNSetupView()
-}

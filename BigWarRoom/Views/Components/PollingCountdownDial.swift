@@ -93,29 +93,3 @@ struct PollingCountdownDial: View {
         }, perform: {})
     }
 }
-
-#Preview {
-    VStack(spacing: 20) {
-        PollingCountdownDial(
-            countdown: 12.0,
-            maxInterval: 15.0,
-            isPolling: true,
-            onRefresh: {}
-        )
-        
-        PollingCountdownDial(
-            countdown: 5.0,
-            maxInterval: 15.0,
-            isPolling: true,
-            onRefresh: {}
-        )
-        
-        PollingCountdownDial(
-            countdown: 1.0,
-            maxInterval: 15.0,
-            isPolling: true,
-            onRefresh: {}
-        )
-    }
-    .padding()
-}

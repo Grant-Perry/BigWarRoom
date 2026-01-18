@@ -111,10 +111,3 @@ struct SpinningOrbsView: View {
         rotationAngle = 360
     }
 }
-
-#Preview {
-    SpinningOrbsView()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-        .preferredColorScheme(.dark)
-}

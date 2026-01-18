@@ -160,18 +160,3 @@ struct LeagueLoadingRow: View {
         )
     }
 }
-
-// MARK: -> Preview
-#Preview {
-    MatchupsHubLoadingIndicator(
-        currentLeague: "Loading ESPN Fantasy League...",
-        progress: 0.65,
-        loadingStates: [
-            "espn_1": LeagueLoadingState(name: "ESPN Fantasy", status: .completed, progress: 1.0),
-            "sleeper_1": LeagueLoadingState(name: "Sleeper Dynasty", status: .loading, progress: 0.7),
-            "sleeper_2": LeagueLoadingState(name: "Chopped League", status: .pending, progress: 0.0)
-        ]
-    )
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(Color.black)
-}

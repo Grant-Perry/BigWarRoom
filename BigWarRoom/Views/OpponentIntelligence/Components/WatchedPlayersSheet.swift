@@ -717,8 +717,3 @@ struct WatchedPlayerCard: View {
         return sleeperPlayerData?.headshotURL
     }
 }
-
-#Preview("Watched Players Sheet") {
-    WatchedPlayersSheet(watchService: PlayerWatchService.shared)
-        .preferredColorScheme(.dark)
-}

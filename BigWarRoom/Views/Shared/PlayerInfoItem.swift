@@ -62,12 +62,3 @@ struct PlayerInfoItem: View {
         }
     }
 }
-
-#Preview {
-    VStack(spacing: 16) {
-        PlayerInfoItem("Age", "25")
-        PlayerInfoItem("Experience", "Y3")
-        PlayerInfoItem("Height", "6' 2\"", style: .compact)
-    }
-    .padding()
-}

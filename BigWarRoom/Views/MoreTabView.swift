@@ -268,8 +268,3 @@ struct MoreRowView: View {
         )
     }
 }
-
-#Preview("More Tab") {
-    MoreTabView(viewModel: DraftRoomViewModel())
-        .preferredColorScheme(.dark)
-}

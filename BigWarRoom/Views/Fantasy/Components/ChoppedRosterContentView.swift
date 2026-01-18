@@ -71,10 +71,3 @@ struct ChoppedRosterContentView: View {
         }
     }
 }
-
-#Preview {
-    // Cannot preview without proper models setup
-    Text("ChoppedRosterContentView Preview")
-        .foregroundColor(.white)
-        .background(Color.black)
-}

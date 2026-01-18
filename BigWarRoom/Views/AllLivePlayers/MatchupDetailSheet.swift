@@ -49,8 +49,3 @@ struct MatchupDetailSheet: View {
         }
     }
 }
-
-#Preview {
-    // Preview requires a mock UnifiedMatchup - would need proper setup
-    Text("MatchupDetailSheet Preview")
-}

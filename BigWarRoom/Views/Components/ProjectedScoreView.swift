@@ -80,27 +80,3 @@ struct ProjectedScoreView: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview("Winning") {
-    ZStack {
-        Color.black
-        ProjectedScoreView(
-            myProjected: 125.5,
-            opponentProjected: 108.2,
-            size: .large
-        )
-    }
-}
-
-#Preview("Losing") {
-    ZStack {
-        Color.black
-        ProjectedScoreView(
-            myProjected: 95.3,
-            opponentProjected: 112.8,
-            size: .large
-        )
-    }
-}

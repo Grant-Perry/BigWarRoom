@@ -187,16 +187,3 @@ struct AllLivePlayersLoadingView: View {
         }
     }
 }
-
-#Preview("All Live Players Loading") {
-    ZStack {
-        Image("BG7")
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .opacity(0.35)
-            .ignoresSafeArea(.all)
-        
-        AllLivePlayersLoadingView()
-    }
-    .preferredColorScheme(.dark)
-}

@@ -34,10 +34,3 @@ struct ChoppedEmptyBenchView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
-
-#Preview {
-    ChoppedEmptyBenchView()
-        .padding()
-        .background(Color.black)
-        .preferredColorScheme(.dark)
-}

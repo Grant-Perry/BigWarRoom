@@ -113,16 +113,3 @@ struct PlayerNotFoundView: View {
         }
     }
 }
-
-#Preview {
-    PlayerNotFoundView(
-        player: Player(
-            id: "unknown-player",
-            firstInitial: "J",
-            lastName: "Unknown",
-            position: .wr,
-            team: "UNK",
-            tier: 4
-        )
-    )
-}

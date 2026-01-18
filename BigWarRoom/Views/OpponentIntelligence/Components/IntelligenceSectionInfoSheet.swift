@@ -300,8 +300,3 @@ struct IntelligenceSectionConfig {
     let strategicValue: String?
     let example: String?
 }
-
-#Preview("Injury Alerts Info") {
-    IntelligenceSectionInfoSheet(sectionType: .injuryAlerts)
-        .preferredColorScheme(.dark)
-}

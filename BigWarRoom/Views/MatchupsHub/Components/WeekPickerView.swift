@@ -191,20 +191,3 @@ struct WeekPickerView: View {
         }
     }
 }
-
-// MARK: - Preview
-#Preview {
-    ZStack {
-        Color.black.ignoresSafeArea()
-        
-        WeekPickerView(
-            weekManager: WeekSelectionManager(nflWeekService: NFLWeekService(apiClient: SleeperAPIClient())),
-            yearManager: SeasonYearManager.shared,
-            isPresented: .constant(true),
-            onPlayoffsSelected: {
-                print("Navigate to playoffs")
-            }
-        )
-    }
-    .preferredColorScheme(.dark)
-}

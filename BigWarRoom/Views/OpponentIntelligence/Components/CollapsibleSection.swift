@@ -119,33 +119,3 @@ struct CollapsibleSection<Content: View>: View {
         }
     }
 }
-
-// MARK: - Preview
-
-#Preview("Collapsible Section") {
-    VStack(spacing: 16) {
-        CollapsibleSection(
-            title: "Player Injury Alerts",
-            count: 3,
-            isExpanded: .constant(true)
-        ) {
-            VStack(spacing: 8) {
-                Text("Josh Allen - BYE Week")
-                Text("Cooper Kupp - Out")
-                Text("Travis Kelce - Questionable")
-            }
-            .padding(.vertical, 8)
-        }
-        
-        CollapsibleSection(
-            title: "Threat Matrix",
-            count: 5,
-            isExpanded: .constant(false)
-        ) {
-            Text("Collapsed content")
-        }
-    }
-    .padding()
-    .background(Color.black)
-    .preferredColorScheme(.dark)
-}

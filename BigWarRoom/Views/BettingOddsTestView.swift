@@ -513,7 +513,3 @@ struct BettingOddsTestView: View {
         }
     }
 }
-
-#Preview {
-    BettingOddsTestView()
-}

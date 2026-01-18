@@ -359,10 +359,3 @@ struct NFLPlayerCard: View {
         return .secondary
     }
 }
-
-#Preview("NFL Team Roster") {
-    NavigationView {
-        NFLTeamRosterView(teamCode: "KC")
-            .preferredColorScheme(.dark)
-    }
-}

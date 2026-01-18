@@ -64,13 +64,3 @@ struct StatBubbleView: View {
         .scaleEffect(isLarge ? 1.03 : 1.0)
     }
 }
-
-#Preview {
-    HStack(spacing: 12) {
-        StatBubbleView(value: "25.6", label: "PPR PTS", color: .gpGreen, isLarge: true)
-        StatBubbleView(value: "15/22", label: "CMP/ATT", color: .blue)
-        StatBubbleView(value: "287", label: "PASS YD", color: .purple)
-    }
-    .padding()
-    .background(Color.black)
-}

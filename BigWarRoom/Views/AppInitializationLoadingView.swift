@@ -145,8 +145,3 @@ struct AppInitializationLoadingView: View {
         }
     }
 }
-
-#Preview {
-    AppInitializationLoadingView(initManager: AppInitializationManager.shared)
-        .preferredColorScheme(.dark)
-}
