@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct NFLScheduleView: View {
-    @State private var viewModel: NFLScheduleViewModel?
+    @State private var nFLScheduleViewModel: NFLScheduleViewModel?
     @Environment(MatchupsHubViewModel.self) private var matchupsHubViewModel
     @Environment(WeekSelectionManager.self) private var weekSelectionManager
     @Environment(NFLStandingsService.self) private var standingsService
@@ -77,7 +77,7 @@ struct NFLScheduleView: View {
             foxStyleBackground
                 .ignoresSafeArea()
             
-            if let viewModel = viewModel {
+            if let nFLScheduleViewModel = nFLScheduleViewModel {
                 // 🏈 NEW: Show playoff bracket for weeks > 18
                 if weekSelectionManager.selectedWeek > 18 {
                     // 🔥 SIMPLIFIED: Check bracketLoaded flag instead of service state
@@ -98,12 +98,12 @@ struct NFLScheduleView: View {
                 } else {
                     VStack(spacing: 0) {
                         // Header Section
-                        scheduleHeader(viewModel: viewModel)
+                        scheduleHeader(nFLScheduleViewModel: nFLScheduleViewModel)
                             .padding(.top, 12)
                             .padding(.bottom, 16)
                         
                         // Games List
-                        gamesList(viewModel: viewModel)
+                        gamesList(nFLScheduleViewModel: nFLScheduleViewModel)
                     }
                 }
             } else {
@@ -113,7 +113,7 @@ struct NFLScheduleView: View {
                         let sleeperAPI = SleeperAPIClient()
                         sleeperAPIClient = sleeperAPI
                         
-                        viewModel = NFLScheduleViewModel(
+                        nFLScheduleViewModel = NFLScheduleViewModel(
                             gameDataService: nflGameDataService,
                             weekService: nflWeekService,
                             bettingOddsService: bettingOddsService
@@ -131,10 +131,10 @@ struct NFLScheduleView: View {
         }
         .navigationBarHidden(true)
         .sheet(isPresented: Binding(
-            get: { viewModel?.showingGameDetail ?? false },
-            set: { if let vm = viewModel { vm.showingGameDetail = $0 } }
+            get: { nFLScheduleViewModel?.showingGameDetail ?? false },
+            set: { if let vm = nFLScheduleViewModel { vm.showingGameDetail = $0 } }
         )) {
-            if let game = viewModel?.selectedGame {
+            if let game = nFLScheduleViewModel?.selectedGame {
                 GameDetailView(game: game)
             }
         }
@@ -193,7 +193,7 @@ struct NFLScheduleView: View {
         // Sync with shared week manager
         .onChange(of: weekSelectionManager.selectedWeek) { _, newWeek in
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: WeekSelectionManager changed to week \(newWeek), updating view model")
-            viewModel?.selectWeek(newWeek)
+            nFLScheduleViewModel?.selectWeek(newWeek)
             
             // 🏈 NEW: Load playoff bracket if in playoffs
             ensurePlayoffServiceCreated()
@@ -211,7 +211,7 @@ struct NFLScheduleView: View {
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Year changed from \(oldYear) to \(newYear)")
             
             // Refresh schedule for new year
-            viewModel?.refreshSchedule()
+            nFLScheduleViewModel?.refreshSchedule()
             
             // If we're viewing playoffs, refresh the bracket with new year
             if weekSelectionManager.selectedWeek > 18 {
@@ -232,13 +232,13 @@ struct NFLScheduleView: View {
             DebugPrint(mode: .weekCheck, "📅 NFLScheduleView: Syncing to WeekSelectionManager week \(weekSelectionManager.selectedWeek)")
             
             // Sync initial week
-            viewModel?.selectWeek(weekSelectionManager.selectedWeek)
+            nFLScheduleViewModel?.selectWeek(weekSelectionManager.selectedWeek)
             
             // 🔥 ASYNC: Wrap heavy operations in Task to prevent blocking main thread
             Task {
                 DebugPrint(mode: .appLoad, "📅 NFLScheduleView: Starting refreshSchedule at \(Date())")
                 // Start global auto-refresh for live scores
-                viewModel?.refreshSchedule() // Initial load only
+                nFLScheduleViewModel?.refreshSchedule() // Initial load only
                 DebugPrint(mode: .appLoad, "📅 NFLScheduleView: refreshSchedule completed at \(Date())")
             }
             
@@ -307,7 +307,7 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Header Section
-    private func scheduleHeader(viewModel: NFLScheduleViewModel) -> some View {
+    private func scheduleHeader(nFLScheduleViewModel: NFLScheduleViewModel) -> some View {
         VStack(spacing: 8) {
             TheWeekPicker(showingWeekPicker: $showingWeekPicker, weekManager: weekSelectionManager)
             
@@ -350,7 +350,7 @@ struct NFLScheduleView: View {
                 }
             }
             
-            if viewModel.games.contains(where: { $0.isLive }) {
+            if nFLScheduleViewModel.games.contains(where: { $0.isLive }) {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(Color.red)
@@ -378,19 +378,19 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Games List
-    private func gamesList(viewModel: NFLScheduleViewModel) -> some View {
+    private func gamesList(nFLScheduleViewModel: NFLScheduleViewModel) -> some View {
         Group {
-            if viewModel.isLoading && viewModel.games.isEmpty {
+            if nFLScheduleViewModel.isLoading && nFLScheduleViewModel.games.isEmpty {
                 loadingView
-            } else if viewModel.errorMessage?.isEmpty == false {
+            } else if nFLScheduleViewModel.errorMessage?.isEmpty == false {
                 errorView
-            } else if viewModel.games.isEmpty {
+            } else if nFLScheduleViewModel.games.isEmpty {
                 emptyStateView
             } else {
                 if cardStyle == 2 {
-                    classicFlatListView(viewModel: viewModel)
+                    classicFlatListView(nFLScheduleViewModel: nFLScheduleViewModel)
                 } else {
-                    gamesScrollView(viewModel: viewModel)
+                    gamesScrollView(nFLScheduleViewModel: nFLScheduleViewModel)
                 }
             }
         }
@@ -446,10 +446,10 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Classic Flat List View (original 12/25 layout - no grouping, no odds)
-    private func classicFlatListView(viewModel: NFLScheduleViewModel) -> some View {
+    private func classicFlatListView(nFLScheduleViewModel: NFLScheduleViewModel) -> some View {
         ScrollView(showsIndicators: false) {
             LazyVStack(spacing: 8) {
-                ForEach(viewModel.games, id: \.id) { game in
+                ForEach(nFLScheduleViewModel.games, id: \.id) { game in
                     NavigationLink(destination: TeamFilteredMatchupsView(
                         awayTeam: game.awayTeam,
                         homeTeam: game.homeTeam,
@@ -459,7 +459,7 @@ struct NFLScheduleView: View {
                     )) {
                         ScheduleGameCard(
                             game: game,
-                            odds: viewModel.gameOddsByGameID[game.id],  
+                            odds: nFLScheduleViewModel.gameOddsByGameID[game.id],  
                             action: {},
                             showDayTime: true
                         )
@@ -470,9 +470,9 @@ struct NFLScheduleView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
                 
-                if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
+                if let manager = unifiedLeagueManager, !nFLScheduleViewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
-                        byeTeams: viewModel.byeWeekTeams,
+                        byeTeams: nFLScheduleViewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
                         matchupsHubViewModel: matchupsHubViewModel,
                         weekSelectionManager: weekSelectionManager,
@@ -480,11 +480,11 @@ struct NFLScheduleView: View {
                         teamAssetManager: teamAssetManager
                     )
                     .padding(.top, 24)
-                } else if viewModel.byeWeekTeams.isEmpty {
+                } else if nFLScheduleViewModel.byeWeekTeams.isEmpty {
                     VStack(spacing: 10) {
                         noByeWeeksBanner
                         
-                        if shouldShowPlayoffKey(for: viewModel) {
+                        if shouldShowPlayoffKey(for: nFLScheduleViewModel) {
                             playoffStatusKey
                         }
                     }
@@ -498,8 +498,8 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Games Scroll View
-    private func gamesScrollView(viewModel: NFLScheduleViewModel) -> some View {
-        let groupedByDay = groupGamesByDay(viewModel.games)
+    private func gamesScrollView(nFLScheduleViewModel: NFLScheduleViewModel) -> some View {
+        let groupedByDay = groupGamesByDay(nFLScheduleViewModel.games)
         let sortedDays = groupedByDay.keys.sorted { day1, day2 in
             guard let game1 = groupedByDay[day1]?.values.flatMap({ $0 }).first?.startDate,
                   let game2 = groupedByDay[day2]?.values.flatMap({ $0 }).first?.startDate else { return false }
@@ -513,7 +513,7 @@ struct NFLScheduleView: View {
                         daySectionView(
                             day: day,
                             timeSlots: timeSlots,
-                            viewModel: viewModel
+                            nFLScheduleViewModel: nFLScheduleViewModel
                         )
                     }
                 }
@@ -550,9 +550,9 @@ struct NFLScheduleView: View {
                     }
                 }
                 
-                if let manager = unifiedLeagueManager, !viewModel.byeWeekTeams.isEmpty {
+                if let manager = unifiedLeagueManager, !nFLScheduleViewModel.byeWeekTeams.isEmpty {
                     ScheduleByeWeekSection(
-                        byeTeams: viewModel.byeWeekTeams,
+                        byeTeams: nFLScheduleViewModel.byeWeekTeams,
                         unifiedLeagueManager: manager,
                         matchupsHubViewModel: matchupsHubViewModel,
                         weekSelectionManager: weekSelectionManager,
@@ -562,11 +562,11 @@ struct NFLScheduleView: View {
                     .padding(.top, 12)
                 }
                 
-                if viewModel.byeWeekTeams.isEmpty {
+                if nFLScheduleViewModel.byeWeekTeams.isEmpty {
                     VStack(spacing: 10) {
                         noByeWeeksBanner
                         
-                        if shouldShowPlayoffKey(for: viewModel) {
+                        if shouldShowPlayoffKey(for: nFLScheduleViewModel) {
                             playoffStatusKey
                         }
                     }
@@ -618,7 +618,7 @@ struct NFLScheduleView: View {
     private func daySectionView(
         day: String,
         timeSlots: [String: [ScheduleGame]],
-        viewModel: NFLScheduleViewModel
+        nFLScheduleViewModel: NFLScheduleViewModel
     ) -> some View {
         let allGamesInDay = timeSlots.values.flatMap { $0 }
         let hasLiveGames = allGamesInDay.contains { $0.isLive }
@@ -678,7 +678,7 @@ struct NFLScheduleView: View {
                             )) {
                                 ScheduleGameCard(
                                     game: game,
-                                    odds: viewModel.gameOddsByGameID[game.id],
+                                    odds: nFLScheduleViewModel.gameOddsByGameID[game.id],
                                     action: {},
                                     showStartTime: true  
                                 )
@@ -697,7 +697,7 @@ struct NFLScheduleView: View {
                                     time: time,
                                     day: day,
                                     games: games,
-                                    viewModel: viewModel
+                                    nFLScheduleViewModel: nFLScheduleViewModel
                                 )
                             }
                         }
@@ -815,7 +815,7 @@ struct NFLScheduleView: View {
         time: String,
         day: String,
         games: [ScheduleGame],
-        viewModel: NFLScheduleViewModel
+        nFLScheduleViewModel: NFLScheduleViewModel
     ) -> some View {
         let slotKey = "\(day)_\(time)"
         let hasLiveGames = games.contains { $0.isLive }
@@ -839,7 +839,7 @@ struct NFLScheduleView: View {
                     isExpanded: isExpanded,
                     isCollapsible: true,
                     games: games,
-                    viewModel: viewModel
+                    nFLScheduleViewModel: nFLScheduleViewModel
                 )
             }
             .buttonStyle(.plain)
@@ -857,12 +857,12 @@ struct NFLScheduleView: View {
                             if cardStyle == 0 {
                                 ScheduleGameCardCompact(
                                     game: game,
-                                    odds: viewModel.gameOddsByGameID[game.id]
+                                    odds: nFLScheduleViewModel.gameOddsByGameID[game.id]
                                 )
                             } else {
                                 ScheduleGameCard(
                                     game: game,
-                                    odds: viewModel.gameOddsByGameID[game.id],
+                                    odds: nFLScheduleViewModel.gameOddsByGameID[game.id],
                                     action: {}
                                 )
                             }
@@ -887,7 +887,7 @@ struct NFLScheduleView: View {
         isExpanded: Bool,
         isCollapsible: Bool,
         games: [ScheduleGame],
-        viewModel: NFLScheduleViewModel
+        nFLScheduleViewModel: NFLScheduleViewModel
     ) -> some View {
         let hasLiveGames = games.contains { $0.isLive }
         
@@ -923,7 +923,7 @@ struct NFLScheduleView: View {
             Spacer()
             
             if !isExpanded {
-                miniOddsPreview(games: games, viewModel: viewModel)
+                miniOddsPreview(games: games, nFLScheduleViewModel: nFLScheduleViewModel)
             }
             
             Text(day.uppercased())
@@ -973,12 +973,12 @@ struct NFLScheduleView: View {
     }
     
     // MARK: -> Mini Odds Preview (shown when collapsed)
-    private func miniOddsPreview(games: [ScheduleGame], viewModel: NFLScheduleViewModel) -> some View {
+    private func miniOddsPreview(games: [ScheduleGame], nFLScheduleViewModel: NFLScheduleViewModel) -> some View {
         let previewGames = Array(games.prefix(3))
         
         return HStack(spacing: 4) {
             ForEach(previewGames, id: \.id) { game in
-                if let odds = viewModel.gameOddsByGameID[game.id],
+                if let odds = nFLScheduleViewModel.gameOddsByGameID[game.id],
                    let team = odds.favoriteMoneylineTeamCode,
                    let ml = odds.favoriteMoneylineOdds {
                     HStack(spacing: 2) {
@@ -1180,8 +1180,8 @@ struct NFLScheduleView: View {
             )
     }
     
-    private func shouldShowPlayoffKey(for viewModel: NFLScheduleViewModel) -> Bool {
-        let teamCodes = Set(viewModel.games.flatMap { [$0.awayTeam, $0.homeTeam] })
+    private func shouldShowPlayoffKey(for nFLScheduleViewModel: NFLScheduleViewModel) -> Bool {
+        let teamCodes = Set(nFLScheduleViewModel.games.flatMap { [$0.awayTeam, $0.homeTeam] })
         for code in teamCodes {
             let status = standingsService.getPlayoffStatus(for: code)
             if status == .clinched || status == .eliminated {
