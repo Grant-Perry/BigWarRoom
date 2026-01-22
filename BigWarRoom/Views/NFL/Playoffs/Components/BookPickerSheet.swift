@@ -9,6 +9,8 @@ import SwiftUI
 
 struct BookPickerSheet: View {
    @Environment(\.dismiss) private var dismiss
+   @Environment(BettingOddsService.self) private var bettingOddsService // 🔥 NEW: For manual refresh
+   
    let odds: GameBettingOdds
    @Binding var selectedBook: String
    let onDismiss: () -> Void
@@ -61,28 +63,63 @@ struct BookPickerSheet: View {
                   }
                }
                
-               // Notice about Settings - spans both columns
-               HStack(spacing: 8) {
-                  Image(systemName: "info.circle.fill")
-                     .foregroundStyle(.blue)
-                     .font(.system(size: 14))
+               // Notice about Settings + Refresh Button - spans both columns
+               VStack(spacing: 8) {
+                  // Settings notice
+                  HStack(spacing: 8) {
+                     Image(systemName: "info.circle.fill")
+                        .foregroundStyle(.blue)
+                        .font(.system(size: 14))
+                     
+                     Text("Set your default sportsbook in ")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                     +
+                     Text("Settings")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.blue)
+                  }
+                  .padding(.horizontal, 12)
+                  .padding(.vertical, 10)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .background(Color(.tertiarySystemGroupedBackground))
+                  .cornerRadius(10)
+                  .onTapGesture {
+                     showingSettings = true
+                  }
                   
-                  Text("Set your default sportsbook in ")
-                     .font(.caption)
-                     .foregroundStyle(.secondary)
-                  +
-                  Text("Settings")
-                     .font(.caption)
-                     .fontWeight(.semibold)
-                     .foregroundStyle(.blue)
-               }
-               .padding(.horizontal, 12)
-               .padding(.vertical, 10)
-               .frame(maxWidth: .infinity, alignment: .leading)
-               .background(Color(.tertiarySystemGroupedBackground))
-               .cornerRadius(10)
-               .onTapGesture {
-                  showingSettings = true
+                  // Refresh Odds Button
+                  Button {
+                     bettingOddsService.refreshGameOddsCache()
+                  } label: {
+                     HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                           .foregroundStyle(.cyan)
+                           .font(.system(size: 14, weight: .semibold))
+                        
+                        Text("Refresh Odds")
+                           .font(.caption)
+                           .fontWeight(.semibold)
+                           .foregroundStyle(.primary)
+                        
+                        Spacer()
+                        
+                        Text("Force update from API")
+                           .font(.caption2)
+                           .foregroundStyle(.secondary)
+                     }
+                     .padding(.horizontal, 12)
+                     .padding(.vertical, 10)
+                     .frame(maxWidth: .infinity)
+                     .background(Color(.tertiarySystemGroupedBackground))
+                     .cornerRadius(10)
+                     .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                           .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                     )
+                  }
+                  .buttonStyle(.plain)
                }
                .gridCellColumns(2)
             }

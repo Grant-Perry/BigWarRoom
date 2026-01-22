@@ -48,9 +48,14 @@ final class BettingOddsService {
     
     // MARK: - Public API
     
-    /// Force refresh game odds cache
+    /// Force refresh game odds cache (clears all caches and resets throttles)
     func refreshGameOddsCache() {
         bettingOddsCacheManager.clearGameOddsCache()
+        
+        // 🔥 NEW: Post notification to reset local throttles in views
+        NotificationCenter.default.post(name: .oddsManualRefreshRequested, object: nil)
+        
+        DebugPrint(mode: .bettingOdds, "🔄 [ODDS MANUAL REFRESH] Cache cleared + throttle reset notification sent")
     }
     
     /// Fetch betting odds for a player
@@ -225,4 +230,9 @@ final class BettingOddsService {
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: date)
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let oddsManualRefreshRequested = Notification.Name("OddsManualRefreshRequested")
 }

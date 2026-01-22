@@ -26,6 +26,12 @@ final class NFLPlayoffBracketService {
     @ObservationIgnored private var cacheTimestamps: [Int: Date] = [:]
     @ObservationIgnored private let cacheExpiration: TimeInterval = 300  // 5 minutes
     
+    // 🔥 NEW: Odds fetch throttling
+    @ObservationIgnored private var lastOddsFetchKey: String?
+    @ObservationIgnored private var lastOddsFetchAt: Date?
+    @ObservationIgnored private let oddsFetchThrottleInterval: TimeInterval = 600  // 10 minutes (same as NFLScheduleViewModel)
+    @ObservationIgnored private var manualRefreshObserver: NSObjectProtocol? // 🔥 NEW: Observer for manual refresh
+    
     @ObservationIgnored private var cancellable: AnyCancellable?
     @ObservationIgnored private var refreshTimer: Timer?
     
@@ -44,6 +50,17 @@ final class NFLPlayoffBracketService {
         self.weekSelectionManager = weekSelectionManager
         self.appLifecycleManager = appLifecycleManager
         self.bettingOddsService = bettingOddsService
+        
+        // 🔥 NEW: Listen for manual refresh notifications
+        manualRefreshObserver = NotificationCenter.default.addObserver(
+            forName: .oddsManualRefreshRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.resetOddsThrottle()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -720,11 +737,28 @@ final class NFLPlayoffBracketService {
         refreshTimer = nil
         cancellable?.cancel()
         cancellable = nil
+        if let observer = manualRefreshObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
     
     // MARK: - Fetch Playoff Game Odds
     
     private func fetchPlayoffGameOdds(bracket: PlayoffBracket, season: Int) async {
+        // 🔥 NEW: Local throttle to prevent excessive API calls
+        let playoffYear = season + 1
+        let oddsKey = "playoff_\(season)_\(playoffYear)"
+        
+        // Check if we should skip this fetch due to throttling
+        if lastOddsFetchKey == oddsKey,
+           let lastAt = lastOddsFetchAt,
+           Date().timeIntervalSince(lastAt) < oddsFetchThrottleInterval {
+            let secondsSinceLastFetch = Int(Date().timeIntervalSince(lastAt))
+            let secondsUntilNextFetch = Int(oddsFetchThrottleInterval - Date().timeIntervalSince(lastAt))
+            DebugPrint(mode: .bettingOdds, "⏱️ [PLAYOFF ODDS THROTTLED] Last fetch was \(secondsSinceLastFetch)s ago, next fetch in \(secondsUntilNextFetch)s")
+            return
+        }
+        
         // Convert playoff games to schedule game format for odds API
         let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
         
@@ -751,7 +785,6 @@ final class NFLPlayoffBracketService {
         }
         
         // Fetch odds (playoffs are in following year)
-        let playoffYear = season + 1
         let week = 19 // Use week 19 as proxy for playoffs
         
         DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
@@ -760,11 +793,27 @@ final class NFLPlayoffBracketService {
         // Store odds keyed by game ID
         gameOdds = odds
         
-        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetched odds for \(odds.count) playoff games")
+        // 🔥 NEW: Update throttle tracking
+        lastOddsFetchKey = oddsKey
+        lastOddsFetchAt = Date()
+        
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetched odds for \(odds.count) playoff games (throttle updated)")
         DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Odds keys: \(odds.keys.sorted().joined(separator: ", "))")
         
         for (gameID, gameOdds) in odds {
             DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   \(gameID): spread=\(gameOdds.spreadDisplay ?? "N/A"), total=\(gameOdds.totalDisplay ?? "N/A"), book=\(gameOdds.sportsbook ?? "N/A")")
+        }
+    }
+    
+    // 🔥 NEW: Reset local throttle (called when user manually refreshes from Settings)
+    private func resetOddsThrottle() async {
+        lastOddsFetchKey = nil
+        lastOddsFetchAt = nil
+        DebugPrint(mode: .bettingOdds, "🔄 [PLAYOFF ODDS] Local throttle reset - next fetch will be immediate")
+        
+        // Trigger immediate odds refresh if we have a bracket
+        if let bracket = currentBracket {
+            await fetchPlayoffGameOdds(bracket: bracket, season: bracket.season)
         }
     }
     

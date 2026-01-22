@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AppSettingsView: View {
-   @State private var viewModel: SettingsViewModel
+   @State private var settingsViewModel: SettingsViewModel
    @Environment(NFLWeekService.self) private var nflWeekService
    @Environment(WeekSelectionManager.self) private var weekSelectionManager
    @Environment(BettingOddsService.self) private var bettingOddsService // 🔥 NEW: For odds refresh
@@ -20,7 +20,7 @@ struct AppSettingsView: View {
    @AppStorage("PreferredSportsbook") private var preferredSportsbookRaw: String = Sportsbook.bestLine.rawValue
    @AppStorage("MatchupRefresh") private var matchupRefresh: Int = 15
    @AppStorage("WinProbabilitySD") private var winProbabilitySD: Double = 40.0
-   @AppStorage("OddsRefreshInterval") private var oddsRefreshInterval: Double = 15.0 // 🔥 NEW: Minutes between odds refreshes
+   @AppStorage("OddsRefreshInterval") private var oddsRefreshInterval: Double = 30.0
    
    // MARK: - Section State
    @State private var isGeneralExpanded = true
@@ -35,7 +35,7 @@ struct AppSettingsView: View {
    @State private var showWeekPicker = false
    
    init(nflWeekService: NFLWeekService) {
-      _viewModel = State(wrappedValue: SettingsViewModel(nflWeekService: nflWeekService))
+      _settingsViewModel = State(wrappedValue: SettingsViewModel(nflWeekService: nflWeekService))
    }
    
    var body: some View {
@@ -43,15 +43,15 @@ struct AppSettingsView: View {
          List {
             GeneralSettingsSection(
                isExpanded: $isGeneralExpanded,
-               autoRefreshEnabled: $viewModel.autoRefreshEnabled,
+               autoRefreshEnabled: $settingsViewModel.autoRefreshEnabled,
                matchupRefresh: $matchupRefresh,
-               keepAppActive: $viewModel.keepAppActive,
-               showEliminatedChoppedLeagues: $viewModel.showEliminatedChoppedLeagues,
-               showEliminatedPlayoffLeagues: $viewModel.showEliminatedPlayoffLeagues,
+               keepAppActive: $settingsViewModel.keepAppActive,
+               showEliminatedChoppedLeagues: $settingsViewModel.showEliminatedChoppedLeagues,
+               showEliminatedPlayoffLeagues: $settingsViewModel.showEliminatedPlayoffLeagues,
                onAutoRefreshChange: { _ in },
-               onKeepActiveChange: viewModel.updateKeepAppActive,
-               onChoppedChange: viewModel.updateShowEliminatedChoppedLeagues,
-               onPlayoffChange: viewModel.updateShowEliminatedPlayoffLeagues
+               onKeepActiveChange: settingsViewModel.updateKeepAppActive,
+               onChoppedChange: settingsViewModel.updateShowEliminatedChoppedLeagues,
+               onPlayoffChange: settingsViewModel.updateShowEliminatedPlayoffLeagues
             )
             
             AppearanceSettingsSection(
@@ -63,12 +63,12 @@ struct AppSettingsView: View {
             
             FeatureSettingsSection(
                isExpanded: $isFeaturesExpanded,
-               lineupThreshold: $viewModel.lineupOptimizationThreshold,
+               lineupThreshold: $settingsViewModel.lineupOptimizationThreshold,
                winProbabilitySD: $winProbabilitySD,
                preferredSportsbook: $preferredSportsbookRaw,
                oddsRefreshInterval: $oddsRefreshInterval, // 🔥 NEW: Pass odds refresh interval
-               onThresholdReset: viewModel.resetLineupOptimizationThreshold,
-               onThresholdChange: viewModel.updateLineupOptimizationThreshold,
+               onThresholdReset: settingsViewModel.resetLineupOptimizationThreshold,
+               onThresholdChange: settingsViewModel.updateLineupOptimizationThreshold,
                onOddsRefresh: {
                   bettingOddsService.refreshGameOddsCache()
                }
@@ -84,29 +84,29 @@ struct AppSettingsView: View {
             
             FantasyServicesSection(
                isExpanded: $isServicesExpanded,
-               espnStatus: viewModel.espnStatus,
-               espnHasCredentials: viewModel.espnHasCredentials,
-               sleeperStatus: viewModel.sleeperStatus,
-               sleeperHasCredentials: viewModel.sleeperHasCredentials,
-               onDisconnectESPN: viewModel.disconnectESPN,
-               onDisconnectSleeper: viewModel.disconnectSleeper,
-               onConnectDefault: viewModel.connectToDefaultServices
+               espnStatus: settingsViewModel.espnStatus,
+               espnHasCredentials: settingsViewModel.espnHasCredentials,
+               sleeperStatus: settingsViewModel.sleeperStatus,
+               sleeperHasCredentials: settingsViewModel.sleeperHasCredentials,
+               onDisconnectESPN: settingsViewModel.disconnectESPN,
+               onDisconnectSleeper: settingsViewModel.disconnectSleeper,
+               onConnectDefault: settingsViewModel.connectToDefaultServices
             )
             
             DataManagementSection(
                isExpanded: $isDataManagementExpanded,
-               onClearCache: viewModel.requestClearAllCache,
-               onClearCredentials: viewModel.requestClearAllServices,
-               onFactoryReset: viewModel.requestClearAllPersistedData
+               onClearCache: settingsViewModel.requestClearAllCache,
+               onClearCredentials: settingsViewModel.requestClearAllServices,
+               onFactoryReset: settingsViewModel.requestClearAllPersistedData
             )
             
             DeveloperSettingsSection(
                isExpanded: $isDeveloperExpanded,
-               debugModeEnabled: $viewModel.debugModeEnabled,
-               espnHasCredentials: viewModel.espnHasCredentials,
-               isTestingConnection: viewModel.isTestingConnection,
-               onTestESPN: viewModel.testESPNConnection,
-               onExportLogs: viewModel.exportDebugLogs
+               debugModeEnabled: $settingsViewModel.debugModeEnabled,
+               espnHasCredentials: settingsViewModel.espnHasCredentials,
+               isTestingConnection: settingsViewModel.isTestingConnection,
+               onTestESPN: settingsViewModel.testESPNConnection,
+               onExportLogs: settingsViewModel.exportDebugLogs
             )
             
             AboutSection(isExpanded: $isAboutExpanded)
@@ -124,24 +124,24 @@ struct AppSettingsView: View {
             }
          }
          .onAppear {
-            viewModel.refreshConnectionStatus()
+            settingsViewModel.refreshConnectionStatus()
          }
-         .alert("Confirm Clear Action", isPresented: $viewModel.showingClearConfirmation) {
+         .alert("Confirm Clear Action", isPresented: $settingsViewModel.showingClearConfirmation) {
             Button("Clear", role: .destructive) {
-               viewModel.confirmClearAction()
+               settingsViewModel.confirmClearAction()
             }
             Button("Cancel", role: .cancel) {
-               viewModel.cancelClearAction()
+               settingsViewModel.cancelClearAction()
             }
          } message: {
             Text("Are you sure you want to clear this data? This action cannot be undone.")
          }
-         .alert("Action Result", isPresented: $viewModel.showingClearResult) {
+         .alert("Action Result", isPresented: $settingsViewModel.showingClearResult) {
             Button("OK") {
-               viewModel.dismissClearResult()
+               settingsViewModel.dismissClearResult()
             }
          } message: {
-            Text(viewModel.clearResultMessage)
+            Text(settingsViewModel.clearResultMessage)
          }
       }
       

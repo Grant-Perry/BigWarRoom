@@ -33,6 +33,7 @@ final class NFLScheduleViewModel {
     @ObservationIgnored private var oddsTask: Task<Void, Never>?
     @ObservationIgnored private var lastOddsFetchKey: String?
     @ObservationIgnored private var lastOddsFetchAt: Date?
+    @ObservationIgnored private var manualRefreshObserver: NSObjectProtocol? // 🔥 NEW: Observer for manual refresh
     
     /// Teams on bye week for current schedule
     var byeWeekTeams: [NFLTeam] {
@@ -58,6 +59,15 @@ final class NFLScheduleViewModel {
         
         setupObservation()
         
+        // 🔥 NEW: Listen for manual refresh notifications
+        manualRefreshObserver = NotificationCenter.default.addObserver(
+            forName: .oddsManualRefreshRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resetOddsThrottle()
+        }
+        
         // Initial data load
         refreshSchedule()
     }
@@ -65,6 +75,9 @@ final class NFLScheduleViewModel {
     deinit {
         Task { @MainActor in
             observationTask?.cancel()
+            if let observer = manualRefreshObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
     }
     
@@ -215,6 +228,16 @@ final class NFLScheduleViewModel {
             let odds = await self.bettingOddsService.fetchGameOdds(for: slate, week: self.selectedWeek, year: year)
             self.gameOddsByGameID = odds
         }
+    }
+    
+    // 🔥 NEW: Reset local throttle (called when user manually refreshes from Settings)
+    private func resetOddsThrottle() {
+        lastOddsFetchKey = nil
+        lastOddsFetchAt = nil
+        DebugPrint(mode: .bettingOdds, "🔄 [SCHEDULE ODDS] Local throttle reset - next fetch will be immediate")
+        
+        // Trigger immediate odds refresh
+        refreshOddsIfNeeded()
     }
     
     /// Show game detail with fantasy players
