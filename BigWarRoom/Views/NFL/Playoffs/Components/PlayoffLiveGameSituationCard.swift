@@ -16,7 +16,6 @@ struct PlayoffLiveGameSituationCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            headerRow
             lastPlayAndDriveRow
             
             if shouldShowDownDistance {
@@ -45,22 +44,6 @@ struct PlayoffLiveGameSituationCard: View {
             } else {
                 DebugPrint(mode: .fieldPosition, "   ⚠️ shouldShowDownDistance=false - showing betweenPlaysState instead")
             }
-        }
-    }
-    
-    private var headerRow: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "football.circle")
-                .font(.title3)
-                .foregroundStyle(.red)
-                .frame(width: 24)
-            
-            Text("Live Game Situation")
-                .font(.subheadline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.primary)
-            
-            Spacer()
         }
     }
     

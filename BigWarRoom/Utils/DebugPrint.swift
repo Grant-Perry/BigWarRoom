@@ -15,7 +15,7 @@ enum DebugConfig {
 	  ///                                           │
 	  ///                         ┌──────────┘
 	  ///                         ▼
-   static var activeMode: DebugMode = [.fieldPosition] // [.bettingOdds, .bracketTimer]
+   static var activeMode: DebugMode = [] // [.fieldPosition] // [.bettingOdds, .bracketTimer]
 
 	  /// Reset all iteration counters (useful for testing)
    static func resetIterations() {

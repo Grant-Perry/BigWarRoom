@@ -731,197 +731,6 @@ final class NFLPlayoffBracketService {
         return code
     }
     
-    deinit {
-        DebugPrint(mode: .nflData, "♻️ NFLPlayoffBracketService deinit - cleaning up")
-        refreshTimer?.invalidate()
-        refreshTimer = nil
-        cancellable?.cancel()
-        cancellable = nil
-        if let observer = manualRefreshObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-    }
-    
-    // MARK: - Fetch Playoff Game Odds
-    
-    private func fetchPlayoffGameOdds(bracket: PlayoffBracket, season: Int) async {
-        // 🔥 NEW: Local throttle to prevent excessive API calls
-        let playoffYear = season + 1
-        let oddsKey = "playoff_\(season)_\(playoffYear)"
-        
-        // Check if we should skip this fetch due to throttling
-        if lastOddsFetchKey == oddsKey,
-           let lastAt = lastOddsFetchAt,
-           Date().timeIntervalSince(lastAt) < oddsFetchThrottleInterval {
-            let secondsSinceLastFetch = Int(Date().timeIntervalSince(lastAt))
-            let secondsUntilNextFetch = Int(oddsFetchThrottleInterval - Date().timeIntervalSince(lastAt))
-            DebugPrint(mode: .bettingOdds, "⏱️ [PLAYOFF ODDS THROTTLED] Last fetch was \(secondsSinceLastFetch)s ago, next fetch in \(secondsUntilNextFetch)s")
-            return
-        }
-        
-        // Convert playoff games to schedule game format for odds API
-        let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
-        
-        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetching odds for \(allGames.count) playoff games (season \(season))")
-        
-        var scheduleGames: [ScheduleGame] = []
-        for game in allGames {
-            let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
-            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Creating ScheduleGame with ID: '\(gameID)' - \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation)")
-            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   Round: \(game.round.rawValue), Date: \(game.gameDate)")
-            
-            let scheduleGame = ScheduleGame(
-                id: gameID,
-                awayTeam: game.awayTeam.abbreviation,
-                homeTeam: game.homeTeam.abbreviation,
-                awayScore: game.awayTeam.score ?? 0,
-                homeScore: game.homeTeam.score ?? 0,
-                gameStatus: game.status.isCompleted ? "final" : "pre",
-                gameTime: "",
-                startDate: game.gameDate,
-                isLive: game.isLive
-            )
-            scheduleGames.append(scheduleGame)
-        }
-        
-        // Fetch odds (playoffs are in following year)
-        let week = 19 // Use week 19 as proxy for playoffs
-        
-        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
-        let odds = await bettingOddsService.fetchGameOdds(for: scheduleGames, week: week, year: playoffYear)
-        
-        // Store odds keyed by game ID
-        gameOdds = odds
-        
-        // 🔥 NEW: Update throttle tracking
-        lastOddsFetchKey = oddsKey
-        lastOddsFetchAt = Date()
-        
-        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetched odds for \(odds.count) playoff games (throttle updated)")
-        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Odds keys: \(odds.keys.sorted().joined(separator: ", "))")
-        
-        for (gameID, gameOdds) in odds {
-            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   \(gameID): spread=\(gameOdds.spreadDisplay ?? "N/A"), total=\(gameOdds.totalDisplay ?? "N/A"), book=\(gameOdds.sportsbook ?? "N/A")")
-        }
-    }
-    
-    // 🔥 NEW: Reset local throttle (called when user manually refreshes from Settings)
-    private func resetOddsThrottle() async {
-        lastOddsFetchKey = nil
-        lastOddsFetchAt = nil
-        DebugPrint(mode: .bettingOdds, "🔄 [PLAYOFF ODDS] Local throttle reset - next fetch will be immediate")
-        
-        // Trigger immediate odds refresh if we have a bracket
-        if let bracket = currentBracket {
-            await fetchPlayoffGameOdds(bracket: bracket, season: bracket.season)
-        }
-    }
-    
-    // MARK: - Weekly Postseason Fetch
-    
-    private func fetchWeeklyPlayoffEvents(for season: Int) async throws -> [ESPNScoreboardResponse.Event] {
-        var all: [ESPNScoreboardResponse.Event] = []
-        for wk in 1...5 {
-            guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard?season=\(season)&seasontype=3&week=\(wk)") else { continue }
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                let resp = try JSONDecoder().decode(ESPNScoreboardResponse.self, from: data)
-                let events = resp.events ?? []
-                DebugPrint(mode: .nflData, "📥 Week \(wk) postseason events fetched: \(events.count)")
-                all.append(contentsOf: events)
-            } catch {
-                DebugPrint(mode: .nflData, "⚠️ Failed weekly fetch for week \(wk), season \(season): \(error)")
-            }
-        }
-        return all
-    }
-    
-    // MARK: - Super Bowl Detection & Fallback
-    
-    private func isGenericSuperBowl(_ game: PlayoffGame) -> Bool {
-        let home = game.homeTeam.abbreviation.uppercased()
-        let away = game.awayTeam.abbreviation.uppercased()
-        let isGenericHome = (home == "AFC" || home == "NFC" || home == "TBD" || home.isEmpty)
-        let isGenericAway = (away == "AFC" || away == "NFC" || away == "TBD" || away.isEmpty)
-        let missingScores = (game.homeTeam.score == nil && game.awayTeam.score == nil)
-        return isGenericHome || isGenericAway || missingScores
-    }
-    
-    private func fallbackSuperBowl(for season: Int) -> PlayoffGame? {
-        let results: [Int: (winner: String, loser: String, wScore: Int, lScore: Int, venue: String, city: String, state: String)] = [
-            2012: ("BAL","SF",34,31, "Mercedes-Benz Superdome", "New Orleans", "LA"),
-            2013: ("SEA","DEN",43,8, "MetLife Stadium", "East Rutherford", "NJ"),
-            2014: ("NE","SEA",28,24, "University of Phoenix Stadium", "Glendale", "AZ"),
-            2015: ("DEN","CAR",24,10, "Levi's Stadium", "Santa Clara", "CA"),
-            2016: ("NE","ATL",34,28, "NRG Stadium", "Houston", "TX"),
-            2017: ("PHI","NE",41,33, "U.S. Bank Stadium", "Minneapolis", "MN"),
-            2018: ("NE","LAR",13,3, "Mercedes-Benz Stadium", "Atlanta", "GA"),
-            2019: ("KC","SF",31,20, "Hard Rock Stadium", "Miami Gardens", "FL"),
-            2020: ("TB","KC",31,9, "Raymond James Stadium", "Tampa", "FL"),
-            2021: ("LAR","CIN",23,20, "SoFi Stadium", "Inglewood", "CA"),
-            2022: ("KC","PHI",38,35, "State Farm Stadium", "Glendale", "AZ"),
-            2023: ("KC","SF",25,22, "Allegiant Stadium", "Las Vegas", "NV"),
-            2024: ("PHI","KC",40,22, "Caesars Superdome", "New Orleans", "LA")
-        ]
-        guard let r = results[season] else { return nil }
-        
-        // Identify conferences to place NFC as home
-        let wTeam = NFLTeam.team(for: r.winner)
-        let lTeam = NFLTeam.team(for: r.loser)
-        guard let wConf = wTeam?.conference, let lConf = lTeam?.conference else { return nil }
-        
-        let nfcWinner = (wConf == .nfc)
-        let nfcAbbr = nfcWinner ? r.winner : r.loser
-        let afcAbbr = nfcWinner ? r.loser  : r.winner
-        let nfcScore = nfcWinner ? r.wScore : r.lScore
-        let afcScore = nfcWinner ? r.lScore : r.wScore
-        
-        let nfcName = NFLTeam.team(for: nfcAbbr)?.fullName ?? nfcAbbr
-        let afcName = NFLTeam.team(for: afcAbbr)?.fullName ?? afcAbbr
-        
-        let playoffYear = season + 1
-        let date = computeSuperBowlDate(for: playoffYear)
-        
-        let home = PlayoffTeam(abbreviation: nfcAbbr, name: nfcName, seed: nil, score: nfcScore, logoURL: nil, timeoutsRemaining: nil)
-        
-        let away = PlayoffTeam(abbreviation: afcAbbr, name: afcName, seed: nil, score: afcScore, logoURL: nil, timeoutsRemaining: nil)
-        
-        let venue = PlayoffGame.Venue(
-            fullName: r.venue,
-            city: r.city,
-            state: r.state
-        )
-        
-        return PlayoffGame(
-            id: "SB_\(season)",
-            round: .superBowl,
-            conference: .none,
-            homeTeam: home,
-            awayTeam: away,
-            gameDate: date,
-            status: .final,
-            venue: venue,
-            broadcasts: nil,
-            liveSituation: nil,
-            lastKnownDownDistance: nil
-        )
-    }
-    
-    private func computeSuperBowlDate(for playoffYear: Int) -> Date {
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = TimeZone(abbreviation: "UTC") ?? .current
-        let feb1 = cal.date(from: DateComponents(year: playoffYear, month: 2, day: 1)) ?? Date()
-        // find first Sunday in Feb
-        var d = feb1
-        while cal.component(.weekday, from: d) != 1 { // Sunday = 1
-            d = cal.date(byAdding: .day, value: 1, to: d)!
-        }
-        // 2nd Sunday
-        return cal.date(byAdding: .day, value: 7, to: d) ?? d
-    }
-    
-    // MARK: - Live Game Situation Fetch
-    
     /// Fetch live play-by-play situation for an in-progress game
     private func fetchLiveGameSituation(gameID: String) async -> LiveGameSituation? {
         let summaryURL = "https://site.web.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=\(gameID)"
@@ -946,6 +755,9 @@ final class NFLPlayoffBracketService {
             // Get team IDs first
             var homeTeamID: String? = nil
             var awayTeamID: String? = nil
+            
+            // 🏈 NEW: Get current period to handle timeout refreshes
+            var currentPeriod: Int = 1
 
             if let header = json?["header"] as? [String: Any],
                let competitions = header["competitions"] as? [[String: Any]],
@@ -963,7 +775,20 @@ final class NFLPlayoffBracketService {
                         }
                     }
                 }
+                
+                // 🏈 NEW: Extract current period from status
+                if let status = competition["status"] as? [String: Any],
+                   let period = status["period"] as? Int {
+                    currentPeriod = period
+                    DebugPrint(mode: .nflData, "🏈 [TIMEOUT PERIOD] Current period: \(currentPeriod)")
+                }
             }
+            
+            // 🏈 NEW: Determine starting timeouts and which periods to count based on current period
+            homeTimeouts = 3
+            awayTimeouts = 3
+            
+            DebugPrint(mode: .nflData, "🏈 [TIMEOUT RULES] Period \(currentPeriod): Starting with \(3) TOs, counting from period \(1)+")
 
             // Count timeout plays from drives
             if let drives = json?["drives"] as? [String: Any],
@@ -973,50 +798,93 @@ final class NFLPlayoffBracketService {
                 
                 for (driveIndex, drive) in previous.enumerated() {
                     if let plays = drive["plays"] as? [[String: Any]] {
-                        DebugPrint(mode: .nflData, "🔍 [TIMEOUT DEBUG] Drive \(driveIndex): \(plays.count) plays")
                         
                         for (playIndex, play) in plays.enumerated() {
                             // Check if this is a timeout play (type 21)
                             if let playType = play["type"] as? [String: Any],
                                let typeID = playType["id"] as? String {
                                 
-                                DebugPrint(mode: .nflData, "🔍 [TIMEOUT DEBUG] Drive \(driveIndex) Play \(playIndex): typeID=\(typeID)")
-                                
                                 if typeID == "21" {
-                                    DebugPrint(mode: .nflData, "🎯 [TIMEOUT FOUND] Drive \(driveIndex) Play \(playIndex) is a timeout!")
-                                    
-                                    if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
-                                        for participant in teamParticipants {
-                                            if let isTimeout = participant["timeout"] as? Bool,
-                                               isTimeout {
-                                                
-                                                // Try to extract team ID from the nested structure
-                                                var teamID: String? = nil
-                                                
-                                                // Parse team ID from $ref URL
-                                                if let teamRef = participant["team"] as? [String: Any],
-                                                   let ref = teamRef["$ref"] as? String {
-                                                    if let url = URL(string: ref) {
-                                                        let pathComponents = url.pathComponents
-                                                        if let teamsIndex = pathComponents.firstIndex(of: "teams"),
-                                                           teamsIndex + 1 < pathComponents.count {
-                                                            teamID = pathComponents[teamsIndex + 1]
+                                    // 🏈 NEW: Get the period this timeout occurred in
+                                    if let period = play["period"] as? [String: Any],
+                                       let periodNumber = period["number"] as? Int {
+                                        
+                                        // 🏈 NEW: Only count timeouts from relevant periods
+                                        if periodNumber >= 1 {
+                                            DebugPrint(mode: .nflData, "🎯 [TIMEOUT FOUND] Drive \(driveIndex) Play \(playIndex) in period \(periodNumber) (counting it)")
+                                            
+                                            if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
+                                                for participant in teamParticipants {
+                                                    if let isTimeout = participant["timeout"] as? Bool,
+                                                       isTimeout {
+                                                        
+                                                        // Try to extract team ID from the nested structure
+                                                        var teamID: String? = nil
+                                                        
+                                                        // Parse team ID from $ref URL
+                                                        if let teamRef = participant["team"] as? [String: Any],
+                                                           let ref = teamRef["$ref"] as? String {
+                                                            if let url = URL(string: ref) {
+                                                                let pathComponents = url.pathComponents
+                                                                if let teamsIndex = pathComponents.firstIndex(of: "teams"),
+                                                                   teamsIndex + 1 < pathComponents.count {
+                                                                    teamID = pathComponents[teamsIndex + 1]
+                                                                }
+                                                            }
+                                                        }
+                                                        
+                                                        // Fallback: try direct ID field
+                                                        if teamID == nil {
+                                                            teamID = participant["id"] as? String
+                                                        }
+                                                        
+                                                        if let tid = teamID {
+                                                            if tid == homeTeamID {
+                                                                homeTimeouts -= 1
+                                                                DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] Period \(periodNumber): Home team timeout used, remaining: \(homeTimeouts)")
+                                                            } else if tid == awayTeamID {
+                                                                awayTimeouts -= 1
+                                                                DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] Period \(periodNumber): Away team timeout used, remaining: \(awayTimeouts)")
+                                                            }
                                                         }
                                                     }
                                                 }
-                                                
-                                                // Fallback: try direct ID field
-                                                if teamID == nil {
-                                                    teamID = participant["id"] as? String
-                                                }
-                                                
-                                                if let tid = teamID {
-                                                    if tid == homeTeamID {
-                                                        homeTimeouts -= 1
-                                                        DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] Home team timeout used, remaining: \(homeTimeouts)")
-                                                    } else if tid == awayTeamID {
-                                                        awayTimeouts -= 1
-                                                        DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] Away team timeout used, remaining: \(awayTimeouts)")
+                                            }
+                                        } else {
+                                            DebugPrint(mode: .nflData, "⏭️ [TIMEOUT SKIPPED] Drive \(driveIndex) Play \(playIndex) in period \(periodNumber) (before period \(1) - ignoring due to refresh)")
+                                        }
+                                    } else {
+                                        DebugPrint(mode: .nflData, "⚠️ [TIMEOUT] No period info for drive \(driveIndex) play \(playIndex) - assuming current period")
+                                        // If no period info, count it (defensive fallback)
+                                        if let teamParticipants = play["teamParticipants"] as? [[String: Any]] {
+                                            for participant in teamParticipants {
+                                                if let isTimeout = participant["timeout"] as? Bool,
+                                                   isTimeout {
+                                                    var teamID: String? = nil
+                                                    
+                                                    if let teamRef = participant["team"] as? [String: Any],
+                                                       let ref = teamRef["$ref"] as? String {
+                                                        if let url = URL(string: ref) {
+                                                            let pathComponents = url.pathComponents
+                                                            if let teamsIndex = pathComponents.firstIndex(of: "teams"),
+                                                               teamsIndex + 1 < pathComponents.count {
+                                                                teamID = pathComponents[teamsIndex + 1]
+                                                            }
+                                                        }
+                                                    }
+                                                    
+                                                    if teamID == nil {
+                                                        teamID = participant["id"] as? String
+                                                    }
+                                                    
+                                                    if let tid = teamID {
+                                                        if tid == homeTeamID {
+                                                            homeTimeouts -= 1
+                                                            DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] (no period): Home team timeout used, remaining: \(homeTimeouts)")
+                                                        } else if tid == awayTeamID {
+                                                            awayTimeouts -= 1
+                                                            DebugPrint(mode: .nflData, "⏱️ [TIMEOUT DETECTED] (no period): Away team timeout used, remaining: \(awayTimeouts)")
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1128,6 +996,7 @@ final class NFLPlayoffBracketService {
                                 yardLine = possText
                                 DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS from possessionText] '\(possText)'")
                             } else if let endYardLine = playEndSituation["yardLine"] as? Int {
+                                
                                 DebugPrint(mode: .fieldPosition, "      🎯 [LAST PLAY END YARDLINE] Raw value: \(endYardLine)")
                                 
                                 if let team = currentDrive["team"] as? [String: Any],
@@ -1136,19 +1005,19 @@ final class NFLPlayoffBracketService {
                                     
                                     if endYardLine == 50 {
                                         yardLine = "50"
-                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] 50 yard line")
+                                        DebugPrint(mode: .fieldPosition, "      ✅ 50 yard line")
                                     } else if endYardLine > 50 {
                                         let normalizedYards = 100 - endYardLine
                                         yardLine = "\(normalizedYards)"
-                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] Converted \(endYardLine) → \(normalizedYards) yard line (opponent territory)")
+                                        DebugPrint(mode: .fieldPosition, "      ✅ Converted \(endYardLine) → \(normalizedYards) yard line (opponent territory)")
                                     } else {
                                         yardLine = "\(teamCode) \(endYardLine)"
-                                        DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] '\(yardLine!)'")
+                                        DebugPrint(mode: .fieldPosition, "      ✅ Constructed field position: '\(yardLine!)'")
                                     }
                                 } else {
                                     let normalizedYL = endYardLine > 50 ? (100 - endYardLine) : endYardLine
                                     yardLine = "\(normalizedYL)"
-                                    DebugPrint(mode: .fieldPosition, "      ✅ [CURRENT POS] Normalized: \(normalizedYL)")
+                                    DebugPrint(mode: .fieldPosition, "      ✅ Normalized: \(normalizedYL)")
                                 }
                             } else {
                                 DebugPrint(mode: .fieldPosition, "      ⚠️ No yardLine in lastPlay.end")
@@ -1416,5 +1285,194 @@ final class NFLPlayoffBracketService {
         currentBracket = updatedBracket
 
         DebugPrint(mode: .bracketTimer, "✅ [REFRESH LIVE SITUATIONS] Updated play-by-play data")
+    }
+    
+    // MARK: - Fetch Playoff Game Odds
+    
+    private func fetchPlayoffGameOdds(bracket: PlayoffBracket, season: Int) async {
+        // 🔥 NEW: Local throttle to prevent excessive API calls
+        let playoffYear = season + 1
+        let oddsKey = "playoff_\(season)_\(playoffYear)"
+        
+        // Check if we should skip this fetch due to throttling
+        if lastOddsFetchKey == oddsKey,
+           let lastAt = lastOddsFetchAt,
+           Date().timeIntervalSince(lastAt) < oddsFetchThrottleInterval {
+            let secondsSinceLastFetch = Int(Date().timeIntervalSince(lastAt))
+            let secondsUntilNextFetch = Int(oddsFetchThrottleInterval - Date().timeIntervalSince(lastAt))
+            DebugPrint(mode: .bettingOdds, "⏱️ [PLAYOFF ODDS THROTTLED] Last fetch was \(secondsSinceLastFetch)s ago, next fetch in \(secondsUntilNextFetch)s")
+            return
+        }
+        
+        // Convert playoff games to schedule game format for odds API
+        let allGames = bracket.afcGames + bracket.nfcGames + (bracket.superBowl != nil ? [bracket.superBowl!] : [])
+        
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetching odds for \(allGames.count) playoff games (season \(season))")
+        
+        var scheduleGames: [ScheduleGame] = []
+        for game in allGames {
+            let gameID = "\(game.awayTeam.abbreviation)@\(game.homeTeam.abbreviation)"
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Creating ScheduleGame with ID: '\(gameID)' - \(game.awayTeam.abbreviation) @ \(game.homeTeam.abbreviation)")
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   Round: \(game.round.rawValue), Date: \(game.gameDate)")
+            
+            let scheduleGame = ScheduleGame(
+                id: gameID,
+                awayTeam: game.awayTeam.abbreviation,
+                homeTeam: game.homeTeam.abbreviation,
+                awayScore: game.awayTeam.score ?? 0,
+                homeScore: game.homeTeam.score ?? 0,
+                gameStatus: game.status.isCompleted ? "final" : "pre",
+                gameTime: "",
+                startDate: game.gameDate,
+                isLive: game.isLive
+            )
+            scheduleGames.append(scheduleGame)
+        }
+        
+        // Fetch odds (playoffs are in following year)
+        let week = 19 // Use week 19 as proxy for playoffs
+        
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Calling bettingOddsService.fetchGameOdds for week \(week), year \(playoffYear)")
+        let odds = await bettingOddsService.fetchGameOdds(for: scheduleGames, week: week, year: playoffYear)
+        
+        // Store odds keyed by game ID
+        gameOdds = odds
+        
+        // 🔥 NEW: Update throttle tracking
+        lastOddsFetchKey = oddsKey
+        lastOddsFetchAt = Date()
+        
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Fetched odds for \(odds.count) playoff games (throttle updated)")
+        DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS] Odds keys: \(odds.keys.sorted().joined(separator: ", "))")
+        
+        for (gameID, gameOdds) in odds {
+            DebugPrint(mode: .bettingOdds, "🎰 [PLAYOFF ODDS]   \(gameID): spread=\(gameOdds.spreadDisplay ?? "N/A"), total=\(gameOdds.totalDisplay ?? "N/A"), book=\(gameOdds.sportsbook ?? "N/A")")
+        }
+    }
+    
+    // 🔥 NEW: Reset local throttle (called when user manually refreshes from Settings)
+    private func resetOddsThrottle() async {
+        lastOddsFetchKey = nil
+        lastOddsFetchAt = nil
+        DebugPrint(mode: .bettingOdds, "🔄 [PLAYOFF ODDS] Local throttle reset - next fetch will be immediate")
+        
+        // Trigger immediate odds refresh if we have a bracket
+        if let bracket = currentBracket {
+            await fetchPlayoffGameOdds(bracket: bracket, season: bracket.season)
+        }
+    }
+    
+    // MARK: - Weekly Postseason Fetch
+    
+    private func fetchWeeklyPlayoffEvents(for season: Int) async throws -> [ESPNScoreboardResponse.Event] {
+        var all: [ESPNScoreboardResponse.Event] = []
+        for wk in 1...5 {
+            guard let url = URL(string: "https://site.api.espn.com/apis/v2/sports/football/nfl/scoreboard?season=\(season)&seasontype=3&week=\(wk)") else { continue }
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                let resp = try JSONDecoder().decode(ESPNScoreboardResponse.self, from: data)
+                let events = resp.events ?? []
+                DebugPrint(mode: .nflData, "📥 Week \(wk) postseason events fetched: \(events.count)")
+                all.append(contentsOf: events)
+            } catch {
+                DebugPrint(mode: .nflData, "⚠️ Failed weekly fetch for week \(wk), season \(season): \(error)")
+            }
+        }
+        return all
+    }
+    
+    // MARK: - Super Bowl Detection & Fallback
+    
+    private func isGenericSuperBowl(_ game: PlayoffGame) -> Bool {
+        let home = game.homeTeam.abbreviation.uppercased()
+        let away = game.awayTeam.abbreviation.uppercased()
+        let isGenericHome = (home == "AFC" || home == "NFC" || home == "TBD" || home.isEmpty)
+        let isGenericAway = (away == "AFC" || away == "NFC" || away == "TBD" || away.isEmpty)
+        let missingScores = (game.homeTeam.score == nil && game.awayTeam.score == nil)
+        return isGenericHome || isGenericAway || missingScores
+    }
+    
+    private func fallbackSuperBowl(for season: Int) -> PlayoffGame? {
+        let results: [Int: (winner: String, loser: String, wScore: Int, lScore: Int, venue: String, city: String, state: String)] = [
+            2012: ("BAL","SF",34,31, "Mercedes-Benz Superdome", "New Orleans", "LA"),
+            2013: ("SEA","DEN",43,8, "MetLife Stadium", "East Rutherford", "NJ"),
+            2014: ("NE","SEA",28,24, "University of Phoenix Stadium", "Glendale", "AZ"),
+            2015: ("DEN","CAR",24,10, "Levi's Stadium", "Santa Clara", "CA"),
+            2016: ("NE","ATL",34,28, "NRG Stadium", "Houston", "TX"),
+            2017: ("PHI","NE",41,33, "U.S. Bank Stadium", "Minneapolis", "MN"),
+            2018: ("NE","LAR",13,3, "Mercedes-Benz Stadium", "Atlanta", "GA"),
+            2019: ("KC","SF",31,20, "Hard Rock Stadium", "Miami Gardens", "FL"),
+            2020: ("TB","KC",31,9, "Raymond James Stadium", "Tampa", "FL"),
+            2021: ("LAR","CIN",23,20, "SoFi Stadium", "Inglewood", "CA"),
+            2022: ("KC","PHI",38,35, "State Farm Stadium", "Glendale", "AZ"),
+            2023: ("KC","SF",25,22, "Allegiant Stadium", "Las Vegas", "NV"),
+            2024: ("PHI","KC",40,22, "Caesars Superdome", "New Orleans", "LA")
+        ]
+        guard let r = results[season] else { return nil }
+        
+        // Identify conferences to place NFC as home
+        let wTeam = NFLTeam.team(for: r.winner)
+        let lTeam = NFLTeam.team(for: r.loser)
+        guard let wConf = wTeam?.conference, let lConf = lTeam?.conference else { return nil }
+        
+        let nfcWinner = (wConf == .nfc)
+        let nfcAbbr = nfcWinner ? r.winner : r.loser
+        let afcAbbr = nfcWinner ? r.loser  : r.winner
+        let nfcScore = nfcWinner ? r.wScore : r.lScore
+        let afcScore = nfcWinner ? r.lScore : r.wScore
+        
+        let nfcName = NFLTeam.team(for: nfcAbbr)?.fullName ?? nfcAbbr
+        let afcName = NFLTeam.team(for: afcAbbr)?.fullName ?? afcAbbr
+        
+        let playoffYear = season + 1
+        let date = computeSuperBowlDate(for: playoffYear)
+        
+        let home = PlayoffTeam(abbreviation: nfcAbbr, name: nfcName, seed: nil, score: nfcScore, logoURL: nil, timeoutsRemaining: nil)
+        
+        let away = PlayoffTeam(abbreviation: afcAbbr, name: afcName, seed: nil, score: afcScore, logoURL: nil, timeoutsRemaining: nil)
+        
+        let venue = PlayoffGame.Venue(
+            fullName: r.venue,
+            city: r.city,
+            state: r.state
+        )
+        
+        return PlayoffGame(
+            id: "SB_\(season)",
+            round: .superBowl,
+            conference: .none,
+            homeTeam: home,
+            awayTeam: away,
+            gameDate: date,
+            status: .final,
+            venue: venue,
+            broadcasts: nil,
+            liveSituation: nil,
+            lastKnownDownDistance: nil
+        )
+    }
+    
+    private func computeSuperBowlDate(for playoffYear: Int) -> Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(abbreviation: "UTC") ?? .current
+        let feb1 = cal.date(from: DateComponents(year: playoffYear, month: 2, day: 1)) ?? Date()
+        // find first Sunday in Feb
+        var d = feb1
+        while cal.component(.weekday, from: d) != 1 { // Sunday = 1
+            d = cal.date(byAdding: .day, value: 1, to: d)!
+        }
+        // 2nd Sunday
+        return cal.date(byAdding: .day, value: 7, to: d) ?? d
+    }
+    
+    deinit {
+        DebugPrint(mode: .nflData, "♻️ NFLPlayoffBracketService deinit - cleaning up")
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        cancellable?.cancel()
+        cancellable = nil
+        if let observer = manualRefreshObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 }

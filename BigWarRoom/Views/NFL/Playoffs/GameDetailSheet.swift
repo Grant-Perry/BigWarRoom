@@ -292,21 +292,6 @@ struct GameDetailSheetContent: View {
     // 🏈 NEW: Live game situation display
     private func liveGameSituationRow(situation: LiveGameSituation) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack(spacing: 12) {
-                Image(systemName: "football.circle")
-                    .font(.title3)
-                    .foregroundStyle(.red)
-                    .frame(width: 24)
-                
-                Text("Live Game Situation")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.primary)
-                
-                Spacer()
-            }
-            
             // Possession indicator with football icon
             if let possession = situation.possession {
                 HStack(spacing: 8) {
